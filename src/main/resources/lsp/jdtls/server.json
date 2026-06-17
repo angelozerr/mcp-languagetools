@@ -1,0 +1,14 @@
+{
+  "id": "jdtls",
+  "name": "Eclipse JDT Language Server",
+  "description": "Java language server based on Eclipse JDT",
+  "command": {
+    "windows": "${serverHome}/bin/jdtls.bat -configuration \"${configuration}\" -data \"${DATA_DIR}\"",
+    "default": "${serverHome}/bin/jdtls -configuration \"${configuration}\" -data \"${DATA_DIR}\""
+  },
+  "documentSelector": [
+    {
+      "language": "java"
+    }
+  ]
+}

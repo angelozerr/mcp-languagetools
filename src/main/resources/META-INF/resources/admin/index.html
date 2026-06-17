@@ -1,0 +1,2295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP Language Tools - Admin</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #f5f5f5;
+            overflow: hidden;
+        }
+
+        .app-container {
+            display: grid;
+            grid-template-columns: 300px 300px 1fr;
+            height: 100vh;
+        }
+
+        /* Left sidebar - Workspaces */
+        .workspaces-sidebar {
+            background: #2c2c2c;
+            color: #cccccc;
+            overflow-y: scroll;
+            border-right: 1px solid #1e1e1e;
+        }
+
+        .workspaces-sidebar::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        .workspaces-sidebar::-webkit-scrollbar-track {
+            background: #1e1e1e;
+        }
+
+        .workspaces-sidebar::-webkit-scrollbar-thumb {
+            background: #424242;
+            border-radius: 5px;
+        }
+
+        .workspaces-sidebar::-webkit-scrollbar-thumb:hover {
+            background: #4e4e4e;
+        }
+
+        .sidebar-header {
+            padding: 1rem;
+            background: #252526;
+            border-bottom: 1px solid #1e1e1e;
+            font-weight: 600;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .workspace-item {
+            padding: 0.75rem 1rem;
+            cursor: pointer;
+            border-left: 3px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .workspace-item:hover {
+            background: #37373d;
+        }
+
+        .workspace-item.active {
+            background: #37373d;
+            border-left-color: #007acc;
+        }
+
+        .workspace-uri {
+            font-size: 0.9rem;
+            font-weight: 500;
+            margin-bottom: 0.25rem;
+            cursor: pointer;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .workspace-uri:hover {
+            color: #ffffff;
+        }
+
+        .workspace-meta {
+            font-size: 0.75rem;
+            color: #858585;
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .workspace-section {
+            margin-top: 0.5rem;
+            padding-left: 0.5rem;
+        }
+
+        .workspace-section-title {
+            font-size: 0.7rem;
+            color: #6b6b6b;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.25rem;
+            font-weight: 600;
+        }
+
+        .workspace-section-item {
+            font-size: 0.75rem;
+            color: #858585;
+            padding: 0.15rem 0;
+        }
+
+        .client-time {
+            font-size: 0.65rem;
+            color: #b0b0b0;
+            font-family: 'Courier New', monospace;
+            margin-left: 0.25rem;
+        }
+
+        .empty-workspaces {
+            padding: 2rem 1rem;
+            color: #858585;
+            font-size: 0.85rem;
+            line-height: 1.6;
+        }
+
+        .empty-workspaces-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #cccccc;
+            margin-bottom: 1rem;
+        }
+
+        .empty-workspaces-text {
+            margin-bottom: 0.75rem;
+        }
+
+        .empty-workspaces-hint {
+            color: #007acc;
+            font-family: 'Courier New', monospace;
+            font-size: 0.8rem;
+            margin-top: 1rem;
+            padding: 0.5rem;
+            background: #2a2a2a;
+            border-radius: 3px;
+        }
+
+        /* Middle sidebar - LSP Servers */
+        .servers-sidebar {
+            background: #252526;
+            color: #cccccc;
+            overflow-y: scroll;
+            border-right: 1px solid #1e1e1e;
+        }
+
+        .servers-sidebar::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        .servers-sidebar::-webkit-scrollbar-track {
+            background: #1e1e1e;
+        }
+
+        .servers-sidebar::-webkit-scrollbar-thumb {
+            background: #424242;
+            border-radius: 5px;
+        }
+
+        .servers-sidebar::-webkit-scrollbar-thumb:hover {
+            background: #4e4e4e;
+        }
+
+        .server-item {
+            padding: 0.75rem 1rem;
+            cursor: pointer;
+            border-left: 3px solid transparent;
+            transition: all 0.2s;
+            border-bottom: 1px solid #1e1e1e;
+            position: relative;
+        }
+
+        .server-item:hover {
+            background: #2a2d2e;
+        }
+
+        .server-item.active {
+            background: #2a2d2e;
+            border-left-color: #007acc;
+        }
+
+        /* Visual distinction for external (IDE) servers */
+        .server-item-external {
+            background: #1a2a1a;
+        }
+
+        .server-item-external:hover {
+            background: #243024;
+        }
+
+        .server-item-external.active {
+            background: #243024;
+            border-left-color: #4ec9b0;
+        }
+
+        /* Visual distinction for MCP-managed servers */
+        .server-item-managed {
+            background: #1e1e1e;
+        }
+
+        .server-source-icon {
+            font-size: 0.9rem;
+            margin-right: 0.25rem;
+        }
+
+        .server-actions {
+            display: none;
+            position: absolute;
+            right: 0.5rem;
+            top: 50%;
+            transform: translateY(-50%);
+            gap: 0.25rem;
+        }
+
+        .server-item:hover .server-actions {
+            display: flex;
+        }
+
+        .server-action-btn {
+            background: #3c3c3c;
+            border: 1px solid #555;
+            color: #cccccc;
+            padding: 0.25rem 0.5rem;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 0.7rem;
+            transition: all 0.2s;
+        }
+
+        .server-action-btn:hover {
+            background: #007acc;
+            border-color: #007acc;
+        }
+
+
+        .server-name {
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+            font-size: 0.9rem;
+        }
+
+        .server-id {
+            font-size: 0.75rem;
+            color: #858585;
+            font-family: 'Courier New', monospace;
+            margin-bottom: 0.5rem;
+        }
+
+        .server-ide-info {
+            font-size: 0.65rem;
+            color: #00bfa5;
+            font-family: 'Courier New', monospace;
+            margin-left: 0.5rem;
+            display: inline-flex;
+            gap: 0.4rem;
+        }
+
+        .server-ide-info span {
+            background: rgba(0, 191, 165, 0.15);
+            padding: 0.15rem 0.35rem;
+            border-radius: 2px;
+        }
+
+        .status-badge {
+            padding: 0.25rem 0.5rem;
+            border-radius: 3px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            display: inline-block;
+        }
+
+        .status-starting { background: #ffa500; color: white; }
+        .status-running { background: #28a745; color: white; }
+        .status-stopping { background: #ff9800; color: white; }
+        .status-stopped { background: #6c757d; color: white; }
+        .status-installing { background: #ffc107; color: black; }
+        .status-install_failed { background: #dc3545; color: white; }
+        .status-start_failed { background: #ff6b6b; color: white; }
+        .status-switching { background: #17a2b8; color: white; }
+        .status-connecting_to_ide { background: #9b59b6; color: white; }
+        .status-connected_to_ide { background: #00897b; color: white; font-weight: 600; }
+        .status-disconnecting { background: #ab47bc; color: white; }
+
+        .servers-placeholder {
+            padding: 2rem 1rem;
+            text-align: center;
+            color: #858585;
+            font-size: 0.85rem;
+        }
+
+        /* Main content - Console */
+        .console-container {
+            background: #1e1e1e;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .search-box {
+            position: absolute;
+            top: 50px;
+            right: 20px;
+            background: #2d2d30;
+            border: 1px solid #3e3e42;
+            border-radius: 4px;
+            padding: 0.5rem;
+            display: none;
+            z-index: 100;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+
+        .search-box.visible {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .search-box input {
+            background: #3c3c3c;
+            border: 1px solid #555;
+            color: #cccccc;
+            padding: 0.4rem 0.6rem;
+            border-radius: 3px;
+            font-size: 0.85rem;
+            width: 200px;
+            outline: none;
+        }
+
+        .search-box input:focus {
+            border-color: #007acc;
+        }
+
+        .search-box button {
+            background: #3c3c3c;
+            border: 1px solid #555;
+            color: #cccccc;
+            padding: 0.4rem 0.6rem;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 0.85rem;
+        }
+
+        .search-box button:hover {
+            background: #505050;
+        }
+
+        .search-count {
+            color: #858585;
+            font-size: 0.85rem;
+        }
+
+        .search-close {
+            color: #858585;
+            cursor: pointer;
+            padding: 0 0.5rem;
+            font-size: 1.2rem;
+        }
+
+        .search-close:hover {
+            color: #cccccc;
+        }
+
+        .highlight {
+            background: #4a4a00;
+            color: #ffff00;
+        }
+
+        .highlight.current {
+            background: #ff9800;
+            color: #000;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 10000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.visible {
+            display: flex;
+        }
+
+        .modal {
+            background: #2d2d30;
+            border: 1px solid #555;
+            border-radius: 6px;
+            padding: 1.5rem;
+            min-width: 400px;
+            max-width: 500px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+        }
+
+        .modal-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #cccccc;
+            margin-bottom: 1rem;
+        }
+
+        .modal-message {
+            color: #cccccc;
+            margin-bottom: 1.5rem;
+            line-height: 1.5;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 0.75rem;
+            justify-content: flex-end;
+        }
+
+        .modal-button {
+            padding: 0.5rem 1.25rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+
+        .modal-button.primary {
+            background: #007acc;
+            color: white;
+        }
+
+        .modal-button.primary:hover {
+            background: #005a9e;
+        }
+
+        .modal-button.danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .modal-button.danger:hover {
+            background: #c82333;
+        }
+
+        .modal-button.secondary {
+            background: #3c3c3c;
+            color: #cccccc;
+            border: 1px solid #555;
+        }
+
+        .modal-button.secondary:hover {
+            background: #505050;
+        }
+
+        .console-header {
+            background: #252526;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #1e1e1e;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0;
+            gap: 1rem;
+        }
+
+        .console-tabs {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .tab-button {
+            background: transparent;
+            border: none;
+            color: #cccccc;
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+            font-size: 0.9rem;
+        }
+
+        .tab-button:hover {
+            color: #ffffff;
+            border-bottom-color: #555;
+        }
+
+        .tab-button.active {
+            color: #ffffff;
+            border-bottom-color: #007acc;
+        }
+
+        .tab-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        .tab-panel {
+            display: none;
+            flex: 1;
+            flex-direction: column;
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        .tab-panel.active {
+            display: flex;
+        }
+
+        .install-panel {
+            padding: 1.5rem;
+            overflow-y: auto;
+        }
+
+        .install-panel h3 {
+            color: #cccccc;
+            margin: 0 0 1rem 0;
+            font-size: 1.1rem;
+        }
+
+        .install-info {
+            background: #1e1e1e;
+            padding: 1rem;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+        }
+
+        .install-info p {
+            margin: 0.5rem 0;
+            color: #cccccc;
+        }
+
+        .install-button {
+            background: #007acc;
+            border: none;
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.95rem;
+            transition: all 0.2s;
+        }
+
+        .install-button:hover {
+            background: #005a9e;
+        }
+
+        .install-output {
+            margin-top: 1.5rem;
+            background: #1e1e1e;
+            padding: 1rem;
+            border-radius: 4px;
+            min-height: 100px;
+            color: #cccccc;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+        }
+
+        .install-output pre {
+            margin: 0;
+            white-space: pre-wrap;
+        }
+
+        .install-output .error {
+            color: #f48771;
+        }
+
+        .install-status, .install-success, .install-error {
+            padding: 1rem;
+        }
+
+        .install-status {
+            text-align: center;
+        }
+
+        .spinner {
+            border: 3px solid #333;
+            border-top: 3px solid #007acc;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .install-success h4 {
+            color: #4caf50;
+            margin: 0 0 1rem 0;
+        }
+
+        .install-error h4 {
+            color: #f48771;
+            margin: 0 0 1rem 0;
+        }
+
+        .error-details {
+            background: #1a1a1a;
+            padding: 0.75rem;
+            border-radius: 4px;
+            margin: 0.75rem 0;
+        }
+
+        .error-details pre {
+            margin: 0.5rem 0 0 0;
+            color: #f48771;
+            font-size: 0.85rem;
+        }
+
+        .hint {
+            color: #888;
+            font-size: 0.9rem;
+            margin-top: 1rem;
+        }
+
+        .installer-editor {
+            margin: 1rem 0;
+            border: 1px solid #444;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .editor-header {
+            background: #2d2d30;
+            padding: 0.5rem 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #444;
+        }
+
+        .editor-header span {
+            color: #cccccc;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+        }
+
+        .editor-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .editor-btn {
+            background: #3c3c3c;
+            border: 1px solid #555;
+            color: #cccccc;
+            padding: 0.25rem 0.75rem;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+
+        .editor-btn:hover {
+            background: #007acc;
+            border-color: #007acc;
+        }
+
+        .json-editor {
+            width: 100%;
+            min-height: 300px;
+            max-height: 500px;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            border: none;
+            padding: 1rem;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            resize: vertical;
+            outline: none;
+        }
+
+        .json-editor:focus {
+            background: #252526;
+        }
+
+        .details-panel {
+            padding: 1.5rem;
+            overflow-y: auto;
+        }
+
+        .details-panel h3 {
+            color: #cccccc;
+            margin: 0 0 1.5rem 0;
+            font-size: 1.1rem;
+        }
+
+        .details-section {
+            background: #1e1e1e;
+            padding: 1rem;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+        }
+
+        .details-section h4 {
+            color: #007acc;
+            margin: 0 0 0.75rem 0;
+            font-size: 0.95rem;
+            font-weight: 600;
+        }
+
+        .detail-item {
+            display: flex;
+            margin-bottom: 0.5rem;
+            color: #cccccc;
+        }
+
+        .detail-label {
+            font-weight: 600;
+            min-width: 120px;
+            color: #888888;
+        }
+
+        .detail-value {
+            color: #cccccc;
+        }
+
+        .selector-item {
+            background: #252526;
+            padding: 0.5rem;
+            border-radius: 3px;
+            margin-bottom: 0.5rem;
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .selector-tag {
+            background: #007acc;
+            color: white;
+            padding: 0.25rem 0.5rem;
+            border-radius: 3px;
+            font-size: 0.85rem;
+            font-family: 'Courier New', monospace;
+        }
+
+        .command-preview {
+            background: #252526;
+            padding: 0.75rem;
+            border-radius: 3px;
+            color: #d4d4d4;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            white-space: pre-wrap;
+            margin: 0;
+        }
+
+        .console-title {
+            color: #cccccc;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .status-indicator.connected { background: #28a745; }
+        .status-indicator.disconnected { background: #dc3545; }
+
+        .console-controls {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .console-controls button {
+            padding: 0.4rem 0.8rem;
+            border: none;
+            border-radius: 3px;
+            background: #007acc;
+            color: white;
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+
+        .console-controls button:hover {
+            background: #005a9e;
+        }
+
+        .console {
+            flex: 1;
+            overflow-y: scroll;
+            overflow-x: hidden;
+            padding: 1rem;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            color: #d4d4d4;
+            min-height: 0;
+            user-select: text;
+            cursor: default;
+        }
+
+        .console * {
+            cursor: text;
+        }
+
+        .console .trace-toggle {
+            cursor: pointer !important;
+        }
+
+        .console:focus {
+            outline: 1px solid #007acc;
+            outline-offset: -1px;
+        }
+
+        .console::-webkit-scrollbar {
+            width: 12px;
+        }
+
+        .console::-webkit-scrollbar-track {
+            background: #1e1e1e;
+        }
+
+        .console::-webkit-scrollbar-thumb {
+            background: #424242;
+            border-radius: 6px;
+        }
+
+        .console::-webkit-scrollbar-thumb:hover {
+            background: #4e4e4e;
+        }
+
+        .trace-line {
+            margin-bottom: 0.5rem;
+        }
+
+        .trace-header {
+            font-size: 12px;
+            display: flex;
+            align-items: flex-start;
+            position: relative;
+            cursor: pointer;
+        }
+
+        .trace-toggle {
+            user-select: none;
+            cursor: pointer;
+            padding: 2px;
+            margin-right: 0.5rem;
+        }
+
+        .trace-toggle:hover {
+            background: #3a3a3a;
+            border-radius: 2px;
+        }
+
+        .trace-header-text {
+            user-select: text;
+        }
+
+        .trace-body {
+            user-select: text;
+        }
+
+        .trace-header:hover {
+            background: #2a2a2a;
+        }
+
+        .trace-tooltip {
+            display: none;
+            position: fixed;
+            background: #2d2d30;
+            border: 1px solid #007acc;
+            border-radius: 4px;
+            padding: 0.75rem;
+            max-width: 500px;
+            max-height: 300px;
+            overflow: auto;
+            z-index: 10000;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            font-size: 11px;
+            box-shadow: 0 6px 16px rgba(0,0,0,0.6);
+            pointer-events: none;
+        }
+
+        .trace-line:hover .trace-tooltip {
+            display: block;
+        }
+
+        .trace-tooltip::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .trace-tooltip::-webkit-scrollbar-track {
+            background: #1e1e1e;
+        }
+
+        .trace-tooltip::-webkit-scrollbar-thumb {
+            background: #424242;
+            border-radius: 4px;
+        }
+
+        .trace-toggle {
+            color: #808080;
+            margin-right: 0.5rem;
+            font-family: monospace;
+            display: inline-block;
+            width: 12px;
+            flex-shrink: 0;
+        }
+
+        .trace-header-text {
+            color: #cccccc;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            flex: 1;
+        }
+
+        .trace-body {
+            margin-left: 1.5rem;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            transition: all 0.2s ease;
+        }
+
+        .trace-body.collapsed {
+            height: 0;
+            opacity: 0;
+            overflow: hidden;
+            margin: 0;
+            padding: 0;
+        }
+
+        .trace-body.expanded {
+            height: auto;
+            opacity: 1;
+        }
+
+        /* Version cachée pour la copie quand plié */
+        .trace-body.collapsed::after {
+            content: attr(data-content);
+            position: absolute;
+            left: -9999px;
+            white-space: pre-wrap;
+        }
+
+        #console-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        .placeholder {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #858585;
+            font-size: 0.9rem;
+        }
+
+        .console-wrapper {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Left: Workspaces -->
+        <div class="workspaces-sidebar">
+            <div class="sidebar-header">Workspaces</div>
+            <div id="workspaces-list"></div>
+        </div>
+
+        <!-- Middle: LSP Servers -->
+        <div class="servers-sidebar">
+            <div class="sidebar-header">LSP Servers</div>
+            <div id="servers-list"></div>
+        </div>
+
+        <!-- Right: Console -->
+        <div class="console-container" id="console-container">
+            <div class="search-box" id="search-box">
+                <input type="text" id="search-input" placeholder="Find in console..." />
+                <span class="search-count" id="search-count">0/0</span>
+                <button onclick="searchPrev()">↑</button>
+                <button onclick="searchNext()">↓</button>
+                <span class="search-close" onclick="closeSearch()">×</span>
+            </div>
+            <div id="console-area">
+                <div class="placeholder">
+                    ← Select a workspace and LSP server to view console
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal -->
+    <div class="modal-overlay" id="modal-overlay">
+        <div class="modal">
+            <div class="modal-title" id="modal-title">Confirm</div>
+            <div class="modal-message" id="modal-message"></div>
+            <div class="modal-buttons" id="modal-buttons"></div>
+        </div>
+    </div>
+
+    <script>
+        let workspaces = [];
+        let selectedWorkspace = null;
+        let selectedServer = null;
+        let eventSource = null;
+        let traces = [];
+
+        // Load workspaces
+        async function loadWorkspaces() {
+            try {
+                const response = await fetch('/api/admin/workspaces');
+                workspaces = await response.json();
+                renderWorkspaces();
+
+                // Auto-select first workspace if available
+                if (workspaces.length > 0 && !selectedWorkspace) {
+                    selectWorkspace(workspaces[0].rootUri);
+                }
+            } catch (error) {
+                console.error('Failed to load workspaces:', error);
+            }
+        }
+
+        function renderWorkspaces() {
+            const container = document.getElementById('workspaces-list');
+
+            if (workspaces.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-workspaces">
+                        <div class="empty-workspaces-title">No Workspaces Yet</div>
+                        <div class="empty-workspaces-text">
+                            Workspaces appear when an MCP client (Claude Desktop, Bob Shell, etc.)
+                            calls an MCP tool with a <code>cwd</code> parameter.
+                        </div>
+                        <div class="empty-workspaces-text">
+                            The <code>cwd</code> (current working directory) identifies the project/workspace
+                            and triggers LSP server initialization.
+                        </div>
+                        <div class="empty-workspaces-hint">
+                            💡 Try calling: getDiagnostics(cwd: "/path/to/project", fileUri: "file://...")
+                        </div>
+                    </div>
+                `;
+
+                // Vider les serveurs et la console
+                selectedWorkspace = null;
+                selectedServer = null;
+                document.getElementById('servers-list').innerHTML = '<div class="servers-placeholder">No workspaces selected</div>';
+                document.getElementById('console-area').innerHTML = `
+                    <div class="placeholder">
+                        ← Select a workspace and LSP server to view console
+                    </div>
+                `;
+
+                return;
+            }
+
+            container.innerHTML = workspaces.map(ws => {
+                // Extract folder name from URI
+                const folderName = ws.rootUri.split('/').filter(p => p).pop() || ws.rootUri;
+
+                return `
+                <div class="workspace-item ${ws.rootUri === selectedWorkspace ? 'active' : ''}"
+                     onclick="selectWorkspace('${ws.rootUri}')">
+                    <div class="workspace-uri" title="${ws.rootUri}">📂 ${folderName}</div>
+                    ${ws.mcpClients && ws.mcpClients.length > 0 ? `
+                        <div class="workspace-section">
+                            <div class="workspace-section-title">AI Clients</div>
+                            ${ws.mcpClients.map(client => {
+                                const date = new Date(client.connectedAt);
+                                const time = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                                return `<div class="workspace-section-item" title="${client.connectedAt}">📱 ${client.name} <span class="client-time">@ ${time}</span></div>`;
+                            }).join('')}
+                        </div>
+                    ` : ''}
+                </div>
+                `;
+            }).join('');
+        }
+
+        function selectWorkspace(uri) {
+            selectedWorkspace = uri;
+            selectedServer = null;
+
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+            }
+
+            renderWorkspaces();
+            loadServers(uri);
+            showPlaceholder();
+        }
+
+        async function loadServers(uri) {
+            try {
+                const response = await fetch('/api/admin/workspaces/' + encodeURIComponent(uri));
+                const workspace = await response.json();
+                renderServers(workspace.lspServers);
+            } catch (error) {
+                console.error('Failed to load servers:', error);
+            }
+        }
+
+        function formatStatusLabel(status, externalInstance) {
+            const labels = {
+                'STARTING': 'Starting',
+                'RUNNING': 'Running',
+                'STOPPING': 'Stopping',
+                'STOPPED': 'Stopped',
+                'INSTALLING': 'Installing',
+                'INSTALL_FAILED': 'Install Failed',
+                'START_FAILED': 'Start Failed',
+                'SWITCHING': 'Switching',
+                'CONNECTING_TO_IDE': 'Connecting to IDE',
+                'CONNECTED_TO_IDE': 'Connected to IDE',
+                'DISCONNECTING': 'Disconnecting'
+            };
+
+            // If connected to IDE and we have client info, show it
+            if (status === 'CONNECTED_TO_IDE' && externalInstance && externalInstance.clientName) {
+                const version = externalInstance.clientVersion ? ` ${externalInstance.clientVersion}` : '';
+                return `Connected to ${externalInstance.clientName}${version}`;
+            }
+
+            return labels[status] || status;
+        }
+
+        function renderServers(servers) {
+            const container = document.getElementById('servers-list');
+
+            if (servers.length === 0) {
+                container.innerHTML = '<div class="servers-placeholder">No LSP servers</div>';
+                return;
+            }
+
+            container.innerHTML = servers.map(server => {
+                // Check if this is an external instance (connected to IDE)
+                const isExternal = server.externalInstance != null &&
+                                   (server.status === 'CONNECTED_TO_IDE' || server.status === 'CONNECTING_TO_IDE');
+                const serverClass = isExternal ? 'server-item-external' : 'server-item-managed';
+
+                // Afficher les actions selon le status
+                let actions = '';
+                if (isExternal) {
+                    // For IDE-connected servers: offer to disconnect
+                    actions = `
+                        <button class="server-action-btn server-action-disconnect"
+                                onclick='event.stopPropagation(); disconnectFromIdeAction("${server.id}")'
+                                title="Disconnect from IDE">⏏</button>
+                    `;
+                } else {
+                    // For MCP-managed servers
+                    if (server.status === 'RUNNING' || server.status === 'STARTING') {
+                        actions = `
+                            <button class="server-action-btn" onclick='event.stopPropagation(); restartServerAction("${server.id}")' title="Restart">↻</button>
+                            <button class="server-action-btn" onclick='event.stopPropagation(); stopServerAction("${server.id}")' title="Stop">■</button>
+                        `;
+                    } else if (server.status === 'STOPPED') {
+                        // Offer to start MCP-managed or connect to IDE
+                        actions = `
+                            <button class="server-action-btn" onclick='event.stopPropagation(); startManagedServerAction("${server.id}")' title="Start MCP-managed server">▶</button>
+                            <button class="server-action-btn" onclick='event.stopPropagation(); connectToIdeAction("${server.id}")' title="Try to connect to IDE instance">🔗</button>
+                        `;
+                    }
+                }
+
+                // Build source indicator
+                const sourceIcon = isExternal ? '🔗' : '🚀';
+                const sourceLabel = isExternal
+                    ? `Connected to IDE (port ${server.externalInstance.port}, PID ${server.externalInstance.pid})`
+                    : 'Managed by MCP';
+
+                // Build IDE info display (port/PID)
+                let ideInfo = '';
+                if (isExternal && server.externalInstance) {
+                    ideInfo = `
+                        <span class="server-ide-info">
+                            <span title="Port">:${server.externalInstance.port}</span>
+                            <span title="Process ID">PID ${server.externalInstance.pid}</span>
+                        </span>
+                    `;
+                }
+
+                return `
+                    <div class="server-item ${serverClass} ${selectedServer?.id === server.id ? 'active' : ''}"
+                         onclick='selectServer(${JSON.stringify(server)})'>
+                        <div class="server-name">
+                            <span class="server-source-icon" title="${sourceLabel}">${sourceIcon}</span>
+                            ${server.name}
+                        </div>
+                        <div class="server-id">${server.id}</div>
+                        <div>
+                            <span class="status-badge status-${server.status.toLowerCase()}">${formatStatusLabel(server.status, server.externalInstance)}</span>
+                            ${ideInfo}
+                        </div>
+                        <div class="server-actions">
+                            ${actions}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            // Auto-sélectionner le premier serveur si aucun n'est sélectionné
+            if (!selectedServer && servers.length > 0) {
+                selectServer(servers[0]);
+            }
+        }
+
+        function selectServer(server) {
+            selectedServer = server;
+            renderServers(workspaces.find(w => w.rootUri === selectedWorkspace)?.lspServers || []);
+            loadConsole(server);
+        }
+
+        function showPlaceholder() {
+            document.getElementById('console-area').innerHTML = `
+                <div class="placeholder">
+                    ← Select an LSP server to view console
+                </div>
+            `;
+        }
+
+        let currentTab = 'traces';
+
+        async function loadConsole(server) {
+            // Setup console UI with tabs
+            document.getElementById('console-area').innerHTML = `
+                <div class="console-wrapper">
+                    <div class="console-header">
+                        <div class="console-title">
+                            ${server.name}
+                            <span class="status-indicator" id="sse-status"></span>
+                        </div>
+                        <div class="console-tabs">
+                            <button class="tab-button active" onclick="switchTab('traces')">Traces</button>
+                            <button class="tab-button" onclick="switchTab('details')">Details</button>
+                            <button class="tab-button" onclick="switchTab('install')">Install</button>
+                        </div>
+                        <div class="console-controls" id="traces-controls">
+                            <input type="text" id="trace-search" placeholder="Search traces..."
+                                   oninput="searchTraces(this.value)"
+                                   onkeydown="if(event.key==='Escape') this.value=''; searchTraces('');">
+                            <button onclick="toggleAllTraces()" id="fold-button">Unfold All</button>
+                            <button onclick="clearConsole()">Clear</button>
+                        </div>
+                    </div>
+                    <div class="tab-content">
+                        <div id="traces-tab" class="tab-panel active">
+                            <div class="console" id="console-output" tabindex="0"></div>
+                        </div>
+                        <div id="details-tab" class="tab-panel">
+                            <div class="details-panel" id="details-content">
+                                <p>Loading...</p>
+                            </div>
+                        </div>
+                        <div id="install-tab" class="tab-panel">
+                            <div class="install-panel">
+                                <h3>Installer Configuration</h3>
+                                <div class="install-info">
+                                    <p><strong>Server:</strong> ${server.name}</p>
+                                    <p><strong>ID:</strong> ${server.id}</p>
+                                </div>
+                                <div class="installer-editor">
+                                    <div class="editor-header">
+                                        <span>installer.json</span>
+                                        <div class="editor-actions">
+                                            <button class="editor-btn" onclick="saveInstallerJson('${server.id}')" title="Save">💾 Save</button>
+                                            <button class="editor-btn" onclick="resetInstallerJson('${server.id}')" title="Reset">↻ Reset</button>
+                                        </div>
+                                    </div>
+                                    <textarea id="installer-json-editor" class="json-editor" spellcheck="false"></textarea>
+                                </div>
+                                <button class="install-button" onclick="runInstaller('${server.id}')">▶ Run Installer</button>
+                                <div id="install-output" class="install-output"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            currentTab = 'traces';
+
+            // Load traces for specific workspace + server
+            try {
+                const encodedWorkspace = encodeURIComponent(selectedWorkspace);
+                const response = await fetch(`/api/admin/traces/workspace/${encodedWorkspace}/server/${server.id}?limit=50`);
+                traces = await response.json();
+                renderConsole();
+                connectSSE(selectedWorkspace, server.id);
+            } catch (error) {
+                console.error('Failed to load traces:', error);
+            }
+
+            // Load server details
+            loadServerDetails(server.id);
+
+            // Load installer.json
+            loadInstallerJson(server.id);
+        }
+
+        let originalInstallerJson = null;
+
+        async function loadInstallerJson(serverId) {
+            try {
+                const response = await fetch(`/api/admin/servers/${serverId}/installer`);
+                if (!response.ok) {
+                    document.getElementById('installer-json-editor').value = '// No installer.json found';
+                    return;
+                }
+
+                const installerJson = await response.json();
+                const formatted = JSON.stringify(installerJson, null, 2);
+                originalInstallerJson = formatted;
+
+                document.getElementById('installer-json-editor').value = formatted;
+            } catch (error) {
+                console.error('Failed to load installer.json:', error);
+                document.getElementById('installer-json-editor').value = `// Error loading installer.json: ${error.message}`;
+            }
+        }
+
+        async function saveInstallerJson(serverId) {
+            const editor = document.getElementById('installer-json-editor');
+            const content = editor.value;
+
+            try {
+                // Validate JSON
+                JSON.parse(content);
+
+                const response = await fetch(`/api/admin/servers/${serverId}/installer`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: content
+                });
+
+                if (response.ok) {
+                    originalInstallerJson = content;
+                    showAlert('Success', 'Installer configuration saved successfully.');
+                } else {
+                    const error = await response.text();
+                    showAlert('Error', `Failed to save: ${error}`);
+                }
+            } catch (error) {
+                showAlert('Error', `Invalid JSON: ${error.message}`);
+            }
+        }
+
+        function resetInstallerJson(serverId) {
+            if (originalInstallerJson) {
+                document.getElementById('installer-json-editor').value = originalInstallerJson;
+            } else {
+                loadInstallerJson(serverId);
+            }
+        }
+
+        async function loadServerDetails(serverId) {
+            try {
+                const response = await fetch(`/api/admin/servers/${serverId}/details`);
+                if (!response.ok) {
+                    throw new Error('Failed to load server details');
+                }
+
+                const details = await response.json();
+                const detailsContent = document.getElementById('details-content');
+
+                detailsContent.innerHTML = `
+                    <h3>Server Configuration</h3>
+
+                    <div class="details-section">
+                        <h4>General Information</h4>
+                        <div class="detail-item">
+                            <span class="detail-label">ID:</span>
+                            <span class="detail-value">${details.id}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Name:</span>
+                            <span class="detail-value">${details.name || 'N/A'}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Description:</span>
+                            <span class="detail-value">${details.description || 'N/A'}</span>
+                        </div>
+                    </div>
+
+                    <div class="details-section">
+                        <h4>Document Selector</h4>
+                        ${details.documentSelector && details.documentSelector.length > 0 ?
+                            details.documentSelector.map(selector => `
+                                <div class="selector-item">
+                                    ${selector.language ? `<span class="selector-tag">language: ${selector.language}</span>` : ''}
+                                    ${selector.scheme ? `<span class="selector-tag">scheme: ${selector.scheme}</span>` : ''}
+                                    ${selector.pattern ? `<span class="selector-tag">pattern: ${selector.pattern}</span>` : ''}
+                                </div>
+                            `).join('')
+                            : '<p class="detail-value">No document selector defined</p>'
+                        }
+                    </div>
+
+                    <div class="details-section">
+                        <h4>Command</h4>
+                        <pre class="command-preview">${formatCommand(details.command)}</pre>
+                    </div>
+
+                    ${details.initializationOptions && Object.keys(details.initializationOptions).length > 0 ? `
+                        <div class="details-section">
+                            <h4>Initialization Options</h4>
+                            <pre class="detail-value">${JSON.stringify(details.initializationOptions, null, 2)}</pre>
+                        </div>
+                    ` : ''}
+                `;
+            } catch (error) {
+                console.error('Failed to load server details:', error);
+                document.getElementById('details-content').innerHTML =
+                    `<p class="error">Failed to load server details: ${error.message}</p>`;
+            }
+        }
+
+        function formatCommand(command) {
+            if (typeof command === 'string') {
+                return command;
+            } else if (typeof command === 'object') {
+                return JSON.stringify(command, null, 2);
+            }
+            return 'N/A';
+        }
+
+        function switchTab(tabName) {
+            currentTab = tabName;
+
+            // Update tab buttons
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            // Update tab panels
+            document.querySelectorAll('.tab-panel').forEach(panel => {
+                panel.classList.remove('active');
+            });
+            document.getElementById(tabName + '-tab').classList.add('active');
+
+            // Show/hide controls
+            const tracesControls = document.getElementById('traces-controls');
+            if (tracesControls) {
+                tracesControls.style.display = tabName === 'traces' ? 'flex' : 'none';
+            }
+        }
+
+        async function runInstaller(serverId) {
+            const output = document.getElementById('install-output');
+            output.innerHTML = `
+                <div class="install-status">
+                    <div class="spinner"></div>
+                    <p>Running installer...</p>
+                    <p class="hint">Check the <strong>Traces</strong> tab for real-time progress.</p>
+                </div>
+            `;
+
+            try {
+                const encodedWorkspace = encodeURIComponent(selectedWorkspace);
+                const response = await fetch(`/api/admin/install/${encodedWorkspace}/${serverId}`, {
+                    method: 'POST'
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    output.innerHTML = `
+                        <div class="install-success">
+                            <h4>✓ Installation Successful</h4>
+                            <p><strong>Status:</strong> ${result.status}</p>
+                            <p><strong>Message:</strong> ${result.message}</p>
+                            ${result.serverHome ? `<p><strong>Server Home:</strong> <code>${result.serverHome}</code></p>` : ''}
+                            <p class="hint">Check the <strong>Traces</strong> tab for installation logs.</p>
+                        </div>
+                    `;
+
+                    // Refresh server list to show updated status
+                    setTimeout(() => loadWorkspaces(), 1000);
+                } else {
+                    output.innerHTML = `
+                        <div class="install-error">
+                            <h4>✗ Installation Failed</h4>
+                            <p><strong>Status:</strong> ${result.status}</p>
+                            <p><strong>Message:</strong> ${result.message}</p>
+                            ${result.error ? `
+                                <div class="error-details">
+                                    <strong>Error Details:</strong>
+                                    <pre>${result.error}</pre>
+                                </div>
+                            ` : ''}
+                            <p class="hint">Check the <strong>Traces</strong> tab for detailed error logs.</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Failed to run installer:', error);
+                output.innerHTML = `
+                    <div class="install-error">
+                        <h4>✗ Request Failed</h4>
+                        <p><strong>Error:</strong> ${error.message}</p>
+                        <p class="hint">Could not communicate with the server.</p>
+                    </div>
+                `;
+            }
+        }
+
+        function connectSSE(workspaceUri, serverId) {
+            if (eventSource) {
+                eventSource.close();
+            }
+
+            const statusIndicator = document.getElementById('sse-status');
+            if (!statusIndicator) return;
+
+            eventSource = new EventSource('/api/admin/traces/stream');
+
+            eventSource.onopen = () => {
+                statusIndicator.className = 'status-indicator connected';
+            };
+
+            eventSource.onmessage = (event) => {
+                const trace = JSON.parse(event.data);
+
+                // Only show traces for current workspace + server
+                if (trace.workspaceUri === workspaceUri && trace.serverId === serverId) {
+                    traces.push(trace);
+
+                    if (traces.length > 200) {
+                        traces = traces.slice(-200);
+                    }
+
+                    renderConsole();
+                }
+            };
+
+            eventSource.onerror = () => {
+                if (statusIndicator) {
+                    statusIndicator.className = 'status-indicator disconnected';
+                }
+            };
+        }
+
+        function renderConsole() {
+            const container = document.getElementById('console-output');
+            if (!container) return;
+
+            if (traces.length === 0) {
+                container.innerHTML = '<div style="text-align: center; padding: 2rem; color: #858585;">No LSP trace messages yet.</div>';
+                return;
+            }
+
+            // Déterminer l'état par défaut basé sur le dernier message existant
+            let defaultFolded = true;
+            const lastBody = container.querySelector('.trace-body:last-child');
+            if (lastBody) {
+                defaultFolded = lastBody.classList.contains('collapsed');
+            }
+
+            container.innerHTML = traces.map((trace, index) => {
+                const content = trace.jsonContent;
+
+                // Parse the trace: first line is header, rest is body
+                const lines = content.split('\n');
+                const headerLine = lines[0]; // [Trace - HH:mm:ss] ...
+
+                // Body is everything after the header line
+                const bodyLines = lines.slice(1);
+                const body = bodyLines.join('\n').trim();
+
+                // Utiliser l'état du dernier message
+                const foldState = defaultFolded ? 'collapsed' : 'expanded';
+                const toggleIcon = defaultFolded ? '▶' : '▼';
+                const headerClass = defaultFolded ? 'trace-header folded' : 'trace-header';
+                const fullContent = headerLine + '\n' + body;
+
+                return `
+                    <div class="trace-line" onmouseenter="showTooltip(event, ${index}, ${defaultFolded})" onmouseleave="hideTooltip(${index})">
+                        <div class="${headerClass}" id="header-${index}"
+                             onmousedown="onHeaderMouseDown(${index})"
+                             onmouseup="onHeaderMouseUp(${index})">
+                            <span class="trace-toggle" id="toggle-${index}">${toggleIcon}</span>
+                            <span class="trace-header-text">${escapeHtml(headerLine)}</span>
+                        </div>
+                        <div class="trace-body ${foldState}" id="body-${index}">${escapeHtml(body)}</div>
+                        ${defaultFolded ? `<div class="trace-tooltip" id="tooltip-${index}">${escapeHtml(fullContent)}</div>` : ''}
+                    </div>
+                `;
+            }).join('');
+
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function showTooltip(event, index, isFolded) {
+            if (!isFolded) return;
+
+            const body = document.getElementById('body-' + index);
+            if (!body || !body.classList.contains('collapsed')) return;
+
+            const tooltip = document.getElementById('tooltip-' + index);
+            if (!tooltip) return;
+
+            // Positionner le tooltip près de la souris
+            const x = event.clientX + 15;
+            const y = event.clientY + 15;
+
+            tooltip.style.left = x + 'px';
+            tooltip.style.top = y + 'px';
+            tooltip.style.display = 'block';
+        }
+
+        function hideTooltip(index) {
+            const tooltip = document.getElementById('tooltip-' + index);
+            if (tooltip) {
+                tooltip.style.display = 'none';
+            }
+        }
+
+        let mouseDownTime = 0;
+        let mouseDownIndex = -1;
+
+        function onHeaderMouseDown(index) {
+            mouseDownTime = Date.now();
+            mouseDownIndex = index;
+        }
+
+        function onHeaderMouseUp(index) {
+            // Si c'est un click rapide (< 200ms) et au même endroit, toggle
+            const timeDiff = Date.now() - mouseDownTime;
+            if (timeDiff < 200 && mouseDownIndex === index) {
+                // Vérifier si du texte a été sélectionné
+                const selection = window.getSelection();
+                if (!selection || selection.toString().length === 0) {
+                    toggleTrace(index);
+                }
+            }
+            mouseDownIndex = -1;
+        }
+
+        function toggleTrace(index) {
+            const body = document.getElementById('body-' + index);
+            const toggle = document.getElementById('toggle-' + index);
+            const header = document.getElementById('header-' + index);
+            const traceLine = header.parentElement;
+
+            if (body.classList.contains('expanded')) {
+                body.classList.remove('expanded');
+                body.classList.add('collapsed');
+                toggle.textContent = '▶';
+                header.classList.add('folded');
+
+                // Ajouter le tooltip pour les traces pliées
+                if (!traceLine.querySelector('.trace-tooltip')) {
+                    const headerText = header.querySelector('.trace-header-text').textContent;
+                    const bodyText = body.textContent;
+                    const fullContent = headerText + '\n' + bodyText;
+
+                    const tooltip = document.createElement('div');
+                    tooltip.className = 'trace-tooltip';
+                    tooltip.id = 'tooltip-' + index;
+                    tooltip.textContent = fullContent;
+                    traceLine.appendChild(tooltip);
+
+                    // Ajouter les event listeners
+                    traceLine.onmouseenter = (e) => showTooltip(e, index, true);
+                    traceLine.onmouseleave = () => hideTooltip(index);
+                }
+            } else {
+                body.classList.remove('collapsed');
+                body.classList.add('expanded');
+                toggle.textContent = '▼';
+                header.classList.remove('folded');
+
+                // Retirer le tooltip pour les traces dépliées
+                const tooltip = traceLine.querySelector('.trace-tooltip');
+                if (tooltip) {
+                    tooltip.remove();
+                }
+
+                // Retirer les event listeners
+                traceLine.onmouseenter = null;
+                traceLine.onmouseleave = null;
+            }
+        }
+
+        let allFolded = true; // Par défaut: tout plié
+
+        function toggleAllTraces() {
+            const consoleOutput = document.getElementById('console-output');
+            if (!consoleOutput) return;
+
+            const bodies = consoleOutput.querySelectorAll('.trace-body');
+            const toggles = consoleOutput.querySelectorAll('.trace-toggle');
+            const foldButton = document.getElementById('fold-button');
+
+            if (allFolded) {
+                // Unfold all
+                bodies.forEach(body => {
+                    body.classList.remove('collapsed');
+                    body.classList.add('expanded');
+                });
+                toggles.forEach(toggle => {
+                    toggle.textContent = '▼';
+                });
+                foldButton.textContent = 'Fold All';
+                allFolded = false;
+            } else {
+                // Fold all
+                bodies.forEach(body => {
+                    body.classList.remove('expanded');
+                    body.classList.add('collapsed');
+                });
+                toggles.forEach(toggle => {
+                    toggle.textContent = '▶';
+                });
+                foldButton.textContent = 'Unfold All';
+                allFolded = true;
+            }
+        }
+
+        function searchTraces(query) {
+            const consoleOutput = document.getElementById('console-output');
+            if (!consoleOutput) return;
+
+            const traceElements = consoleOutput.querySelectorAll('.trace-entry');
+
+            if (!query || query.trim() === '') {
+                // Reset: show all traces, remove highlights
+                traceElements.forEach(el => {
+                    el.style.display = '';
+                    el.querySelectorAll('.search-highlight').forEach(mark => {
+                        const parent = mark.parentNode;
+                        parent.replaceChild(document.createTextNode(mark.textContent), mark);
+                        parent.normalize();
+                    });
+                });
+                return;
+            }
+
+            const lowerQuery = query.toLowerCase();
+            let matchCount = 0;
+
+            traceElements.forEach(el => {
+                const text = el.textContent.toLowerCase();
+                const matches = text.includes(lowerQuery);
+
+                if (matches) {
+                    el.style.display = '';
+                    matchCount++;
+
+                    // Open details if match is in JSON content
+                    const details = el.querySelector('details');
+                    if (details) {
+                        const detailsText = details.textContent.toLowerCase();
+                        if (detailsText.includes(lowerQuery)) {
+                            details.open = true;
+                        }
+                    }
+
+                    // TODO: Highlight matching text (optional enhancement)
+                } else {
+                    el.style.display = 'none';
+                }
+            });
+
+            console.log(`Found ${matchCount} matching traces`);
+        }
+
+        async function clearConsole() {
+            try {
+                await fetch('/api/admin/traces', { method: 'DELETE' });
+                traces = [];
+                renderConsole();
+            } catch (error) {
+                console.error('Failed to clear traces:', error);
+            }
+        }
+
+        async function stopServerAction(serverId) {
+            if (!selectedWorkspace) return;
+
+            const server = workspaces.find(w => w.rootUri === selectedWorkspace)?.lspServers.find(s => s.id === serverId);
+            if (!server) return;
+
+            const confirmed = await confirmAction(
+                'Stop LSP Server',
+                `Stop "${server.name}"?\n\nThe server process will be terminated.`,
+                'Stop',
+                true
+            );
+            if (!confirmed) return;
+
+            try {
+                const response = await fetch(
+                    `/api/admin/servers/${encodeURIComponent(selectedWorkspace)}/${serverId}/stop`,
+                    { method: 'POST' }
+                );
+
+                if (response.ok) {
+                    console.log('Server stopped');
+                    // Refresh workspace to update status
+                    loadServers(selectedWorkspace);
+                } else {
+                    const error = await response.text();
+                    showAlert('Error', 'Failed to stop server: ' + error);
+                }
+            } catch (error) {
+                console.error('Failed to stop server:', error);
+                showAlert('Error', 'Failed to stop server: ' + error.message);
+            }
+        }
+
+        async function startManagedServerAction(serverId) {
+            if (!selectedWorkspace) return;
+
+            const server = workspaces.find(w => w.rootUri === selectedWorkspace)?.lspServers.find(s => s.id === serverId);
+            if (!server) return;
+
+            try {
+                const response = await fetch(
+                    `/api/admin/servers/${encodeURIComponent(selectedWorkspace)}/${serverId}/start-managed`,
+                    { method: 'POST' }
+                );
+
+                if (response.ok) {
+                    console.log('MCP-managed server started');
+                    loadServers(selectedWorkspace);
+                } else {
+                    const error = await response.text();
+                    showAlert('Error', 'Failed to start managed server: ' + error);
+                }
+            } catch (error) {
+                console.error('Failed to start managed server:', error);
+                showAlert('Error', 'Failed to start managed server: ' + error.message);
+            }
+        }
+
+        async function restartServerAction(serverId) {
+            if (!selectedWorkspace) return;
+
+            const server = workspaces.find(w => w.rootUri === selectedWorkspace)?.lspServers.find(s => s.id === serverId);
+            if (!server) return;
+
+            const confirmed = await confirmAction(
+                'Restart LSP Server',
+                `Restart "${server.name}"?\n\nThe server will be stopped and restarted.`,
+                'Restart',
+                false
+            );
+            if (!confirmed) return;
+
+            try {
+                const response = await fetch(
+                    `/api/admin/servers/${encodeURIComponent(selectedWorkspace)}/${serverId}/restart`,
+                    { method: 'POST' }
+                );
+
+                if (response.ok) {
+                    console.log('Server restarted');
+                    // Refresh workspace to update status
+                    loadServers(selectedWorkspace);
+                } else {
+                    const error = await response.text();
+                    showAlert('Error', 'Failed to restart server: ' + error);
+                }
+            } catch (error) {
+                console.error('Failed to restart server:', error);
+                showAlert('Error', 'Failed to restart server: ' + error.message);
+            }
+        }
+
+        async function disconnectFromIdeAction(serverId) {
+            if (!selectedWorkspace) return;
+
+            const server = workspaces.find(w => w.rootUri === selectedWorkspace)?.lspServers.find(s => s.id === serverId);
+            if (!server) return;
+
+            const confirmed = await confirmAction(
+                'Disconnect from IDE',
+                `Disconnect "${server.name}" from IDE?\n\nThe connection to the IDE instance will be closed.`,
+                'Disconnect',
+                true
+            );
+            if (!confirmed) return;
+
+            try {
+                const response = await fetch(
+                    `/api/admin/servers/${encodeURIComponent(selectedWorkspace)}/${serverId}/disconnect`,
+                    { method: 'POST' }
+                );
+
+                if (response.ok) {
+                    console.log('Server disconnected from IDE');
+                    loadServers(selectedWorkspace);
+                } else {
+                    const error = await response.text();
+                    showAlert('Error', 'Failed to disconnect: ' + error);
+                }
+            } catch (error) {
+                console.error('Failed to disconnect:', error);
+                showAlert('Error', 'Failed to disconnect: ' + error.message);
+            }
+        }
+
+        async function connectToIdeAction(serverId) {
+            if (!selectedWorkspace) return;
+
+            const server = workspaces.find(w => w.rootUri === selectedWorkspace)?.lspServers.find(s => s.id === serverId);
+            if (!server) return;
+
+            try {
+                const response = await fetch(
+                    `/api/admin/servers/${encodeURIComponent(selectedWorkspace)}/${serverId}/connect-ide`,
+                    { method: 'POST' }
+                );
+
+                if (response.ok) {
+                    console.log('Server connected to IDE');
+                    loadServers(selectedWorkspace);
+                } else {
+                    const error = await response.text();
+                    showAlert('Error', 'Failed to connect to IDE: ' + error);
+                }
+            } catch (error) {
+                console.error('Failed to connect to IDE:', error);
+                showAlert('Error', 'Failed to connect to IDE: ' + error.message);
+            }
+        }
+
+        // Auto-refresh
+        function autoRefresh() {
+            loadWorkspaces();
+            if (selectedWorkspace) {
+                loadServers(selectedWorkspace);
+            }
+        }
+
+        // Search functionality
+        let searchMatches = [];
+        let currentMatchIndex = -1;
+
+        let fullTextSelected = false;
+
+        document.addEventListener('keydown', (e) => {
+            const consoleOutput = document.getElementById('console-output');
+
+            // Ctrl+A to select all console content
+            if (e.ctrlKey && e.key === 'a' && consoleOutput && selectedServer) {
+                // Vérifier si le focus est dans la console ou pas dans un input
+                const activeElement = document.activeElement;
+                if (activeElement.tagName !== 'INPUT' && activeElement.tagName !== 'TEXTAREA') {
+                    e.preventDefault();
+                    selectAllConsoleContent();
+                }
+            }
+
+            // Ctrl+C après Ctrl+A pour copier tout (incluant plié)
+            if (e.ctrlKey && e.key === 'c' && fullTextSelected && selectedServer) {
+                e.preventDefault();
+                copyFullConsoleContent();
+            }
+
+            // Ctrl+F to open search - seulement si un serveur est sélectionné
+            if (e.ctrlKey && e.key === 'f') {
+                if (consoleOutput && selectedServer) {
+                    e.preventDefault();
+                    openSearch();
+                }
+            }
+
+            // Escape to close search
+            if (e.key === 'Escape') {
+                closeSearch();
+            }
+        });
+
+        // Reset flag when clicking
+        document.addEventListener('mousedown', () => {
+            fullTextSelected = false;
+        });
+
+        function selectAllConsoleContent() {
+            const consoleOutput = document.getElementById('console-output');
+            if (!consoleOutput) return;
+
+            // Sélectionner visuellement tout le contenu visible
+            const range = document.createRange();
+            range.selectNodeContents(consoleOutput);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+
+            // Marquer que la sélection complète est active
+            fullTextSelected = true;
+
+            // Donner le focus
+            consoleOutput.focus();
+        }
+
+        function copyFullConsoleContent() {
+            // Construire le texte complet incluant les traces pliées
+            let fullText = '';
+            traces.forEach(trace => {
+                fullText += trace.jsonContent + '\n\n';
+            });
+
+            // Copier dans le presse-papier
+            navigator.clipboard.writeText(fullText).then(() => {
+                console.log('Console content copied to clipboard');
+                fullTextSelected = false;
+            }).catch(err => {
+                console.error('Failed to copy:', err);
+                fullTextSelected = false;
+            });
+        }
+
+        function openSearch() {
+            const searchBox = document.getElementById('search-box');
+            const searchInput = document.getElementById('search-input');
+            searchBox.classList.add('visible');
+            searchInput.focus();
+            searchInput.select();
+        }
+
+        function closeSearch() {
+            const searchBox = document.getElementById('search-box');
+            searchBox.classList.remove('visible');
+            clearHighlights();
+        }
+
+        document.getElementById('search-input').addEventListener('input', (e) => {
+            performSearch(e.target.value);
+        });
+
+        document.getElementById('search-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                if (e.shiftKey) {
+                    searchPrev();
+                } else {
+                    searchNext();
+                }
+            }
+        });
+
+        function performSearch(query) {
+            clearHighlights();
+            searchMatches = [];
+            currentMatchIndex = -1;
+
+            if (!query) {
+                updateSearchCount();
+                return;
+            }
+
+            const consoleOutput = document.getElementById('console-output');
+            if (!consoleOutput) return;
+
+            const traceContents = consoleOutput.querySelectorAll('.trace-body, .trace-header-text');
+
+            traceContents.forEach((content, traceIndex) => {
+                const text = content.textContent;
+                const regex = new RegExp(escapeRegex(query), 'gi');
+                let match;
+                let highlightedHtml = text;
+                let offset = 0;
+
+                while ((match = regex.exec(text)) !== null) {
+                    searchMatches.push({ traceIndex, element: content });
+
+                    const matchStart = match.index + offset;
+                    const matchEnd = matchStart + query.length;
+                    const before = highlightedHtml.substring(0, matchStart);
+                    const matchText = highlightedHtml.substring(matchStart, matchEnd);
+                    const after = highlightedHtml.substring(matchEnd);
+
+                    highlightedHtml = before + '<span class="highlight">' + matchText + '</span>' + after;
+                    offset += '<span class="highlight"></span>'.length;
+                }
+
+                if (offset > 0) {
+                    content.innerHTML = highlightedHtml;
+                    // Auto-expand traces with matches
+                    if (content.classList.contains('collapsed')) {
+                        toggleTrace(traceIndex);
+                    }
+                }
+            });
+
+            if (searchMatches.length > 0) {
+                currentMatchIndex = 0;
+                highlightCurrentMatch();
+            }
+
+            updateSearchCount();
+        }
+
+        function escapeRegex(string) {
+            return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        }
+
+        function clearHighlights() {
+            const consoleOutput = document.getElementById('console-output');
+            if (!consoleOutput) return;
+
+            const highlights = consoleOutput.querySelectorAll('.highlight');
+            highlights.forEach(highlight => {
+                const parent = highlight.parentNode;
+                parent.replaceChild(document.createTextNode(highlight.textContent), highlight);
+                parent.normalize();
+            });
+
+            // Re-render to clean up
+            if (traces.length > 0) {
+                renderConsoleWithoutScroll();
+            }
+        }
+
+        function highlightCurrentMatch() {
+            // Remove all current highlights
+            document.querySelectorAll('.highlight.current').forEach(el => {
+                el.classList.remove('current');
+            });
+
+            if (currentMatchIndex >= 0 && currentMatchIndex < searchMatches.length) {
+                const highlights = document.querySelectorAll('.highlight');
+                if (highlights[currentMatchIndex]) {
+                    highlights[currentMatchIndex].classList.add('current');
+                    highlights[currentMatchIndex].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }
+        }
+
+        function searchNext() {
+            if (searchMatches.length === 0) return;
+            currentMatchIndex = (currentMatchIndex + 1) % searchMatches.length;
+            highlightCurrentMatch();
+            updateSearchCount();
+        }
+
+        function searchPrev() {
+            if (searchMatches.length === 0) return;
+            currentMatchIndex = (currentMatchIndex - 1 + searchMatches.length) % searchMatches.length;
+            highlightCurrentMatch();
+            updateSearchCount();
+        }
+
+        function updateSearchCount() {
+            const searchCount = document.getElementById('search-count');
+            if (searchMatches.length === 0) {
+                searchCount.textContent = '0/0';
+            } else {
+                searchCount.textContent = `${currentMatchIndex + 1}/${searchMatches.length}`;
+            }
+        }
+
+        function renderConsoleWithoutScroll() {
+            const container = document.getElementById('console-output');
+            if (!container) return;
+
+            if (traces.length === 0) {
+                container.innerHTML = '<div style="text-align: center; padding: 2rem; color: #858585;">No LSP trace messages yet.</div>';
+                return;
+            }
+
+            container.innerHTML = traces.map((trace, index) => {
+                const content = trace.jsonContent;
+
+                // Parse the trace: first line is header, rest is body
+                const lines = content.split('\n');
+                const headerLine = lines[0]; // [Trace - HH:mm:ss] ...
+
+                // Body is everything after the header line
+                const bodyLines = lines.slice(1);
+                const body = bodyLines.join('\n').trim();
+
+                // Par défaut: tout plié
+                return `
+                    <div class="trace-line">
+                        <div class="trace-header" onclick="toggleTrace(${index})">
+                            <span class="trace-toggle" id="toggle-${index}">▶</span>
+                            <span class="trace-header-text">${escapeHtml(headerLine)}</span>
+                        </div>
+                        <div class="trace-body collapsed" id="body-${index}">${escapeHtml(body)}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Modal functions
+        function showModal(title, message, buttons) {
+            const modal = document.getElementById('modal-overlay');
+            const modalTitle = document.getElementById('modal-title');
+            const modalMessage = document.getElementById('modal-message');
+            const modalButtons = document.getElementById('modal-buttons');
+
+            modalTitle.textContent = title;
+            modalMessage.textContent = message;
+
+            modalButtons.innerHTML = buttons.map(btn => `
+                <button class="modal-button ${btn.type || 'secondary'}"
+                        onclick="${btn.onclick}">${btn.label}</button>
+            `).join('');
+
+            modal.classList.add('visible');
+        }
+
+        function hideModal() {
+            document.getElementById('modal-overlay').classList.remove('visible');
+        }
+
+        async function confirmAction(title, message, confirmLabel, isDanger = false) {
+            return new Promise((resolve) => {
+                showModal(title, message, [
+                    {
+                        label: 'Cancel',
+                        type: 'secondary',
+                        onclick: `hideModal(); window.modalResolve(false);`
+                    },
+                    {
+                        label: confirmLabel,
+                        type: isDanger ? 'danger' : 'primary',
+                        onclick: `hideModal(); window.modalResolve(true);`
+                    }
+                ]);
+
+                window.modalResolve = resolve;
+            });
+        }
+
+        function showAlert(title, message) {
+            showModal(title, message, [
+                {
+                    label: 'OK',
+                    type: 'primary',
+                    onclick: 'hideModal()'
+                }
+            ]);
+        }
+
+        // Close modal on overlay click
+        document.getElementById('modal-overlay').addEventListener('click', (e) => {
+            if (e.target.id === 'modal-overlay') {
+                hideModal();
+                if (window.modalResolve) {
+                    window.modalResolve(false);
+                }
+            }
+        });
+
+        // Initialize
+        loadWorkspaces();
+        setInterval(autoRefresh, 2000);
+    </script>
+</body>
+</html>

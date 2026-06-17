@@ -1,0 +1,38 @@
+package com.redhat.mcp.languagetools.lsp.installer.task;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+
+import com.redhat.mcp.languagetools.lsp.installer.InstallerContext;
+
+/**
+ * Check if a file exists.
+ * Example:
+ * {
+ *   "fileExists": {
+ *     "name": "Check if installed",
+ *     "file": "$USER_HOME$/.mcp-lsp/lsp/jdtls/bin/jdtls"
+ *   }
+ * }
+ */
+public class FileExistsTask extends InstallerTask {
+
+    private final String file;
+
+    public FileExistsTask(String id, String name, String file, InstallerTask onFail, InstallerTask onSuccess) {
+        super(id, name, onFail, onSuccess);
+        this.file = file;
+    }
+
+    @Override
+    protected boolean run(InstallerContext context) {
+        String resolvedFile = context.resolveVariables(file);
+        Path filePath = Paths.get(resolvedFile);
+
+        boolean exists = Files.exists(filePath);
+        context.log(exists ? "  ✓ File exists: " + resolvedFile : "  ✗ File not found: " + resolvedFile);
+
+        return exists;
+    }
+}
