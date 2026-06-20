@@ -27,6 +27,7 @@ public class Workspace {
     private final URI rootUri;
     private final Path workspaceDataDir;
     private final LspTraceCollector traceCollector;
+    private final WorkspaceConfiguration configuration;
     private final Map<String, LspServer> lspServers = new ConcurrentHashMap<>();
     private final Map<String, ServerInfo> serverInfos = new ConcurrentHashMap<>();
     private final Map<String, ServerStatus> installationStatus = new ConcurrentHashMap<>();
@@ -47,13 +48,17 @@ public class Workspace {
         this.rootUri = rootUri;
         this.workspaceDataDir = createWorkspaceDataDir(workspaceDataDir, rootUri);
         this.traceCollector = traceCollector;
+        this.configuration = new WorkspaceConfiguration(java.nio.file.Paths.get(rootUri));
     }
 
     /**
      * Add a language server to this workspace.
      */
     public void addLspServer(LspServerConfig config, Path serverHome) {
-        LspServer server = new LspServer(config, rootUri, workspaceDataDir, serverHome, traceCollector);
+        LspServer server = com.redhat.mcp.languagetools.lsp.LspServerFactoryRegistry.createServer(
+            config, rootUri, workspaceDataDir, serverHome, traceCollector
+        );
+        server.setWorkspaceConfiguration(configuration);
         lspServers.put(config.getId(), server);
         serverInfos.put(config.getId(), new ServerInfo(config, serverHome));
         LOG.infof("Added LSP server '%s' to workspace: %s", config.getId(), rootUri);
@@ -78,8 +83,11 @@ public class Workspace {
                     oldServer.shutdown().join();
                 }
 
-                // Create new server instance
-                LspServer newServer = new LspServer(info.config, rootUri, workspaceDataDir, info.serverHome, traceCollector);
+                // Create new server instance using factory
+                LspServer newServer = com.redhat.mcp.languagetools.lsp.LspServerFactoryRegistry.createServer(
+                    info.config, rootUri, workspaceDataDir, info.serverHome, traceCollector
+                );
+                newServer.setWorkspaceConfiguration(configuration);
                 lspServers.put(serverId, newServer);
 
                 // Start and initialize (will detect IDE instance)
@@ -114,8 +122,11 @@ public class Workspace {
                     oldServer.shutdown().join();
                 }
 
-                // Create new server instance
-                LspServer newServer = new LspServer(info.config, rootUri, workspaceDataDir, info.serverHome, traceCollector);
+                // Create new server instance using factory
+                LspServer newServer = com.redhat.mcp.languagetools.lsp.LspServerFactoryRegistry.createServer(
+                    info.config, rootUri, workspaceDataDir, info.serverHome, traceCollector
+                );
+                newServer.setWorkspaceConfiguration(configuration);
                 lspServers.put(serverId, newServer);
 
                 // Start MCP-managed only (skip IDE instance detection)
@@ -244,6 +255,13 @@ public class Workspace {
 
     public boolean isInitialized() {
         return initialized;
+    }
+
+    /**
+     * Get workspace configuration (reads from .vscode/settings.json).
+     */
+    public WorkspaceConfiguration getConfiguration() {
+        return configuration;
     }
 
     /**

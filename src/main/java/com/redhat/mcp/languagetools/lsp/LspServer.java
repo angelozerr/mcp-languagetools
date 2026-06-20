@@ -35,15 +35,15 @@ public class LspServer {
 
     private static final Logger LOG = Logger.getLogger(LspServer.class);
 
-    private final LspServerConfig config;
-    private final URI workspaceRoot;
-    private final Path workspaceDataDir;
-    private final Path serverHome;
-    private final TracingMessageConsumer tracing;
+    protected final LspServerConfig config;
+    protected final URI workspaceRoot;
+    protected final Path workspaceDataDir;
+    protected final Path serverHome;
+    protected final TracingMessageConsumer tracing;
 
-    private Process serverProcess;
-    private Socket socket;
-    private LanguageServer languageServer;
+    protected Process serverProcess;
+    protected Socket socket;
+    protected LanguageServer languageServer;
     private final ExecutorService executorService;
     private final Map<String, List<Diagnostic>> diagnosticsCache = new ConcurrentHashMap<>();
     private final java.util.Set<String> openedFiles = ConcurrentHashMap.newKeySet();
@@ -51,6 +51,8 @@ public class LspServer {
     private boolean isSocketConnection = false;
     private InstanceFileWatcher fileWatcher;
     private LspInstanceRegistry.InstanceInfo currentInstance;
+    protected volatile boolean isReady = false;
+    protected com.redhat.mcp.languagetools.workspace.WorkspaceConfiguration workspaceConfiguration;
 
     public LspServer(LspServerConfig config, URI workspaceRoot, Path workspaceDataDir, Path serverHome, LspTraceCollector traceCollector) {
         this.config = config;
@@ -134,8 +136,8 @@ public class LspServer {
         InputStream in = socket.getInputStream();
         OutputStream out = socket.getOutputStream();
 
-        // Create LSP client
-        LanguageClient client = new GenericLanguageClient();
+        // Create LSP client (subclasses can override to provide custom client)
+        LanguageClient client = createLanguageClient();
 
         // Create LSP launcher with message tracing wrapper
         Launcher<LanguageServer> launcher = LSPLauncher.createClientLauncher(
@@ -160,7 +162,7 @@ public class LspServer {
     /**
      * Launch a new language server process.
      */
-    private void launchProcess() throws IOException {
+    protected void launchProcess() throws IOException {
         LOG.infof("Launching new %s process for workspace: %s", config.getId(), workspaceRoot);
 
         List<String> command = buildCommand();
@@ -207,8 +209,8 @@ public class LspServer {
             }
         });
 
-        // Create LSP client
-        LanguageClient client = new GenericLanguageClient();
+        // Create LSP client (subclasses can override to provide custom client)
+        LanguageClient client = createLanguageClient();
 
         // Create LSP launcher with message tracing wrapper (like lsp4ij)
         Launcher<LanguageServer> launcher = LSPLauncher.createClientLauncher(
@@ -284,6 +286,9 @@ public class LspServer {
                     LOG.infof("%s initialized for workspace: %s", config.getId(), workspaceRoot);
                     languageServer.initialized(new InitializedParams());
                     status = ServerStatus.RUNNING;
+                    // For generic servers, ready after initialization
+                    // Subclasses like JdtLsServer may override this behavior
+                    isReady = true;
                     return CompletableFuture.completedFuture(null);
                 });
     }
@@ -373,7 +378,7 @@ public class LspServer {
      * - ${DATA_DIR} → workspace data directory
      * - ${user.name} → system user name
      */
-    private List<String> buildCommand() throws IOException {
+    protected List<String> buildCommand() throws IOException {
         String cmd = config.getCommandForCurrentOS();
         if (cmd == null) {
             throw new IOException("No command configured for current OS");
@@ -499,8 +504,40 @@ public class LspServer {
         return status;
     }
 
+    /**
+     * Check if the language server is ready to handle requests.
+     * For most servers, this is true after initialize() completes (status == RUNNING).
+     * For servers like JDT.LS, this is determined by specific notifications (e.g., language/status).
+     * Subclasses can override this method to provide custom readiness detection.
+     */
+    public boolean isReady() {
+        return isReady;
+    }
+
+    /**
+     * Set the ready state of the language server.
+     * Called by subclasses when they detect the server is ready (e.g., JdtLsServer on language/status).
+     */
+    protected void setReady(boolean ready) {
+        this.isReady = ready;
+    }
+
     public LspInstanceRegistry.InstanceInfo getCurrentInstance() {
         return currentInstance;
+    }
+
+    /**
+     * Set workspace configuration (called by Workspace after server creation).
+     */
+    public void setWorkspaceConfiguration(com.redhat.mcp.languagetools.workspace.WorkspaceConfiguration configuration) {
+        this.workspaceConfiguration = configuration;
+    }
+
+    /**
+     * Get workspace configuration.
+     */
+    protected com.redhat.mcp.languagetools.workspace.WorkspaceConfiguration getWorkspaceConfiguration() {
+        return workspaceConfiguration;
     }
 
     /**
@@ -624,6 +661,15 @@ public class LspServer {
                 status = ServerStatus.STOPPED;
             }
         }
+    }
+
+    /**
+     * Create the language client for this server.
+     * Subclasses can override this to provide custom client implementations
+     * (e.g., JdtLsServer provides JdtLsLanguageClient for language/status notifications).
+     */
+    protected LanguageClient createLanguageClient() {
+        return new GenericLanguageClient();
     }
 
     /**
