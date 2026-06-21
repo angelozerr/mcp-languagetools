@@ -36,7 +36,9 @@ public class ServerDetailsResource {
             return Response.status(404).entity("{\"error\": \"Server not found\"}").build();
         }
 
-        return Response.ok(config).build();
+        // Convert to JSON string using Gson, then parse back to generic Map for Jackson
+        String jsonString = gson.toJson(config);
+        return Response.ok(jsonString).build();
     }
 
     @GET
