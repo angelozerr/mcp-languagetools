@@ -2,14 +2,18 @@ package com.redhat.mcp.languagetools.workspace;
 
 import org.jboss.logging.Logger;
 
+import com.redhat.mcp.languagetools.lsp.LspInstanceRegistry;
 import com.redhat.mcp.languagetools.lsp.LspServer;
 import com.redhat.mcp.languagetools.lsp.LspServerConfig;
+import com.redhat.mcp.languagetools.lsp.LspServerFactoryRegistry;
+import com.redhat.mcp.languagetools.lsp.RequestRouter;
 import com.redhat.mcp.languagetools.lsp.ServerStatus;
 import com.redhat.mcp.languagetools.lsp.trace.LspTraceCollector;
 
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -28,9 +32,11 @@ public class Workspace {
     private final Path workspaceDataDir;
     private final LspTraceCollector traceCollector;
     private final WorkspaceConfiguration configuration;
+    private com.redhat.mcp.languagetools.lsp.ExtensionManager extensionManager;
     private final Map<String, LspServer> lspServers = new ConcurrentHashMap<>();
     private final Map<String, ServerInfo> serverInfos = new ConcurrentHashMap<>();
     private final Map<String, ServerStatus> installationStatus = new ConcurrentHashMap<>();
+    private List<com.redhat.mcp.languagetools.lsp.LspServerConfig> allServerConfigs = new ArrayList<>();
     private final Map<String, java.time.Instant> mcpClientConnections = new ConcurrentHashMap<>();
     private volatile boolean initialized = false;
 
@@ -52,16 +58,71 @@ public class Workspace {
     }
 
     /**
-     * Add a language server to this workspace.
+     * Set extension manager for this workspace.
      */
-    public void addLspServer(LspServerConfig config, Path serverHome) {
-        LspServer server = com.redhat.mcp.languagetools.lsp.LspServerFactoryRegistry.createServer(
-            config, rootUri, workspaceDataDir, serverHome, traceCollector
+    public void setExtensionManager(com.redhat.mcp.languagetools.lsp.ExtensionManager extensionManager) {
+        this.extensionManager = extensionManager;
+    }
+
+    /**
+     * Add a language server to this workspace.
+     *
+     * @param config Server configuration
+     * @param serverHome Server installation directory
+     * @param allServerConfigs All server configurations (for reading contributes)
+     */
+    public void addLspServer(LspServerConfig config, Path serverHome, List<LspServerConfig> allServerConfigs) {
+        // Store allServerConfigs for later use (reconnect, etc.)
+        this.allServerConfigs = allServerConfigs;
+
+        LspServer server = LspServerFactoryRegistry.createServer(
+            config, rootUri, workspaceDataDir, serverHome, traceCollector, allServerConfigs
         );
         server.setWorkspaceConfiguration(configuration);
+        if (extensionManager != null) {
+            server.setExtensionManager(extensionManager);
+        }
+
+        // Set up request router for bindRequest support
+        server.setRequestRouter(createRequestRouter());
+
         lspServers.put(config.getId(), server);
         serverInfos.put(config.getId(), new ServerInfo(config, serverHome));
         LOG.infof("Added LSP server '%s' to workspace: %s", config.getId(), rootUri);
+    }
+
+    /**
+     * Create a request router that routes bindRequest calls between servers.
+     */
+    private RequestRouter createRequestRouter() {
+        return (targetServerId, method, params, mode) -> {
+            // Look up the target server
+            LspServer targetServer = lspServers.get(targetServerId);
+
+            if (targetServer == null) {
+                LOG.warnf("Target server '%s' not found for bindRequest: %s", targetServerId, method);
+                return CompletableFuture.failedFuture(
+                    new IllegalStateException("Target server not found: " + targetServerId)
+                );
+            }
+
+            // Wait for target server to be ready before routing (important for JDT.LS)
+            LOG.debugf("Routing request %s to server %s (mode: %s), waiting for server to be ready...",
+                method, targetServerId, mode);
+
+            return targetServer.waitUntilReady(30000) // 30 seconds timeout
+                .thenCompose(v -> {
+                    LOG.debugf("Server %s is ready, routing request %s", targetServerId, method);
+
+                    if ("direct".equals(mode)) {
+                        // Direct JSON-RPC request
+                        return targetServer.sendRequest(method, params);
+                    } else {
+                        // Default: workspace/executeCommand (for JDT.LS delegate handlers)
+                        return targetServer.sendCommandRequest(method, params);
+                    }
+                });
+        };
     }
 
     /**
@@ -84,8 +145,8 @@ public class Workspace {
                 }
 
                 // Create new server instance using factory
-                LspServer newServer = com.redhat.mcp.languagetools.lsp.LspServerFactoryRegistry.createServer(
-                    info.config, rootUri, workspaceDataDir, info.serverHome, traceCollector
+                LspServer newServer = LspServerFactoryRegistry.createServer(
+                    info.config, rootUri, workspaceDataDir, info.serverHome, traceCollector, allServerConfigs
                 );
                 newServer.setWorkspaceConfiguration(configuration);
                 lspServers.put(serverId, newServer);
@@ -123,8 +184,8 @@ public class Workspace {
                 }
 
                 // Create new server instance using factory
-                LspServer newServer = com.redhat.mcp.languagetools.lsp.LspServerFactoryRegistry.createServer(
-                    info.config, rootUri, workspaceDataDir, info.serverHome, traceCollector
+                LspServer newServer = LspServerFactoryRegistry.createServer(
+                    info.config, rootUri, workspaceDataDir, info.serverHome, traceCollector, allServerConfigs
                 );
                 newServer.setWorkspaceConfiguration(configuration);
                 lspServers.put(serverId, newServer);
@@ -239,10 +300,10 @@ public class Workspace {
     /**
      * Get external instance info for a server (launched by an IDE).
      */
-    public com.redhat.mcp.languagetools.lsp.LspInstanceRegistry.InstanceInfo getExternalInstance(String serverId) {
+    public LspInstanceRegistry.InstanceInfo getExternalInstance(String serverId) {
         try {
-            String workspacePath = java.nio.file.Paths.get(rootUri).toString();
-            return com.redhat.mcp.languagetools.lsp.LspInstanceRegistry.findInstance(workspacePath, serverId);
+            String workspacePath = Paths.get(rootUri).toString();
+            return LspInstanceRegistry.findInstance(workspacePath, serverId);
         } catch (Exception e) {
             LOG.debugf("Failed to check for external instance of %s: %s", serverId, e.getMessage());
             return null;

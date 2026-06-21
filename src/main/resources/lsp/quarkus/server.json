@@ -1,0 +1,28 @@
+{
+  "id": "quarkus",
+  "name": "Quarkus Extension",
+  "description": "Quarkus extensions for JDT.LS and MicroProfile LS",
+  "contributes": {
+    "jdtls": {
+      "bundles": [
+        "./jars/com.redhat.microprofile.jdt.quarkus.jar"
+      ]
+    },
+    "microprofile": {
+      "bundles": [
+        "./server/com.redhat.quarkus.ls.jar"
+      ],
+      "documentSelector": [
+        {
+          "language": "quarkus-properties"
+        },
+        {
+          "pattern": "**/application.yaml"
+        },
+        {
+          "pattern": "**/application.yml"
+        }
+      ]
+    }
+  }
+}

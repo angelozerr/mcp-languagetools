@@ -129,6 +129,14 @@ public class DownloadInstaller implements LspServerInstaller {
     }
 
     private void extract(Path archiveFile, Path destDir, String format) throws IOException, InterruptedException {
+        // Special case: JAR files don't need extraction, just copy them
+        if (format.equals("jar")) {
+            Path targetJar = destDir.resolve(archiveFile.getFileName());
+            Files.copy(archiveFile, targetJar, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            LOG.infof("Copied JAR to: %s", targetJar);
+            return;
+        }
+
         ProcessBuilder pb;
 
         if (format.equals("tar.gz") || format.equals("tgz")) {

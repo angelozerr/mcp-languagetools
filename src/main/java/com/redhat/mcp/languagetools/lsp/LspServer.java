@@ -11,8 +11,10 @@ import com.redhat.mcp.languagetools.lsp.trace.LspTraceCollector;
 import com.redhat.mcp.languagetools.lsp.trace.LspTraceMessage;
 import com.redhat.mcp.languagetools.lsp.trace.TracingMessageConsumer;
 
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.Socket;
 import java.net.URI;
@@ -40,6 +42,7 @@ public class LspServer {
     protected final Path workspaceDataDir;
     protected final Path serverHome;
     protected final TracingMessageConsumer tracing;
+    protected final List<LspServerConfig> allServerConfigs;
 
     protected Process serverProcess;
     protected Socket socket;
@@ -53,14 +56,18 @@ public class LspServer {
     private LspInstanceRegistry.InstanceInfo currentInstance;
     protected volatile boolean isReady = false;
     protected com.redhat.mcp.languagetools.workspace.WorkspaceConfiguration workspaceConfiguration;
+    protected ExtensionManager extensionManager;
+    protected RequestRouter requestRouter;
 
-    public LspServer(LspServerConfig config, URI workspaceRoot, Path workspaceDataDir, Path serverHome, LspTraceCollector traceCollector) {
+    public LspServer(LspServerConfig config, URI workspaceRoot, Path workspaceDataDir, Path serverHome,
+                     LspTraceCollector traceCollector, List<LspServerConfig> allServerConfigs) {
         this.config = config;
         this.workspaceRoot = workspaceRoot;
         this.workspaceDataDir = workspaceDataDir;
         this.serverHome = serverHome;
         this.tracing = new TracingMessageConsumer(traceCollector, workspaceRoot.toString(), config.getId(), config.getName());
         this.executorService = Executors.newCachedThreadPool();
+        this.allServerConfigs = allServerConfigs != null ? allServerConfigs : List.of();
     }
 
     /**
@@ -186,7 +193,7 @@ public class LspServer {
 
         // Read and log stderr in background, send to trace collector
         executorService.submit(() -> {
-            try (var reader = new java.io.BufferedReader(new java.io.InputStreamReader(serverProcess.getErrorStream()))) {
+            try (var reader = new BufferedReader(new InputStreamReader(serverProcess.getErrorStream()))) {
                 String line;
                 while ((line = reader.readLine()) != null) {
                     LOG.errorf("[%s stderr] %s", config.getId(), line);
@@ -212,19 +219,23 @@ public class LspServer {
         // Create LSP client (subclasses can override to provide custom client)
         LanguageClient client = createLanguageClient();
 
+        // Wrap client to support both LanguageClient AND custom bindRequest routing
+        Object serviceObject = createRoutingServiceObject(client);
+
         // Create LSP launcher with message tracing wrapper (like lsp4ij)
-        Launcher<LanguageServer> launcher = LSPLauncher.createClientLauncher(
-                client,
-                serverProcess.getInputStream(),
-                serverProcess.getOutputStream(),
-                executorService,
-                consumer -> message -> {
+        Launcher<LanguageServer> launcher = new Launcher.Builder<LanguageServer>()
+                .setLocalService(serviceObject)
+                .setRemoteInterface(LanguageServer.class)
+                .setInput(serverProcess.getInputStream())
+                .setOutput(serverProcess.getOutputStream())
+                .setExecutorService(executorService)
+                .wrapMessages(consumer -> message -> {
                     // Log the message
                     tracing.log(message, consumer);
                     // Forward to original consumer
                     consumer.consume(message);
-                }
-        );
+                })
+                .create();
 
         languageServer = launcher.getRemoteProxy();
         launcher.startListening();
@@ -276,9 +287,10 @@ public class LspServer {
 
         params.setCapabilities(capabilities);
 
-        // Set initialization options from config
-        if (config.getInitializationOptions() != null && !config.getInitializationOptions().isEmpty()) {
-            params.setInitializationOptions(config.getInitializationOptions());
+        // Prepare initialization options (hook for subclasses to add server-specific options)
+        Object initOptions = prepareInitializationOptions();
+        if (initOptions != null) {
+            params.setInitializationOptions(initOptions);
         }
 
         return languageServer.initialize(params)
@@ -291,6 +303,67 @@ public class LspServer {
                     isReady = true;
                     return CompletableFuture.completedFuture(null);
                 });
+    }
+
+    /**
+     * Send a request directly to the language server via JSON-RPC.
+     * Used for custom LSP requests that are not standard LSP commands.
+     *
+     * @param method Request method (e.g., "custom/myRequest")
+     * @param params Request parameters
+     * @return CompletableFuture with the response
+     */
+    public CompletableFuture<Object> sendRequest(String method, Object params) {
+        if (languageServer == null) {
+            return CompletableFuture.failedFuture(
+                new IllegalStateException("Language server not started")
+            );
+        }
+
+        // Send directly via Endpoint (JSON-RPC)
+        if (languageServer instanceof org.eclipse.lsp4j.jsonrpc.Endpoint) {
+            org.eclipse.lsp4j.jsonrpc.Endpoint endpoint = (org.eclipse.lsp4j.jsonrpc.Endpoint) languageServer;
+            return endpoint.request(method, params)
+                .thenApply(result -> (Object) result);
+        }
+
+        return CompletableFuture.failedFuture(
+            new UnsupportedOperationException("Server does not support direct requests")
+        );
+    }
+
+    /**
+     * Send a request via workspace/executeCommand.
+     * Used for routing bindRequest between servers (like vscode-java does with java.execute.workspaceCommand).
+     * The target server must have registered a command handler for this method.
+     *
+     * @param method Request method/command (e.g., "microprofile/java/projectInfo")
+     * @param params Request parameters
+     * @return CompletableFuture with the response
+     */
+    public CompletableFuture<Object> sendCommandRequest(String method, Object params) {
+        if (languageServer == null) {
+            return CompletableFuture.failedFuture(
+                new IllegalStateException("Language server not started")
+            );
+        }
+
+        // Send via workspace/executeCommand (like vscode-java does)
+        ExecuteCommandParams commandParams = new ExecuteCommandParams();
+        commandParams.setCommand(method);
+
+        // If params is already a list, use it; otherwise wrap in a list
+        if (params instanceof java.util.List) {
+            commandParams.setArguments((java.util.List<Object>) params);
+        } else if (params != null) {
+            commandParams.setArguments(java.util.List.of(params));
+        } else {
+            commandParams.setArguments(java.util.List.of());
+        }
+
+        return languageServer.getWorkspaceService()
+            .executeCommand(commandParams)
+            .thenApply(result -> (Object) result);
     }
 
     /**
@@ -515,6 +588,31 @@ public class LspServer {
     }
 
     /**
+     * Wait until the server is ready, with a timeout.
+     * Returns a CompletableFuture that completes when the server is ready.
+     */
+    public CompletableFuture<Void> waitUntilReady(long timeoutMs) {
+        if (isReady) {
+            return CompletableFuture.completedFuture(null);
+        }
+
+        return CompletableFuture.runAsync(() -> {
+            long startTime = System.currentTimeMillis();
+            while (!isReady && (System.currentTimeMillis() - startTime) < timeoutMs) {
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    throw new RuntimeException("Interrupted while waiting for server to be ready", e);
+                }
+            }
+            if (!isReady) {
+                throw new RuntimeException("Server not ready after " + timeoutMs + "ms");
+            }
+        }, executorService);
+    }
+
+    /**
      * Set the ready state of the language server.
      * Called by subclasses when they detect the server is ready (e.g., JdtLsServer on language/status).
      */
@@ -538,6 +636,27 @@ public class LspServer {
      */
     protected com.redhat.mcp.languagetools.workspace.WorkspaceConfiguration getWorkspaceConfiguration() {
         return workspaceConfiguration;
+    }
+
+    /**
+     * Set extension manager (called by Workspace after server creation).
+     */
+    public void setExtensionManager(ExtensionManager extensionManager) {
+        this.extensionManager = extensionManager;
+    }
+
+    /**
+     * Get extension manager.
+     */
+    protected ExtensionManager getExtensionManager() {
+        return extensionManager;
+    }
+
+    /**
+     * Set request router for delegating requests to other servers (bindRequest mechanism).
+     */
+    public void setRequestRouter(RequestRouter router) {
+        this.requestRouter = router;
     }
 
     /**
@@ -673,6 +792,189 @@ public class LspServer {
     }
 
     /**
+     * Create a service object that combines LanguageClient with custom request routing.
+     * Uses LSP4J's ServiceEndpoints to support both standard LSP methods and custom requests.
+     */
+    private Object createRoutingServiceObject(LanguageClient client) {
+        LOG.infof("Creating routing service object for %s", config.getId());
+
+        // Create a delegating endpoint that intercepts requests
+        org.eclipse.lsp4j.jsonrpc.Endpoint delegatingEndpoint = new org.eclipse.lsp4j.jsonrpc.Endpoint() {
+            private org.eclipse.lsp4j.jsonrpc.Endpoint clientEndpoint;
+
+            @Override
+            public CompletableFuture<?> request(String method, Object parameter) {
+                LOG.infof("[%s] Endpoint.request() called with method: %s", config.getId(), method);
+
+                // Check if this request should be routed to another server (bindRequest)
+                BindRequestInfo bindInfo = findBindRequestInfo(method);
+
+                if (bindInfo != null && requestRouter != null) {
+                    LOG.infof("Routing bindRequest %s to server %s (mode: %s)",
+                        method, bindInfo.targetServerId, bindInfo.mode);
+                    return requestRouter.routeRequest(bindInfo.targetServerId, method, parameter, bindInfo.mode);
+                }
+
+                LOG.debugf("[%s] Request %s is not a bindRequest, not routing", config.getId(), method);
+
+                // Otherwise, delegate to client endpoint
+                if (clientEndpoint == null) {
+                    return CompletableFuture.failedFuture(
+                        new UnsupportedOperationException("Request not supported: " + method)
+                    );
+                }
+                return clientEndpoint.request(method, parameter);
+            }
+
+            @Override
+            public void notify(String method, Object parameter) {
+                if (clientEndpoint != null) {
+                    clientEndpoint.notify(method, parameter);
+                }
+            }
+
+            // Store the client endpoint when it's set by ServiceEndpoints
+            public void setClientEndpoint(org.eclipse.lsp4j.jsonrpc.Endpoint endpoint) {
+                this.clientEndpoint = endpoint;
+            }
+        };
+
+        // Return composite service that implements both LanguageClient and Endpoint
+        return new CompositeService(client, delegatingEndpoint);
+    }
+
+    /**
+     * Composite service that implements both LanguageClient and Endpoint.
+     */
+    private class CompositeService implements LanguageClient, org.eclipse.lsp4j.jsonrpc.Endpoint {
+        private final LanguageClient client;
+        private final org.eclipse.lsp4j.jsonrpc.Endpoint customEndpoint;
+
+        CompositeService(LanguageClient client, org.eclipse.lsp4j.jsonrpc.Endpoint customEndpoint) {
+            this.client = client;
+            this.customEndpoint = customEndpoint;
+        }
+
+        // Delegate all LanguageClient methods to the wrapped client
+        @Override
+        public void telemetryEvent(Object object) {
+            client.telemetryEvent(object);
+        }
+
+        @Override
+        public void publishDiagnostics(PublishDiagnosticsParams diagnostics) {
+            client.publishDiagnostics(diagnostics);
+        }
+
+        @Override
+        public void showMessage(MessageParams messageParams) {
+            client.showMessage(messageParams);
+        }
+
+        @Override
+        public CompletableFuture<MessageActionItem> showMessageRequest(ShowMessageRequestParams requestParams) {
+            return client.showMessageRequest(requestParams);
+        }
+
+        @Override
+        public void logMessage(MessageParams message) {
+            client.logMessage(message);
+        }
+
+        // Endpoint methods - intercept for bindRequest routing
+        @Override
+        public CompletableFuture<?> request(String method, Object parameter) {
+            return customEndpoint.request(method, parameter);
+        }
+
+        @Override
+        public void notify(String method, Object parameter) {
+            customEndpoint.notify(method, parameter);
+        }
+    }
+
+    /**
+     * Information about a bindRequest routing.
+     */
+    private static class BindRequestInfo {
+        final String targetServerId;
+        final String mode; // "executeCommand" or "direct"
+
+        BindRequestInfo(String targetServerId, String mode) {
+            this.targetServerId = targetServerId;
+            this.mode = mode;
+        }
+    }
+
+    /**
+     * Find which server this request should be routed to based on bindRequest declarations.
+     * Returns binding info (target server + mode), or null if not a bindRequest.
+     */
+    private BindRequestInfo findBindRequestInfo(String requestMethod) {
+        LOG.infof("[%s] Looking for bindRequest routing for method: %s", config.getId(), requestMethod);
+
+        // Check our own config's contributes sections
+        if (config.getContributes() == null) {
+            LOG.warnf("[%s] No contributes section in config", config.getId());
+            return null;
+        }
+
+        if (config.getContributes().getContributions() == null) {
+            LOG.warnf("[%s] contributes.getContributions() is null", config.getId());
+            return null;
+        }
+
+        LOG.infof("[%s] Found %d contribution targets", config.getId(),
+            config.getContributes().getContributions().size());
+
+        // Look through all contributes.{serverId}.bindRequest arrays
+        for (Map.Entry<String, com.google.gson.JsonElement> entry : config.getContributes().getContributions().entrySet()) {
+            String targetServerId = entry.getKey();
+            com.google.gson.JsonElement contrib = entry.getValue();
+
+            if (!contrib.isJsonObject()) {
+                continue;
+            }
+
+            com.google.gson.JsonObject contribObj = contrib.getAsJsonObject();
+            if (!contribObj.has("bindRequest")) {
+                continue;
+            }
+
+            com.google.gson.JsonElement bindRequestElem = contribObj.get("bindRequest");
+            if (!bindRequestElem.isJsonArray()) {
+                continue;
+            }
+
+            // Check if our requestMethod is in this bindRequest array
+            com.google.gson.JsonArray bindRequests = bindRequestElem.getAsJsonArray();
+            LOG.infof("[%s] Checking %d bindRequests for target '%s'", config.getId(),
+                bindRequests.size(), targetServerId);
+
+            for (com.google.gson.JsonElement req : bindRequests) {
+                if (req.isJsonPrimitive()) {
+                    String bindMethod = req.getAsString();
+                    LOG.debugf("[%s] Comparing '%s' with '%s'", config.getId(), requestMethod, bindMethod);
+
+                    if (bindMethod.equals(requestMethod)) {
+                        // Found! Now determine the mode
+                        String mode = "executeCommand"; // Default mode
+                        if (contribObj.has("bindMode") && contribObj.get("bindMode").isJsonPrimitive()) {
+                            mode = contribObj.get("bindMode").getAsString();
+                        }
+                        LOG.infof("[%s] FOUND bindRequest match! Routing to %s (mode: %s)",
+                            config.getId(), targetServerId, mode);
+                        return new BindRequestInfo(targetServerId, mode);
+                    }
+                }
+            }
+        }
+
+        LOG.warnf("[%s] No bindRequest found for method: %s", config.getId(), requestMethod);
+        return null;
+    }
+
+    /**
      * Generic LSP client implementation.
      */
     private class GenericLanguageClient implements LanguageClient {
@@ -702,5 +1004,19 @@ public class LspServer {
         public void logMessage(MessageParams message) {
             LOG.infof("%s log: %s", config.getId(), message.getMessage());
         }
+    }
+
+    /**
+     * Prepare initialization options for this server.
+     * Subclasses can override to add server-specific options (e.g., bundles for JDT.LS).
+     *
+     * @return initialization options object, or null if none
+     */
+    protected Object prepareInitializationOptions() {
+        // Default: use options from config if present
+        if (config.getInitializationOptions() != null && !config.getInitializationOptions().isEmpty()) {
+            return config.getInitializationOptions();
+        }
+        return null;
     }
 }

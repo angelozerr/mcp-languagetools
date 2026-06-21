@@ -3,6 +3,7 @@ package com.redhat.mcp.languagetools.admin;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
+import com.redhat.mcp.languagetools.admin.dto.ErrorResponse;
 import com.redhat.mcp.languagetools.lsp.LspServerConfig;
 import com.redhat.mcp.languagetools.workspace.WorkspaceManager;
 
@@ -57,7 +58,7 @@ public class ServerDetailsResource {
                 String installerPath = "/lsp/" + serverId + "/installer.json";
                 InputStream is = getClass().getResourceAsStream(installerPath);
                 if (is == null) {
-                    return Response.status(404).entity("{\"error\": \"No installer.json found\"}").build();
+                    return Response.status(404).entity(new ErrorResponse("No installer.json found")).build();
                 }
                 jsonContent = new String(is.readAllBytes());
             }
@@ -65,7 +66,7 @@ public class ServerDetailsResource {
             return Response.ok(jsonContent, MediaType.APPLICATION_JSON).build();
 
         } catch (Exception e) {
-            return Response.status(500).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
+            return Response.status(500).entity(new ErrorResponse(e.getMessage())).build();
         }
     }
 
@@ -89,7 +90,7 @@ public class ServerDetailsResource {
                     .build();
 
         } catch (Exception e) {
-            return Response.status(500).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
+            return Response.status(500).entity(new ErrorResponse(e.getMessage())).build();
         }
     }
 }

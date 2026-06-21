@@ -1,5 +1,7 @@
 package com.redhat.mcp.languagetools.admin;
 
+import com.redhat.mcp.languagetools.admin.dto.ErrorResponse;
+import com.redhat.mcp.languagetools.admin.dto.StatusResponse;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
@@ -35,9 +37,9 @@ public class LspServerControlResource {
             }
 
             server.shutdown().join();
-            return Response.ok().entity("{\"status\": \"stopped\"}").build();
+            return Response.ok().entity(new StatusResponse("stopped")).build();
         } catch (Exception e) {
-            return Response.status(500).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
+            return Response.status(500).entity(new ErrorResponse(e.getMessage())).build();
         }
     }
 
@@ -56,9 +58,9 @@ public class LspServerControlResource {
             // Restart via workspace (recreates server instance, will detect IDE if available)
             workspace.restartLspServer(serverId).join();
 
-            return Response.ok().entity("{\"status\": \"restarted\"}").build();
+            return Response.ok().entity(new StatusResponse("restarted")).build();
         } catch (Exception e) {
-            return Response.status(500).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
+            return Response.status(500).entity(new ErrorResponse(e.getMessage())).build();
         }
     }
 
@@ -84,9 +86,9 @@ public class LspServerControlResource {
                 workspaceManager.ensureServerInstalled(serverId, workspaceUri).join();
             }
 
-            return Response.ok().entity("{\"status\": \"started\"}").build();
+            return Response.ok().entity(new StatusResponse("started")).build();
         } catch (Exception e) {
-            return Response.status(500).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
+            return Response.status(500).entity(new ErrorResponse(e.getMessage())).build();
         }
     }
 
@@ -109,9 +111,9 @@ public class LspServerControlResource {
 
             // Just shutdown the connection (don't remove the server)
             server.shutdown().join();
-            return Response.ok().entity("{\"status\": \"disconnected\"}").build();
+            return Response.ok().entity(new StatusResponse("disconnected")).build();
         } catch (Exception e) {
-            return Response.status(500).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
+            return Response.status(500).entity(new ErrorResponse(e.getMessage())).build();
         }
     }
 
@@ -136,9 +138,9 @@ public class LspServerControlResource {
             // Restart will detect and connect to the IDE instance
             workspace.restartLspServer(serverId).join();
 
-            return Response.ok().entity("{\"status\": \"connected\"}").build();
+            return Response.ok().entity(new StatusResponse("connected")).build();
         } catch (Exception e) {
-            return Response.status(500).entity("{\"error\": \"" + e.getMessage() + "\"}").build();
+            return Response.status(500).entity(new ErrorResponse(e.getMessage())).build();
         }
     }
 }

@@ -4,6 +4,7 @@ import com.redhat.mcp.languagetools.lsp.trace.LspTraceCollector;
 
 import java.net.URI;
 import java.nio.file.Path;
+import java.util.List;
 
 /**
  * SPI interface for creating custom LSP server implementations.
@@ -18,8 +19,16 @@ public interface LspServerFactory {
 
     /**
      * Create a custom LSP server instance.
+     *
+     * @param config This server's configuration
+     * @param workspaceRoot Workspace root URI
+     * @param workspaceDataDir Workspace data directory
+     * @param serverHome Server installation directory
+     * @param traceCollector Trace collector for LSP messages
+     * @param allServerConfigs All server configurations (for reading contributes)
      */
     LspServer createServer(LspServerConfig config, URI workspaceRoot,
                           Path workspaceDataDir, Path serverHome,
-                          LspTraceCollector traceCollector);
+                          LspTraceCollector traceCollector,
+                          List<LspServerConfig> allServerConfigs);
 }

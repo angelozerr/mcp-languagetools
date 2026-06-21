@@ -1,12 +1,9 @@
 package com.redhat.mcp.languagetools.lsp;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
-
 /**
  * Document selector as defined in LSP specification.
  * Determines which files a language server is interested in.
  */
-@JsonInclude(JsonInclude.Include.NON_NULL)
 public class DocumentSelector {
 
     /**

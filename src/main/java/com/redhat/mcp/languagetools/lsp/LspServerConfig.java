@@ -1,7 +1,5 @@
 package com.redhat.mcp.languagetools.lsp;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -11,7 +9,6 @@ import java.util.Map;
  * Configuration for a language server.
  * Can be loaded from JSON or built programmatically.
  */
-@JsonInclude(JsonInclude.Include.NON_NULL)
 public class LspServerConfig {
 
     /**
@@ -66,6 +63,11 @@ public class LspServerConfig {
      * Description
      */
     private String description;
+
+    /**
+     * Contributions (VS Code-like extension system)
+     */
+    private Contributes contributes;
 
     public LspServerConfig() {
     }
@@ -127,11 +129,13 @@ public class LspServerConfig {
         }
 
         public LspServerConfig build() {
-            if (config.command == null) {
-                throw new IllegalStateException("command is required");
+            // Command is required unless this is a contribution-only config
+            if (config.command == null && config.contributes == null) {
+                throw new IllegalStateException("command or contributes is required");
             }
-            if (config.documentSelector.isEmpty()) {
-                throw new IllegalStateException("documentSelector is required");
+            // documentSelector is optional for contribution-only configs
+            if (config.documentSelector.isEmpty() && config.command != null) {
+                throw new IllegalStateException("documentSelector is required for servers with command");
             }
             return config;
         }
@@ -143,6 +147,13 @@ public class LspServerConfig {
     public boolean canHandle(String uri, String language) {
         return documentSelector.stream()
                 .anyMatch(selector -> selector.matches(uri, language));
+    }
+
+    /**
+     * Check if this is a contribution-only config (no command, only contributes to other servers).
+     */
+    public boolean isContributionOnly() {
+        return command == null && contributes != null;
     }
 
     // Getters and setters
@@ -248,6 +259,14 @@ public class LspServerConfig {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public Contributes getContributes() {
+        return contributes;
+    }
+
+    public void setContributes(Contributes contributes) {
+        this.contributes = contributes;
     }
 
     @Override

@@ -24,6 +24,8 @@ import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -56,6 +58,9 @@ public class WorkspaceManager {
     @ConfigProperty(name = "mcp.lsp.workspace.data-dir")
     Path workspaceDataDir;
 
+    @ConfigProperty(name = "mcp.lsp.servers.base-dir")
+    Optional<Path> serversBaseDir;
+
     private final Map<URI, Workspace> workspaces = new ConcurrentHashMap<>();
     private final Map<String, LspServerConfig> serverConfigs = new ConcurrentHashMap<>();
     private final Map<String, Path> serverHomes = new ConcurrentHashMap<>();
@@ -72,6 +77,17 @@ public class WorkspaceManager {
     void onShutdown(@Observes ShutdownEvent ev) {
         LOG.info("Shutting down all workspaces...");
         shutdownAll().join();
+    }
+
+    /**
+     * Create extension manager for collecting server contributions.
+     */
+    private com.redhat.mcp.languagetools.lsp.ExtensionManager createExtensionManager() {
+        // Use serversBaseDir from config, or default to ~/.mcp-lsp/lsp
+        Path baseDir = serversBaseDir.orElseGet(() ->
+            Paths.get(System.getProperty("user.home"), ".mcp-lsp", "lsp")
+        );
+        return new com.redhat.mcp.languagetools.lsp.ExtensionManager(serverConfigs, baseDir);
     }
 
     /**
@@ -111,8 +127,15 @@ public class WorkspaceManager {
         String language = languageId.get();
         LOG.debugf("Detected language '%s' for: %s", language, fileUri);
 
-        // Find servers that can handle this language
+        // Find ALL servers that can handle this language (may be multiple, e.g., JDT.LS + MicroProfile LS for Java)
+        List<CompletableFuture<Void>> serverFutures = new ArrayList<>();
+
         for (LspServerConfig config : serverConfigs.values()) {
+            // Skip contribution-only configs (they don't run as servers)
+            if (config.isContributionOnly()) {
+                continue;
+            }
+
             if (config.canHandle(fileUri.toString(), language)) {
                 // Check if server already exists in workspace
                 if (workspace.getLspServer(config.getId()) == null) {
@@ -127,28 +150,30 @@ public class WorkspaceManager {
 
                         // No need to install, use a dummy serverHome (won't be used for socket connection)
                         java.nio.file.Path dummyHome = java.nio.file.Paths.get(System.getProperty("user.home"), ".mcp-lsp", "lsp", config.getId());
-                        workspace.addLspServer(config, dummyHome);
+                        workspace.setExtensionManager(createExtensionManager());
+                        workspace.addLspServer(config, dummyHome, new ArrayList<>(serverConfigs.values()));
 
                         // Start and initialize (will connect to socket)
                         var server = workspace.getLspServer(config.getId());
                         if (server != null) {
-                            return server.start()
+                            CompletableFuture<Void> future = server.start()
                                     .thenCompose(v -> server.initialize())
                                     .exceptionally(ex -> {
                                         LOG.errorf(ex, "Failed to connect to external %s", config.getName());
                                         workspace.setInstallationStatus(config.getId(), ServerStatus.START_FAILED);
                                         return null;
                                     });
+                            serverFutures.add(future);
                         }
-                        return CompletableFuture.completedFuture(null);
+                        continue;
                     }
 
                     // No external instance - need to install and start our own
                     // Set status to INSTALLING
                     workspace.setInstallationStatus(config.getId(), ServerStatus.INSTALLING);
 
-                    // Ensure server is installed before starting
-                    return ensureServerInstalled(config, workspace.getRootUri())
+                    // Ensure server is installed before starting (don't fail if one server fails)
+                    CompletableFuture<Void> future = ensureServerInstalled(config, workspace.getRootUri())
                             .thenCompose(serverHome -> {
                                 if (serverHome == null) {
                                     LOG.errorf("Failed to install %s, cannot start", config.getName());
@@ -160,7 +185,8 @@ public class WorkspaceManager {
                                 workspace.setInstallationStatus(config.getId(), null);
 
                                 // Add server to workspace
-                                workspace.addLspServer(config, serverHome);
+                                workspace.setExtensionManager(createExtensionManager());
+                                workspace.addLspServer(config, serverHome, new ArrayList<>(serverConfigs.values()));
 
                                 // Start and initialize
                                 var server = workspace.getLspServer(config.getId());
@@ -181,11 +207,17 @@ public class WorkspaceManager {
                                 workspace.setInstallationStatus(config.getId(), ServerStatus.INSTALL_FAILED);
                                 return null;
                             });
+                    serverFutures.add(future);
                 }
             }
         }
 
-        return CompletableFuture.completedFuture(null);
+        // Wait for all servers to start (continue even if some fail)
+        if (serverFutures.isEmpty()) {
+            return CompletableFuture.completedFuture(null);
+        }
+
+        return CompletableFuture.allOf(serverFutures.toArray(new CompletableFuture[0]));
     }
 
     /**
@@ -274,18 +306,23 @@ public class WorkspaceManager {
                 var runTask = registry.loadTask(runJson);
 
                 return CompletableFuture.supplyAsync(() -> {
-                    boolean success = runTask.execute(context);
-                    if (success) {
-                        String homeDir = context.getPropertyAsString("output.dir");
-                        if (homeDir != null) {
-                            Path home = Paths.get(homeDir);
-                            serverHomes.put(config.getId(), home);
-                            LOG.infof("%s installed successfully at: %s", config.getName(), home);
-                            return home;
+                    try {
+                        boolean success = runTask.execute(context);
+                        if (success) {
+                            String homeDir = context.getPropertyAsString("output.dir");
+                            if (homeDir != null) {
+                                Path home = Paths.get(homeDir);
+                                serverHomes.put(config.getId(), home);
+                                LOG.infof("%s installed successfully at: %s", config.getName(), home);
+                                return home;
+                            }
                         }
+                        LOG.errorf("Failed to install %s", config.getName());
+                        return null;
+                    } catch (Exception e) {
+                        LOG.errorf(e, "Exception during installation of %s", config.getName());
+                        throw new RuntimeException("Installation failed: " + config.getName(), e);
                     }
-                    LOG.errorf("Failed to install %s", config.getName());
-                    return null;
                 });
             }
 
@@ -294,7 +331,7 @@ public class WorkspaceManager {
 
         } catch (Exception e) {
             LOG.errorf(e, "Failed to load/execute installer for %s", config.getId());
-            return CompletableFuture.completedFuture(null);
+            return CompletableFuture.failedFuture(e);
         }
     }
 
@@ -418,7 +455,8 @@ public class WorkspaceManager {
                     workspace.setInstallationStatus(serverId, null);
 
                     // Add server to workspace
-                    workspace.addLspServer(config, serverHome);
+                    workspace.setExtensionManager(createExtensionManager());
+                    workspace.addLspServer(config, serverHome, new ArrayList<>(serverConfigs.values()));
 
                     // Start MCP-managed (do not connect to IDE)
                     return workspace.startManagedLspServer(serverId)

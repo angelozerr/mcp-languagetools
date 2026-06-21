@@ -1,12 +1,16 @@
 package com.redhat.mcp.languagetools.lsp;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.gson.Gson;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.jboss.logging.Logger;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -24,7 +28,7 @@ public class ServerDescriptorLoader {
 
     private static final Logger LOG = Logger.getLogger(ServerDescriptorLoader.class);
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final Gson gson = new Gson();
 
     /**
      * Load a bundled server configuration from resources.
@@ -63,8 +67,9 @@ public class ServerDescriptorLoader {
      * Parse installer configuration from JSON.
      */
     private InstallerConfig parseInstallerConfig(InputStream is) throws IOException {
-        JsonNode root = objectMapper.readTree(is);
-        return objectMapper.treeToValue(root, InstallerConfig.class);
+        try (InputStreamReader reader = new InputStreamReader(is, StandardCharsets.UTF_8)) {
+            return gson.fromJson(reader, InstallerConfig.class);
+        }
     }
 
     /**
@@ -81,21 +86,49 @@ public class ServerDescriptorLoader {
 
     /**
      * Load all bundled server configurations.
+     * Auto-discovers all server.json files in /lsp/ directory.
      */
     public Map<String, LspServerConfig> loadAllBundled() {
         Map<String, LspServerConfig> configs = new HashMap<>();
 
-        // Load bundled servers (we'll add auto-discovery later)
-        String[] serverIds = {"jdtls", "lemminx"};
-
-        for (String serverId : serverIds) {
-            try {
-                LspServerConfig config = loadBundled(serverId);
-                configs.put(config.getId(), config);
-                LOG.infof("Loaded bundled server descriptor: %s", config.getId());
-            } catch (IOException e) {
-                LOG.warnf("Failed to load bundled %s config: %s", serverId, e.getMessage());
+        try {
+            // List all subdirectories in /lsp/
+            java.net.URL lspDirUrl = getClass().getResource("/lsp");
+            if (lspDirUrl == null) {
+                LOG.warn("No /lsp directory found in resources");
+                return configs;
             }
+
+            // Handle both JAR and file system paths
+            java.net.URI lspDirUri = lspDirUrl.toURI();
+            java.nio.file.Path lspPath;
+
+            if (lspDirUri.getScheme().equals("jar")) {
+                // Running from JAR - use FileSystem
+                java.nio.file.FileSystem fs = java.nio.file.FileSystems.newFileSystem(lspDirUri, java.util.Collections.emptyMap());
+                lspPath = fs.getPath("/lsp");
+            } else {
+                // Running from IDE/filesystem
+                lspPath = java.nio.file.Paths.get(lspDirUri);
+            }
+
+            // Scan for server.json files
+            try (java.util.stream.Stream<java.nio.file.Path> entries = java.nio.file.Files.list(lspPath)) {
+                entries.filter(java.nio.file.Files::isDirectory)
+                       .forEach(dir -> {
+                           String serverId = dir.getFileName().toString();
+                           try {
+                               LspServerConfig config = loadBundled(serverId);
+                               configs.put(config.getId(), config);
+                               LOG.infof("Auto-discovered bundled server: %s", config.getId());
+                           } catch (IOException e) {
+                               LOG.debugf("Skipping %s (no valid server.json): %s", serverId, e.getMessage());
+                           }
+                       });
+            }
+
+        } catch (Exception e) {
+            LOG.errorf(e, "Failed to auto-discover bundled servers");
         }
 
         return configs;
@@ -105,87 +138,105 @@ public class ServerDescriptorLoader {
      * Parse server configuration from JSON.
      */
     private LspServerConfig parseServerConfig(InputStream is, String defaultId) throws IOException {
-        JsonNode root = objectMapper.readTree(is);
+        try (InputStreamReader reader = new InputStreamReader(is, StandardCharsets.UTF_8)) {
+            JsonObject root = gson.fromJson(reader, JsonObject.class);
 
-        LspServerConfig config = new LspServerConfig();
+            LspServerConfig config = new LspServerConfig();
 
-        // Basic info
-        config.setId(root.has("id") ? root.get("id").asText() : defaultId);
-        config.setName(root.has("name") ? root.get("name").asText() : null);
-        config.setDescription(root.has("description") ? root.get("description").asText() : null);
+            // Basic info
+            config.setId(root.has("id") ? root.get("id").getAsString() : defaultId);
+            config.setName(root.has("name") ? root.get("name").getAsString() : null);
+            config.setDescription(root.has("description") ? root.get("description").getAsString() : null);
 
-        // Command - can be String or Object (for OS-specific commands)
-        if (root.has("command")) {
-            JsonNode commandNode = root.get("command");
-            if (commandNode.isTextual()) {
-                // Simple string command
-                config.setCommand(commandNode.asText());
-            } else if (commandNode.isObject()) {
-                // OS-specific commands: {windows: "...", default: "..."}
-                Map<String, String> commandMap = new HashMap<>();
-                commandNode.fields().forEachRemaining(entry -> {
-                    commandMap.put(entry.getKey(), entry.getValue().asText());
-                });
-                config.setCommand(commandMap);
+            // Command - can be String or Object (for OS-specific commands)
+            if (root.has("command")) {
+                JsonElement commandNode = root.get("command");
+                if (commandNode.isJsonPrimitive()) {
+                    // Simple string command
+                    config.setCommand(commandNode.getAsString());
+                } else if (commandNode.isJsonObject()) {
+                    // OS-specific commands: {windows: "...", default: "..."}
+                    Map<String, String> commandMap = new HashMap<>();
+                    commandNode.getAsJsonObject().entrySet().forEach(entry -> {
+                        commandMap.put(entry.getKey(), entry.getValue().getAsString());
+                    });
+                    config.setCommand(commandMap);
+                }
             }
-        }
 
-        // Args (if separate from command)
-        if (root.has("args")) {
-            List<String> args = new ArrayList<>();
-            root.get("args").forEach(arg -> args.add(arg.asText()));
-            config.setArgs(args);
-        }
+            // Args (if separate from command)
+            if (root.has("args")) {
+                List<String> args = new ArrayList<>();
+                root.getAsJsonArray("args").forEach(arg -> args.add(arg.getAsString()));
+                config.setArgs(args);
+            }
 
-        // Document selector
-        if (root.has("documentSelector")) {
-            List<DocumentSelector> selectors = new ArrayList<>();
-            root.get("documentSelector").forEach(selectorNode -> {
-                DocumentSelector selector = new DocumentSelector();
-                if (selectorNode.has("language")) {
-                    selector.setLanguage(selectorNode.get("language").asText());
+            // Document selector
+            if (root.has("documentSelector")) {
+                List<DocumentSelector> selectors = new ArrayList<>();
+                root.getAsJsonArray("documentSelector").forEach(selectorEl -> {
+                    JsonObject selectorNode = selectorEl.getAsJsonObject();
+                    DocumentSelector selector = new DocumentSelector();
+                    if (selectorNode.has("language")) {
+                        selector.setLanguage(selectorNode.get("language").getAsString());
+                    }
+                    if (selectorNode.has("scheme")) {
+                        selector.setScheme(selectorNode.get("scheme").getAsString());
+                    }
+                    if (selectorNode.has("pattern")) {
+                        selector.setPattern(selectorNode.get("pattern").getAsString());
+                    }
+                    selectors.add(selector);
+                });
+                config.setDocumentSelector(selectors);
+            }
+
+            // Contributes (extensions)
+            if (root.has("contributes")) {
+                JsonElement contributesEl = root.get("contributes");
+                if (contributesEl.isJsonObject()) {
+                    // Parse the contributes structure: { "jdtls": {...}, "microprofile": {...} }
+                    Contributes contributes = new Contributes();
+                    Map<String, JsonElement> contributionsMap = new HashMap<>();
+                    contributesEl.getAsJsonObject().entrySet().forEach(entry -> {
+                        contributionsMap.put(entry.getKey(), entry.getValue());
+                    });
+                    contributes.setContributions(contributionsMap);
+                    config.setContributes(contributes);
                 }
-                if (selectorNode.has("scheme")) {
-                    selector.setScheme(selectorNode.get("scheme").asText());
-                }
-                if (selectorNode.has("pattern")) {
-                    selector.setPattern(selectorNode.get("pattern").asText());
-                }
-                selectors.add(selector);
-            });
-            config.setDocumentSelector(selectors);
-        }
+            }
 
-        // Installer (deprecated in server.json, should be in separate installer.json)
-        if (root.has("installer")) {
-            LOG.warnf("Installer config in server.json is deprecated, use separate installer.json for: %s", config.getId());
-            InstallerConfig installer = objectMapper.treeToValue(root.get("installer"), InstallerConfig.class);
-            config.setInstaller(installer);
-        }
+            // Installer (deprecated in server.json, should be in separate installer.json)
+            if (root.has("installer")) {
+                LOG.warnf("Installer config in server.json is deprecated, use separate installer.json for: %s", config.getId());
+                InstallerConfig installer = gson.fromJson(root.get("installer"), InstallerConfig.class);
+                config.setInstaller(installer);
+            }
 
-        // Environment variables
-        if (root.has("env")) {
-            Map<String, String> env = new HashMap<>();
-            root.get("env").fields().forEachRemaining(entry ->
-                env.put(entry.getKey(), entry.getValue().asText())
-            );
-            config.setEnv(env);
-        }
+            // Environment variables
+            if (root.has("env")) {
+                Map<String, String> env = new HashMap<>();
+                root.getAsJsonObject("env").entrySet().forEach(entry ->
+                    env.put(entry.getKey(), entry.getValue().getAsString())
+                );
+                config.setEnv(env);
+            }
 
-        // Working directory
-        if (root.has("workingDirectory")) {
-            config.setWorkingDirectory(root.get("workingDirectory").asText());
-        }
+            // Working directory
+            if (root.has("workingDirectory")) {
+                config.setWorkingDirectory(root.get("workingDirectory").getAsString());
+            }
 
-        // Initialization options
-        if (root.has("initializationOptions")) {
-            Map<String, Object> initOptions = objectMapper.convertValue(
-                root.get("initializationOptions"),
-                objectMapper.getTypeFactory().constructMapType(Map.class, String.class, Object.class)
-            );
-            config.setInitializationOptions(initOptions);
-        }
+            // Initialization options
+            if (root.has("initializationOptions")) {
+                Map<String, Object> initOptions = gson.fromJson(
+                    root.get("initializationOptions"),
+                    new com.google.gson.reflect.TypeToken<Map<String, Object>>() {}.getType()
+                );
+                config.setInitializationOptions(initOptions);
+            }
 
-        return config;
+            return config;
+        }
     }
 }

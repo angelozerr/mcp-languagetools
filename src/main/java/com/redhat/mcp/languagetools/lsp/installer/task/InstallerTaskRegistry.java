@@ -17,6 +17,7 @@ public class InstallerTaskRegistry {
         registerFactory("fileExists", new FileExistsTaskFactory(this));
         registerFactory("download", new DownloadTaskFactory(this));
         registerFactory("configureServer", new ConfigureServerTaskFactory(this));
+        registerFactory("copy", new CopyTaskFactory(this));
     }
 
     public void registerFactory(String taskName, InstallerTaskFactory factory) {

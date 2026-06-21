@@ -1,11 +1,8 @@
 package com.redhat.mcp.languagetools.lsp;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
-
 /**
  * Configuration for a language server installer.
  */
-@JsonInclude(JsonInclude.Include.NON_NULL)
 public class InstallerConfig {
 
     /**

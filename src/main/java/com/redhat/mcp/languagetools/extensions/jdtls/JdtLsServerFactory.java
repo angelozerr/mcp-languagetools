@@ -7,6 +7,7 @@ import com.redhat.mcp.languagetools.lsp.trace.LspTraceCollector;
 
 import java.net.URI;
 import java.nio.file.Path;
+import java.util.List;
 
 /**
  * Factory for creating JDT.LS custom server instances.
@@ -21,7 +22,8 @@ public class JdtLsServerFactory implements LspServerFactory {
     @Override
     public LspServer createServer(LspServerConfig config, URI workspaceRoot,
                                   Path workspaceDataDir, Path serverHome,
-                                  LspTraceCollector traceCollector) {
-        return new JdtLsServer(config, workspaceRoot, workspaceDataDir, serverHome, traceCollector);
+                                  LspTraceCollector traceCollector,
+                                  List<LspServerConfig> allServerConfigs) {
+        return new JdtLsServer(config, workspaceRoot, workspaceDataDir, serverHome, traceCollector, allServerConfigs);
     }
 }

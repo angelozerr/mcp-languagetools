@@ -6,6 +6,7 @@ import org.jboss.logging.Logger;
 import java.net.URI;
 import java.nio.file.Path;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.ServiceLoader;
 
@@ -29,20 +30,29 @@ public class LspServerFactoryRegistry {
 
     /**
      * Create an LSP server instance based on the config.
-     * Returns a custom implementation if a factory is registered,
-     * or the default LspServer otherwise.
+     * Priority:
+     * 1. Custom factory registered via SPI (e.g., JdtLsServer) - for servers with special needs
+     * 2. ClasspathExtensibleLspServer - default for all other servers
+     *
+     * ClasspathExtensibleLspServer automatically detects and applies jarExtensions contributions.
+     * If no extensions exist, it behaves exactly like the base LspServer.
+     *
+     * @param allServerConfigs All server configurations (for reading contributes)
      */
     public static LspServer createServer(LspServerConfig config, URI workspaceRoot,
                                          Path workspaceDataDir, Path serverHome,
-                                         LspTraceCollector traceCollector) {
+                                         LspTraceCollector traceCollector,
+                                         List<LspServerConfig> allServerConfigs) {
 
+        // Check for custom factory (highest priority)
         LspServerFactory factory = factories.get(config.getId());
         if (factory != null) {
             LOG.infof("Creating custom LSP server for %s (workspace: %s)", config.getId(), workspaceRoot);
-            return factory.createServer(config, workspaceRoot, workspaceDataDir, serverHome, traceCollector);
+            return factory.createServer(config, workspaceRoot, workspaceDataDir, serverHome, traceCollector, allServerConfigs);
         }
 
-        LOG.debugf("Creating default LSP server for %s", config.getId());
-        return new LspServer(config, workspaceRoot, workspaceDataDir, serverHome, traceCollector);
+        // Default: use classpath-extensible server (supports jarExtensions contributions)
+        LOG.debugf("Creating classpath-extensible LSP server for %s", config.getId());
+        return new ClasspathExtensibleLspServer(config, workspaceRoot, workspaceDataDir, serverHome, traceCollector, allServerConfigs);
     }
 }

@@ -2,6 +2,8 @@ package com.redhat.mcp.languagetools.admin;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
+import com.redhat.mcp.languagetools.admin.dto.ErrorResponse;
+import com.redhat.mcp.languagetools.admin.dto.StatusResponse;
 import com.redhat.mcp.languagetools.lsp.LspServerConfig;
 import com.redhat.mcp.languagetools.lsp.installer.InstallerContext;
 import com.redhat.mcp.languagetools.lsp.installer.task.InstallerTask;
@@ -66,14 +68,14 @@ public class InstallerResource {
             // Get server config
             LspServerConfig config = workspaceManager.getServerConfigs().get(serverId);
             if (config == null) {
-                return Response.status(404).entity("{\"error\": \"Server config not found\"}").build();
+                return Response.status(404).entity(new ErrorResponse("Server config not found")).build();
             }
 
             // Load installer.json (user config or bundled)
             Gson gson = new Gson();
             JsonObject installerJson = loadInstallerJson(serverId, gson);
             if (installerJson == null) {
-                return Response.status(404).entity("{\"error\": \"No installer.json found for " + serverId + "\"}").build();
+                return Response.status(404).entity(new ErrorResponse("No installer.json found for " + serverId)).build();
             }
 
             // Get or create workspace to update status
@@ -158,12 +160,12 @@ public class InstallerResource {
             }
 
             return Response.status(400)
-                    .entity("{\"error\": \"No run task defined in installer.json\"}")
+                    .entity(new ErrorResponse("No run task defined in installer.json"))
                     .build();
 
         } catch (Exception e) {
             return Response.status(500)
-                    .entity("{\"error\": \"" + e.getMessage() + "\"}")
+                    .entity(new ErrorResponse(e.getMessage()))
                     .build();
         }
     }
