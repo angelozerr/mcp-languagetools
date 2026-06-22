@@ -217,8 +217,9 @@
             cursor: pointer;
             border-left: 3px solid transparent;
             transition: all 0.2s;
-            border-bottom: 1px solid #1e1e1e;
+            border-bottom: 1px solid #3a3a3a;
             position: relative;
+            background: #1e1e1e;
         }
 
         .server-item:hover {
@@ -1160,6 +1161,7 @@
         let workspaces = [];
         let selectedWorkspace = null;
         let selectedServer = null;
+        let selectedAllServer = null; // Track selected server in "All Servers" tab
         let eventSource = null;
         let tracesByServer = {}; // Store traces per server: {serverId: [...traces]}
         let currentTab = 'workspaces';
@@ -1187,20 +1189,33 @@
                 // 3 columns layout: workspaces | servers | console
                 appContainer.style.gridTemplateColumns = '300px 300px 1fr';
                 consoleColumn.style.gridColumn = '3';
+
+                // If we have a selected workspace and server, reload the console
+                if (selectedWorkspace && selectedServer) {
+                    loadConsole(selectedServer);
+                }
             } else {
                 document.getElementById('workspaces-list').style.display = 'none';
                 document.getElementById('all-servers-list').style.display = 'block';
                 serversColumn.style.display = 'none';
-                // 2 columns layout: workspaces | console (skip middle)
+                // 2 columns layout: servers | console
                 appContainer.style.gridTemplateColumns = '300px 1fr';
                 consoleColumn.style.gridColumn = '2';
-                // Don't hide console if showing server details
-                if (!consoleColumn.querySelector('.details-panel')) {
-                    consoleColumn.style.display = 'none';
-                }
-                // Only load once
+
+                // Load servers if not already loaded
                 if (!allServersLoaded) {
                     loadAllServers();
+                } else {
+                    // Already loaded, just show details of previously selected server (or first)
+                    fetch('/api/admin/servers')
+                        .then(response => response.json())
+                        .then(servers => {
+                            if (servers.length > 0) {
+                                const previousServerExists = selectedAllServer && servers.find(s => s.id === selectedAllServer);
+                                const serverToShow = previousServerExists ? selectedAllServer : servers[0].id;
+                                showServerDetails(serverToShow);
+                            }
+                        });
                 }
             }
         }
@@ -1211,16 +1226,29 @@
                 const servers = await response.json();
 
                 const container = document.getElementById('all-servers-list');
+                if (!container) {
+                    console.error('all-servers-list container not found');
+                    return;
+                }
                 container.innerHTML = servers.map(server => {
+                    const isActive = selectedAllServer === server.id ? 'active' : '';
                     return `
-                        <div class="server-item" onclick="showServerDetails('${server.id}')">
+                        <div class="server-item ${isActive}" onclick="showServerDetails('${server.id}')">
                             <div class="server-name">${server.name}</div>
                             <div class="server-id">${server.id}</div>
                         </div>
                     `;
                 }).join('');
+                console.log('All servers rendered:', servers.length, 'selectedAllServer:', selectedAllServer);
 
                 allServersLoaded = true;
+
+                // Auto-select previously selected server if it exists, otherwise first server
+                if (servers.length > 0) {
+                    const previousServerExists = selectedAllServer && servers.find(s => s.id === selectedAllServer);
+                    const serverToShow = previousServerExists ? selectedAllServer : servers[0].id;
+                    showServerDetails(serverToShow);
+                }
             } catch (error) {
                 console.error('Failed to load all servers:', error);
             }
@@ -1228,6 +1256,24 @@
 
         async function showServerDetails(serverId) {
             console.log('showServerDetails called for:', serverId);
+
+            // Update selected server and refresh list to show active state
+            selectedAllServer = serverId;
+
+            // Re-render server list to update active state
+            const response = await fetch('/api/admin/servers');
+            const servers = await response.json();
+            const container = document.getElementById('all-servers-list');
+            container.innerHTML = servers.map(server => {
+                const isActive = selectedAllServer === server.id ? 'active' : '';
+                return `
+                    <div class="server-item ${isActive}" onclick="showServerDetails('${server.id}')">
+                        <div class="server-name">${server.name}</div>
+                        <div class="server-id">${server.id}</div>
+                    </div>
+                `;
+            }).join('');
+
             try {
                 // Show console column and adjust grid
                 const appContainer = document.querySelector('.app-container');
@@ -1551,9 +1597,10 @@
                 `;
             }).join('');
 
-            // Auto-select first server if none selected
+            // Auto-select first RUNNING server if none selected, otherwise first server
             if (!selectedServer && servers.length > 0) {
-                selectServer(servers[0]);
+                const runningServer = servers.find(s => s.status === 'RUNNING');
+                selectServer(runningServer || servers[0]);
             }
         }
 
