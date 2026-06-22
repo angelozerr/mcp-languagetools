@@ -14,8 +14,11 @@ import com.redhat.mcp.languagetools.lsp.trace.LspTraceCollector;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.event.Event;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
+import com.redhat.mcp.languagetools.admin.McpClientChangeEvent;
+import com.redhat.mcp.languagetools.lsp.LspServerStatusChangeEvent;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
@@ -54,6 +57,15 @@ public class WorkspaceManager {
 
     @Inject
     com.redhat.mcp.languagetools.mcp.McpClientTracker mcpClientTracker;
+
+    @Inject
+    Event<WorkspaceChangeEvent> workspaceChangeEvent;
+
+    @Inject
+    Event<McpClientChangeEvent> mcpClientChangeEvent;
+
+    @Inject
+    Event<LspServerStatusChangeEvent> lspServerStatusChangeEvent;
 
     @ConfigProperty(name = "mcp.lsp.workspace.data-dir")
     Path workspaceDataDir;
@@ -99,15 +111,44 @@ public class WorkspaceManager {
         URI normalizedUri = normalizeUri(rootUri);
 
         // Get or create workspace (without initialization)
+        boolean isNewWorkspace = !workspaces.containsKey(normalizedUri);
+
         Workspace workspace = workspaces.computeIfAbsent(normalizedUri, uri -> {
             Workspace ws = new Workspace(uri, workspaceDataDir, traceCollector);
+
+            // Register callback for LSP server status changes
+            ws.setServerStatusChangeCallback(event -> {
+                lspServerStatusChangeEvent.fire(event);
+            });
+
             LOG.infof("Created workspace %s", uri);
             return ws;
         });
 
+        // Fire event if workspace was just created
+        if (isNewWorkspace) {
+            workspaceChangeEvent.fire(new WorkspaceChangeEvent(
+                WorkspaceChangeEvent.Type.CREATED,
+                normalizedUri
+            ));
+        }
+
         // Add current MCP client to this workspace
         String clientName = mcpClientTracker.getCurrentClientName();
-        workspace.addMcpClient(clientName);
+        String connectionId = mcpClientTracker.getCurrentConnectionId();
+
+        LOG.infof("Adding MCP client to workspace %s: name=%s, connectionId=%s",
+                 normalizedUri, clientName, connectionId);
+
+        boolean isNewClient = workspace.addMcpClient(connectionId, clientName);
+
+        // Fire event if a new client was added
+        if (isNewClient) {
+            LOG.infof("New MCP client added to workspace, firing McpClientChangeEvent");
+            mcpClientChangeEvent.fire(new McpClientChangeEvent());
+        } else {
+            LOG.infof("MCP client already exists in workspace, no event fired");
+        }
 
         return CompletableFuture.completedFuture(workspace);
     }
@@ -442,6 +483,12 @@ public class WorkspaceManager {
             // Remove from active workspaces
             workspaces.remove(workspaceUri);
             LOG.infof("Workspace closed and removed from memory: %s", workspaceUri);
+
+            // Fire workspace closed event
+            workspaceChangeEvent.fire(new WorkspaceChangeEvent(
+                WorkspaceChangeEvent.Type.CLOSED,
+                workspaceUri
+            ));
         });
     }
 

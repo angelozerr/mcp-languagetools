@@ -37,8 +37,9 @@ public class Workspace {
     private final Map<String, ServerInfo> serverInfos = new ConcurrentHashMap<>();
     private final Map<String, ServerStatus> installationStatus = new ConcurrentHashMap<>();
     private List<com.redhat.mcp.languagetools.lsp.LspServerConfig> allServerConfigs = new ArrayList<>();
-    private final Map<String, java.time.Instant> mcpClientConnections = new ConcurrentHashMap<>();
+    private final Map<String, McpClientInfo> mcpClientConnections = new ConcurrentHashMap<>();
     private volatile boolean initialized = false;
+    private java.util.function.Consumer<com.redhat.mcp.languagetools.lsp.LspServerStatusChangeEvent> statusChangeCallback;
 
     private static class ServerInfo {
         final LspServerConfig config;
@@ -48,6 +49,13 @@ public class Workspace {
             this.config = config;
             this.serverHome = serverHome;
         }
+    }
+
+    public record McpClientInfo(
+        String connectionId,
+        String name,
+        java.time.Instant connectedAt
+    ) {
     }
 
     public Workspace(URI rootUri, Path workspaceDataDir, LspTraceCollector traceCollector) {
@@ -62,6 +70,13 @@ public class Workspace {
      */
     public void setExtensionManager(com.redhat.mcp.languagetools.lsp.ExtensionManager extensionManager) {
         this.extensionManager = extensionManager;
+    }
+
+    /**
+     * Set callback for LSP server status changes.
+     */
+    public void setServerStatusChangeCallback(java.util.function.Consumer<com.redhat.mcp.languagetools.lsp.LspServerStatusChangeEvent> callback) {
+        this.statusChangeCallback = callback;
     }
 
     /**
@@ -85,6 +100,18 @@ public class Workspace {
 
         // Set up request router for bindRequest support
         server.setRequestRouter(createRequestRouter());
+
+        // Register status change callback
+        server.setStatusChangeCallback(newStatus -> {
+            if (statusChangeCallback != null) {
+                statusChangeCallback.accept(new com.redhat.mcp.languagetools.lsp.LspServerStatusChangeEvent(
+                    rootUri,
+                    config.getId(),
+                    server.getStatus(),  // oldStatus (we don't track it here, using current as approximation)
+                    newStatus
+                ));
+            }
+        });
 
         lspServers.put(config.getId(), server);
         serverInfos.put(config.getId(), new ServerInfo(config, serverHome));
@@ -328,18 +355,36 @@ public class Workspace {
     /**
      * Add an MCP client name to this workspace.
      */
-    public void addMcpClient(String clientName) {
-        if (clientName != null && !clientName.isEmpty()) {
-            mcpClientConnections.put(clientName, java.time.Instant.now());
-            LOG.infof("Added MCP client '%s' to workspace: %s (total: %d)",
-                     clientName, rootUri, mcpClientConnections.size());
+    /**
+     * Add an MCP client to this workspace.
+     * @param connectionId MCP connection ID
+     * @param clientName Client name (e.g., "claude-code 2.1.183")
+     * @return true if this is a new client, false if it already existed
+     */
+    public boolean addMcpClient(String connectionId, String clientName) {
+        if (connectionId != null && !connectionId.isEmpty()) {
+            boolean isNew = !mcpClientConnections.containsKey(connectionId);
+            if (isNew) {
+                mcpClientConnections.put(connectionId, new McpClientInfo(
+                    connectionId,
+                    clientName,
+                    java.time.Instant.now()
+                ));
+                LOG.infof("Added MCP client '%s' [%s] to workspace: %s (total: %d)",
+                         clientName, connectionId, rootUri, mcpClientConnections.size());
+            } else {
+                LOG.debugf("MCP client '%s' [%s] already connected to workspace: %s",
+                          clientName, connectionId, rootUri);
+            }
+            return isNew;
         }
+        return false;
     }
 
     /**
-     * Get all MCP client connections with their timestamps.
+     * Get all MCP client connections.
      */
-    public Map<String, java.time.Instant> getMcpClientConnections() {
+    public Map<String, McpClientInfo> getMcpClientConnections() {
         return java.util.Collections.unmodifiableMap(mcpClientConnections);
     }
 

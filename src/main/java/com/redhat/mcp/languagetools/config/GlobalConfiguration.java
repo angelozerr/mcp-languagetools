@@ -110,4 +110,33 @@ public class GlobalConfiguration {
         save();
         LOG.infof("Set trace level for %s: %s", serverId, level);
     }
+
+    /**
+     * Get MCP trace level.
+     * @return "off", "messages", or "verbose" (default)
+     */
+    public String getMcpTraceLevel() {
+        Object mcpConfig = config.get("mcp");
+        if (mcpConfig instanceof Map) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> mcp = (Map<String, Object>) mcpConfig;
+            Object trace = mcp.get("trace");
+            if (trace instanceof String) {
+                return (String) trace;
+            }
+        }
+        return "verbose"; // Default
+    }
+
+    /**
+     * Set MCP trace level.
+     */
+    public synchronized void setMcpTraceLevel(String level) {
+        @SuppressWarnings("unchecked")
+        Map<String, Object> mcp = (Map<String, Object>) config.computeIfAbsent("mcp", k -> new HashMap<>());
+        mcp.put("trace", level);
+
+        save();
+        LOG.infof("Set MCP trace level: %s", level);
+    }
 }

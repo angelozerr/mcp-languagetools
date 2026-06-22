@@ -17,12 +17,18 @@ package com.redhat.mcp.languagetools.mcp;
 public class McpClientConnectedEvent {
 
     private final String clientName;
+    private final String connectionId;
 
-    public McpClientConnectedEvent(String clientName) {
+    public McpClientConnectedEvent(String clientName, String connectionId) {
         this.clientName = clientName;
+        this.connectionId = connectionId;
     }
 
     public String getClientName() {
         return clientName;
+    }
+
+    public String getConnectionId() {
+        return connectionId;
     }
 }

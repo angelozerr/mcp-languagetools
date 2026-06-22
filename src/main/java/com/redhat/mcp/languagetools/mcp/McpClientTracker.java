@@ -24,13 +24,19 @@ public class McpClientTracker {
     private static final Logger LOG = Logger.getLogger(McpClientTracker.class);
 
     private volatile String currentClientName = "No client connected";
+    private volatile String currentConnectionId = null;
 
     void onClientConnected(@Observes McpClientConnectedEvent event) {
         this.currentClientName = event.getClientName();
-        LOG.infof("Updated current MCP client: %s", currentClientName);
+        this.currentConnectionId = event.getConnectionId();
+        LOG.infof("Updated current MCP client: %s [%s]", currentClientName, currentConnectionId);
     }
 
     public String getCurrentClientName() {
         return currentClientName;
+    }
+
+    public String getCurrentConnectionId() {
+        return currentConnectionId;
     }
 }
