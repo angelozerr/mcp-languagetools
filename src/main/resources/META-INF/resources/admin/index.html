@@ -1004,6 +1004,40 @@
             white-space: pre-wrap;
         }
 
+        /* MCP Trace body styles (same as LSP but with mcp-trace-body prefix) */
+        .mcp-trace-body {
+            padding-left: 1.5rem;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            transition: all 0.2s ease;
+        }
+
+        .mcp-trace-body.collapsed {
+            height: 0;
+            opacity: 0;
+            overflow: hidden;
+            margin: 0;
+            padding: 0;
+        }
+
+        .mcp-trace-body.expanded {
+            height: auto;
+            opacity: 1;
+            padding: 0 0.25rem 0.25rem 1.5rem;
+        }
+
+        .mcp-trace-body.collapsed::after {
+            content: attr(data-content);
+            position: absolute;
+            left: -9999px;
+            white-space: pre-wrap;
+        }
+
+        /* MCP console without padding (different from LSP) */
+        #mcp-console-output {
+            padding: 0.5rem;
+        }
+
         #console-area {
             flex: 1;
             display: flex;
@@ -1120,10 +1154,18 @@
                 <div class="tabs">
                     <div class="tab active" onclick="switchTab('workspaces', this)">Workspaces</div>
                     <div class="tab" onclick="switchTab('all-servers', this)">Servers</div>
+                    <div class="tab" onclick="switchTab('mcp-traces', this)">MCP</div>
                 </div>
             </div>
             <div id="workspaces-list"></div>
             <div id="all-servers-list" style="display: none;"></div>
+            <div id="mcp-traces-list" style="display: none;">
+                <div style="padding: 1rem; border-bottom: 1px solid #1e1e1e;">
+                    <h3 style="margin-bottom: 0.25rem; color: #cccccc;">AI Clients</h3>
+                    <p style="font-size: 0.75rem; color: #666;">Connected via MCP</p>
+                </div>
+                <div id="mcp-clients-list"></div>
+            </div>
         </div>
 
         <!-- Middle: LSP Servers -->
@@ -1157,6 +1199,8 @@
         let tracesByServer = {}; // Store traces per server: {serverId: [...traces]}
         let currentTab = 'workspaces';
         let allServersLoaded = false;
+        let workspacesEventSource = null;
+        let mcpClientsEventSource = null;
 
         function switchTab(tab, element) {
             currentTab = tab;
@@ -1175,6 +1219,7 @@
             if (tab === 'workspaces') {
                 document.getElementById('workspaces-list').style.display = 'block';
                 document.getElementById('all-servers-list').style.display = 'none';
+                document.getElementById('mcp-traces-list').style.display = 'none';
                 serversColumn.style.display = 'block';
                 consoleColumn.style.display = 'flex';
                 // 3 columns layout: workspaces | servers | console
@@ -1185,10 +1230,12 @@
                 if (selectedWorkspace && selectedServer) {
                     loadConsole(selectedServer);
                 }
-            } else {
+            } else if (tab === 'all-servers') {
                 document.getElementById('workspaces-list').style.display = 'none';
                 document.getElementById('all-servers-list').style.display = 'block';
+                document.getElementById('mcp-traces-list').style.display = 'none';
                 serversColumn.style.display = 'none';
+                consoleColumn.style.display = 'flex';
                 // 2 columns layout: servers | console
                 appContainer.style.gridTemplateColumns = '300px 1fr';
                 consoleColumn.style.gridColumn = '2';
@@ -1208,6 +1255,32 @@
                             }
                         });
                 }
+            } else if (tab === 'mcp-traces') {
+                document.getElementById('workspaces-list').style.display = 'none';
+                document.getElementById('all-servers-list').style.display = 'none';
+                document.getElementById('mcp-traces-list').style.display = 'block';
+                serversColumn.style.display = 'none';
+                consoleColumn.style.display = 'flex';
+                // 2 columns layout: mcp info | console
+                appContainer.style.gridTemplateColumns = '300px 1fr';
+                consoleColumn.style.gridColumn = '2';
+
+                // Load MCP clients and auto-select
+                loadMcpClients().then(() => {
+                    // Auto-select first client or previously selected client
+                    if (mcpClients.length > 0) {
+                        if (selectedMcpClient && mcpClients.find(c => c.id === selectedMcpClient)) {
+                            // Re-select and refresh
+                            loadMcpConsole(selectedMcpClient);
+                        } else {
+                            // Select first client
+                            selectMcpClient(mcpClients[0].id);
+                        }
+                    } else {
+                        // No clients, show placeholder
+                        loadMcpTracesConsole();
+                    }
+                });
             }
         }
 
@@ -1267,7 +1340,6 @@
                 // Show console column and adjust grid
                 const appContainer = document.querySelector('.app-container');
                 const consoleColumn = document.querySelector('.console-container');
-                console.log('Console column:', consoleColumn);
                 consoleColumn.style.display = 'flex';
                 // 2 columns: left sidebar (300px) + console (rest), console in position 2
                 appContainer.style.gridTemplateColumns = '300px 1fr';
@@ -1276,9 +1348,7 @@
                 // Fetch server details
                 console.log('Fetching details for:', serverId);
                 const response = await fetch(`/api/admin/servers/${serverId}/details`);
-                console.log('Response status:', response.status);
                 const details = await response.json();
-                console.log('Details received:', details);
 
                 // Format command (can be string or object)
                 let commandStr = '';
@@ -1325,8 +1395,6 @@
                 `;
 
                 const consoleArea = document.getElementById('console-area');
-                console.log('console-area element:', consoleArea);
-                console.log('HTML to insert:', html.substring(0, 200));
                 consoleArea.innerHTML = html;
                 console.log('innerHTML set, now checking:', consoleArea.innerHTML.substring(0, 100));
             } catch (error) {
@@ -1339,7 +1407,55 @@
             }
         }
 
-        // Load workspaces
+        // Setup workspaces stream via SSE (with fallback to polling)
+        function setupWorkspacesStream() {
+            // Check SSE support
+            if (typeof EventSource === 'undefined') {
+                console.warn('SSE not supported, falling back to polling');
+                // Fallback: poll every 2 seconds
+                setInterval(() => {
+                    loadWorkspaces();
+                    if (selectedWorkspace) {
+                        loadServers(selectedWorkspace);
+                    }
+                }, 2000);
+                return;
+            }
+
+            if (workspacesEventSource) {
+                workspacesEventSource.close();
+            }
+
+            workspacesEventSource = new EventSource('/api/admin/workspaces/stream');
+
+            workspacesEventSource.onmessage = (event) => {
+                try {
+                    workspaces = JSON.parse(event.data);
+                    renderWorkspaces();
+
+                    // Auto-select first workspace if available
+                    if (workspaces.length > 0 && !selectedWorkspace) {
+                        selectWorkspace(workspaces[0].rootUri);
+                    }
+
+                    // Refresh servers for selected workspace
+                    if (selectedWorkspace) {
+                        const workspace = workspaces.find(w => w.rootUri === selectedWorkspace);
+                        if (workspace) {
+                            renderServers(workspace.lspServers);
+                        }
+                    }
+                } catch (error) {
+                    console.error('Failed to parse workspaces:', error);
+                }
+            };
+
+            workspacesEventSource.onerror = () => {
+                console.error('Workspaces SSE connection error');
+            };
+        }
+
+        // Load workspaces (initial load only, SSE will keep it updated)
         async function loadWorkspaces() {
             try {
                 const response = await fetch('/api/admin/workspaces');
@@ -1403,9 +1519,22 @@
                         <div class="workspace-section">
                             <div class="workspace-section-title">AI Clients</div>
                             ${ws.mcpClients.map(client => {
-                                const date = new Date(client.connectedAt);
-                                const time = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-                                return `<div class="workspace-section-item" title="${client.connectedAt}">📱 ${client.name} <span class="client-time">@ ${time}</span></div>`;
+                                let timeStr = '';
+                                if (client.connectedAt) {
+                                    try {
+                                        const date = new Date(client.connectedAt);
+                                        timeStr = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                                    } catch (e) {
+                                        timeStr = '';
+                                    }
+                                }
+                                const shortId = client.connectionId ? client.connectionId.substring(0, 8) + '...' : '';
+                                return `
+                                    <div class="workspace-section-item" title="Session: ${client.connectionId || 'N/A'}">
+                                        <div>📱 ${client.name}${timeStr ? ` <span class="client-time">@ ${timeStr}</span>` : ''}</div>
+                                        ${shortId ? `<div style="font-size: 0.7rem; color: #555; margin-left: 1.5rem; margin-top: 0.15rem;">Session: ${shortId}</div>` : ''}
+                                    </div>
+                                `;
                             }).join('')}
                         </div>
                     ` : ''}
@@ -1485,7 +1614,6 @@
                         // Reload workspaces list
                         await loadWorkspaces();
 
-                        console.log('Workspace closed:', uri);
                     } catch (error) {
                         console.error('Failed to close workspace:', error);
                         alert('Failed to close workspace: ' + error.message);
@@ -1795,9 +1923,15 @@
 
         async function loadInstallerJson(serverId) {
             try {
+                const editor = document.getElementById('installer-json-editor');
+                if (!editor) {
+                    console.warn('installer-json-editor element not found, skipping load');
+                    return;
+                }
+
                 const response = await fetch(`/api/admin/servers/${serverId}/installer`);
                 if (!response.ok) {
-                    document.getElementById('installer-json-editor').value = '// No installer.json found';
+                    editor.value = '// No installer.json found';
                     return;
                 }
 
@@ -1805,10 +1939,13 @@
                 const formatted = JSON.stringify(installerJson, null, 2);
                 originalInstallerJson = formatted;
 
-                document.getElementById('installer-json-editor').value = formatted;
+                editor.value = formatted;
             } catch (error) {
                 console.error('Failed to load installer.json:', error);
-                document.getElementById('installer-json-editor').value = `// Error loading installer.json: ${error.message}`;
+                const editor = document.getElementById('installer-json-editor');
+                if (editor) {
+                    editor.value = `// Error loading installer.json: ${error.message}`;
+                }
             }
         }
 
@@ -1848,13 +1985,18 @@
 
         async function loadServerDetails(serverId) {
             try {
+                const detailsContent = document.getElementById('details-content');
+                if (!detailsContent) {
+                    console.warn('details-content element not found, skipping load');
+                    return;
+                }
+
                 const response = await fetch(`/api/admin/servers/${serverId}/details`);
                 if (!response.ok) {
                     throw new Error('Failed to load server details');
                 }
 
                 const details = await response.json();
-                const detailsContent = document.getElementById('details-content');
 
                 detailsContent.innerHTML = `
                     <h3>Server Configuration</h3>
@@ -1903,8 +2045,10 @@
                 `;
             } catch (error) {
                 console.error('Failed to load server details:', error);
-                document.getElementById('details-content').innerHTML =
-                    `<p class="error">Failed to load server details: ${error.message}</p>`;
+                const detailsContent = document.getElementById('details-content');
+                if (detailsContent) {
+                    detailsContent.innerHTML = `<p class="error">Failed to load server details: ${error.message}</p>`;
+                }
             }
         }
 
@@ -2206,15 +2350,16 @@
 
         let allFolded = true; // Par défaut: tout plié
 
-        function toggleAllTraces() {
-            const consoleOutput = document.getElementById('console-output');
+        // Generic function for toggling all traces (LSP or MCP)
+        function toggleAllTracesGeneric(outputId, bodyClass, toggleClass, buttonId, foldedStateRef) {
+            const consoleOutput = document.getElementById(outputId);
             if (!consoleOutput) return;
 
-            const bodies = consoleOutput.querySelectorAll('.trace-body');
-            const toggles = consoleOutput.querySelectorAll('.trace-toggle');
-            const foldButton = document.getElementById('fold-button');
+            const bodies = consoleOutput.querySelectorAll(`.${bodyClass}`);
+            const toggles = consoleOutput.querySelectorAll(`.${toggleClass}`);
+            const foldButton = document.getElementById(buttonId);
 
-            if (allFolded) {
+            if (foldedStateRef.value) {
                 // Unfold all
                 bodies.forEach(body => {
                     body.classList.remove('collapsed');
@@ -2224,7 +2369,7 @@
                     toggle.textContent = '▼';
                 });
                 foldButton.textContent = 'Fold All';
-                allFolded = false;
+                foldedStateRef.value = false;
             } else {
                 // Fold all
                 bodies.forEach(body => {
@@ -2235,8 +2380,15 @@
                     toggle.textContent = '▶';
                 });
                 foldButton.textContent = 'Unfold All';
-                allFolded = true;
+                foldedStateRef.value = true;
             }
+        }
+
+        function toggleAllTraces() {
+            toggleAllTracesGeneric('console-output', 'trace-body', 'trace-toggle', 'fold-button', {
+                get value() { return allFolded; },
+                set value(v) { allFolded = v; }
+            });
         }
 
         function searchTraces(query) {
@@ -2284,7 +2436,6 @@
                 }
             });
 
-            console.log(`Found ${matchCount} matching traces`);
         }
 
         async function clearConsole() {
@@ -2323,7 +2474,6 @@
                 );
 
                 if (response.ok) {
-                    console.log('Server stopped');
                     // Refresh workspace to update status
                     loadServers(selectedWorkspace);
                 } else {
@@ -2349,7 +2499,6 @@
                 );
 
                 if (response.ok) {
-                    console.log('MCP-managed server started');
                     loadServers(selectedWorkspace);
                 } else {
                     const error = await response.text();
@@ -2382,7 +2531,6 @@
                 );
 
                 if (response.ok) {
-                    console.log('Server restarted');
                     // Refresh workspace to update status
                     loadServers(selectedWorkspace);
                 } else {
@@ -2416,7 +2564,6 @@
                 );
 
                 if (response.ok) {
-                    console.log('Server disconnected from IDE');
                     loadServers(selectedWorkspace);
                 } else {
                     const error = await response.text();
@@ -2441,7 +2588,6 @@
                 );
 
                 if (response.ok) {
-                    console.log('Server connected to IDE');
                     loadServers(selectedWorkspace);
                 } else {
                     const error = await response.text();
@@ -2453,17 +2599,11 @@
             }
         }
 
-        // Auto-refresh
+        // Auto-refresh is no longer needed - SSE handles real-time updates
+        // Keep the function for compatibility but make it a no-op
         function autoRefresh() {
-            // Don't auto-refresh when viewing "All Servers" tab
-            if (currentTab === 'all-servers') {
-                return;
-            }
-
-            loadWorkspaces();
-            if (selectedWorkspace) {
-                loadServers(selectedWorkspace);
-            }
+            // SSE streams handle all updates in real-time
+            // No polling needed anymore
         }
 
         // Search functionality
@@ -2492,9 +2632,13 @@
                 copyFullConsoleContent();
             }
 
-            // Ctrl+F to open search - seulement si un serveur est sélectionné
+            // Ctrl+F to open search - pour LSP ou MCP console
             if (e.ctrlKey && e.key === 'f') {
-                if (consoleOutput && selectedServer) {
+                const mcpConsoleOutput = document.getElementById('mcp-console-output');
+                const isLspConsole = consoleOutput && selectedServer;
+                const isMcpConsole = mcpConsoleOutput && currentTab === 'mcp-traces';
+
+                if (isLspConsole || isMcpConsole) {
                     e.preventDefault();
                     openSearch();
                 }
@@ -2541,7 +2685,6 @@
 
             // Copier dans le presse-papier
             navigator.clipboard.writeText(fullText).then(() => {
-                console.log('Console content copied to clipboard');
                 fullTextSelected = false;
             }).catch(err => {
                 console.error('Failed to copy:', err);
@@ -2657,8 +2800,12 @@
             searchMatches = [];
             currentMatchIndex = -1;
 
-            // Re-render with highlighting
-            renderConsoleWithHighlights();
+            // Re-render with highlighting based on active console
+            if (currentTab === 'mcp-traces') {
+                renderMcpConsoleWithHighlights();
+            } else {
+                renderConsoleWithHighlights();
+            }
 
             // Collect all highlights for navigation
             document.querySelectorAll('.highlight').forEach(el => {
@@ -2848,9 +2995,502 @@
             });
         }
 
+        // ============ MCP Traces ============
+
+        let mcpTraces = [];
+        let mcpTraceLevel = 'verbose';
+        let mcpSseConnection = null;
+        let mcpClients = [];
+        let mcpAllFolded = true;
+        let selectedMcpClient = null;
+        let mcpTracesByClient = {}; // Store traces per client: {connectionId: [...traces]}
+        let mcpTracesStreamStarted = false;
+
+        // Setup MCP clients stream via SSE (with fallback to polling)
+        function setupMcpClientsStream() {
+            // Check SSE support
+            if (typeof EventSource === 'undefined') {
+                console.warn('SSE not supported, falling back to polling');
+                // Fallback: poll every 2 seconds
+                setInterval(loadMcpClients, 2000);
+                return;
+            }
+
+            if (mcpClientsEventSource) {
+                mcpClientsEventSource.close();
+            }
+
+            mcpClientsEventSource = new EventSource('/api/admin/mcp-clients/stream');
+
+            mcpClientsEventSource.onmessage = (event) => {
+                try {
+                    mcpClients = JSON.parse(event.data);
+                    renderMcpClients();
+
+                    // Auto-select first client if none selected, or re-select previous
+                    if (mcpClients.length > 0) {
+                        if (!selectedMcpClient) {
+                            // No selection yet, select first client
+                            selectMcpClient(mcpClients[0].id);
+                        } else {
+                            // Check if previously selected client still exists
+                            const stillExists = mcpClients.find(c => c.id === selectedMcpClient);
+                            if (!stillExists) {
+                                // Previously selected client disconnected, select first
+                                selectMcpClient(mcpClients[0].id);
+                            }
+                            // Note: Don't call renderMcpConsole() here - traces are updated via SSE
+                        }
+                    } else {
+                        // No clients connected
+                        selectedMcpClient = null;
+                    }
+                } catch (error) {
+                    console.error('Failed to parse MCP clients:', error);
+                }
+            };
+
+            mcpClientsEventSource.onerror = () => {
+                console.error('MCP clients SSE connection error');
+            };
+        }
+
+        // Load MCP clients (initial load only, SSE will keep it updated)
+        async function loadMcpClients() {
+            try {
+                const response = await fetch('/api/admin/mcp-clients');
+                mcpClients = await response.json();
+                renderMcpClients();
+
+                // Auto-select first client if none selected
+                if (mcpClients.length > 0 && !selectedMcpClient) {
+                    selectMcpClient(mcpClients[0].id);
+                }
+            } catch (e) {
+                console.error('Failed to load MCP clients:', e);
+                document.getElementById('mcp-clients-list').innerHTML =
+                    '<div style="padding: 1rem; color: #888;">Failed to load clients</div>';
+            }
+        }
+
+        function renderMcpClients() {
+            const list = document.getElementById('mcp-clients-list');
+            if (!list) return;
+
+            if (mcpClients.length === 0) {
+                list.innerHTML = '<div style="padding: 1rem; color: #888;">No clients connected</div>';
+                return;
+            }
+
+            list.innerHTML = mcpClients.map(client => {
+                // Get first trace timestamp for this client
+                const clientTraces = mcpTracesByClient[client.id] || [];
+                let timeStr = '';
+                if (clientTraces.length > 0) {
+                    const firstTrace = clientTraces[0];
+                    try {
+                        const date = new Date(firstTrace.timestamp);
+                        timeStr = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                    } catch (e) {
+                        timeStr = '';
+                    }
+                }
+
+                // Shorten connection ID for display (first 8 chars)
+                const shortId = client.id.substring(0, 8) + '...';
+
+                return `
+                    <div class="workspace-item ${client.id === selectedMcpClient ? 'active' : ''}"
+                         onclick="selectMcpClient('${client.id}')"
+                         style="cursor: pointer;"
+                         title="${escapeHtml(client.id)}">
+                        <div style="font-weight: 600; margin-bottom: 0.25rem;">
+                            📱 ${escapeHtml(client.name)} ${timeStr ? `<span style="color: #666; font-weight: normal; font-size: 0.75rem;">@ ${timeStr}</span>` : ''}
+                        </div>
+                        <div style="font-size: 0.75rem; color: #666; padding-left: 1.5rem;">
+                            Session: ${escapeHtml(shortId)}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function selectMcpClient(clientId) {
+            selectedMcpClient = clientId;
+            renderMcpClients();
+            loadMcpConsole(clientId);
+        }
+
+        /**
+         * Setup SSE stream for MCP traces (call once at startup).
+         */
+        function setupMcpTracesStream() {
+            if (mcpTracesStreamStarted) {
+                console.log('MCP traces stream already started, skipping');
+                return; // Already started
+            }
+            console.log('Setting up MCP traces SSE stream...');
+            mcpTracesStreamStarted = true;
+
+            // Load current trace level
+            fetch('/api/admin/config/mcp/trace')
+                .then(response => response.json())
+                .then(data => {
+                    mcpTraceLevel = data.trace || 'verbose';
+                })
+                .catch(e => {
+                    console.error('Failed to load MCP trace level:', e);
+                    mcpTraceLevel = 'verbose';
+                });
+
+            // Load ALL MCP traces (we'll filter by client later)
+            fetch('/api/admin/mcp-traces?limit=500')
+                .then(response => response.json())
+                .then(allTraces => {
+                    // Organize traces by connectionId (client)
+                    mcpTracesByClient = {};
+                    allTraces.forEach(trace => {
+                        const connectionId = trace.connectionId;
+                        if (!mcpTracesByClient[connectionId]) {
+                            mcpTracesByClient[connectionId] = [];
+                        }
+                        mcpTracesByClient[connectionId].push(trace);
+                    });
+                })
+                .catch(e => {
+                    console.error('Failed to load MCP traces:', e);
+                    mcpTracesByClient = {};
+                });
+
+            // Setup SSE for real-time traces
+            if (mcpSseConnection) {
+                mcpSseConnection.close();
+            }
+
+            mcpSseConnection = new EventSource('/api/admin/mcp-traces/stream');
+            mcpSseConnection.onmessage = (event) => {
+                try {
+                    const trace = JSON.parse(event.data);
+                    const connectionId = trace.connectionId;
+
+                    // Add to the appropriate client's trace list
+                    if (!mcpTracesByClient[connectionId]) {
+                        mcpTracesByClient[connectionId] = [];
+                    }
+                    mcpTracesByClient[connectionId].push(trace);
+
+                    // Keep only last 500 traces per client
+                    if (mcpTracesByClient[connectionId].length > 500) {
+                        mcpTracesByClient[connectionId].shift();
+                    }
+
+                    // Re-render if this is the selected client
+                    if (connectionId === selectedMcpClient) {
+                        renderMcpConsole();
+                    }
+                } catch (e) {
+                    console.error('Failed to parse MCP trace:', e);
+                }
+            };
+        }
+
+        async function loadMcpTracesConsole() {
+            const consoleArea = document.getElementById('console-area');
+
+            // Show placeholder if no client selected yet
+            consoleArea.innerHTML = `
+                <div class="placeholder">
+                    ← Select an AI client to view MCP traces
+                </div>
+            `;
+        }
+
+        async function loadMcpConsole(clientId) {
+            const consoleArea = document.getElementById('console-area');
+
+            // Find client info
+            const client = mcpClients.find(c => c.id === clientId);
+            const clientName = client ? client.name : 'MCP Client';
+
+            // Render console with tabs (exact same structure as LSP)
+            consoleArea.innerHTML = `
+                <div class="console-wrapper">
+                    <div class="console-header">
+                        <div class="console-tabs">
+                            <button class="tab-button active" onclick="switchMcpConsoleTab('traces')">Traces</button>
+                            <button class="tab-button" onclick="switchMcpConsoleTab('tools')">Tools</button>
+                        </div>
+                        <div class="console-controls" id="mcp-traces-controls">
+                            <label style="color: #cccccc; font-size: 0.85rem;">
+                                Trace Level:
+                                <select id="mcp-trace-level" onchange="changeMcpTraceLevel(this.value)" style="margin-left: 0.5rem; background: #3e3e42; color: #cccccc; border: 1px solid #555; padding: 0.25rem 0.5rem; border-radius: 3px;">
+                                    <option value="off" ${mcpTraceLevel === 'off' ? 'selected' : ''}>Off</option>
+                                    <option value="messages" ${mcpTraceLevel === 'messages' ? 'selected' : ''}>Messages</option>
+                                    <option value="verbose" ${mcpTraceLevel === 'verbose' ? 'selected' : ''}>Verbose</option>
+                                </select>
+                            </label>
+                            <button onclick="toggleAllMcpTraces()" id="mcp-fold-button">Unfold All</button>
+                            <button onclick="clearMcpConsole()">Clear</button>
+                        </div>
+                    </div>
+                    <div class="tab-content">
+                        <div id="mcp-traces-tab" class="tab-panel active">
+                            <div class="console" id="mcp-console-output" tabindex="0"></div>
+                        </div>
+                        <div id="mcp-tools-tab" class="tab-panel">
+                            <div class="details-panel">
+                                <p>MCP Tools coming soon...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            renderMcpConsole();
+
+            // SSE is already set up in loadMcpTracesConsole() - no need to duplicate it here
+        }
+
+        async function changeMcpTraceLevel(newLevel) {
+            try {
+                await fetch('/api/admin/config/mcp/trace', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ trace: newLevel })
+                });
+
+                mcpTraceLevel = newLevel;
+                renderMcpConsole();
+            } catch (err) {
+                console.error('Failed to set MCP trace level:', err);
+            }
+        }
+
+        function switchMcpConsoleTab(tab) {
+            // Update tab buttons
+            document.querySelectorAll('#console-area .tab-button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            // Update tab panels
+            document.querySelectorAll('#console-area .tab-panel').forEach(panel => {
+                panel.classList.remove('active');
+            });
+
+            // Show selected tab
+            if (tab === 'traces') {
+                document.getElementById('mcp-traces-tab').classList.add('active');
+                document.getElementById('mcp-traces-controls').style.display = 'flex';
+            } else if (tab === 'tools') {
+                document.getElementById('mcp-tools-tab').classList.add('active');
+                document.getElementById('mcp-traces-controls').style.display = 'none';
+            }
+        }
+
+        function renderMcpConsole() {
+            const output = document.getElementById('mcp-console-output');
+            if (!output) return;
+
+            if (mcpTraceLevel === 'off') {
+                output.innerHTML = '<div style="padding: 1rem; color: #888;">Traces disabled (level: off)</div>';
+                return;
+            }
+
+            // Get traces for the selected client
+            const clientTraces = mcpTracesByClient[selectedMcpClient] || [];
+
+            if (clientTraces.length === 0) {
+                output.innerHTML = '<div style="padding: 1rem; color: #888;">No MCP traces yet...</div>';
+                return;
+            }
+
+            // Save expanded state before re-rendering
+            const expandedTraces = new Set();
+            output.querySelectorAll('.mcp-trace-body.expanded').forEach(el => {
+                expandedTraces.add(el.id);
+            });
+
+            const html = clientTraces.map(trace => formatMcpTrace(trace, '')).join('');
+            output.innerHTML = html;
+
+            // Restore expanded state
+            expandedTraces.forEach(traceId => {
+                const body = document.getElementById(traceId);
+                const arrow = document.getElementById(traceId + '-arrow');
+                if (body && arrow) {
+                    body.classList.remove('collapsed');
+                    body.classList.add('expanded');
+                    arrow.textContent = '▼';
+                }
+            });
+
+            // Auto-scroll to bottom
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function renderMcpConsoleWithHighlights() {
+            const output = document.getElementById('mcp-console-output');
+            if (!output) return;
+
+            if (mcpTraceLevel === 'off') {
+                output.innerHTML = '<div style="padding: 1rem; color: #888;">Traces disabled (level: off)</div>';
+                return;
+            }
+
+            // Get traces for the selected client
+            const clientTraces = mcpTracesByClient[selectedMcpClient] || [];
+
+            if (clientTraces.length === 0) {
+                output.innerHTML = '<div style="padding: 1rem; color: #888;">No MCP traces yet...</div>';
+                return;
+            }
+
+            // Save expanded state before re-rendering
+            const expandedTraces = new Set();
+            output.querySelectorAll('.mcp-trace-body.expanded').forEach(el => {
+                expandedTraces.add(el.id);
+            });
+
+            const html = clientTraces.map(trace => formatMcpTrace(trace, currentSearchQuery)).join('');
+            output.innerHTML = html;
+
+            // Restore expanded state
+            expandedTraces.forEach(traceId => {
+                const body = document.getElementById(traceId);
+                const arrow = document.getElementById(traceId + '-arrow');
+                if (body && arrow) {
+                    body.classList.remove('collapsed');
+                    body.classList.add('expanded');
+                    arrow.textContent = '▼';
+                }
+            });
+        }
+
+        function formatMcpTrace(trace, searchQuery = '') {
+            const content = trace.jsonContent;
+
+            // Split by first newline to separate header from body
+            const firstNewline = content.indexOf('\n');
+            if (firstNewline === -1) {
+                // No body, just header
+                return `
+                    <div class="trace-line">
+                        <div style="padding: 0.25rem; font-family: 'Consolas', 'Monaco', monospace; font-size: 0.85rem; color: #cccccc;">${highlightText(content, searchQuery)}</div>
+                    </div>
+                `;
+            }
+
+            const headerLine = content.substring(0, firstNewline);
+            let body = content.substring(firstNewline + 1).trim();
+
+            // Check if trace has search match
+            const hasMatch = searchQuery && trace.jsonContent.toLowerCase().includes(searchQuery.toLowerCase());
+
+            // Messages mode: show only header line, no folding
+            if (mcpTraceLevel === 'messages') {
+                return `
+                    <div class="trace-line">
+                        <div style="padding: 0.25rem; font-family: 'Consolas', 'Monaco', monospace; font-size: 0.85rem; color: #cccccc;">${highlightText(headerLine, searchQuery)}</div>
+                    </div>
+                `;
+            }
+
+            // Verbose mode: header + body folded by default
+            const hasBody = body.length > 0;
+            if (!hasBody) {
+                return `<div class="trace-line">
+                    <div style="padding: 0.25rem; font-family: 'Consolas', 'Monaco', monospace; font-size: 0.85rem; color: #cccccc;">${highlightText(headerLine, searchQuery)}</div>
+                </div>`;
+            }
+
+            // With body: show toggle arrow and collapsible content
+            // Auto-expand if has search match
+            const traceId = 'mcp-trace-' + Math.random().toString(36).substr(2, 9);
+            const foldState = hasMatch ? 'expanded' : 'collapsed';
+            const toggleIcon = hasMatch ? '▼' : '▶';
+            const fullContent = headerLine + '\n' + body;
+
+            return `
+                <div class="trace-line" onmouseenter="showMcpTooltip(event, '${traceId}', ${!hasMatch})" onmouseleave="hideMcpTooltip('${traceId}')">
+                    <div style="display: flex; align-items: flex-start; padding: 0.25rem; cursor: pointer;"
+                         onclick="toggleMcpTrace('${traceId}')">
+                        <span id="${traceId}-arrow" class="mcp-trace-toggle" style="margin-right: 0.5rem; user-select: none; font-size: 0.7rem; color: #888;">${toggleIcon}</span>
+                        <div style="flex: 1; font-family: 'Consolas', 'Monaco', monospace; font-size: 0.85rem; color: #cccccc;">${highlightText(headerLine, searchQuery)}</div>
+                    </div>
+                    <div id="${traceId}" class="mcp-trace-body ${foldState}" style="font-family: 'Consolas', 'Monaco', monospace; font-size: 0.8rem; color: #d4d4d4; white-space: pre-wrap; word-wrap: break-word; padding-left: 1.5rem;">${highlightText(body, searchQuery)}</div>
+                    <div class="trace-tooltip" id="${traceId}-tooltip">${escapeHtml(fullContent)}</div>
+                </div>
+            `;
+        }
+
+        function showMcpTooltip(event, traceId, isFolded) {
+            if (!isFolded) return;
+
+            const body = document.getElementById(traceId);
+            if (!body || !body.classList.contains('collapsed')) return;
+
+            const tooltip = document.getElementById(traceId + '-tooltip');
+            if (!tooltip) return;
+
+            // Position tooltip near mouse
+            const x = event.clientX + 15;
+            const y = event.clientY + 15;
+
+            tooltip.style.left = x + 'px';
+            tooltip.style.top = y + 'px';
+            tooltip.style.display = 'block';
+        }
+
+        function hideMcpTooltip(traceId) {
+            const tooltip = document.getElementById(traceId + '-tooltip');
+            if (tooltip) {
+                tooltip.style.display = 'none';
+            }
+        }
+
+        function toggleMcpTrace(id) {
+            const body = document.getElementById(id);
+            const arrow = document.getElementById(id + '-arrow');
+
+            if (body.classList.contains('collapsed')) {
+                body.classList.remove('collapsed');
+                body.classList.add('expanded');
+                arrow.textContent = '▼';
+            } else {
+                body.classList.remove('expanded');
+                body.classList.add('collapsed');
+                arrow.textContent = '▶';
+            }
+        }
+
+        function toggleAllMcpTraces() {
+            toggleAllTracesGeneric('mcp-console-output', 'mcp-trace-body', 'mcp-trace-toggle', 'mcp-fold-button', {
+                get value() { return mcpAllFolded; },
+                set value(v) { mcpAllFolded = v; }
+            });
+        }
+
+        async function clearMcpConsole() {
+            try {
+                await fetch('/api/admin/mcp-traces', { method: 'DELETE' });
+
+                // Clear traces for current client only
+                if (selectedMcpClient) {
+                    mcpTracesByClient[selectedMcpClient] = [];
+                }
+
+                renderMcpConsole();
+            } catch (error) {
+                console.error('Failed to clear MCP traces:', error);
+            }
+        }
+
         // Initialize
         loadWorkspaces();
-        setInterval(autoRefresh, 2000);
+        setupWorkspacesStream();
+        setupMcpClientsStream();
+        setupMcpTracesStream();
     </script>
 
     <!-- Generic Modal (for confirmAction, showAlert) -->

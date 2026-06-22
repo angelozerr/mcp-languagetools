@@ -58,6 +58,7 @@ public class LspServer {
     protected com.redhat.mcp.languagetools.workspace.WorkspaceConfiguration workspaceConfiguration;
     protected ExtensionManager extensionManager;
     protected RequestRouter requestRouter;
+    private java.util.function.Consumer<ServerStatus> statusChangeCallback;
 
     public LspServer(LspServerConfig config, URI workspaceRoot, Path workspaceDataDir, Path serverHome,
                      LspTraceCollector traceCollector, List<LspServerConfig> allServerConfigs) {
@@ -71,11 +72,34 @@ public class LspServer {
     }
 
     /**
+     * Set a callback to be notified when server status changes.
+     */
+    public void setStatusChangeCallback(java.util.function.Consumer<ServerStatus> callback) {
+        this.statusChangeCallback = callback;
+    }
+
+    /**
+     * Update server status and notify callback if registered.
+     */
+    private void setStatus(ServerStatus newStatus) {
+        ServerStatus oldStatus = this.status;
+        this.status = newStatus;
+
+        if (statusChangeCallback != null && oldStatus != newStatus) {
+            try {
+                statusChangeCallback.accept(newStatus);
+            } catch (Exception e) {
+                LOG.warnf(e, "Error in status change callback for %s", config.getId());
+            }
+        }
+    }
+
+    /**
      * Start the language server process and establish LSP communication.
      * First tries to connect to an existing instance via socket, falls back to launching a new process.
      */
     public CompletableFuture<Void> start() {
-        status = ServerStatus.STARTING;
+        setStatus(ServerStatus.STARTING);
         return CompletableFuture.runAsync(() -> {
             try {
                 // Try to find existing instance first
@@ -84,7 +108,7 @@ public class LspServer {
 
                 if (existingInstance != null) {
                     // Connect to existing instance via socket
-                    status = ServerStatus.CONNECTING_TO_IDE;
+                    setStatus(ServerStatus.CONNECTING_TO_IDE);
                     try {
                         connectToSocket(existingInstance.port);
                         currentInstance = existingInstance;
@@ -95,7 +119,7 @@ public class LspServer {
                     } catch (IOException e) {
                         LOG.warnf("Failed to connect to existing instance on port %d, will launch new process: %s",
                             existingInstance.port, e.getMessage());
-                        status = ServerStatus.STARTING;
+                        setStatus(ServerStatus.STARTING);
                         // Fall through to launch new process
                     }
                 }
@@ -115,7 +139,7 @@ public class LspServer {
      * Start a MCP-managed language server process only (do not connect to IDE instance).
      */
     public CompletableFuture<Void> startManagedOnly() {
-        status = ServerStatus.STARTING;
+        setStatus(ServerStatus.STARTING);
         return CompletableFuture.runAsync(() -> {
             try {
                 String workspacePath = Paths.get(workspaceRoot).toString();
@@ -251,7 +275,7 @@ public class LspServer {
         if (isSocketConnection && currentInstance != null) {
             LOG.infof("%s already initialized by IDE (port %d, PID %d)",
                      config.getId(), currentInstance.port, currentInstance.pid);
-            status = ServerStatus.CONNECTED_TO_IDE;
+            setStatus(ServerStatus.CONNECTED_TO_IDE);
             return CompletableFuture.completedFuture(null);
         }
 
@@ -300,7 +324,7 @@ public class LspServer {
                 .thenCompose(initResult -> {
                     LOG.infof("%s initialized for workspace: %s", config.getId(), workspaceRoot);
                     languageServer.initialized(new InitializedParams());
-                    status = ServerStatus.RUNNING;
+                    setStatus(ServerStatus.RUNNING);
                     // For generic servers, ready after initialization
                     // Subclasses like JdtLsServer may override this behavior
                     isReady = true;
@@ -377,9 +401,9 @@ public class LspServer {
 
         // Set status based on current connection type
         if (isSocketConnection && currentInstance != null) {
-            status = ServerStatus.DISCONNECTING;
+            setStatus(ServerStatus.DISCONNECTING);
         } else {
-            status = ServerStatus.STOPPING;
+            setStatus(ServerStatus.STOPPING);
         }
 
         // Stop file watcher first
@@ -435,11 +459,11 @@ public class LspServer {
                 }
 
                 LOG.infof("%s shut down for workspace: %s", config.getId(), workspaceRoot);
-                status = ServerStatus.STOPPED;
+                setStatus(ServerStatus.STOPPED);
 
             } catch (Exception e) {
                 LOG.errorf(e, "Error during shutdown of %s", config.getId());
-                status = ServerStatus.STOPPED;
+                setStatus(ServerStatus.STOPPED);
             }
         }, executorService);
     }
@@ -797,7 +821,7 @@ public class LspServer {
                 });
             } catch (IOException e) {
                 LOG.errorf(e, "Failed to launch server after instance removal");
-                status = ServerStatus.STOPPED;
+                setStatus(ServerStatus.STOPPED);
             }
         }
     }
