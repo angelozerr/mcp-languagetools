@@ -1230,7 +1230,6 @@
                         </div>
                     `;
                 }).join('');
-                console.log('All servers rendered:', servers.length, 'selectedAllServer:', selectedAllServer);
 
                 allServersLoaded = true;
 
@@ -1246,7 +1245,6 @@
         }
 
         async function showServerDetails(serverId) {
-            console.log('showServerDetails called for:', serverId);
 
             // Update selected server and refresh list to show active state
             selectedAllServer = serverId;
@@ -1772,11 +1770,13 @@
             // Load traces for specific workspace + server
             try {
                 const encodedWorkspace = encodeURIComponent(selectedWorkspace);
-                const response = await fetch(`/api/admin/traces/workspace/${encodedWorkspace}/server/${server.id}?limit=50`);
-                const loadedTraces = await response.json();
 
-                // Store traces for this server
-                tracesByServer[server.id] = loadedTraces || [];
+                // Only load from API if we don't have traces for this server yet
+                if (!tracesByServer[server.id] || tracesByServer[server.id].length === 0) {
+                    const response = await fetch(`/api/admin/traces/workspace/${encodedWorkspace}/server/${server.id}?limit=50`);
+                    const loadedTraces = await response.json();
+                    tracesByServer[server.id] = loadedTraces || [];
+                }
 
                 renderConsole();
                 connectSSE(selectedWorkspace, server.id);
