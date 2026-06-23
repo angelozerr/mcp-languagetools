@@ -1,9 +1,9 @@
 package com.redhat.mcp.languagetools.lsp;
 
+import com.redhat.mcp.languagetools.lsp.server.LspServerConfig;
 import org.jboss.logging.Logger;
 
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.*;
 
 /**

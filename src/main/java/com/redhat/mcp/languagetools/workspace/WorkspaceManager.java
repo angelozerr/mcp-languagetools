@@ -3,12 +3,13 @@ package com.redhat.mcp.languagetools.workspace;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.redhat.mcp.languagetools.language.LanguageRegistry;
-import com.redhat.mcp.languagetools.lsp.LspServerConfig;
-import com.redhat.mcp.languagetools.lsp.ServerDescriptorLoader;
-import com.redhat.mcp.languagetools.lsp.ServerStatus;
-import com.redhat.mcp.languagetools.lsp.installer.DownloadInstaller;
+import com.redhat.mcp.languagetools.lsp.*;
 import com.redhat.mcp.languagetools.lsp.installer.InstallerContext;
 import com.redhat.mcp.languagetools.lsp.installer.task.InstallerTaskRegistry;
+import com.redhat.mcp.languagetools.lsp.server.LspServerConfig;
+import com.redhat.mcp.languagetools.lsp.server.LspServerStatusChangeEvent;
+import com.redhat.mcp.languagetools.lsp.server.ServerDescriptorLoader;
+import com.redhat.mcp.languagetools.lsp.server.ServerStatus;
 import com.redhat.mcp.languagetools.lsp.trace.LspTraceCollector;
 
 import io.quarkus.runtime.ShutdownEvent;
@@ -18,7 +19,6 @@ import jakarta.enterprise.event.Event;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import com.redhat.mcp.languagetools.admin.McpClientChangeEvent;
-import com.redhat.mcp.languagetools.lsp.LspServerStatusChangeEvent;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
@@ -45,9 +45,6 @@ public class WorkspaceManager {
 
     @Inject
     ServerDescriptorLoader serverDescriptorLoader;
-
-    @Inject
-    DownloadInstaller downloadInstaller;
 
     @Inject
     LspTraceCollector traceCollector;
@@ -94,19 +91,19 @@ public class WorkspaceManager {
     /**
      * Create extension manager for collecting server contributions.
      */
-    private com.redhat.mcp.languagetools.lsp.ExtensionManager createExtensionManager() {
+    private ExtensionManager createExtensionManager() {
         // Use serversBaseDir from config, or default to ~/.mcp-lsp/lsp
         Path baseDir = serversBaseDir.orElseGet(() ->
             Paths.get(System.getProperty("user.home"), ".mcp-lsp", "lsp")
         );
-        return new com.redhat.mcp.languagetools.lsp.ExtensionManager(serverConfigs, baseDir);
+        return new ExtensionManager(serverConfigs, baseDir);
     }
 
     /**
      * Get or create a workspace for the given root URI.
      * Workspace is created but NOT initialized (servers added on-demand).
      */
-    public CompletableFuture<Workspace> getOrCreateWorkspace(URI rootUri) {
+    public Workspace getOrCreateWorkspace(URI rootUri) {
         // Normalize URI
         URI normalizedUri = normalizeUri(rootUri);
 
@@ -150,14 +147,14 @@ public class WorkspaceManager {
             LOG.infof("MCP client already exists in workspace, no event fired");
         }
 
-        return CompletableFuture.completedFuture(workspace);
+        return workspace;
     }
 
     /**
      * Ensure LSP server is running for the given file in the workspace.
      * Detects language, finds matching servers, installs if needed, and starts them.
      */
-    public CompletableFuture<Void> ensureServerForFile(Workspace workspace, URI fileUri) {
+    private CompletableFuture<Void> ensureServerForFile(Workspace workspace, URI fileUri) {
         // Detect language from file
         Optional<String> languageId = languageRegistry.detectLanguage(fileUri);
         if (languageId.isEmpty()) {
@@ -258,7 +255,7 @@ public class WorkspaceManager {
             return CompletableFuture.completedFuture(null);
         }
 
-        return CompletableFuture.allOf(serverFutures.toArray(new CompletableFuture[0]));
+        return CompletableFuture.allOf(serverFutures.toArray(new CompletableFuture[serverFutures.size()]));
     }
 
     /**
@@ -266,7 +263,7 @@ public class WorkspaceManager {
      */
     private JsonObject loadInstallerJson(String serverId, Gson gson) {
         // Try user config directory first
-        java.nio.file.Path userConfigPath = java.nio.file.Paths.get(
+        Path userConfigPath = Paths.get(
             System.getProperty("user.home"), ".mcp-lsp", "config", "lsp", serverId, "installer.json"
         );
 
@@ -389,11 +386,9 @@ public class WorkspaceManager {
             );
         }
 
-        return getOrCreateWorkspace(rootUri)
-                .thenCompose(workspace ->
-                    ensureServerForFile(workspace, fileUri)
-                        .thenApply(v -> workspace)
-                );
+        Workspace workspace = getOrCreateWorkspace(rootUri);
+        return ensureServerForFile(workspace, fileUri)
+                .thenApply(v -> workspace);
     }
 
     /**

@@ -2,6 +2,7 @@ package com.redhat.mcp.languagetools.admin;
 
 import com.redhat.mcp.languagetools.admin.dto.ErrorResponse;
 import com.redhat.mcp.languagetools.admin.dto.StatusResponse;
+import com.redhat.mcp.languagetools.lsp.server.ServerStatus;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
@@ -29,7 +30,7 @@ public class LspServerControlResource {
                 .map(config -> new com.redhat.mcp.languagetools.admin.dto.LspServerDTO(
                     config.getId(),
                     config.getName(),
-                    com.redhat.mcp.languagetools.lsp.ServerStatus.STOPPED,
+                    ServerStatus.STOPPED,
                     null,
                     null,
                     null

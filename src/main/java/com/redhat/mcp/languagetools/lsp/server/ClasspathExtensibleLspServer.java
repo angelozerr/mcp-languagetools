@@ -1,8 +1,9 @@
-package com.redhat.mcp.languagetools.lsp;
+package com.redhat.mcp.languagetools.lsp.server;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.redhat.mcp.languagetools.lsp.DocumentSelector;
 import com.redhat.mcp.languagetools.lsp.trace.LspTraceCollector;
 import org.jboss.logging.Logger;
 
@@ -28,7 +29,7 @@ public class ClasspathExtensibleLspServer extends LspServer {
     private static final Logger LOG = Logger.getLogger(ClasspathExtensibleLspServer.class);
 
     public ClasspathExtensibleLspServer(LspServerConfig config, URI workspaceRoot, Path workspaceDataDir,
-                                       Path serverHome, LspTraceCollector traceCollector, List<LspServerConfig> allServerConfigs) {
+                                        Path serverHome, LspTraceCollector traceCollector, List<LspServerConfig> allServerConfigs) {
         super(config, workspaceRoot, workspaceDataDir, serverHome, traceCollector, allServerConfigs);
     }
 

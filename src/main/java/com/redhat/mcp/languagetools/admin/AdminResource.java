@@ -18,7 +18,7 @@ import com.redhat.mcp.languagetools.admin.dto.WorkspaceDTO;
 import com.redhat.mcp.languagetools.workspace.Workspace;
 import com.redhat.mcp.languagetools.workspace.WorkspaceManager;
 import com.redhat.mcp.languagetools.workspace.WorkspaceChangeEvent;
-import com.redhat.mcp.languagetools.lsp.LspServerStatusChangeEvent;
+import com.redhat.mcp.languagetools.lsp.server.LspServerStatusChangeEvent;
 
 @Path("/api/admin")
 @Produces(MediaType.APPLICATION_JSON)

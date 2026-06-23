@@ -1,4 +1,8 @@
-package com.redhat.mcp.languagetools.lsp;
+package com.redhat.mcp.languagetools.lsp.server;
+
+import com.redhat.mcp.languagetools.lsp.Contributes;
+import com.redhat.mcp.languagetools.lsp.DocumentSelector;
+import com.redhat.mcp.languagetools.lsp.installer.InstallerConfig;
 
 import java.util.ArrayList;
 import java.util.HashMap;

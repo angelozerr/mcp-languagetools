@@ -3,7 +3,7 @@ package com.redhat.mcp.languagetools.lsp.installer;
 import java.nio.file.Path;
 import java.util.concurrent.CompletableFuture;
 
-import com.redhat.mcp.languagetools.lsp.LspServerConfig;
+import com.redhat.mcp.languagetools.lsp.server.LspServerConfig;
 
 /**
  * Interface for language server installers.

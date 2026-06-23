@@ -115,6 +115,31 @@ public class LanguageRegistry {
         return Optional.empty();
     }
 
+    /**
+     * Create an LSP document from a file URI string.
+     * Detects the language ID automatically.
+     * The languageId can be null if the language cannot be detected.
+     *
+     * @param fileUri the file URI as a string
+     * @return the LSP document
+     */
+    public LanguageDocument createDocument(String fileUri) {
+        return createDocument(URI.create(fileUri));
+    }
+
+    /**
+     * Create an LSP document from a file URI.
+     * Detects the language ID automatically.
+     * The languageId can be null if the language cannot be detected.
+     *
+     * @param uri the file URI
+     * @return the LSP document
+     */
+    public LanguageDocument createDocument(URI uri) {
+        String languageId = detectLanguage(uri).orElse(null);
+        return new LanguageDocument(uri, languageId);
+    }
+
     public List<LanguageDefinition> getAllLanguages() {
         return List.copyOf(languages);
     }

@@ -1,4 +1,4 @@
-package com.redhat.mcp.languagetools.lsp;
+package com.redhat.mcp.languagetools.lsp.server;
 
 import com.redhat.mcp.languagetools.lsp.trace.LspTraceCollector;
 import org.jboss.logging.Logger;

@@ -1,9 +1,11 @@
-package com.redhat.mcp.languagetools.lsp;
+package com.redhat.mcp.languagetools.lsp.server;
 
 import com.google.gson.Gson;
-import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.redhat.mcp.languagetools.lsp.Contributes;
+import com.redhat.mcp.languagetools.lsp.DocumentSelector;
+import com.redhat.mcp.languagetools.lsp.installer.InstallerConfig;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.jboss.logging.Logger;
 

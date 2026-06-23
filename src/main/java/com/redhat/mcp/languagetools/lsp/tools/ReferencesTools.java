@@ -11,6 +11,9 @@
  *******************************************************************************/
 package com.redhat.mcp.languagetools.lsp.tools;
 
+import com.redhat.mcp.languagetools.language.LanguageRegistry;
+import com.redhat.mcp.languagetools.lsp.client.LspCapability;
+import com.redhat.mcp.languagetools.lsp.server.LspServerResolver;
 import io.quarkiverse.mcp.server.Tool;
 import io.quarkiverse.mcp.server.ToolArg;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -18,14 +21,16 @@ import jakarta.inject.Inject;
 import org.eclipse.lsp4j.*;
 import org.jboss.logging.Logger;
 
-import com.redhat.mcp.languagetools.lsp.LspServer;
+import com.redhat.mcp.languagetools.lsp.server.LspServer;
 import com.redhat.mcp.languagetools.tools.ToolArgDescriptions;
-import com.redhat.mcp.languagetools.workspace.Workspace;
 import com.redhat.mcp.languagetools.workspace.WorkspaceManager;
 
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 
 /**
  * MCP tools for LSP references (find all references).
@@ -36,10 +41,13 @@ public class ReferencesTools {
     private static final Logger LOG = Logger.getLogger(ReferencesTools.class);
 
     @Inject
+    LspServerResolver serverResolver;
+
+    @Inject
     WorkspaceManager workspaceManager;
 
     @Inject
-    com.redhat.mcp.languagetools.language.LanguageRegistry languageRegistry;
+    LanguageRegistry languageRegistry;
 
     @Tool(description = "Find all references to a symbol at a specific position in a file. " +
                         "Returns all locations where the symbol is used across the workspace. " +
@@ -47,40 +55,19 @@ public class ReferencesTools {
     public String findReferences(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
-            @ToolArg(description = "Line number (0-based)") int line,
-            @ToolArg(description = "Character position in the line (0-based)") int character) {
-        try {
-            URI uri = URI.create(fileUri);
-            LOG.infof("Finding references at: %s:%d:%d (from cwd: %s)", uri, line, character, cwd);
+            @ToolArg(description = ToolArgDescriptions.POSITION_LINE) int line,
+            @ToolArg(description = ToolArgDescriptions.POSITION_CHARACTER) int character) {
+        // Create language document (detects language once)
+        var document = languageRegistry.createDocument(fileUri);
 
-            Workspace ws = workspaceManager.getWorkspaceForFile(uri).join();
-
-            // Detect language from file
-            java.util.Optional<String> languageId = languageRegistry.detectLanguage(uri);
-            if (languageId.isEmpty()) {
-                LOG.debugf("No language detected for: %s", uri);
-                return "No language detected for: " + fileUri;
-            }
-
-            String language = languageId.get();
-            LOG.debugf("Detected language '%s' for: %s", language, uri);
-
-            Map<String, LspServer> servers = ws.getAllLspServers();
+        // Get all servers that support references for this file
+        return serverResolver.getLspServersForFile(
+                document,
+                cwd,
+                server -> server.isEnabled() && server.supportsCapability(LspCapability.REFERENCES, document)
+        ).thenCompose(servers -> {
             if (servers.isEmpty()) {
-                return "No language servers available in workspace";
-            }
-
-            // Find the server that handles this file
-            LspServer server = null;
-            for (LspServer s : servers.values()) {
-                if (s.getConfig().canHandle(fileUri, language)) {
-                    server = s;
-                    break;
-                }
-            }
-
-            if (server == null) {
-                return "No language server found for: " + fileUri;
+                return CompletableFuture.completedFuture("No language server with references support found for: " + fileUri);
             }
 
             // Build references parameters
@@ -92,46 +79,65 @@ public class ReferencesTools {
             context.setIncludeDeclaration(true); // Include the declaration itself
             params.setContext(context);
 
-            // Call textDocument/references
-            List<? extends Location> references = server.getLanguageServer()
-                    .getTextDocumentService()
-                    .references(params)
-                    .join();
+            // Call textDocument/references on all servers in parallel
+            List<CompletableFuture<List<? extends Location>>> futures = servers.stream()
+                    .map(server -> server.getLanguageServer()
+                            .getTextDocumentService()
+                            .references(params)
+                            .exceptionally(ex -> {
+                                LOG.warnf("Failed to get references from server %s: %s", server.getConfig().getId(), ex.getMessage());
+                                return null;
+                            }))
+                    .toList();
 
-            if (references == null || references.isEmpty()) {
-                return String.format("No references found for symbol at %s:%d:%d", fileUri, line + 1, character);
-            }
+            // Wait for all to complete and merge results
+            return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
+                    .thenApply(v -> {
+                        List<? extends Location> allReferences = futures.stream()
+                                .map(CompletableFuture::join)
+                                .filter(refs -> refs != null && !refs.isEmpty())
+                                .flatMap(List::stream)
+                                .toList();
 
-            // Format results
-            StringBuilder result = new StringBuilder();
-            result.append(String.format("Found %d reference(s) for symbol at %s:%d:%d\n\n",
-                    references.size(), fileUri, line + 1, character));
+                        if (allReferences.isEmpty()) {
+                            return String.format("No references found for symbol at %s:%d:%d", fileUri, line + 1, character);
+                        }
 
-            // Group by file
-            Map<String, List<Location>> byFile = references.stream()
-                    .collect(java.util.stream.Collectors.groupingBy(Location::getUri));
+                        // Deduplicate based on URI + range
+                        List<? extends Location> references = allReferences.stream()
+                                .distinct()
+                                .toList();
 
-            for (Map.Entry<String, List<Location>> entry : byFile.entrySet()) {
-                String file = entry.getKey();
-                List<Location> locations = entry.getValue();
+                        // Format results
+                        StringBuilder result = new StringBuilder();
+                        result.append(String.format("Found %d reference(s) for symbol at %s:%d:%d\n\n",
+                                references.size(), fileUri, line + 1, character));
 
-                result.append(String.format("File: %s (%d reference(s))\n", file, locations.size()));
+                        // Group by file
+                        Map<String, List<Location>> byFile = references.stream()
+                                .collect(Collectors.groupingBy(Location::getUri));
 
-                for (Location location : locations) {
-                    Range range = location.getRange();
-                    result.append(String.format("  Line %d:%d-%d\n",
-                            range.getStart().getLine() + 1,
-                            range.getStart().getCharacter(),
-                            range.getEnd().getCharacter()));
-                }
-                result.append("\n");
-            }
+                        for (Map.Entry<String, List<Location>> entry : byFile.entrySet()) {
+                            String file = entry.getKey();
+                            List<Location> locations = entry.getValue();
 
-            return result.toString();
+                            result.append(String.format("File: %s (%d reference(s))\n", file, locations.size()));
 
-        } catch (Exception e) {
-            LOG.error("Failed to find references", e);
-            return "Failed to find references: " + e.getMessage();
-        }
+                            for (Location location : locations) {
+                                Range range = location.getRange();
+                                result.append(String.format("  Line %d:%d-%d\n",
+                                        range.getStart().getLine() + 1,
+                                        range.getStart().getCharacter(),
+                                        range.getEnd().getCharacter()));
+                            }
+                            result.append("\n");
+                        }
+
+                        return result.toString();
+                    });
+        }).exceptionally(ex -> {
+            LOG.error("Failed to find references", ex);
+            return "Failed to find references: " + ex.getMessage();
+        }).join();
     }
 }

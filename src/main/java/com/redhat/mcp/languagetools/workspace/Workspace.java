@@ -1,13 +1,14 @@
 package com.redhat.mcp.languagetools.workspace;
 
+import com.redhat.mcp.languagetools.lsp.server.LspServerStatusChangeEvent;
 import org.jboss.logging.Logger;
 
 import com.redhat.mcp.languagetools.lsp.LspInstanceRegistry;
-import com.redhat.mcp.languagetools.lsp.LspServer;
-import com.redhat.mcp.languagetools.lsp.LspServerConfig;
-import com.redhat.mcp.languagetools.lsp.LspServerFactoryRegistry;
+import com.redhat.mcp.languagetools.lsp.server.LspServer;
+import com.redhat.mcp.languagetools.lsp.server.LspServerConfig;
+import com.redhat.mcp.languagetools.lsp.server.LspServerFactoryRegistry;
 import com.redhat.mcp.languagetools.lsp.RequestRouter;
-import com.redhat.mcp.languagetools.lsp.ServerStatus;
+import com.redhat.mcp.languagetools.lsp.server.ServerStatus;
 import com.redhat.mcp.languagetools.lsp.trace.LspTraceCollector;
 
 import java.net.URI;
@@ -36,10 +37,10 @@ public class Workspace {
     private final Map<String, LspServer> lspServers = new ConcurrentHashMap<>();
     private final Map<String, ServerInfo> serverInfos = new ConcurrentHashMap<>();
     private final Map<String, ServerStatus> installationStatus = new ConcurrentHashMap<>();
-    private List<com.redhat.mcp.languagetools.lsp.LspServerConfig> allServerConfigs = new ArrayList<>();
+    private List<LspServerConfig> allServerConfigs = new ArrayList<>();
     private final Map<String, McpClientInfo> mcpClientConnections = new ConcurrentHashMap<>();
     private volatile boolean initialized = false;
-    private java.util.function.Consumer<com.redhat.mcp.languagetools.lsp.LspServerStatusChangeEvent> statusChangeCallback;
+    private java.util.function.Consumer<LspServerStatusChangeEvent> statusChangeCallback;
 
     private static class ServerInfo {
         final LspServerConfig config;
@@ -75,7 +76,7 @@ public class Workspace {
     /**
      * Set callback for LSP server status changes.
      */
-    public void setServerStatusChangeCallback(java.util.function.Consumer<com.redhat.mcp.languagetools.lsp.LspServerStatusChangeEvent> callback) {
+    public void setServerStatusChangeCallback(java.util.function.Consumer<LspServerStatusChangeEvent> callback) {
         this.statusChangeCallback = callback;
     }
 
@@ -104,7 +105,7 @@ public class Workspace {
         // Register status change callback
         server.setStatusChangeCallback(newStatus -> {
             if (statusChangeCallback != null) {
-                statusChangeCallback.accept(new com.redhat.mcp.languagetools.lsp.LspServerStatusChangeEvent(
+                statusChangeCallback.accept(new LspServerStatusChangeEvent(
                     rootUri,
                     config.getId(),
                     server.getStatus(),  // oldStatus (we don't track it here, using current as approximation)

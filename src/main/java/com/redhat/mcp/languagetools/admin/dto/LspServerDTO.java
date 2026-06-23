@@ -1,6 +1,6 @@
 package com.redhat.mcp.languagetools.admin.dto;
 
-import com.redhat.mcp.languagetools.lsp.ServerStatus;
+import com.redhat.mcp.languagetools.lsp.server.ServerStatus;
 
 public record LspServerDTO(
     String id,

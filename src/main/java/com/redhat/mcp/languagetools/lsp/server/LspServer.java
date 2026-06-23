@@ -1,5 +1,8 @@
-package com.redhat.mcp.languagetools.lsp;
+package com.redhat.mcp.languagetools.lsp.server;
 
+import com.redhat.mcp.languagetools.language.LanguageDocument;
+import com.redhat.mcp.languagetools.lsp.*;
+import com.redhat.mcp.languagetools.lsp.client.GenericLanguageClient;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.Launcher;
 import org.eclipse.lsp4j.launch.LSPLauncher;
@@ -7,6 +10,9 @@ import org.eclipse.lsp4j.services.LanguageClient;
 import org.eclipse.lsp4j.services.LanguageServer;
 import org.jboss.logging.Logger;
 
+import com.redhat.mcp.languagetools.lsp.client.LspCapability;
+import com.redhat.mcp.languagetools.lsp.client.LspClientFeatures;
+import com.redhat.mcp.languagetools.lsp.client.LspNotificationConstants;
 import com.redhat.mcp.languagetools.lsp.trace.LspTraceCollector;
 import com.redhat.mcp.languagetools.lsp.trace.LspTraceMessage;
 import com.redhat.mcp.languagetools.lsp.trace.TracingMessageConsumer;
@@ -59,6 +65,7 @@ public class LspServer {
     protected ExtensionManager extensionManager;
     protected RequestRouter requestRouter;
     private java.util.function.Consumer<ServerStatus> statusChangeCallback;
+    private LspClientFeatures clientFeatures;
 
     public LspServer(LspServerConfig config, URI workspaceRoot, Path workspaceDataDir, Path serverHome,
                      LspTraceCollector traceCollector, List<LspServerConfig> allServerConfigs) {
@@ -69,6 +76,9 @@ public class LspServer {
         this.tracing = new TracingMessageConsumer(traceCollector, workspaceRoot.toString(), config.getId(), config.getName());
         this.executorService = Executors.newCachedThreadPool();
         this.allServerConfigs = allServerConfigs != null ? allServerConfigs : List.of();
+
+        // Create client features for managing capabilities
+        this.clientFeatures = new LspClientFeatures(config);
     }
 
     /**
@@ -323,6 +333,10 @@ public class LspServer {
         return languageServer.initialize(params)
                 .thenCompose(initResult -> {
                     LOG.infof("%s initialized for workspace: %s", config.getId(), workspaceRoot);
+
+                    // Pass server capabilities to client features
+                    clientFeatures.setServerCapabilities(initResult.getCapabilities());
+
                     languageServer.initialized(new InitializedParams());
                     setStatus(ServerStatus.RUNNING);
                     // For generic servers, ready after initialization
@@ -832,7 +846,7 @@ public class LspServer {
      * (e.g., JdtLsServer provides JdtLsLanguageClient for language/status notifications).
      */
     protected LanguageClient createLanguageClient() {
-        return new GenericLanguageClient();
+        return new GenericLanguageClient(this);
     }
 
     /**
@@ -849,6 +863,22 @@ public class LspServer {
             @Override
             public CompletableFuture<?> request(String method, Object parameter) {
                 LOG.infof("[%s] Endpoint.request() called with method: %s", config.getId(), method);
+
+                // Handle client/registerCapability
+                if (LspNotificationConstants.CLIENT_REGISTER_CAPABILITY.equals(method)) {
+                    if (parameter instanceof RegistrationParams) {
+                        clientFeatures.registerCapability((RegistrationParams) parameter);
+                        return CompletableFuture.completedFuture(null);
+                    }
+                }
+
+                // Handle client/unregisterCapability
+                if (LspNotificationConstants.CLIENT_UNREGISTER_CAPABILITY.equals(method)) {
+                    if (parameter instanceof UnregistrationParams) {
+                        clientFeatures.unregisterCapability((UnregistrationParams) parameter);
+                        return CompletableFuture.completedFuture(null);
+                    }
+                }
 
                 // Check if this request should be routed to another server (bindRequest)
                 BindRequestInfo bindInfo = findBindRequestInfo(method);
@@ -1019,38 +1049,6 @@ public class LspServer {
     }
 
     /**
-     * Generic LSP client implementation.
-     */
-    private class GenericLanguageClient implements LanguageClient {
-
-        @Override
-        public void telemetryEvent(Object object) {
-            // Ignore telemetry for now
-        }
-
-        @Override
-        public void publishDiagnostics(PublishDiagnosticsParams diagnostics) {
-            LOG.debugf("Diagnostics published for: %s", diagnostics.getUri());
-            diagnosticsCache.put(diagnostics.getUri(), diagnostics.getDiagnostics());
-        }
-
-        @Override
-        public void showMessage(MessageParams messageParams) {
-            LOG.infof("%s message: %s", config.getId(), messageParams.getMessage());
-        }
-
-        @Override
-        public CompletableFuture<MessageActionItem> showMessageRequest(ShowMessageRequestParams requestParams) {
-            return CompletableFuture.completedFuture(null);
-        }
-
-        @Override
-        public void logMessage(MessageParams message) {
-            LOG.infof("%s log: %s", config.getId(), message.getMessage());
-        }
-    }
-
-    /**
      * Prepare initialization options for this server.
      * Subclasses can override to add server-specific options (e.g., bundles for JDT.LS).
      *
@@ -1097,5 +1095,35 @@ public class LspServer {
             LOG.debugf("Failed to read trace level from config: %s", e.getMessage());
             return "verbose"; // Default on error
         }
+    }
+
+    /**
+     * Check if the language server is enabled.
+     * Can be controlled by user configuration.
+     *
+     * @return true if the server is enabled
+     */
+    public boolean isEnabled() {
+        return clientFeatures.isEnabled();
+    }
+
+    /**
+     * Check if the server supports a given capability for a file.
+     *
+     * @param capability the LSP capability to check
+     * @param document   the language document
+     * @return true if the capability is supported
+     */
+    public boolean supportsCapability(LspCapability capability, LanguageDocument document) {
+        return clientFeatures.supportsCapability(capability, document);
+    }
+
+    /**
+     * Get the client features for this server.
+     *
+     * @return the client features
+     */
+    public LspClientFeatures getClientFeatures() {
+        return clientFeatures;
     }
 }

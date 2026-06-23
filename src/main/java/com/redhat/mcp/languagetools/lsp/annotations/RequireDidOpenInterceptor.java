@@ -23,7 +23,7 @@ import org.eclipse.lsp4j.TextDocumentItem;
 import org.jboss.logging.Logger;
 
 import com.redhat.mcp.languagetools.language.LanguageRegistry;
-import com.redhat.mcp.languagetools.lsp.LspServer;
+import com.redhat.mcp.languagetools.lsp.server.LspServer;
 import com.redhat.mcp.languagetools.workspace.Workspace;
 import com.redhat.mcp.languagetools.workspace.WorkspaceManager;
 

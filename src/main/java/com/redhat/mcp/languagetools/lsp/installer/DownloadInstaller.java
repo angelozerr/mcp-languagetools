@@ -3,8 +3,7 @@ package com.redhat.mcp.languagetools.lsp.installer;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.jboss.logging.Logger;
 
-import com.redhat.mcp.languagetools.lsp.InstallerConfig;
-import com.redhat.mcp.languagetools.lsp.LspServerConfig;
+import com.redhat.mcp.languagetools.lsp.server.LspServerConfig;
 
 import java.io.BufferedInputStream;
 import java.io.FileOutputStream;

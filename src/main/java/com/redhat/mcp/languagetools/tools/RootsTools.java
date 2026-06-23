@@ -81,7 +81,7 @@ public class RootsTools {
                     URI rootUri = URI.create(root.uri());
                     LOG.infof("Initializing workspace: %s (%s)", root.name(), rootUri);
 
-                    Workspace workspace = workspaceManager.getOrCreateWorkspace(rootUri).join();
+                    Workspace workspace = workspaceManager.getOrCreateWorkspace(rootUri);
 
                     result.append(String.format("✓ %s: initialized with %d language servers\n",
                         root.name() != null ? root.name() : rootUri.toString(),

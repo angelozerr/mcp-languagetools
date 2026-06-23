@@ -4,7 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import com.redhat.mcp.languagetools.admin.dto.ErrorResponse;
-import com.redhat.mcp.languagetools.lsp.LspServerConfig;
+import com.redhat.mcp.languagetools.lsp.server.LspServerConfig;
 import com.redhat.mcp.languagetools.workspace.WorkspaceManager;
 
 import jakarta.inject.Inject;
@@ -13,7 +13,6 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
 import java.io.InputStream;
-import java.io.InputStreamReader;
 
 /**
  * REST endpoint for server details and installer configuration.

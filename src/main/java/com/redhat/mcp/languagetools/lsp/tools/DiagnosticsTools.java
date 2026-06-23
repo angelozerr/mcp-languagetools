@@ -7,7 +7,7 @@ import jakarta.inject.Inject;
 import org.eclipse.lsp4j.Diagnostic;
 import org.jboss.logging.Logger;
 
-import com.redhat.mcp.languagetools.lsp.LspServer;
+import com.redhat.mcp.languagetools.lsp.server.LspServer;
 import com.redhat.mcp.languagetools.lsp.annotations.RequireDidOpen;
 import com.redhat.mcp.languagetools.tools.ToolArgDescriptions;
 import com.redhat.mcp.languagetools.workspace.Workspace;
@@ -99,7 +99,7 @@ public class DiagnosticsTools {
             URI uri = new File(cwd).toURI();
             LOG.infof("Getting all diagnostics for workspace: %s", uri);
 
-            Workspace ws = workspaceManager.getOrCreateWorkspace(uri).join();
+            Workspace ws = workspaceManager.getOrCreateWorkspace(uri);
 
             StringBuilder result = new StringBuilder();
             result.append("All diagnostics for workspace: ").append(uri).append("\n\n");

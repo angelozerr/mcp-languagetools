@@ -1,4 +1,4 @@
-package com.redhat.mcp.languagetools.lsp;
+package com.redhat.mcp.languagetools.lsp.server;
 
 /**
  * LSP Server status.

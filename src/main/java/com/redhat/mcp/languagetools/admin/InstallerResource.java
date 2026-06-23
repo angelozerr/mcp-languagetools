@@ -3,11 +3,11 @@ package com.redhat.mcp.languagetools.admin;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.redhat.mcp.languagetools.admin.dto.ErrorResponse;
-import com.redhat.mcp.languagetools.admin.dto.StatusResponse;
-import com.redhat.mcp.languagetools.lsp.LspServerConfig;
+import com.redhat.mcp.languagetools.lsp.server.LspServerConfig;
 import com.redhat.mcp.languagetools.lsp.installer.InstallerContext;
 import com.redhat.mcp.languagetools.lsp.installer.task.InstallerTask;
 import com.redhat.mcp.languagetools.lsp.installer.task.InstallerTaskRegistry;
+import com.redhat.mcp.languagetools.lsp.server.ServerStatus;
 import com.redhat.mcp.languagetools.lsp.trace.LspTraceCollector;
 import com.redhat.mcp.languagetools.workspace.WorkspaceManager;
 
@@ -79,11 +79,10 @@ public class InstallerResource {
             }
 
             // Get or create workspace to update status
-            var workspaceFuture = workspaceManager.getOrCreateWorkspace(workspaceUri);
-            var workspace = workspaceFuture.join();
+            var workspace = workspaceManager.getOrCreateWorkspace(workspaceUri);
 
             // Set status to INSTALLING
-            workspace.setInstallationStatus(serverId, com.redhat.mcp.languagetools.lsp.ServerStatus.INSTALLING);
+            workspace.setInstallationStatus(serverId, ServerStatus.INSTALLING);
 
             // Create installer context
             InstallerContext context = new InstallerContext();
@@ -132,7 +131,7 @@ public class InstallerResource {
                                 .build();
                     } else {
                         // Set INSTALL_FAILED status
-                        workspace.setInstallationStatus(serverId, com.redhat.mcp.languagetools.lsp.ServerStatus.INSTALL_FAILED);
+                        workspace.setInstallationStatus(serverId, ServerStatus.INSTALL_FAILED);
 
                         // Get error log from context
                         String errorLog = context.getErrorLog();
@@ -145,7 +144,7 @@ public class InstallerResource {
                     }
                 } catch (Exception e) {
                     // Set INSTALL_FAILED status
-                    workspace.setInstallationStatus(serverId, com.redhat.mcp.languagetools.lsp.ServerStatus.INSTALL_FAILED);
+                    workspace.setInstallationStatus(serverId, ServerStatus.INSTALL_FAILED);
 
                     String errorDetails = e.getClass().getSimpleName() + ": " + e.getMessage();
                     if (e.getCause() != null) {

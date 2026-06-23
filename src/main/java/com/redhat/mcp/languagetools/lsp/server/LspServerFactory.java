@@ -1,4 +1,4 @@
-package com.redhat.mcp.languagetools.lsp;
+package com.redhat.mcp.languagetools.lsp.server;
 
 import com.redhat.mcp.languagetools.lsp.trace.LspTraceCollector;
 
@@ -28,7 +28,7 @@ public interface LspServerFactory {
      * @param allServerConfigs All server configurations (for reading contributes)
      */
     LspServer createServer(LspServerConfig config, URI workspaceRoot,
-                          Path workspaceDataDir, Path serverHome,
-                          LspTraceCollector traceCollector,
-                          List<LspServerConfig> allServerConfigs);
+                           Path workspaceDataDir, Path serverHome,
+                           LspTraceCollector traceCollector,
+                           List<LspServerConfig> allServerConfigs);
 }

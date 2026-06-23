@@ -18,7 +18,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
         <quarkus.version>3.33.2</quarkus.version>
-        <lsp4j.version>0.24.0</lsp4j.version>
+        <lsp4j.version>1.0.0</lsp4j.version>
         <quarkus-mcp-server.version>1.13.0</quarkus-mcp-server.version>
     </properties>
 

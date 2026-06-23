@@ -1,8 +1,8 @@
 package com.redhat.mcp.languagetools.extensions.jdtls;
 
-import com.redhat.mcp.languagetools.lsp.LspServer;
-import com.redhat.mcp.languagetools.lsp.LspServerConfig;
-import com.redhat.mcp.languagetools.lsp.LspServerFactory;
+import com.redhat.mcp.languagetools.lsp.server.LspServer;
+import com.redhat.mcp.languagetools.lsp.server.LspServerConfig;
+import com.redhat.mcp.languagetools.lsp.server.LspServerFactory;
 import com.redhat.mcp.languagetools.lsp.trace.LspTraceCollector;
 
 import java.net.URI;
