@@ -57,7 +57,7 @@ public class McpTracesResource {
         var processor = io.smallrye.mutiny.operators.multi.processors.BroadcastProcessor.<McpTraceDto>create();
         subscribers.add(processor);
 
-        return processor
+        return SseHelper.withAutoClose(processor)
                 .onCancellation().invoke(() -> subscribers.remove(processor))
                 .onTermination().invoke(() -> subscribers.remove(processor));
     }

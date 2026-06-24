@@ -1199,11 +1199,18 @@
         let tracesByServer = {}; // Store traces per server: {serverId: [...traces]}
         let currentTab = 'workspaces';
         let allServersLoaded = false;
-        let workspacesEventSource = null;
-        let mcpClientsEventSource = null;
+        // SSE removed for workspaces/clients to avoid HTTP/1.1 connection limits - using polling instead
+
+        // Polling intervals
+        let workspacesPollingInterval = null;
+        let mcpClientsPollingInterval = null;
 
         function switchTab(tab, element) {
             currentTab = tab;
+
+            // Stop all polling when switching tabs
+            stopWorkspacesPolling();
+            stopMcpClientsPolling();
 
             // Update tab UI
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -1217,6 +1224,10 @@
             const consoleColumn = document.querySelector('.console-container');
 
             if (tab === 'workspaces') {
+                // Restart workspaces polling
+                if (!workspacesPollingInterval) {
+                    setupWorkspacesPolling();
+                }
                 document.getElementById('workspaces-list').style.display = 'block';
                 document.getElementById('all-servers-list').style.display = 'none';
                 document.getElementById('mcp-traces-list').style.display = 'none';
@@ -1226,9 +1237,30 @@
                 appContainer.style.gridTemplateColumns = '300px 300px 1fr';
                 consoleColumn.style.gridColumn = '3';
 
-                // If we have a selected workspace and server, reload the console
-                if (selectedWorkspace && selectedServer) {
-                    loadConsole(selectedServer);
+                // Refresh immediately when switching to this tab
+                loadWorkspaces();
+
+                // Refresh the view: reload servers list and console for selected workspace
+                if (selectedWorkspace) {
+                    loadServers(selectedWorkspace);
+                    if (selectedServer) {
+                        loadConsole(selectedServer);
+                    } else {
+                        // No server selected, show placeholder
+                        document.getElementById('console-area').innerHTML = `
+                            <div class="placeholder">
+                                ← Select a workspace and LSP server to view console
+                            </div>
+                        `;
+                    }
+                } else {
+                    // No workspace selected, show placeholder
+                    document.getElementById('servers-list').innerHTML = '<div class="servers-placeholder">No workspaces selected</div>';
+                    document.getElementById('console-area').innerHTML = `
+                        <div class="placeholder">
+                            ← Select a workspace and LSP server to view console
+                        </div>
+                    `;
                 }
             } else if (tab === 'all-servers') {
                 document.getElementById('workspaces-list').style.display = 'none';
@@ -1240,21 +1272,8 @@
                 appContainer.style.gridTemplateColumns = '300px 1fr';
                 consoleColumn.style.gridColumn = '2';
 
-                // Load servers if not already loaded
-                if (!allServersLoaded) {
-                    loadAllServers();
-                } else {
-                    // Already loaded, just show details of previously selected server (or first)
-                    fetch('/api/admin/servers')
-                        .then(response => response.json())
-                        .then(servers => {
-                            if (servers.length > 0) {
-                                const previousServerExists = selectedAllServer && servers.find(s => s.id === selectedAllServer);
-                                const serverToShow = previousServerExists ? selectedAllServer : servers[0].id;
-                                showServerDetails(serverToShow);
-                            }
-                        });
-                }
+                // Always reload servers when switching to this tab (no caching)
+                loadAllServers();
             } else if (tab === 'mcp-traces') {
                 document.getElementById('workspaces-list').style.display = 'none';
                 document.getElementById('all-servers-list').style.display = 'none';
@@ -1264,6 +1283,14 @@
                 // 2 columns layout: mcp info | console
                 appContainer.style.gridTemplateColumns = '300px 1fr';
                 consoleColumn.style.gridColumn = '2';
+
+                // Setup MCP traces SSE stream on first access
+                setupMcpTracesStream();
+
+                // Restart MCP clients polling
+                if (!mcpClientsPollingInterval) {
+                    setupMcpClientsPolling();
+                }
 
                 // Load MCP clients and auto-select
                 loadMcpClients().then(() => {
@@ -1407,30 +1434,36 @@
             }
         }
 
-        // Setup workspaces stream via SSE (with fallback to polling)
-        function setupWorkspacesStream() {
-            // Check SSE support
-            if (typeof EventSource === 'undefined') {
-                console.warn('SSE not supported, falling back to polling');
-                // Fallback: poll every 2 seconds
-                setInterval(() => {
-                    loadWorkspaces();
-                    if (selectedWorkspace) {
-                        loadServers(selectedWorkspace);
-                    }
-                }, 2000);
-                return;
+        // Setup workspaces polling (SSE removed to avoid HTTP/1.1 connection limits)
+        function setupWorkspacesPolling() {
+            // Initial load
+            loadWorkspaces();
+
+            // Poll every 30 seconds (stopped when switching tabs)
+            workspacesPollingInterval = setInterval(() => {
+                loadWorkspaces();
+                if (selectedWorkspace) {
+                    loadServers(selectedWorkspace);
+                }
+            }, 30000);
+        }
+
+        function stopWorkspacesPolling() {
+            if (workspacesPollingInterval) {
+                clearInterval(workspacesPollingInterval);
+                workspacesPollingInterval = null;
             }
+        }
 
-            if (workspacesEventSource) {
-                workspacesEventSource.close();
-            }
+        // Load workspaces (initial load only, SSE will keep it updated)
+        async function loadWorkspaces() {
+            try {
+                const response = await fetch('/api/admin/workspaces');
+                const newWorkspaces = await response.json();
 
-            workspacesEventSource = new EventSource('/api/admin/workspaces/stream');
-
-            workspacesEventSource.onmessage = (event) => {
-                try {
-                    workspaces = JSON.parse(event.data);
+                // Check if data actually changed to avoid unnecessary re-renders
+                if (JSON.stringify(newWorkspaces) !== JSON.stringify(workspaces)) {
+                    workspaces = newWorkspaces;
                     renderWorkspaces();
 
                     // Auto-select first workspace if available
@@ -1438,33 +1471,17 @@
                         selectWorkspace(workspaces[0].rootUri);
                     }
 
-                    // Refresh servers for selected workspace
+                    // Refresh servers for currently selected workspace if it still exists
                     if (selectedWorkspace) {
                         const workspace = workspaces.find(w => w.rootUri === selectedWorkspace);
                         if (workspace) {
                             renderServers(workspace.lspServers);
+                        } else {
+                            // Selected workspace was removed, clear selection
+                            selectedWorkspace = null;
+                            selectedServer = null;
                         }
                     }
-                } catch (error) {
-                    console.error('Failed to parse workspaces:', error);
-                }
-            };
-
-            workspacesEventSource.onerror = () => {
-                console.error('Workspaces SSE connection error');
-            };
-        }
-
-        // Load workspaces (initial load only, SSE will keep it updated)
-        async function loadWorkspaces() {
-            try {
-                const response = await fetch('/api/admin/workspaces');
-                workspaces = await response.json();
-                renderWorkspaces();
-
-                // Auto-select first workspace if available
-                if (workspaces.length > 0 && !selectedWorkspace) {
-                    selectWorkspace(workspaces[0].rootUri);
                 }
             } catch (error) {
                 console.error('Failed to load workspaces:', error);
@@ -1622,11 +1639,19 @@
             );
         }
 
+        let lastServersData = null;
+
         async function loadServers(uri) {
             try {
                 const response = await fetch('/api/admin/workspaces/' + encodeURIComponent(uri));
                 const workspace = await response.json();
-                renderServers(workspace.lspServers);
+
+                // Only re-render if servers data actually changed
+                const newServersData = JSON.stringify(workspace.lspServers);
+                if (newServersData !== lastServersData) {
+                    lastServersData = newServersData;
+                    renderServers(workspace.lspServers);
+                }
             } catch (error) {
                 console.error('Failed to load servers:', error);
             }
@@ -3007,64 +3032,50 @@
         let mcpTracesStreamStarted = false;
 
         // Setup MCP clients stream via SSE (with fallback to polling)
-        function setupMcpClientsStream() {
-            // Check SSE support
-            if (typeof EventSource === 'undefined') {
-                console.warn('SSE not supported, falling back to polling');
-                // Fallback: poll every 2 seconds
-                setInterval(loadMcpClients, 2000);
-                return;
-            }
+        function setupMcpClientsPolling() {
+            // Initial load
+            loadMcpClients();
 
-            if (mcpClientsEventSource) {
-                mcpClientsEventSource.close();
-            }
-
-            mcpClientsEventSource = new EventSource('/api/admin/mcp-clients/stream');
-
-            mcpClientsEventSource.onmessage = (event) => {
-                try {
-                    mcpClients = JSON.parse(event.data);
-                    renderMcpClients();
-
-                    // Auto-select first client if none selected, or re-select previous
-                    if (mcpClients.length > 0) {
-                        if (!selectedMcpClient) {
-                            // No selection yet, select first client
-                            selectMcpClient(mcpClients[0].id);
-                        } else {
-                            // Check if previously selected client still exists
-                            const stillExists = mcpClients.find(c => c.id === selectedMcpClient);
-                            if (!stillExists) {
-                                // Previously selected client disconnected, select first
-                                selectMcpClient(mcpClients[0].id);
-                            }
-                            // Note: Don't call renderMcpConsole() here - traces are updated via SSE
-                        }
-                    } else {
-                        // No clients connected
-                        selectedMcpClient = null;
-                    }
-                } catch (error) {
-                    console.error('Failed to parse MCP clients:', error);
-                }
-            };
-
-            mcpClientsEventSource.onerror = () => {
-                console.error('MCP clients SSE connection error');
-            };
+            // Poll every 30 seconds (stopped when switching tabs)
+            mcpClientsPollingInterval = setInterval(() => {
+                loadMcpClients();
+            }, 30000);
         }
 
-        // Load MCP clients (initial load only, SSE will keep it updated)
+        function stopMcpClientsPolling() {
+            if (mcpClientsPollingInterval) {
+                clearInterval(mcpClientsPollingInterval);
+                mcpClientsPollingInterval = null;
+            }
+        }
+
+        // Load MCP clients with polling
         async function loadMcpClients() {
             try {
                 const response = await fetch('/api/admin/mcp-clients');
-                mcpClients = await response.json();
-                renderMcpClients();
+                const newClients = await response.json();
 
-                // Auto-select first client if none selected
-                if (mcpClients.length > 0 && !selectedMcpClient) {
-                    selectMcpClient(mcpClients[0].id);
+                // Check if data actually changed to avoid unnecessary re-renders
+                if (JSON.stringify(newClients) !== JSON.stringify(mcpClients)) {
+                    mcpClients = newClients;
+                    renderMcpClients();
+
+                    // Auto-select first client if none selected
+                    if (mcpClients.length > 0 && !selectedMcpClient) {
+                        selectMcpClient(mcpClients[0].id);
+                    }
+
+                    // Check if previously selected client still exists
+                    if (selectedMcpClient) {
+                        const stillExists = mcpClients.find(c => c.id === selectedMcpClient);
+                        if (!stillExists) {
+                            // Previously selected client disconnected
+                            selectedMcpClient = null;
+                            if (mcpClients.length > 0) {
+                                selectMcpClient(mcpClients[0].id);
+                            }
+                        }
+                    }
                 }
             } catch (e) {
                 console.error('Failed to load MCP clients:', e);
@@ -3487,10 +3498,8 @@
         }
 
         // Initialize
-        loadWorkspaces();
-        setupWorkspacesStream();
-        setupMcpClientsStream();
-        setupMcpTracesStream();
+        setupWorkspacesPolling(); // Workspaces is the default tab, start polling immediately
+        // MCP polling will start when user switches to MCP tab
     </script>
 
     <!-- Generic Modal (for confirmAction, showAlert) -->

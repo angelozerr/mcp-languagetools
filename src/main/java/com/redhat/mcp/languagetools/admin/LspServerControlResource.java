@@ -7,6 +7,7 @@ import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import org.jboss.logging.Logger;
 
 import java.net.URI;
 
@@ -17,6 +18,8 @@ import com.redhat.mcp.languagetools.workspace.WorkspaceManager;
 @Produces(MediaType.APPLICATION_JSON)
 public class LspServerControlResource {
 
+    private static final Logger LOG = Logger.getLogger(LspServerControlResource.class);
+
     @Inject
     WorkspaceManager workspaceManager;
 
@@ -26,16 +29,28 @@ public class LspServerControlResource {
      */
     @GET
     public java.util.List<com.redhat.mcp.languagetools.admin.dto.LspServerDTO> listAllServers() {
-        return workspaceManager.getServerConfigs().values().stream()
-                .map(config -> new com.redhat.mcp.languagetools.admin.dto.LspServerDTO(
-                    config.getId(),
-                    config.getName(),
-                    ServerStatus.STOPPED,
-                    null,
-                    null,
-                    null
-                ))
-                .toList();
+        LOG.info("listAllServers() called");
+        try {
+            var configs = workspaceManager.getServerConfigs();
+            LOG.infof("Found %d server configs", configs.size());
+
+            var result = configs.values().stream()
+                    .map(config -> new com.redhat.mcp.languagetools.admin.dto.LspServerDTO(
+                        config.getId(),
+                        config.getName(),
+                        ServerStatus.STOPPED,
+                        null,
+                        null,
+                        null
+                    ))
+                    .toList();
+
+            LOG.infof("Returning %d servers", result.size());
+            return result;
+        } catch (Exception e) {
+            LOG.error("Error in listAllServers", e);
+            throw e;
+        }
     }
 
     @POST

@@ -1,6 +1,7 @@
 package com.redhat.mcp.languagetools.admin;
 
 import io.smallrye.mutiny.Multi;
+import io.smallrye.mutiny.operators.multi.processors.BroadcastProcessor;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
@@ -13,6 +14,8 @@ import com.redhat.mcp.languagetools.lsp.trace.LspTraceCollector;
 import com.redhat.mcp.languagetools.lsp.trace.LspTraceMessage;
 
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * REST endpoints for LSP trace messages.
@@ -28,7 +31,10 @@ public class LspTraceResource {
     LspTraceCollector traceCollector;
 
     @Inject
-    io.smallrye.mutiny.operators.multi.processors.BroadcastProcessor<LspTraceMessage> traceProcessor;
+    BroadcastProcessor<LspTraceMessage> traceProcessor;
+
+    // Track active SSE connections
+    private final Map<String, Boolean> activeConnections = new ConcurrentHashMap<>();
 
     @GET
     @Produces(MediaType.APPLICATION_JSON)
@@ -62,7 +68,16 @@ public class LspTraceResource {
     @Produces(MediaType.SERVER_SENT_EVENTS)
     @RestStreamElementType(MediaType.APPLICATION_JSON)
     public Multi<LspTraceMessage> streamTraces() {
-        return Multi.createFrom().publisher(traceProcessor);
+        String connectionId = java.util.UUID.randomUUID().toString();
+        activeConnections.put(connectionId, true);
+        LOG.infof("SSE client connected: %s (total: %d)", connectionId, activeConnections.size());
+
+        return SseHelper.withAutoClose(Multi.createFrom().publisher(traceProcessor))
+                .onTermination().invoke(() -> {
+                    activeConnections.remove(connectionId);
+                    LOG.infof("SSE client disconnected: %s (remaining: %d)", connectionId, activeConnections.size());
+                })
+                .runSubscriptionOn(io.smallrye.mutiny.infrastructure.Infrastructure.getDefaultWorkerPool());
     }
 
     @DELETE
@@ -72,6 +87,11 @@ public class LspTraceResource {
 
     public void onTraceEvent(@Observes LspTraceMessage trace) {
         LOG.debugf("Broadcasting trace: %s", trace.serverId());
-        traceProcessor.onNext(trace);
+        try {
+            traceProcessor.onNext(trace);
+        } catch (Exception e) {
+            // Ignore backpressure errors - events will be dropped by onOverflow().drop()
+            LOG.debugf("Failed to broadcast trace (backpressure): %s", e.getMessage());
+        }
     }
 }

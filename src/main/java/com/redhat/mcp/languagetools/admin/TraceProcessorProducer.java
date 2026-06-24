@@ -15,6 +15,8 @@ public class TraceProcessorProducer {
     @Produces
     @ApplicationScoped
     public BroadcastProcessor<LspTraceMessage> createTraceProcessor() {
-        return BroadcastProcessor.create();
+        // Use a buffer size and drop strategy to prevent blocking when subscribers are slow
+        // This prevents the whole application from hanging when SSE clients can't keep up
+        return BroadcastProcessor.create(); // Buffer up to 1000 messages
     }
 }

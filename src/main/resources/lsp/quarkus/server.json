@@ -4,9 +4,7 @@
   "description": "Quarkus extensions for JDT.LS and MicroProfile LS",
   "contributes": {
     "jdtls": {
-      "bundles": [
-        "./jars/com.redhat.microprofile.jdt.quarkus.jar"
-      ]
+      "bundles": ["plugins/*.jar"]
     },
     "microprofile": {
       "bundles": [
