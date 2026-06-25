@@ -98,10 +98,17 @@ public class AdminResource {
                         command = lspServer.getStartCommand();
                     }
 
+                    // Get status message, truncate if too long
+                    String statusMessage = lspServer != null ? lspServer.getStatusMessage() : null;
+                    if (statusMessage != null && statusMessage.length() > 100) {
+                        statusMessage = statusMessage.substring(0, 97) + "...";
+                    }
+
                     return new LspServerDTO(
                         config.getId(),
                         config.getName(),
                         workspace.getServerStatus(config.getId()),
+                        statusMessage,
                         externalInfo,
                         pid,
                         command

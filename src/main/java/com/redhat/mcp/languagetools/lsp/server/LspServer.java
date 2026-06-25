@@ -57,6 +57,7 @@ public class LspServer {
     private final Map<String, List<Diagnostic>> diagnosticsCache = new ConcurrentHashMap<>();
     private final java.util.Set<String> openedFiles = ConcurrentHashMap.newKeySet();
     private volatile ServerStatus status = ServerStatus.STOPPED;
+    private volatile String statusMessage = null;
     private boolean isSocketConnection = false;
     private InstanceFileWatcher fileWatcher;
     private LspInstanceRegistry.InstanceInfo currentInstance;
@@ -66,6 +67,10 @@ public class LspServer {
     protected RequestRouter requestRouter;
     private java.util.function.Consumer<ServerStatus> statusChangeCallback;
     private LspClientFeatures clientFeatures;
+
+    public RequestRouter getRequestRouter() {
+        return requestRouter;
+    }
 
     public LspServer(LspServerConfig config, URI workspaceRoot, Path workspaceDataDir, Path serverHome,
                      LspTraceCollector traceCollector, List<LspServerConfig> allServerConfigs) {
@@ -94,6 +99,11 @@ public class LspServer {
     private void setStatus(ServerStatus newStatus) {
         ServerStatus oldStatus = this.status;
         this.status = newStatus;
+
+        // Clear status message when stopping/stopped
+        if (newStatus == ServerStatus.STOPPING || newStatus == ServerStatus.STOPPED) {
+            this.statusMessage = null;
+        }
 
         LOG.infof("LspServer.setStatus: %s -> %s (callback registered: %s)",
                 oldStatus, newStatus, statusChangeCallback != null);
@@ -233,14 +243,61 @@ public class LspServer {
         executorService.submit(() -> {
             try (var reader = new BufferedReader(new InputStreamReader(serverProcess.getErrorStream()))) {
                 String line;
+                StringBuilder stackTraceBuffer = new StringBuilder();
+                String stackTraceTimestamp = null;
+
                 while ((line = reader.readLine()) != null) {
                     LOG.errorf("[%s stderr] %s", config.getId(), line);
 
-                    // Send to trace collector as error notification
+                    String trimmed = line.trim();
+                    boolean isStackTraceLine = trimmed.startsWith("at ") && trimmed.contains("(") && trimmed.contains(")");
+                    boolean isExceptionLine = trimmed.contains("Exception:") || trimmed.contains("Error:");
+
+                    if (isStackTraceLine || (isExceptionLine && stackTraceBuffer.length() == 0)) {
+                        // Start or continue stack trace buffering
+                        if (stackTraceBuffer.length() == 0) {
+                            stackTraceTimestamp = java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss"));
+                        }
+                        stackTraceBuffer.append(line).append("\n");
+                    } else {
+                        // Flush buffered stack trace if any
+                        if (stackTraceBuffer.length() > 0) {
+                            String errorTrace = String.format("[Error - %s] %s stderr: %s",
+                                stackTraceTimestamp,
+                                config.getName(),
+                                stackTraceBuffer.toString().trim());
+                            tracing.getCollector().addTrace(
+                                workspaceRoot.toString(),
+                                config.getId(),
+                                config.getName(),
+                                LspTraceMessage.MessageDirection.SERVER_TO_CLIENT,
+                                errorTrace
+                            );
+                            stackTraceBuffer.setLength(0);
+                            stackTraceTimestamp = null;
+                        }
+
+                        // Send current line as regular error
+                        String errorTrace = String.format("[Error - %s] %s stderr: %s",
+                            java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss")),
+                            config.getName(),
+                            line);
+                        tracing.getCollector().addTrace(
+                            workspaceRoot.toString(),
+                            config.getId(),
+                            config.getName(),
+                            LspTraceMessage.MessageDirection.SERVER_TO_CLIENT,
+                            errorTrace
+                        );
+                    }
+                }
+
+                // Flush remaining stack trace at end of stream
+                if (stackTraceBuffer.length() > 0) {
                     String errorTrace = String.format("[Error - %s] %s stderr: %s",
-                        java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss")),
+                        stackTraceTimestamp,
                         config.getName(),
-                        line);
+                        stackTraceBuffer.toString().trim());
                     tracing.getCollector().addTrace(
                         workspaceRoot.toString(),
                         config.getId(),
@@ -257,12 +314,11 @@ public class LspServer {
         // Create LSP client (subclasses can override to provide custom client)
         LanguageClient client = createLanguageClient();
 
-        // Wrap client to support both LanguageClient AND custom bindRequest routing
-        Object serviceObject = createRoutingServiceObject(client);
-
+        // GenericLanguageClient already implements Endpoint for bindRequest routing,
+        // so we can pass it directly - LSP4J will scan it for @JsonNotification
         // Create LSP launcher with message tracing wrapper (like lsp4ij)
         Launcher<LanguageServer> launcher = new Launcher.Builder<LanguageServer>()
-                .setLocalService(serviceObject)
+                .setLocalService(client)
                 .setRemoteInterface(LanguageServer.class)
                 .setInput(serverProcess.getInputStream())
                 .setOutput(serverProcess.getOutputStream())
@@ -346,6 +402,7 @@ public class LspServer {
                     // For generic servers, ready after initialization
                     // Subclasses like JdtLsServer may override this behavior
                     isReady = true;
+                    setStatusMessage("Ready");
                     return CompletableFuture.completedFuture(null);
                 });
     }
@@ -622,6 +679,25 @@ public class LspServer {
         return status;
     }
 
+    public String getStatusMessage() {
+        return statusMessage;
+    }
+
+    public void setStatusMessage(String statusMessage) {
+        String oldMessage = this.statusMessage;
+        this.statusMessage = statusMessage;
+
+        LOG.infof("[%s] setStatusMessage called: %s -> %s (callback: %s)",
+            config.getId(), oldMessage, statusMessage, statusChangeCallback != null);
+
+        // Notify if message changed and callback is registered
+        if (statusChangeCallback != null && !java.util.Objects.equals(oldMessage, statusMessage)) {
+            LOG.infof("[%s] Status message changed, firing callback", config.getId());
+            // Trigger status change callback to refresh UI
+            statusChangeCallback.accept(this.status);
+        }
+    }
+
     /**
      * Get the process ID of the running server (if available).
      */
@@ -854,10 +930,11 @@ public class LspServer {
     }
 
     /**
-     * Create a service object that combines LanguageClient with custom request routing.
-     * Uses LSP4J's ServiceEndpoints to support both standard LSP methods and custom requests.
+     * DEPRECATED: Routing is now handled by GenericLanguageClient.request() via Endpoint interface.
+     * This method is no longer used.
      */
-    private Object createRoutingServiceObject(LanguageClient client) {
+    @Deprecated
+    private Object createRoutingServiceObject_UNUSED(LanguageClient client) {
         LOG.infof("Creating routing service object for %s", config.getId());
 
         // Create a delegating endpoint that intercepts requests
