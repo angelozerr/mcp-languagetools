@@ -11,6 +11,57 @@
         let adminWebSocket = null;
 
         /**
+         * Build contributedBy map (inverse of contributesTo)
+         */
+        function buildContributedByMap(servers) {
+            const map = {};
+            for (const server of servers) {
+                if (server.contributesTo && server.contributesTo.length > 0) {
+                    for (const targetId of server.contributesTo) {
+                        if (!map[targetId]) map[targetId] = [];
+                        map[targetId].push(server.id);
+                    }
+                }
+            }
+            return map;
+        }
+
+        /**
+         * Format contribute info for display (contributesTo or contributedBy)
+         */
+        function formatContributeInfo(server, contributedByMap) {
+            const contributesTo = server.contributesTo || [];
+            const contributedBy = contributedByMap[server.id] || [];
+
+            let text = '';
+            let tooltip = '';
+
+            if (contributesTo.length > 0) {
+                const full = contributesTo.join(', ');
+                const styled = contributesTo.map(id => `<span style="color: #777;">${id}</span>`).join(', ');
+                const displayStyled = full.length > 20
+                    ? contributesTo.slice(0, 1).map(id => `<span style="color: #777;">${id}</span>`).join('') + ', <span style="color: #777;">...</span>'
+                    : styled;
+                text = ` <span style="color: #666;">→</span> ${displayStyled}`;
+                if (full.length > 20) {
+                    tooltip = `Contributes to: ${full}`;
+                }
+            } else if (contributedBy.length > 0) {
+                const full = contributedBy.join(', ');
+                const styled = contributedBy.map(id => `<span style="color: #777;">${id}</span>`).join(', ');
+                const displayStyled = full.length > 20
+                    ? contributedBy.slice(0, 1).map(id => `<span style="color: #777;">${id}</span>`).join('') + ', <span style="color: #777;">...</span>'
+                    : styled;
+                text = ` <span style="color: #666;">←</span> ${displayStyled}`;
+                if (full.length > 20) {
+                    tooltip = `Contributed by: ${full}`;
+                }
+            }
+
+            return { text, tooltip };
+        }
+
+        /**
          * Connect to admin WebSocket for real-time updates.
          * Replaces SSE streams and polling intervals.
          */
@@ -262,12 +313,16 @@
                     console.error('all-servers-list container not found');
                     return;
                 }
+                // Calculate contributedBy for all servers
+                const contributedByMap = buildContributedByMap(servers);
+
                 container.innerHTML = servers.map(server => {
                     const isActive = selectedAllServer === server.id ? 'active' : '';
+                    const contributeInfo = formatContributeInfo(server, contributedByMap);
                     return `
                         <div class="server-item ${isActive}" onclick="showServerDetails('${server.id}')">
                             <div class="server-name">${server.name}</div>
-                            <div class="server-id">${server.id}</div>
+                            <div class="server-id" ${contributeInfo.tooltip ? `title="${contributeInfo.tooltip}"` : ''}>${server.id}${contributeInfo.text}</div>
                         </div>
                     `;
                 }).join('');
@@ -293,13 +348,15 @@
             // Re-render server list to update active state
             const response = await fetch('/api/admin/servers');
             const servers = await response.json();
+            const contributedByMap = buildContributedByMap(servers);
             const container = document.getElementById('all-servers-list');
             container.innerHTML = servers.map(server => {
                 const isActive = selectedAllServer === server.id ? 'active' : '';
+                const contributeInfo = formatContributeInfo(server, contributedByMap);
                 return `
                     <div class="server-item ${isActive}" onclick="showServerDetails('${server.id}')">
                         <div class="server-name">${server.name}</div>
-                        <div class="server-id">${server.id}</div>
+                        <div class="server-id" ${contributeInfo.tooltip ? `title="${contributeInfo.tooltip}"` : ''}>${server.id}${contributeInfo.text}</div>
                     </div>
                 `;
             }).join('');
@@ -631,6 +688,9 @@
                 return;
             }
 
+            // Calculate contributedBy for all servers
+            const contributedByMap = buildContributedByMap(servers);
+
             container.innerHTML = servers.map(server => {
                 // Check if this is an external instance (connected to IDE)
                 const isExternal = server.externalInstance != null &&
@@ -690,7 +750,7 @@
                             <span class="server-source-icon" title="${sourceLabel}">${sourceIcon}</span>
                             ${server.name}
                         </div>
-                        <div class="server-id">${server.id}</div>
+                        <div class="server-id" ${(() => { const info = formatContributeInfo(server, contributedByMap); return info.tooltip ? `title="${info.tooltip}"` : ''; })()}>${server.id}${(() => formatContributeInfo(server, contributedByMap).text)()}</div>
                         <div>
                             <span class="status-badge ${server.status === 'RUNNING' && !server.isReady ? 'status-running-not-ready' : 'status-' + server.status.toLowerCase()}">${formatStatusLabel(server.status, server.externalInstance)}</span>
                             ${server.statusMessage ? `<span class="server-status-message" style="color: #888; font-size: 0.85rem; margin-left: 0.5rem;">${escapeHtml(server.statusMessage)}</span>` : ''}

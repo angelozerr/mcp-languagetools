@@ -35,16 +35,25 @@ public class LspServerControlResource {
             LOG.infof("Found %d server configs", configs.size());
 
             var result = configs.values().stream()
-                    .map(config -> new com.redhat.mcp.languagetools.admin.dto.LspServerDTO(
-                        config.getId(),
-                        config.getName(),
-                        ServerStatus.STOPPED,
-                        null,   // statusMessage
-                        false,  // isReady
-                        null,   // externalInstance
-                        null,   // pid
-                        null    // command
-                    ))
+                    .map(config -> {
+                        // Get contributesTo list (servers this one contributes to via bindRequest)
+                        java.util.List<String> contributesTo = java.util.List.of();
+                        if (config.getContributes() != null && config.getContributes().getContributions() != null) {
+                            contributesTo = new java.util.ArrayList<>(config.getContributes().getContributions().keySet());
+                        }
+
+                        return new com.redhat.mcp.languagetools.admin.dto.LspServerDTO(
+                            config.getId(),
+                            config.getName(),
+                            ServerStatus.STOPPED,
+                            null,   // statusMessage
+                            false,  // isReady
+                            contributesTo,
+                            null,   // externalInstance
+                            null,   // pid
+                            null    // command
+                        );
+                    })
                     .toList();
 
             LOG.infof("Returning %d servers", result.size());

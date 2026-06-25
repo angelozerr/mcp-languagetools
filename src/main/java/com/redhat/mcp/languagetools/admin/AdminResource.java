@@ -107,12 +107,19 @@ public class AdminResource {
                     // Get ready state
                     boolean isReady = lspServer != null && lspServer.isReady();
 
+                    // Get contributesTo list (servers this one contributes to via bindRequest)
+                    java.util.List<String> contributesTo = java.util.List.of();
+                    if (config.getContributes() != null && config.getContributes().getContributions() != null) {
+                        contributesTo = new java.util.ArrayList<>(config.getContributes().getContributions().keySet());
+                    }
+
                     return new LspServerDTO(
                         config.getId(),
                         config.getName(),
                         workspace.getServerStatus(config.getId()),
                         statusMessage,
                         isReady,
+                        contributesTo,
                         externalInfo,
                         pid,
                         command
