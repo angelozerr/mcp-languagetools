@@ -43,6 +43,12 @@ public class AdminWebSocketEndpoint {
     @Inject
     ObjectMapper objectMapper;
 
+    @Inject
+    com.redhat.mcp.languagetools.lsp.trace.LspTraceCollector lspTraceCollector;
+
+    @Inject
+    com.redhat.mcp.languagetools.mcp.trace.McpTraceCollector mcpTraceCollector;
+
     // Thread-safe set of active WebSocket sessions
     private final Set<Session> sessions = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
@@ -87,9 +93,76 @@ public class AdminWebSocketEndpoint {
             );
             sendToSession(session, clientsMsg);
 
+            // Send LSP trace history for all servers
+            sendLspTraceHistory(session);
+
+            // Send MCP trace history
+            sendMcpTraceHistory(session);
+
             LOG.debugf("Initial state sent to session: %s", session.getId());
         } catch (Exception e) {
             LOG.errorf(e, "Failed to send initial state to session: %s", session.getId());
+        }
+    }
+
+    /**
+     * Send LSP trace history for all servers.
+     */
+    private void sendLspTraceHistory(Session session) {
+        try {
+            // Get all workspaces and their servers
+            for (var workspace : workspaceManager.getWorkspaces().values()) {
+                for (var serverId : workspace.getAllLspServers().keySet()) {
+                    // Get last 200 traces for this server
+                    var traces = lspTraceCollector.getTracesForWorkspaceAndServer(
+                        workspace.getRootUri().toString(),
+                        serverId,
+                        200
+                    );
+
+                    // Send each trace
+                    for (var trace : traces) {
+                        LspTraceWsMessage msg = new LspTraceWsMessage(
+                            "lsp-trace",
+                            trace.workspaceUri().toString(),
+                            trace.serverId(),
+                            trace.serverName(),
+                            trace.timestamp().toString(),
+                            trace.direction().name(),
+                            trace.jsonContent()
+                        );
+                        sendToSession(session, msg);
+                    }
+                }
+            }
+            LOG.debugf("LSP trace history sent to session: %s", session.getId());
+        } catch (Exception e) {
+            LOG.errorf(e, "Failed to send LSP trace history to session: %s", session.getId());
+        }
+    }
+
+    /**
+     * Send MCP trace history.
+     */
+    private void sendMcpTraceHistory(Session session) {
+        try {
+            // Get last 500 MCP traces
+            var traces = mcpTraceCollector.getTraces(500);
+
+            // Send each trace
+            for (var trace : traces) {
+                McpTraceWsMessage msg = new McpTraceWsMessage(
+                    "mcp-trace",
+                    trace.direction(),
+                    trace.connectionId(),
+                    trace.message(),
+                    trace.timestamp().toString()
+                );
+                sendToSession(session, msg);
+            }
+            LOG.debugf("MCP trace history sent to session: %s", session.getId());
+        } catch (Exception e) {
+            LOG.errorf(e, "Failed to send MCP trace history to session: %s", session.getId());
         }
     }
 
