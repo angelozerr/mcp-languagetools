@@ -296,11 +296,15 @@ public class AdminWebSocketEndpoint {
                         statusMessage = statusMessage.substring(0, 97) + "...";
                     }
 
+                    // Get ready state
+                    boolean isReady = lspServer != null && lspServer.isReady();
+
                     return new com.redhat.mcp.languagetools.admin.dto.LspServerDTO(
                             config.getId(),
                             config.getName(),
                             workspace.getServerStatus(config.getId()),
                             statusMessage,
+                            isReady,
                             externalInfo,
                             pid,
                             command

@@ -323,6 +323,7 @@
 
         .status-starting { background: #ffa500; color: white; }
         .status-running { background: #28a745; color: white; }
+        .status-running-not-ready { background: #cddc39; color: black; } /* Yellow-green transition between STARTING and RUNNING */
         .status-stopping { background: #ff9800; color: white; }
         .status-stopped { background: #6c757d; color: white; }
         .status-installing { background: #ffc107; color: black; }
@@ -1885,7 +1886,7 @@
                         </div>
                         <div class="server-id">${server.id}</div>
                         <div>
-                            <span class="status-badge status-${server.status.toLowerCase()}">${formatStatusLabel(server.status, server.externalInstance)}</span>
+                            <span class="status-badge ${server.status === 'RUNNING' && !server.isReady ? 'status-running-not-ready' : 'status-' + server.status.toLowerCase()}">${formatStatusLabel(server.status, server.externalInstance)}</span>
                             ${server.statusMessage ? `<span class="server-status-message" style="color: #888; font-size: 0.85rem; margin-left: 0.5rem;">${escapeHtml(server.statusMessage)}</span>` : ''}
                             ${ideInfo}
                             ${server.pid ? `<span class="server-ide-info"><span title="Process ID">${server.pid}</span></span>` : ''}

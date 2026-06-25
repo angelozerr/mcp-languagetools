@@ -39,10 +39,11 @@ public class LspServerControlResource {
                         config.getId(),
                         config.getName(),
                         ServerStatus.STOPPED,
-                        null,  // statusMessage
-                        null,  // externalInstance
-                        null,  // pid
-                        null   // command
+                        null,   // statusMessage
+                        false,  // isReady
+                        null,   // externalInstance
+                        null,   // pid
+                        null    // command
                     ))
                     .toList();
 

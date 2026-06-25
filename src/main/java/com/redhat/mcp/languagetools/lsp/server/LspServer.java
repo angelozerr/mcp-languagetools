@@ -335,6 +335,11 @@ public class LspServer {
         launcher.startListening();
 
         LOG.infof("%s process started for workspace: %s", config.getId(), workspaceRoot);
+
+        // Set initial status message - server is RUNNING but not ready yet
+        // Will be overridden by "Ready" after initialization,
+        // or by language/status notifications for servers like JDT.LS
+        setStatusMessage("Not Ready");
     }
 
     /**

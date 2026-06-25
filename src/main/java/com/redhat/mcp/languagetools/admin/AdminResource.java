@@ -104,11 +104,15 @@ public class AdminResource {
                         statusMessage = statusMessage.substring(0, 97) + "...";
                     }
 
+                    // Get ready state
+                    boolean isReady = lspServer != null && lspServer.isReady();
+
                     return new LspServerDTO(
                         config.getId(),
                         config.getName(),
                         workspace.getServerStatus(config.getId()),
                         statusMessage,
+                        isReady,
                         externalInfo,
                         pid,
                         command
