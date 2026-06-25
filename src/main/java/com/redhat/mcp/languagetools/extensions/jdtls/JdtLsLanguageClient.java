@@ -36,6 +36,9 @@ public class JdtLsLanguageClient extends GenericLanguageClient {
         LOG.infof("JDT.LS status [%s]: %s", status.getType(), status.getMessage());
         currentStatus = status.getMessage();
 
+        // Update status message for admin UI
+        server.setStatusMessage(status.getMessage());
+
         // JDT.LS reports "ServiceReady" when it's done indexing and ready
         if ("ServiceReady".equals(status.getType()) ||
             (status.getMessage() != null && status.getMessage().contains("Ready"))) {

@@ -62,6 +62,7 @@ public class LspServer {
     private final Map<String, List<Diagnostic>> diagnosticsCache = new ConcurrentHashMap<>();
     private final java.util.Set<String> openedFiles = ConcurrentHashMap.newKeySet();
     private volatile ServerStatus status = ServerStatus.STOPPED;
+    private volatile String statusMessage = null;
     private boolean isSocketConnection = false;
     private InstanceFileWatcher fileWatcher;
     private LspInstanceRegistry.InstanceInfo currentInstance;
@@ -103,6 +104,11 @@ public class LspServer {
     private void setStatus(ServerStatus newStatus) {
         ServerStatus oldStatus = this.status;
         this.status = newStatus;
+
+        // Clear status message when stopping/stopped
+        if (newStatus == ServerStatus.STOPPING || newStatus == ServerStatus.STOPPED) {
+            this.statusMessage = null;
+        }
 
         LOG.infof("LspServer.setStatus: %s -> %s (callback registered: %s)",
                 oldStatus, newStatus, statusChangeCallback != null);
@@ -404,6 +410,7 @@ public class LspServer {
                     // For generic servers, ready after initialization
                     // Subclasses like JdtLsServer may override this behavior
                     isReady = true;
+                    setStatusMessage("Ready");
                     return CompletableFuture.completedFuture(null);
                 });
     }
@@ -678,6 +685,23 @@ public class LspServer {
 
     public ServerStatus getStatus() {
         return status;
+    }
+
+    public String getStatusMessage() {
+        return statusMessage;
+    }
+
+    public void setStatusMessage(String statusMessage) {
+        String oldMessage = this.statusMessage;
+        this.statusMessage = statusMessage;
+
+        // Notify if message changed and callback is registered
+        if (statusChangeCallback != null && !java.util.Objects.equals(oldMessage, statusMessage)) {
+            LOG.debugf("[%s] Status message changed: %s -> %s", config.getId(), oldMessage, statusMessage);
+            // Trigger status change callback to refresh UI
+            // We pass the same status twice since the status itself didn't change
+            statusChangeCallback.accept(this.status);
+        }
     }
 
     /**

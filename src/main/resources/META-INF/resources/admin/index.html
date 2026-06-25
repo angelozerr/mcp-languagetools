@@ -1886,6 +1886,7 @@
                         <div class="server-id">${server.id}</div>
                         <div>
                             <span class="status-badge status-${server.status.toLowerCase()}">${formatStatusLabel(server.status, server.externalInstance)}</span>
+                            ${server.statusMessage ? `<span class="server-status-message" style="color: #888; font-size: 0.85rem; margin-left: 0.5rem;">${escapeHtml(server.statusMessage)}</span>` : ''}
                             ${ideInfo}
                             ${server.pid ? `<span class="server-ide-info"><span title="Process ID">${server.pid}</span></span>` : ''}
                         </div>

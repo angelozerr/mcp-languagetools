@@ -38,6 +38,9 @@ public class DiagnosticsTools {
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri) {
         try {
+
+            Thread.sleep(1000);
+
             URI uri = URI.create(fileUri);
             LOG.infof("Getting diagnostics for: %s (from cwd: %s)", uri, cwd);
 

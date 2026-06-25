@@ -6,6 +6,7 @@ public record LspServerDTO(
     String id,
     String name,
     ServerStatus status,
+    String statusMessage,  // Optional message like "Ready", "Indexing...", etc.
     ExternalInstanceInfo externalInstance,
     Long pid,
     String command
