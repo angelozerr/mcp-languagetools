@@ -38,21 +38,21 @@
 
             if (contributesTo.length > 0) {
                 const full = contributesTo.join(', ');
-                const styled = contributesTo.map(id => `<span style="color: #777;">${id}</span>`).join(', ');
+                const styled = contributesTo.map(id => `<span style="color: #888;">${id}</span>`).join(', ');
                 const displayStyled = full.length > 20
-                    ? contributesTo.slice(0, 1).map(id => `<span style="color: #777;">${id}</span>`).join('') + ', <span style="color: #777;">...</span>'
+                    ? contributesTo.slice(0, 1).map(id => `<span style="color: #888;">${id}</span>`).join('') + ', <span style="color: #888;">...</span>'
                     : styled;
-                text = ` <span style="color: #666;">→</span> ${displayStyled}`;
+                text = ` <span style="color: #aaa; font-size: 1.3rem; font-weight: bold;">→</span> ${displayStyled}`;
                 if (full.length > 20) {
                     tooltip = `Contributes to: ${full}`;
                 }
             } else if (contributedBy.length > 0) {
                 const full = contributedBy.join(', ');
-                const styled = contributedBy.map(id => `<span style="color: #777;">${id}</span>`).join(', ');
+                const styled = contributedBy.map(id => `<span style="color: #888;">${id}</span>`).join(', ');
                 const displayStyled = full.length > 20
-                    ? contributedBy.slice(0, 1).map(id => `<span style="color: #777;">${id}</span>`).join('') + ', <span style="color: #777;">...</span>'
+                    ? contributedBy.slice(0, 1).map(id => `<span style="color: #888;">${id}</span>`).join('') + ', <span style="color: #888;">...</span>'
                     : styled;
-                text = ` <span style="color: #666;">←</span> ${displayStyled}`;
+                text = ` <span style="color: #aaa; font-size: 1.3rem; font-weight: bold;">←</span> ${displayStyled}`;
                 if (full.length > 20) {
                     tooltip = `Contributed by: ${full}`;
                 }
