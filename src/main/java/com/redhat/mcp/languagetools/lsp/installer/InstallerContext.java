@@ -95,7 +95,7 @@ public class InstallerContext {
     }
 
     /**
-     * Resolve variables in a string (e.g., ${output.dir}, ${user.home}).
+     * Resolve variables in a string (e.g., ${output.dir}, ${user.home}, $SERVER_HOME$).
      */
     public String resolveVariables(String input) {
         if (input == null) {
@@ -107,6 +107,12 @@ public class InstallerContext {
         // System properties
         result = result.replace("${user.home}", System.getProperty("user.home"));
         result = result.replace("$USER_HOME$", System.getProperty("user.home"));
+
+        // Special variables
+        String serverHome = getPropertyAsString("server.home");
+        if (serverHome != null) {
+            result = result.replace("$SERVER_HOME$", serverHome);
+        }
 
         // Context properties
         for (Map.Entry<String, Object> entry : properties.entrySet()) {

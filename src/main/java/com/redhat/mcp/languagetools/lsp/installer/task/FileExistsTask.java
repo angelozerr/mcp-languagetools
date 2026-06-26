@@ -12,7 +12,7 @@ import com.redhat.mcp.languagetools.lsp.installer.InstallerContext;
  * {
  *   "fileExists": {
  *     "name": "Check if installed",
- *     "file": "$USER_HOME$/.mcp-lsp/lsp/jdtls/bin/jdtls"
+ *     "file": "$USER_HOME$/.mcp-languagetools/lsp/jdtls/bin/jdtls"
  *   }
  * }
  */
@@ -31,7 +31,13 @@ public class FileExistsTask extends InstallerTask {
         Path filePath = Paths.get(resolvedFile);
 
         boolean exists = Files.exists(filePath);
-        context.log(exists ? "  ✓ File exists: " + resolvedFile : "  ✗ File not found: " + resolvedFile);
+
+        // Show original template and resolved path
+        String logMessage = file.equals(resolvedFile)
+            ? file  // No variables to resolve
+            : file + " (" + resolvedFile + ")";  // Show both template and resolved path
+
+        context.log(exists ? "  ✓ File exists: " + logMessage : "  ✗ File not found: " + logMessage);
 
         return exists;
     }

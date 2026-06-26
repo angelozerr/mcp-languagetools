@@ -2,6 +2,7 @@ package com.redhat.mcp.languagetools.admin;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
+import com.redhat.mcp.languagetools.PathManager;
 import com.redhat.mcp.languagetools.admin.dto.ErrorResponse;
 import com.redhat.mcp.languagetools.lsp.server.LspServerConfig;
 import com.redhat.mcp.languagetools.lsp.installer.InstallerContext;
@@ -34,14 +35,15 @@ public class InstallerResource {
     @Inject
     LspTraceCollector traceCollector;
 
+    @Inject
+    PathManager pathManager;
+
     /**
      * Load installer.json from user config directory first, then fallback to bundled resources.
      */
     private JsonObject loadInstallerJson(String serverId, Gson gson) throws Exception {
         // Try user config directory first
-        java.nio.file.Path userConfigPath = java.nio.file.Paths.get(
-            System.getProperty("user.home"), ".mcp-lsp", "config", "lsp", serverId, "installer.json"
-        );
+        var userConfigPath = pathManager.getServerInstallerConfig(serverId);
 
         if (Files.exists(userConfigPath)) {
             String content = Files.readString(userConfigPath);
@@ -88,6 +90,7 @@ public class InstallerResource {
             InstallerContext context = new InstallerContext();
             context.setProperty("workspace", workspaceUri.toString());
             context.setProperty("server.id", serverId);
+            context.setProperty("server.home", pathManager.getServerHome(serverId).toString());
             context.setTraceCollector(traceCollector, workspaceUri.toString(), serverId, config.getName());
 
             // Create task registry and load tasks

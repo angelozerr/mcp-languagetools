@@ -4,23 +4,23 @@
   "check": {
     "fileExists": {
       "name": "Check if MicroProfile is installed",
-      "file": "$USER_HOME$/.mcp-lsp/lsp/microprofile/org.eclipse.lsp4mp.ls-uber.jar"
+      "file": "$SERVER_HOME$/org.eclipse.lsp4mp.ls-uber.jar"
     }
   },
   "run": {
     "copy": {
       "name": "Copy MicroProfile LS JAR",
       "source": "/lsp/microprofile/lib/org.eclipse.lsp4mp.ls-uber.jar",
-      "destination": "$USER_HOME$/.mcp-lsp/lsp/microprofile/org.eclipse.lsp4mp.ls-uber.jar",
+      "destination": "$SERVER_HOME$/org.eclipse.lsp4mp.ls-uber.jar",
       "onSuccess": {
         "copy": {
           "name": "Copy MicroProfile plugins directory",
           "source": "/lsp/microprofile/plugins",
-          "destination": "$USER_HOME$/.mcp-lsp/lsp/microprofile/plugins",
+          "destination": "$SERVER_HOME$/plugins",
           "onSuccess": {
             "configureServer": {
               "name": "Configure MicroProfile server command",
-              "command": "java -jar \"$USER_HOME$/.mcp-lsp/lsp/microprofile/org.eclipse.lsp4mp.ls-uber.jar\"",
+              "command": "java -jar \"$SERVER_HOME$/org.eclipse.lsp4mp.ls-uber.jar\"",
               "update": true
             }
           }

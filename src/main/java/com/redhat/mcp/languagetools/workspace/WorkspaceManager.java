@@ -2,6 +2,7 @@ package com.redhat.mcp.languagetools.workspace;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
+import com.redhat.mcp.languagetools.PathManager;
 import com.redhat.mcp.languagetools.language.LanguageRegistry;
 import com.redhat.mcp.languagetools.lsp.*;
 import com.redhat.mcp.languagetools.lsp.installer.InstallerContext;
@@ -64,11 +65,8 @@ public class WorkspaceManager {
     @Inject
     Event<LspServerStatusChangeEvent> lspServerStatusChangeEvent;
 
-    @ConfigProperty(name = "mcp.lsp.workspace.data-dir")
-    Path workspaceDataDir;
-
-    @ConfigProperty(name = "mcp.lsp.servers.base-dir")
-    Optional<Path> serversBaseDir;
+    @Inject
+    PathManager pathManager;
 
     private final Map<URI, Workspace> workspaces = new ConcurrentHashMap<>();
     private final Map<String, LspServerConfig> serverConfigs = new ConcurrentHashMap<>();
@@ -92,10 +90,8 @@ public class WorkspaceManager {
      * Create extension manager for collecting server contributions.
      */
     private ExtensionManager createExtensionManager() {
-        // Use serversBaseDir from config, or default to ~/.mcp-lsp/lsp
-        Path baseDir = serversBaseDir.orElseGet(() ->
-            Paths.get(System.getProperty("user.home"), ".mcp-lsp", "lsp")
-        );
+        // Use PathManager for servers directory
+        Path baseDir = pathManager.getLspServersDir();
         return new ExtensionManager(serverConfigs, baseDir);
     }
 
@@ -111,7 +107,7 @@ public class WorkspaceManager {
         boolean isNewWorkspace = !workspaces.containsKey(normalizedUri);
 
         Workspace workspace = workspaces.computeIfAbsent(normalizedUri, uri -> {
-            Workspace ws = new Workspace(uri, workspaceDataDir, traceCollector);
+            Workspace ws = new Workspace(uri, pathManager.getWorkspaceDataDir(), traceCollector, pathManager);
 
             // Register callback for LSP server status changes
             ws.setServerStatusChangeCallback(event -> {
@@ -189,7 +185,7 @@ public class WorkspaceManager {
                                  config.getName(), externalInstance.port, externalInstance.pid);
 
                         // No need to install, use a dummy serverHome (won't be used for socket connection)
-                        java.nio.file.Path dummyHome = java.nio.file.Paths.get(System.getProperty("user.home"), ".mcp-lsp", "lsp", config.getId());
+                        Path dummyHome = pathManager.getServerHome(config.getId());
                         workspace.setExtensionManager(createExtensionManager());
                         workspace.addLspServer(config, dummyHome, new ArrayList<>(serverConfigs.values()));
 
@@ -265,9 +261,7 @@ public class WorkspaceManager {
      */
     private JsonObject loadInstallerJson(String serverId, Gson gson) {
         // Try user config directory first
-        Path userConfigPath = Paths.get(
-            System.getProperty("user.home"), ".mcp-lsp", "config", "lsp", serverId, "installer.json"
-        );
+        Path userConfigPath = pathManager.getServerInstallerConfig(serverId);
 
         try {
             if (Files.exists(userConfigPath)) {
@@ -316,6 +310,7 @@ public class WorkspaceManager {
             // Create context
             InstallerContext context = new InstallerContext();
             context.setProperty("server.id", config.getId());
+            context.setProperty("server.home", pathManager.getServerHome(config.getId()).toString());
             context.setTraceCollector(traceCollector, workspaceUri.toString(), config.getId(), config.getName());
 
             // Create task registry
@@ -330,7 +325,7 @@ public class WorkspaceManager {
                     // Already installed, get the directory from context or default
                     String homeDir = context.getPropertyAsString("output.dir");
                     if (homeDir == null) {
-                        homeDir = System.getProperty("user.home") + "/.mcp-lsp/lsp/" + config.getId();
+                        homeDir = pathManager.getServerHome(config.getId()).toString();
                     }
                     Path home = Paths.get(homeDir);
                     serverHomes.put(config.getId(), home);

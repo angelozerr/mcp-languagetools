@@ -1,11 +1,14 @@
 package com.redhat.mcp.languagetools.workspace;
 
+import com.redhat.mcp.languagetools.PathManager;
 import com.redhat.mcp.languagetools.lsp.server.LspServerStatusChangeEvent;
 import org.jboss.logging.Logger;
 
+import com.redhat.mcp.languagetools.lsp.ExtensionManager;
 import com.redhat.mcp.languagetools.lsp.LspInstanceRegistry;
 import com.redhat.mcp.languagetools.lsp.server.LspServer;
 import com.redhat.mcp.languagetools.lsp.server.LspServerConfig;
+import com.redhat.mcp.languagetools.lsp.server.LspServerContext;
 import com.redhat.mcp.languagetools.lsp.server.LspServerFactoryRegistry;
 import com.redhat.mcp.languagetools.lsp.RequestRouter;
 import com.redhat.mcp.languagetools.lsp.server.ServerStatus;
@@ -32,8 +35,9 @@ public class Workspace {
     private final URI rootUri;
     private final Path workspaceDataDir;
     private final LspTraceCollector traceCollector;
+    private final PathManager pathManager;
     private final WorkspaceConfiguration configuration;
-    private com.redhat.mcp.languagetools.lsp.ExtensionManager extensionManager;
+    private ExtensionManager extensionManager;
     private final Map<String, LspServer> lspServers = new ConcurrentHashMap<>();
     private final Map<String, ServerInfo> serverInfos = new ConcurrentHashMap<>();
     private final Map<String, ServerStatus> installationStatus = new ConcurrentHashMap<>();
@@ -59,17 +63,19 @@ public class Workspace {
     ) {
     }
 
-    public Workspace(URI rootUri, Path workspaceDataDir, LspTraceCollector traceCollector) {
+    public Workspace(URI rootUri, Path workspaceDataDir, LspTraceCollector traceCollector,
+                     PathManager pathManager) {
         this.rootUri = rootUri;
         this.workspaceDataDir = createWorkspaceDataDir(workspaceDataDir, rootUri);
         this.traceCollector = traceCollector;
+        this.pathManager = pathManager;
         this.configuration = new WorkspaceConfiguration(java.nio.file.Paths.get(rootUri));
     }
 
     /**
      * Set extension manager for this workspace.
      */
-    public void setExtensionManager(com.redhat.mcp.languagetools.lsp.ExtensionManager extensionManager) {
+    public void setExtensionManager(ExtensionManager extensionManager) {
         this.extensionManager = extensionManager;
     }
 
@@ -91,9 +97,11 @@ public class Workspace {
         // Store allServerConfigs for later use (reconnect, etc.)
         this.allServerConfigs = allServerConfigs;
 
-        LspServer server = LspServerFactoryRegistry.createServer(
-            config, rootUri, workspaceDataDir, serverHome, traceCollector, allServerConfigs
-        );
+        LspServerContext context =
+            LspServerFactoryRegistry.createContext(
+                pathManager, allServerConfigs, rootUri, workspaceDataDir, serverHome, traceCollector);
+
+        LspServer server = LspServerFactoryRegistry.createServer(config, context);
         server.setWorkspaceConfiguration(configuration);
         if (extensionManager != null) {
             server.setExtensionManager(extensionManager);
@@ -173,9 +181,9 @@ public class Workspace {
                 }
 
                 // Create new server instance using factory
-                LspServer newServer = LspServerFactoryRegistry.createServer(
-                    info.config, rootUri, workspaceDataDir, info.serverHome, traceCollector, allServerConfigs
-                );
+                LspServerContext newContext = LspServerFactoryRegistry.createContext(
+                    pathManager, allServerConfigs, rootUri, workspaceDataDir, info.serverHome, traceCollector);
+                LspServer newServer = LspServerFactoryRegistry.createServer(info.config, newContext);
                 newServer.setWorkspaceConfiguration(configuration);
 
                 // Register status change callback
@@ -225,9 +233,9 @@ public class Workspace {
                 }
 
                 // Create new server instance using factory
-                LspServer newServer = LspServerFactoryRegistry.createServer(
-                    info.config, rootUri, workspaceDataDir, info.serverHome, traceCollector, allServerConfigs
-                );
+                LspServerContext newContext = LspServerFactoryRegistry.createContext(
+                    pathManager, allServerConfigs, rootUri, workspaceDataDir, info.serverHome, traceCollector);
+                LspServer newServer = LspServerFactoryRegistry.createServer(info.config, newContext);
                 newServer.setWorkspaceConfiguration(configuration);
 
                 // Register status change callback

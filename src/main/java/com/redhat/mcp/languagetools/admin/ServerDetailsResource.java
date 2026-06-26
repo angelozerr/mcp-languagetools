@@ -3,6 +3,7 @@ package com.redhat.mcp.languagetools.admin;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
+import com.redhat.mcp.languagetools.PathManager;
 import com.redhat.mcp.languagetools.admin.dto.ErrorResponse;
 import com.redhat.mcp.languagetools.lsp.server.LspServerConfig;
 import com.redhat.mcp.languagetools.workspace.WorkspaceManager;
@@ -13,6 +14,7 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
 import java.io.InputStream;
+import java.nio.file.Files;
 
 /**
  * REST endpoint for server details and installer configuration.
@@ -23,6 +25,9 @@ public class ServerDetailsResource {
 
     @Inject
     WorkspaceManager workspaceManager;
+
+    @Inject
+    PathManager pathManager;
 
     private final Gson gson = new GsonBuilder().setPrettyPrinting().create();
 
@@ -45,9 +50,7 @@ public class ServerDetailsResource {
     @Produces(MediaType.APPLICATION_JSON)
     public Response getInstallerJson(@PathParam("serverId") String serverId) {
         // Try user config directory first
-        java.nio.file.Path userConfigPath = java.nio.file.Paths.get(
-            System.getProperty("user.home"), ".mcp-lsp", "config", "lsp", serverId, "installer.json"
-        );
+        var userConfigPath = pathManager.getServerInstallerConfig(serverId);
 
         try {
             String jsonContent;
@@ -80,11 +83,11 @@ public class ServerDetailsResource {
             JsonObject installerJson = gson.fromJson(jsonContent, JsonObject.class);
 
             // Save to user config directory (not bundled resources)
-            java.nio.file.Path configDir = java.nio.file.Paths.get(System.getProperty("user.home"), ".mcp-lsp", "config", "lsp", serverId);
-            java.nio.file.Files.createDirectories(configDir);
+            var configDir = pathManager.getServerConfigDir(serverId);
+            Files.createDirectories(configDir);
 
-            java.nio.file.Path installerFile = configDir.resolve("installer.json");
-            java.nio.file.Files.writeString(installerFile, gson.toJson(installerJson));
+            var installerFile = configDir.resolve("installer.json");
+            Files.writeString(installerFile, gson.toJson(installerJson));
 
             return Response.ok()
                     .entity("{\"status\": \"saved\", \"path\": \"" + installerFile.toString().replace("\\", "\\\\") + "\"}")

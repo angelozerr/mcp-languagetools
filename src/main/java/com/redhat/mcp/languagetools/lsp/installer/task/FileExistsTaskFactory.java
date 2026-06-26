@@ -8,7 +8,7 @@ import com.google.gson.JsonObject;
  * {
  *   "fileExists": {
  *     "name": "Check if installed",
- *     "file": "$USER_HOME$/.mcp-lsp/lsp/jdtls/bin/jdtls"
+ *     "file": "$USER_HOME$/.mcp-languagetools/lsp/jdtls/bin/jdtls"
  *   }
  * }
  */

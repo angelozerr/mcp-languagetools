@@ -5,7 +5,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.redhat.mcp.languagetools.lsp.server.LspServer;
 import com.redhat.mcp.languagetools.lsp.server.LspServerConfig;
-import com.redhat.mcp.languagetools.lsp.trace.LspTraceCollector;
+import com.redhat.mcp.languagetools.lsp.server.LspServerContext;
 import org.eclipse.lsp4j.services.LanguageClient;
 import org.jboss.logging.Logger;
 
@@ -34,9 +34,8 @@ public class JdtLsServer extends LspServer {
 
     private JdtLsLanguageClient jdtClient;
 
-    public JdtLsServer(LspServerConfig config, URI workspaceRoot, Path workspaceDataDir, Path serverHome,
-                       LspTraceCollector traceCollector, List<LspServerConfig> allServerConfigs) {
-        super(config, workspaceRoot, workspaceDataDir, serverHome, traceCollector, allServerConfigs);
+    public JdtLsServer(LspServerConfig config, LspServerContext context) {
+        super(config, context);
     }
 
     /**
@@ -219,8 +218,8 @@ public class JdtLsServer extends LspServer {
      * Get the server home directory for a contributor server.
      */
     private Path getContributorServerHome(String serverId) {
-        // Server homes are in ~/.mcp-lsp/lsp/{serverId}/
-        return Paths.get(System.getProperty("user.home"), ".mcp-lsp", "lsp", serverId);
+        // Server homes are in ~/.mcp-languagetools/lsp/{serverId}/
+        return pathManager.getServerHome(serverId);
     }
 
     /**
@@ -269,7 +268,7 @@ public class JdtLsServer extends LspServer {
         String normalizedPath = bundlePattern.startsWith("./") ? bundlePattern.substring(2) : bundlePattern;
 
         // Target directory on filesystem
-        Path targetServerHome = Paths.get(System.getProperty("user.home"), ".mcp-lsp", "lsp", serverId);
+        Path targetServerHome = pathManager.getServerHome(serverId);
 
         try {
             Files.createDirectories(targetServerHome);

@@ -32,7 +32,12 @@ public class ConfigureServerTask extends InstallerTask {
         // Store resolved command in context for server configuration update
         context.setProperty("server.command", resolvedCommand);
 
-        context.log("  ✓ Configured server command: " + resolvedCommand);
+        // Show original template and resolved command
+        String logMessage = command.equals(resolvedCommand)
+            ? command  // No variables to resolve
+            : command + " → " + resolvedCommand;  // Show both template and resolved
+
+        context.log("  ✓ Configured server command: " + logMessage);
         return true;
     }
 

@@ -29,7 +29,7 @@ import java.util.zip.ZipInputStream;
  *     "name": "Download JDT.LS",
  *     "url": "https://...",
  *     "output": {
- *       "dir": "$USER_HOME$/.mcp-lsp/lsp/jdtls",
+ *       "dir": "$USER_HOME$/.mcp-languagetools/lsp/jdtls",
  *       "file": {
  *         "name": "bin/jdtls",
  *         "executable": true

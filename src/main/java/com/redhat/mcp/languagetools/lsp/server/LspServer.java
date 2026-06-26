@@ -1,5 +1,6 @@
 package com.redhat.mcp.languagetools.lsp.server;
 
+import com.redhat.mcp.languagetools.PathManager;
 import com.redhat.mcp.languagetools.language.LanguageDocument;
 import com.redhat.mcp.languagetools.lsp.*;
 import com.redhat.mcp.languagetools.lsp.client.GenericLanguageClient;
@@ -49,6 +50,7 @@ public class LspServer {
     protected final Path serverHome;
     protected final TracingMessageConsumer tracing;
     protected final List<LspServerConfig> allServerConfigs;
+    protected final PathManager pathManager;
 
     protected Process serverProcess;
     protected Socket socket;
@@ -72,15 +74,15 @@ public class LspServer {
         return requestRouter;
     }
 
-    public LspServer(LspServerConfig config, URI workspaceRoot, Path workspaceDataDir, Path serverHome,
-                     LspTraceCollector traceCollector, List<LspServerConfig> allServerConfigs) {
+    public LspServer(LspServerConfig config, LspServerContext context) {
         this.config = config;
-        this.workspaceRoot = workspaceRoot;
-        this.workspaceDataDir = workspaceDataDir;
-        this.serverHome = serverHome;
-        this.tracing = new TracingMessageConsumer(traceCollector, workspaceRoot.toString(), config.getId(), config.getName());
+        this.workspaceRoot = context.getWorkspaceRoot();
+        this.workspaceDataDir = context.getWorkspaceDataDir();
+        this.serverHome = context.getServerHome();
+        this.tracing = new TracingMessageConsumer(context.getTraceCollector(), workspaceRoot.toString(), config.getId(), config.getName());
         this.executorService = Executors.newCachedThreadPool();
-        this.allServerConfigs = allServerConfigs != null ? allServerConfigs : List.of();
+        this.allServerConfigs = context.getAllServerConfigs() != null ? context.getAllServerConfigs() : List.of();
+        this.pathManager = context.getPathManager();
 
         // Create client features for managing capabilities
         this.clientFeatures = new LspClientFeatures(config);
@@ -1149,12 +1151,12 @@ public class LspServer {
     }
 
     /**
-     * Get trace level from global config file (~/.mcp-lsp/config.json).
+     * Get trace level from global config file (~/.mcp-languagetools/config.json).
      * Returns "off", "messages", or "verbose" (default).
      */
     private String getTraceLevelFromConfig() {
         try {
-            Path configFile = Paths.get(System.getProperty("user.home"), ".mcp-lsp", "config.json");
+            Path configFile = pathManager.getGlobalConfigFile();
             if (!Files.exists(configFile)) {
                 return "verbose"; // Default
             }
