@@ -14,7 +14,7 @@ package com.redhat.mcp.languagetools.lsp.tools;
 import com.redhat.mcp.languagetools.language.LanguageRegistry;
 import com.redhat.mcp.languagetools.lsp.client.LspCapability;
 import com.redhat.mcp.languagetools.lsp.tools.params.FilePositionRequestParams;
-import com.redhat.mcp.languagetools.lsp.tools.strategies.ReferencesStrategy;
+import com.redhat.mcp.languagetools.lsp.tools.strategies.ImplementationStrategy;
 import com.redhat.mcp.languagetools.tools.ToolArgDescriptions;
 import io.quarkiverse.mcp.server.Cancellation;
 import io.quarkiverse.mcp.server.Tool;
@@ -25,10 +25,10 @@ import jakarta.inject.Inject;
 import java.util.concurrent.CompletableFuture;
 
 /**
- * MCP tools for LSP references (find all references).
+ * MCP tools for LSP implementation (go to implementation).
  */
 @ApplicationScoped
-public class ReferencesTools {
+public class ImplementationTools {
 
     @Inject
     LspRequestExecutor requestExecutor;
@@ -36,21 +36,21 @@ public class ReferencesTools {
     @Inject
     LanguageRegistry languageRegistry;
 
-    @Tool(description = "Find all references to a symbol at a specific position in a file. " +
-                        "Returns all locations where the symbol is used across the workspace. " +
-                        "Example: findReferences(cwd='/home/user/project', fileUri='file:///home/user/project/src/Main.java', line=10, character=5)")
-    public CompletableFuture<String> findReferences(
+    @Tool(description = "Find all implementations of an interface or abstract class at a specific position. " +
+                        "Returns the locations where the symbol is implemented. " +
+                        "Example: findImplementations(cwd='/home/user/project', fileUri='file:///home/user/project/src/MyInterface.java', line=5, character=15)")
+    public CompletableFuture<String> findImplementations(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
             @ToolArg(description = ToolArgDescriptions.POSITION_LINE) int line,
             @ToolArg(description = ToolArgDescriptions.POSITION_CHARACTER) int character,
             @ToolArg(description = ToolArgDescriptions.CANCELLATION) Cancellation cancellation) {
+
         FilePositionRequestParams params = new FilePositionRequestParams(cwd, fileUri, line, character);
         return requestExecutor.execute(
                 params,
-                new ReferencesStrategy(languageRegistry),
+                new ImplementationStrategy(languageRegistry),
                 cancellation
         );
     }
 }
-

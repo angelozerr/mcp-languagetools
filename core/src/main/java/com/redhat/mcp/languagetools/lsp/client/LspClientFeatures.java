@@ -69,7 +69,7 @@ public class LspClientFeatures {
         return switch (capability) {
             case REFERENCES -> referencesRegistry.isReferencesSupported(document);
             // TODO: Add other capabilities
-            case DEFINITION, HOVER, COMPLETION, DIAGNOSTIC, DOCUMENT_SYMBOL -> false;
+            case DEFINITION, DECLARATION, IMPLEMENTATION, HOVER, COMPLETION, DIAGNOSTIC, DOCUMENT_SYMBOL, WORKSPACE_SYMBOL -> false;
         };
     }
 

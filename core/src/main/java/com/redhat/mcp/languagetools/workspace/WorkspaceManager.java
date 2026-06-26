@@ -389,6 +389,37 @@ public class WorkspaceManager {
     }
 
     /**
+     * Get or create workspace from a path (String cwd).
+     * Converts the path to URI and creates/returns the workspace.
+     *
+     * @param cwd the workspace root path (e.g., "/home/user/project" or "C:\\Users\\project")
+     * @return completable future with the workspace
+     */
+    public CompletableFuture<Workspace> getWorkspaceForPath(String cwd) {
+        // Convert path to URI
+        // If already a URI (starts with file:), use as-is
+        // Otherwise convert path to file:/// URI (3 slashes for absolute paths)
+        String workspaceUriStr;
+        if (cwd.startsWith("file:")) {
+            workspaceUriStr = cwd;
+        } else {
+            // Normalize path separators and create file URI
+            String normalizedPath = cwd.replace("\\", "/");
+            // Add leading slash if not present (for absolute paths)
+            if (!normalizedPath.startsWith("/")) {
+                normalizedPath = "/" + normalizedPath;
+            }
+            workspaceUriStr = "file://" + normalizedPath;
+        }
+
+        URI workspaceUri = URI.create(workspaceUriStr);
+
+        // Create workspace directly (no file detection needed)
+        Workspace workspace = getOrCreateWorkspace(workspaceUri);
+        return CompletableFuture.completedFuture(workspace);
+    }
+
+    /**
      * Shutdown all workspaces.
      */
     public CompletableFuture<Void> shutdownAll() {

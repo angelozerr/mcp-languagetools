@@ -15,6 +15,7 @@ import com.redhat.mcp.languagetools.workspace.WorkspaceManager;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
+import java.net.URI;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Predicate;
@@ -44,6 +45,30 @@ public class LspServerResolver {
             Predicate<LspServer> filter) {
 
         return workspaceManager.getWorkspaceForFile(document.getUri())
+                .thenApply(workspace -> {
+                    // Get all LSP servers from workspace
+                    var allServers = workspace.getAllLspServers();
+
+                    // Filter servers based on the predicate
+                    return allServers.values().stream()
+                            .filter(filter)
+                            .collect(Collectors.toList());
+                });
+    }
+
+    /**
+     * Get all LSP servers for a workspace (without specific file).
+     * Used for workspace-level operations like workspace/symbol.
+     *
+     * @param cwd    the current working directory path (not URI)
+     * @param filter predicate to filter servers (e.g., by enabled status)
+     * @return completable future with list of matching servers
+     */
+    public CompletableFuture<List<LspServer>> getLspServersForWorkspace(
+            String cwd,
+            Predicate<LspServer> filter) {
+
+        return workspaceManager.getWorkspaceForPath(cwd)
                 .thenApply(workspace -> {
                     // Get all LSP servers from workspace
                     var allServers = workspace.getAllLspServers();
