@@ -6,6 +6,8 @@
         let currentTab = 'workspaces';
         let allServersLoaded = false;
         let workspacesRendered = false; // Track if workspaces have been rendered at least once
+        let currentServerTab = 'overview'; // Track current tab in Servers view
+        let currentConsoleTab = 'traces'; // Track current tab in Workspaces view
 
         // WebSocket connection (replaces SSE and polling)
         let adminWebSocket = null;
@@ -439,17 +441,26 @@
                 const detailsHTML = renderServerDetailsHTML(details);
                 const contributionsHTML = formatContributionsSection(details, servers);
 
+                // Check if there are contributions
+                const hasContributions = (details.contributions && Object.keys(details.contributions).length > 0) ||
+                                        buildContributedByMap(servers)[details.id]?.length > 0;
+
+                // If current tab is contributions but there are none, switch to overview
+                if (!hasContributions && currentServerTab === 'contributions') {
+                    currentServerTab = 'overview';
+                }
+
                 const html = `
                     <div class="console-header">
                         <div class="console-title">${details.name || details.id}</div>
                         <div class="console-tabs">
-                            <button class="tab-button active" onclick="switchServerTab('details')">Details</button>
-                            <button class="tab-button" onclick="switchServerTab('contributions')">Contributions</button>
-                            <button class="tab-button" onclick="switchServerTab('install')">Install</button>
+                            <button class="tab-button ${currentServerTab === 'overview' ? 'active' : ''}" onclick="switchServerTab('overview')">Overview</button>
+                            ${hasContributions ? `<button class="tab-button ${currentServerTab === 'contributions' ? 'active' : ''}" onclick="switchServerTab('contributions')">Contributions</button>` : ''}
+                            <button class="tab-button ${currentServerTab === 'install' ? 'active' : ''}" onclick="switchServerTab('install')">Install</button>
                         </div>
                     </div>
                     <div class="tab-content">
-                        <div id="server-details-tab" class="tab-panel active">
+                        <div id="server-overview-tab" class="tab-panel ${currentServerTab === 'overview' ? 'active' : ''}">
                             <div class="details-panel" style="padding: 2rem; color: #cccccc; overflow-y: auto;">
                                 ${detailsHTML}
                                 <div style="margin-top: 2rem; padding: 1rem; background: #252526; border-left: 3px solid #007acc; border-radius: 4px;">
@@ -457,12 +468,15 @@
                                 </div>
                             </div>
                         </div>
-                        <div id="server-contributions-tab" class="tab-panel">
-                            <div class="details-panel" style="padding: 2rem; color: #cccccc; overflow-y: auto;">
-                                ${contributionsHTML || '<p class="detail-value">No contributions</p>'}
+                        ${hasContributions ? `
+                        <div id="server-contributions-tab" class="tab-panel ${currentServerTab === 'contributions' ? 'active' : ''}" style="overflow-y: auto;">
+                            <div id="server-diagram-container" style="width: 100%; height: 400px; background: #1e1e1e; border-bottom: 1px solid #333;"></div>
+                            <div class="details-panel" style="padding: 2rem; color: #cccccc;">
+                                ${contributionsHTML}
                             </div>
                         </div>
-                        <div id="server-install-tab" class="tab-panel">
+                        ` : ''}
+                        <div id="server-install-tab" class="tab-panel ${currentServerTab === 'install' ? 'active' : ''}">
                             <div class="install-panel">
                                 <h3>Installer Configuration</h3>
                                 <div class="install-info">
@@ -491,6 +505,16 @@
 
                 // Load installer.json for this server
                 loadInstallerJson(details.id);
+
+                // Render diagram (will be called when switching to diagram tab)
+                // Store servers data for diagram rendering
+                window.currentDiagramServers = servers;
+                window.currentDiagramServerId = details.id;
+
+                // If contributions tab is active, render diagram immediately
+                if (currentServerTab === 'contributions') {
+                    setTimeout(() => renderServerDiagram(servers, details.id), 100);
+                }
 
                 console.log('innerHTML set, now checking:', consoleArea.innerHTML.substring(0, 100));
             } catch (error) {
@@ -881,7 +905,6 @@
             `;
         }
 
-        let currentConsoleTab = 'traces';
         let currentTraceLevel = 'verbose';
         let currentServerId = null;
 
@@ -936,6 +959,17 @@
         }
 
         async function loadConsole(server) {
+            // Check if server has contributions
+            const workspace = workspaces.find(w => w.rootUri === selectedWorkspace);
+            const allServers = workspace ? workspace.lspServers : [];
+            const hasContributions = (server.contributions && Object.keys(server.contributions).length > 0) ||
+                                    buildContributedByMap(allServers)[server.id]?.length > 0;
+
+            // If current tab is contributions but there are none, switch to traces
+            if (!hasContributions && currentConsoleTab === 'contributions') {
+                currentConsoleTab = 'traces';
+            }
+
             // Setup console UI with tabs
             document.getElementById('console-area').innerHTML = `
                 <div class="console-wrapper">
@@ -945,10 +979,10 @@
                             <span class="status-indicator" id="sse-status"></span>
                         </div>
                         <div class="console-tabs">
-                            <button class="tab-button active" onclick="switchConsoleTab('traces')">Traces</button>
-                            <button class="tab-button" onclick="switchConsoleTab('details')">Details</button>
-                            <button class="tab-button" onclick="switchConsoleTab('contributions')">Contributions</button>
-                            <button class="tab-button" onclick="switchConsoleTab('install')">Install</button>
+                            <button class="tab-button ${currentConsoleTab === 'traces' ? 'active' : ''}" onclick="switchConsoleTab('traces')">Traces</button>
+                            <button class="tab-button ${currentConsoleTab === 'overview' ? 'active' : ''}" onclick="switchConsoleTab('overview')">Overview</button>
+                            ${hasContributions ? `<button class="tab-button ${currentConsoleTab === 'contributions' ? 'active' : ''}" onclick="switchConsoleTab('contributions')">Contributions</button>` : ''}
+                            <button class="tab-button ${currentConsoleTab === 'install' ? 'active' : ''}" onclick="switchConsoleTab('install')">Install</button>
                         </div>
                         <div class="console-controls" id="traces-controls">
                             <label style="color: #cccccc; font-size: 0.85rem;">
@@ -964,20 +998,23 @@
                         </div>
                     </div>
                     <div class="tab-content">
-                        <div id="traces-tab" class="tab-panel active">
+                        <div id="traces-tab" class="tab-panel ${currentConsoleTab === 'traces' ? 'active' : ''}">
                             <div class="console" id="console-output" tabindex="0"></div>
                         </div>
-                        <div id="details-tab" class="tab-panel">
-                            <div class="details-panel" id="details-content">
+                        <div id="overview-tab" class="tab-panel ${currentConsoleTab === 'overview' ? 'active' : ''}">
+                            <div class="details-panel" id="overview-content">
                                 <p>Loading...</p>
                             </div>
                         </div>
-                        <div id="contributions-tab" class="tab-panel">
-                            <div class="details-panel" id="contributions-content">
+                        ${hasContributions ? `
+                        <div id="contributions-tab" class="tab-panel ${currentConsoleTab === 'contributions' ? 'active' : ''}" style="overflow-y: auto;">
+                            <div id="workspace-diagram-container" style="width: 100%; height: 400px; background: #1e1e1e; border-bottom: 1px solid #333;"></div>
+                            <div class="details-panel" id="contributions-content" style="padding: 2rem; color: #cccccc;">
                                 <p>Loading...</p>
                             </div>
                         </div>
-                        <div id="install-tab" class="tab-panel">
+                        ` : ''}
+                        <div id="install-tab" class="tab-panel ${currentConsoleTab === 'install' ? 'active' : ''}">
                             <div class="install-panel">
                                 <h3>Installer Configuration</h3>
                                 <div class="install-info">
@@ -1002,8 +1039,19 @@
                 </div>
             `;
 
-            currentTab = 'traces';
             currentServerId = server.id;
+
+            // Store servers data for diagram rendering
+            const currentWorkspace = workspaces.find(w => w.rootUri === selectedWorkspace);
+            if (currentWorkspace) {
+                window.currentWorkspaceDiagramServers = currentWorkspace.lspServers;
+                window.currentWorkspaceDiagramServerId = server.id;
+            }
+
+            // If contributions tab is active, render diagram immediately
+            if (currentConsoleTab === 'contributions' && currentWorkspace) {
+                setTimeout(() => renderWorkspaceDiagram(currentWorkspace.lspServers, server.id), 100);
+            }
 
             // Load and initialize trace level selector with saved value
             try {
@@ -1122,7 +1170,7 @@
         async function loadServerDetails(serverId) {
             console.log('loadServerDetails called for:', serverId);
             try {
-                const detailsContent = document.getElementById('details-content');
+                const detailsContent = document.getElementById('overview-content');
                 if (!detailsContent) {
                     console.warn('details-content element not found, skipping load');
                     return;
@@ -1153,7 +1201,7 @@
                 }
             } catch (error) {
                 console.error('Failed to load server details:', error);
-                const detailsContent = document.getElementById('details-content');
+                const detailsContent = document.getElementById('overview-content');
                 if (detailsContent) {
                     detailsContent.innerHTML = `<p class="error">Failed to load server details: ${error.message}</p>`;
                 }
@@ -1340,7 +1388,7 @@
         }
 
         function switchConsoleTab(tabName) {
-            currentConsoleTab = tabName;
+            currentConsoleTab = tabName; // Save current tab
 
             // Update tab buttons
             document.querySelectorAll('.tab-button').forEach(btn => {
@@ -1359,9 +1407,16 @@
             if (tracesControls) {
                 tracesControls.style.display = tabName === 'traces' ? 'flex' : 'none';
             }
+
+            // Render diagram when switching to contributions tab
+            if (tabName === 'contributions' && window.currentWorkspaceDiagramServers) {
+                renderWorkspaceDiagram(window.currentWorkspaceDiagramServers, window.currentWorkspaceDiagramServerId);
+            }
         }
 
         function switchServerTab(tabName) {
+            currentServerTab = tabName; // Save current tab
+
             // Update tab buttons
             document.querySelectorAll('.tab-button').forEach(btn => {
                 btn.classList.remove('active');
@@ -1373,6 +1428,11 @@
                 panel.classList.remove('active');
             });
             document.getElementById('server-' + tabName + '-tab').classList.add('active');
+
+            // Render diagram when switching to contributions tab
+            if (tabName === 'contributions' && window.currentDiagramServers) {
+                renderServerDiagram(window.currentDiagramServers, window.currentDiagramServerId);
+            }
         }
 
         async function runInstaller(serverId) {
