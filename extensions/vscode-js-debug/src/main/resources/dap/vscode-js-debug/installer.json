@@ -1,0 +1,38 @@
+{
+  "id": "vscode-js-debug",
+  "name": "JavaScript Debugger",
+  "check": {
+    "fileExists": {
+      "name": "Check if vscode-js-debug is installed",
+      "file": "$SERVER_HOME$/src/dapDebugServer.js"
+    }
+  },
+  "run": {
+    "download": {
+      "name": "Download vscode-js-debug",
+      "github": {
+        "owner": "microsoft",
+        "repository": "vscode-js-debug",
+        "prerelease": false,
+        "asset": {
+          "windows": "js-debug-dap-*",
+          "unix": "js-debug-dap-*",
+          "mac": "js-debug-dap-*"
+        }
+      },
+      "output": {
+        "dir": "$USER_HOME$/.mcp-languagetools/dap/vscode-js-debug",
+        "file": {
+          "name": "src/dapDebugServer.js"
+        }
+      },
+      "onSuccess": {
+        "configureServer": {
+          "name": "Configure vscode-js-debug command",
+          "command": "node ${output.dir}/src/dapDebugServer.js",
+          "update": true
+        }
+      }
+    }
+  }
+}

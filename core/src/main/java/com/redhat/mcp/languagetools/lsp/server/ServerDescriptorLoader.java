@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.redhat.mcp.languagetools.PathManager;
+import com.redhat.mcp.languagetools.dap.server.DapServerConfig;
 import com.redhat.mcp.languagetools.lsp.Contributes;
 import com.redhat.mcp.languagetools.lsp.DocumentSelector;
 import com.redhat.mcp.languagetools.lsp.installer.InstallerConfig;
@@ -23,7 +24,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Loads LSP server descriptors from JSON files.
+ * Loads LSP and DAP server descriptors from JSON files.
  * Each server has: server.json (config) + installer.json (installation steps).
  * Similar to lsp4ij ServerDescriptor + InstallerDescriptor.
  */
@@ -32,6 +33,7 @@ public class ServerDescriptorLoader {
 
     private static final Logger LOG = Logger.getLogger(ServerDescriptorLoader.class);
     private static final String LSP_RESOURCE_DIR = "lsp";
+    private static final String DAP_RESOURCE_DIR = "dap";
     private static final String SERVER_CONFIG_FILE = "server.json";
     private static final String SERVER_EXTENSION_CONFIG_FILE = "server-extension.json";
     private static final String INSTALLER_CONFIG_FILE = "installer.json";
@@ -287,5 +289,185 @@ public class ServerDescriptorLoader {
      */
     private String buildResourcePath(String serverId, String fileName) {
         return "/" + LSP_RESOURCE_DIR + "/" + serverId + "/" + fileName;
+    }
+
+    // ========== DAP Server Loading ==========
+
+    /**
+     * Load a bundled DAP server configuration from resources.
+     * Expects structure: /dap/{serverId}/server.json and optionally /dap/{serverId}/installer.json
+     */
+    public DapServerConfig loadDapBundled(String serverId) throws IOException {
+        String serverPath = buildDapResourcePath(serverId, SERVER_CONFIG_FILE);
+        String installerPath = buildDapResourcePath(serverId, INSTALLER_CONFIG_FILE);
+
+        // Load server.json
+        DapServerConfig config;
+        try (InputStream is = getClass().getResourceAsStream(serverPath)) {
+            if (is == null) {
+                throw new IOException("Bundled DAP server config not found: " + serverPath);
+            }
+            LOG.infof("Loading bundled DAP config: %s", serverPath);
+            config = parseDapServerConfig(is, serverId);
+        }
+
+        // Load installer.json if present
+        try (InputStream is = getClass().getResourceAsStream(installerPath)) {
+            if (is != null) {
+                InstallerConfig installer = parseInstallerConfig(is);
+                config.setInstaller(installer);
+                LOG.debugf("Loaded installer config for DAP: %s", serverId);
+            }
+        } catch (IOException e) {
+            LOG.debugf("No installer config for DAP %s: %s", serverId, e.getMessage());
+        }
+
+        return config;
+    }
+
+    /**
+     * Load all bundled DAP server configurations.
+     * Auto-discovers all server.json files in /dap/ directory.
+     */
+    public Map<String, DapServerConfig> loadAllDapBundled() {
+        Map<String, DapServerConfig> configs = new HashMap<>();
+
+        try {
+            ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+            java.util.Enumeration<java.net.URL> dapResources = classLoader.getResources(DAP_RESOURCE_DIR);
+
+            if (!dapResources.hasMoreElements()) {
+                LOG.debugf("No /%s directory found in classpath", DAP_RESOURCE_DIR);
+                return configs;
+            }
+
+            while (dapResources.hasMoreElements()) {
+                java.net.URL dapDirUrl = dapResources.nextElement();
+                LOG.debugf("Scanning /%s from: %s", DAP_RESOURCE_DIR, dapDirUrl);
+
+                java.net.URI dapDirUri = dapDirUrl.toURI();
+                java.nio.file.Path dapPath;
+
+                if (dapDirUri.getScheme().equals("jar")) {
+                    java.nio.file.FileSystem fs = java.nio.file.FileSystems.newFileSystem(dapDirUri, java.util.Collections.emptyMap());
+                    dapPath = fs.getPath("/" + DAP_RESOURCE_DIR);
+                } else {
+                    dapPath = java.nio.file.Paths.get(dapDirUri);
+                }
+
+                try (java.util.stream.Stream<java.nio.file.Path> entries = java.nio.file.Files.list(dapPath)) {
+                    entries.filter(java.nio.file.Files::isDirectory)
+                           .forEach(dir -> {
+                               String serverId = dir.getFileName().toString();
+                               if (configs.containsKey(serverId)) {
+                                   LOG.debugf("Skipping duplicate DAP server: %s", serverId);
+                                   return;
+                               }
+                               try {
+                                   DapServerConfig config = loadDapBundled(serverId);
+                                   configs.put(config.getId(), config);
+                                   LOG.infof("Auto-discovered bundled DAP server: %s", config.getId());
+                               } catch (IOException e) {
+                                   LOG.debugf("Skipping DAP %s (no valid server.json): %s", serverId, e.getMessage());
+                               }
+                           });
+                }
+            }
+
+        } catch (Exception e) {
+            LOG.errorf(e, "Failed to auto-discover bundled DAP servers");
+        }
+
+        return configs;
+    }
+
+    /**
+     * Parse DAP server configuration from JSON.
+     */
+    private DapServerConfig parseDapServerConfig(InputStream is, String defaultId) throws IOException {
+        try (InputStreamReader reader = new InputStreamReader(is, StandardCharsets.UTF_8)) {
+            JsonObject root = gson.fromJson(reader, JsonObject.class);
+
+            DapServerConfig config = new DapServerConfig();
+
+            // Basic info
+            config.setId(root.has("id") ? root.get("id").getAsString() : defaultId);
+            config.setName(root.has("name") ? root.get("name").getAsString() : null);
+            config.setDescription(root.has("description") ? root.get("description").getAsString() : null);
+
+            // Launch - can be String or Object (for OS-specific commands)
+            if (root.has("launch")) {
+                JsonElement launchNode = root.get("launch");
+                Map<String, String> launchMap = new HashMap<>();
+                if (launchNode.isJsonPrimitive()) {
+                    launchMap.put("default", launchNode.getAsString());
+                } else if (launchNode.isJsonObject()) {
+                    launchNode.getAsJsonObject().entrySet().forEach(entry -> {
+                        launchMap.put(entry.getKey(), entry.getValue().getAsString());
+                    });
+                }
+                config.setLaunch(launchMap);
+            }
+
+            // Attach configuration (optional)
+            if (root.has("attach")) {
+                Map<String, Object> attachMap = gson.fromJson(
+                    root.get("attach"),
+                    new com.google.gson.reflect.TypeToken<Map<String, Object>>() {}.getType()
+                );
+                config.setAttach(attachMap);
+            }
+
+            // Debug server ready pattern
+            if (root.has("debugServerReadyPattern")) {
+                config.setDebugServerReadyPattern(root.get("debugServerReadyPattern").getAsString());
+            }
+
+            // Document selector
+            if (root.has("documentSelector")) {
+                List<DocumentSelector> selectors = new ArrayList<>();
+                root.getAsJsonArray("documentSelector").forEach(selectorEl -> {
+                    JsonObject selectorNode = selectorEl.getAsJsonObject();
+                    DocumentSelector selector = new DocumentSelector();
+                    if (selectorNode.has("language")) {
+                        selector.setLanguage(selectorNode.get("language").getAsString());
+                    }
+                    if (selectorNode.has("scheme")) {
+                        selector.setScheme(selectorNode.get("scheme").getAsString());
+                    }
+                    if (selectorNode.has("pattern")) {
+                        selector.setPattern(selectorNode.get("pattern").getAsString());
+                    }
+                    selectors.add(selector);
+                });
+                config.setDocumentSelector(selectors);
+            }
+
+            // Environment variables
+            if (root.has("env")) {
+                Map<String, Object> env = new HashMap<>();
+                root.getAsJsonObject("env").entrySet().forEach(entry ->
+                    env.put(entry.getKey(), entry.getValue().getAsString())
+                );
+                config.setEnv(env);
+            }
+
+            // Working directory
+            if (root.has("workingDirectory")) {
+                config.setWorkingDirectory(root.get("workingDirectory").getAsString());
+            }
+
+            return config;
+        }
+    }
+
+    /**
+     * Build resource path for bundled DAP server files.
+     * @param serverId Server ID
+     * @param fileName File name (e.g., "server.json", "installer.json")
+     * @return Resource path (e.g., "/dap/vscode-js-debug/server.json")
+     */
+    private String buildDapResourcePath(String serverId, String fileName) {
+        return "/" + DAP_RESOURCE_DIR + "/" + serverId + "/" + fileName;
     }
 }

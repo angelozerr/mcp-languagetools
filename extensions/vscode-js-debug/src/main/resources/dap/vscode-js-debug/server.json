@@ -1,0 +1,24 @@
+{
+  "id": "vscode-js-debug",
+  "name": "JavaScript Debugger",
+  "description": "Debug adapter for JavaScript and TypeScript",
+  "launch": {
+    "windows": "node ${serverHome}/src/dapDebugServer.js",
+    "default": "node ${serverHome}/src/dapDebugServer.js"
+  },
+  "debugServerReadyPattern": "DAP server listening on port ${port}",
+  "documentSelector": [
+    {
+      "language": "javascript",
+      "pattern": "**/*.{js,mjs,cjs}"
+    },
+    {
+      "language": "typescript",
+      "pattern": "**/*.{ts,tsx}"
+    },
+    {
+      "language": "json",
+      "pattern": "**/*.json"
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 package com.redhat.mcp.languagetools.admin;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.redhat.mcp.languagetools.admin.dto.DapServerDTO;
 import com.redhat.mcp.languagetools.admin.dto.McpClientDTO;
 import com.redhat.mcp.languagetools.admin.dto.ServerDTOBuilder;
 import com.redhat.mcp.languagetools.admin.dto.ServerRuntimeDTO;
@@ -345,9 +346,19 @@ public class AdminWebSocketEndpoint {
     private WorkspaceDTO toWorkspaceDTO(URI uri, Workspace workspace) {
         var allServerConfigs = workspaceManager.getServerConfigs();
 
-        // Build runtime DTOs for all servers in this workspace
+        // Build runtime DTOs for all LSP servers in this workspace
         List<ServerRuntimeDTO> servers = allServerConfigs.values().stream()
                 .map(config -> serverDTOBuilder.buildRuntime(config, workspace))
+                .toList();
+
+        // Build DAP server DTOs for this workspace
+        List<DapServerDTO> dapServers = workspace.getDapServerConfigs().values().stream()
+                .map(config -> new DapServerDTO(
+                    config.getId(),
+                    config.getName(),
+                    config.getDescription(),
+                    config.getDocumentSelector()
+                ))
                 .toList();
 
         java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ISO_INSTANT;
@@ -358,6 +369,6 @@ public class AdminWebSocketEndpoint {
                 ))
                 .toList();
 
-        return new WorkspaceDTO(uri, workspace.isInitialized(), mcpClients, servers);
+        return new WorkspaceDTO(uri, workspace.isInitialized(), mcpClients, servers, dapServers);
     }
 }

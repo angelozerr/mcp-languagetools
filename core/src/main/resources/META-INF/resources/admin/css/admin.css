@@ -32,7 +32,7 @@ body {
 
 .app-container {
     display: grid;
-    grid-template-columns: 300px 300px 1fr;
+    grid-template-columns: 400px 300px 1fr;
     height: 100vh;
 }
 
@@ -73,15 +73,17 @@ body {
 
 .tab {
     flex: 1;
-    padding: 0.75rem 1rem;
+    padding: 0.75rem 0.25rem;
     text-align: center;
     cursor: pointer;
     font-weight: 600;
-    font-size: 0.85rem;
+    font-size: 0.7rem;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.2px;
     border-bottom: 2px solid transparent;
     transition: all 0.2s;
+    white-space: nowrap;
+    min-width: 0;
 }
 
 .tab:hover {

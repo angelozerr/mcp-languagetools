@@ -1,8 +1,10 @@
 package com.redhat.mcp.languagetools.admin;
 
+import com.redhat.mcp.languagetools.admin.dto.DapServerDTO;
 import com.redhat.mcp.languagetools.admin.dto.ServerDTOBuilder;
 import com.redhat.mcp.languagetools.admin.dto.ServerRuntimeDTO;
 import com.redhat.mcp.languagetools.admin.dto.WorkspaceDTO;
+import com.redhat.mcp.languagetools.dap.server.DapServerConfig;
 import com.redhat.mcp.languagetools.lsp.server.LspServerConfig;
 import com.redhat.mcp.languagetools.workspace.Workspace;
 import com.redhat.mcp.languagetools.workspace.WorkspaceManager;
@@ -14,6 +16,7 @@ import org.jboss.logging.Logger;
 
 import java.net.URI;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Path("/api/admin")
 @Produces(MediaType.APPLICATION_JSON)
@@ -75,10 +78,15 @@ public class AdminResource {
         // Get all available server descriptors
         var allServerConfigs = workspaceManager.getServerConfigs();
 
-        // Build runtime DTOs for all servers in this workspace
+        // Build runtime DTOs for all LSP servers in this workspace
         List<ServerRuntimeDTO> servers = allServerConfigs.values().stream()
                 .map(config -> serverDTOBuilder.buildRuntime(config, workspace))
                 .toList();
+
+        // Build DAP server DTOs for this workspace
+        List<DapServerDTO> dapServers = workspace.getDapServerConfigs().values().stream()
+                .map(this::toDapDTO)
+                .collect(Collectors.toList());
 
         // Build MCP client info with timestamps
         java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ISO_INSTANT;
@@ -89,7 +97,27 @@ public class AdminResource {
                 ))
                 .toList();
 
-        LOG.infof("Workspace %s - mcpClients: %s", uri, mcpClients);
-        return new WorkspaceDTO(uri, workspace.isInitialized(), mcpClients, servers);
+        LOG.infof("Workspace %s - mcpClients: %s, dapServers: %d", uri, mcpClients, dapServers.size());
+        return new WorkspaceDTO(uri, workspace.isInitialized(), mcpClients, servers, dapServers);
+    }
+
+    /**
+     * Get all available DAP (Debug Adapter Protocol) server configurations.
+     */
+    @GET
+    @Path("/dap-servers")
+    public List<DapServerDTO> listDapServers() {
+        return workspaceManager.getDapServerConfigs().values().stream()
+                .map(this::toDapDTO)
+                .collect(Collectors.toList());
+    }
+
+    private DapServerDTO toDapDTO(DapServerConfig config) {
+        return new DapServerDTO(
+            config.getId(),
+            config.getName(),
+            config.getDescription(),
+            config.getDocumentSelector()
+        );
     }
 }

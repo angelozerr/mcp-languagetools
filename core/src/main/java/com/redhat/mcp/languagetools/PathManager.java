@@ -43,6 +43,20 @@ public class PathManager {
     }
 
     /**
+     * Get the directory where DAP servers are installed (~/.mcp-languagetools/dap)
+     */
+    public Path getDapServersDir() {
+        return getMcpLangToolsRoot().resolve("dap");
+    }
+
+    /**
+     * Get the home directory for a specific DAP server (~/.mcp-languagetools/dap/{serverId})
+     */
+    public Path getDapServerHome(String serverId) {
+        return getDapServersDir().resolve(serverId);
+    }
+
+    /**
      * Get the config directory root (~/.mcp-languagetools/config)
      */
     public Path getConfigDir() {

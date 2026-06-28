@@ -3,6 +3,7 @@ package com.redhat.mcp.languagetools.workspace;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.redhat.mcp.languagetools.PathManager;
+import com.redhat.mcp.languagetools.dap.server.DapServerConfig;
 import com.redhat.mcp.languagetools.language.LanguageRegistry;
 import com.redhat.mcp.languagetools.lsp.*;
 import com.redhat.mcp.languagetools.lsp.installer.InstallerContext;
@@ -73,18 +74,23 @@ public class WorkspaceManager {
 
     private final Map<URI, Workspace> workspaces = new ConcurrentHashMap<>();
     private final Map<String, LspServerConfig> serverConfigs = new ConcurrentHashMap<>();
+    private final Map<String, DapServerConfig> dapServerConfigs = new ConcurrentHashMap<>();
     private final Map<String, Path> serverHomes = new ConcurrentHashMap<>();
 
     void onStart(@Observes StartupEvent ev) {
         LOG.info("WorkspaceManager starting...");
 
-        // Load all bundled server descriptors
+        // Load all bundled LSP server descriptors
         serverConfigs.putAll(serverDescriptorLoader.loadAllBundled());
+
+        // Load all bundled DAP server descriptors
+        dapServerConfigs.putAll(serverDescriptorLoader.loadAllDapBundled());
 
         // Initialize contribution manager with loaded configs
         initializeLspContributionManager();
 
         LOG.infof("Loaded %d LSP server descriptors", serverConfigs.size());
+        LOG.infof("Loaded %d DAP server descriptors", dapServerConfigs.size());
     }
 
     void onShutdown(@Observes ShutdownEvent ev) {
@@ -252,12 +258,50 @@ public class WorkspaceManager {
             }
         }
 
+        // Also find and add matching DAP servers (without starting them)
+        ensureDapServersForFile(workspace, fileUri, language);
+
         // Wait for all servers to start (continue even if some fail)
         if (serverFutures.isEmpty()) {
             return CompletableFuture.completedFuture(null);
         }
 
         return CompletableFuture.allOf(serverFutures.toArray(new CompletableFuture[serverFutures.size()]));
+    }
+
+    /**
+     * Find and add matching DAP servers to the workspace for the given file.
+     * DAP servers are NOT started - they are added to the workspace configuration only.
+     */
+    private void ensureDapServersForFile(Workspace workspace, URI fileUri, String language) {
+        for (DapServerConfig config : dapServerConfigs.values()) {
+            // Check if this DAP server can handle the file's language
+            if (config.getDocumentSelector() != null) {
+                boolean canHandle = config.getDocumentSelector().stream()
+                    .anyMatch(selector -> {
+                        if (selector.getLanguage() != null && selector.getLanguage().equals(language)) {
+                            return true;
+                        }
+                        if (selector.getPattern() != null) {
+                            // Simple pattern matching (could be improved with glob matching)
+                            String path = fileUri.getPath();
+                            String pattern = selector.getPattern();
+                            // Convert glob to simple contains check for now
+                            if (pattern.contains("*")) {
+                                String ext = pattern.substring(pattern.lastIndexOf('.'));
+                                return path.endsWith(ext.replace("*", "").replace("}", ""));
+                            }
+                        }
+                        return false;
+                    });
+
+                if (canHandle && workspace.getDapServerConfig(config.getId()) == null) {
+                    workspace.addDapServer(config);
+                    LOG.infof("Added DAP server %s for language '%s' in workspace: %s",
+                        config.getName(), language, workspace.getRootUri());
+                }
+            }
+        }
     }
 
     /**
@@ -507,6 +551,14 @@ public class WorkspaceManager {
 
     public Map<String, LspServerConfig> getServerConfigs() {
         return Map.copyOf(serverConfigs);
+    }
+
+    /**
+     * Get all DAP server configurations (debug adapters).
+     * Used by Qute DAP to discover available debug adapters.
+     */
+    public Map<String, DapServerConfig> getDapServerConfigs() {
+        return Map.copyOf(dapServerConfigs);
     }
 
     /**

@@ -7,7 +7,8 @@ public record WorkspaceDTO(
     URI rootUri,
     boolean initialized,
     List<McpClientInfo> mcpClients,
-    List<ServerRuntimeDTO> lspServers
+    List<ServerRuntimeDTO> lspServers,
+    List<DapServerDTO> dapServers
 ) {
     public record McpClientInfo(
         String name,

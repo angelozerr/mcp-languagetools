@@ -42,6 +42,13 @@
             <version>${lsp4j.version}</version>
         </dependency>
 
+        <!-- LSP4J Debug for DAP (Debug Adapter Protocol) support -->
+        <dependency>
+            <groupId>org.eclipse.lsp4j</groupId>
+            <artifactId>org.eclipse.lsp4j.debug</artifactId>
+            <version>${lsp4j.version}</version>
+        </dependency>
+
         <!-- Quarkus MCP Server (HTTP/SSE) -->
         <dependency>
             <groupId>io.quarkiverse.mcp</groupId>

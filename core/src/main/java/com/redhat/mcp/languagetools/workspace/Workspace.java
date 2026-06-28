@@ -1,6 +1,7 @@
 package com.redhat.mcp.languagetools.workspace;
 
 import com.redhat.mcp.languagetools.PathManager;
+import com.redhat.mcp.languagetools.dap.server.DapServerConfig;
 import com.redhat.mcp.languagetools.lsp.server.LspServerStatusChangeEvent;
 import org.jboss.logging.Logger;
 
@@ -25,8 +26,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Represents a workspace (project) with its language server instances.
- * A workspace can have multiple LSP servers (e.g., JDT.LS + Qute LS).
+ * Represents a workspace (project) with its language server and debug adapter instances.
+ * A workspace can have multiple LSP servers (e.g., JDT.LS + Qute LS) and DAP servers (e.g., vscode-js-debug).
  */
 public class Workspace {
 
@@ -39,6 +40,7 @@ public class Workspace {
     private final WorkspaceConfiguration configuration;
     private LspContributionManager extensionManager;
     private final Map<String, LspServer> lspServers = new ConcurrentHashMap<>();
+    private final Map<String, DapServerConfig> dapServerConfigs = new ConcurrentHashMap<>();
     private final Map<String, ServerInfo> serverInfos = new ConcurrentHashMap<>();
     private final Map<String, ServerStatus> installationStatus = new ConcurrentHashMap<>();
     private List<LspServerConfig> allServerConfigs = new ArrayList<>();
@@ -326,6 +328,29 @@ public class Workspace {
      */
     public LspServer getLspServer(String id) {
         return lspServers.get(id);
+    }
+
+    /**
+     * Add a DAP server configuration to this workspace.
+     * DAP servers are not started automatically - they are started on-demand during debug sessions.
+     */
+    public void addDapServer(DapServerConfig config) {
+        dapServerConfigs.put(config.getId(), config);
+        LOG.infof("Added DAP server to workspace %s: %s", rootUri, config.getId());
+    }
+
+    /**
+     * Get a DAP server configuration by ID.
+     */
+    public DapServerConfig getDapServerConfig(String id) {
+        return dapServerConfigs.get(id);
+    }
+
+    /**
+     * Get all DAP server configurations for this workspace.
+     */
+    public Map<String, DapServerConfig> getDapServerConfigs() {
+        return Map.copyOf(dapServerConfigs);
     }
 
     /**

@@ -277,7 +277,7 @@
                     console.log('Found workspace:', workspace);
                     if (workspace) {
                         console.log('Rendering servers:', workspace.lspServers);
-                        renderServers(workspace.lspServers);
+                        renderServers(workspace.lspServers, workspace.dapServers || []);
                     } else {
                         // Selected workspace no longer exists
                         selectedWorkspace = null;
@@ -335,7 +335,7 @@
 
             // Re-render if this workspace is selected
             if (selectedWorkspace === event.workspaceUri) {
-                renderServers(workspace.lspServers);
+                renderServers(workspace.lspServers, workspace.dapServers || []);
             }
         }
 
@@ -355,12 +355,12 @@
 
             if (tab === 'workspaces') {
                 document.getElementById('workspaces-list').style.display = 'block';
-                document.getElementById('all-servers-list').style.display = 'none';
+                document.getElementById('lsp-servers-list').style.display = 'none';
                 document.getElementById('mcp-traces-list').style.display = 'none';
                 serversColumn.style.display = 'block';
                 consoleColumn.style.display = 'flex';
                 // 3 columns layout: workspaces | servers | console
-                appContainer.style.gridTemplateColumns = '300px 300px 1fr';
+                appContainer.style.gridTemplateColumns = '400px 300px 1fr';
                 consoleColumn.style.gridColumn = '3';
 
                 // Refresh the view: reload servers list and console for selected workspace
@@ -386,26 +386,40 @@
                         </div>
                     `;
                 }
-            } else if (tab === 'all-servers') {
+            } else if (tab === 'lsp-servers') {
                 document.getElementById('workspaces-list').style.display = 'none';
-                document.getElementById('all-servers-list').style.display = 'block';
+                document.getElementById('lsp-servers-list').style.display = 'block';
+                document.getElementById('dap-servers-list').style.display = 'none';
                 document.getElementById('mcp-traces-list').style.display = 'none';
                 serversColumn.style.display = 'none';
                 consoleColumn.style.display = 'flex';
                 // 2 columns layout: servers | console
-                appContainer.style.gridTemplateColumns = '300px 1fr';
+                appContainer.style.gridTemplateColumns = '400px 1fr';
                 consoleColumn.style.gridColumn = '2';
 
                 // Always reload servers when switching to this tab (no caching)
-                loadAllServers();
+                loadAllLspServers();
+            } else if (tab === 'dap-servers') {
+                document.getElementById('workspaces-list').style.display = 'none';
+                document.getElementById('lsp-servers-list').style.display = 'none';
+                document.getElementById('dap-servers-list').style.display = 'block';
+                document.getElementById('mcp-traces-list').style.display = 'none';
+                serversColumn.style.display = 'none';
+                consoleColumn.style.display = 'flex';
+                // 2 columns layout: servers | console
+                appContainer.style.gridTemplateColumns = '400px 1fr';
+                consoleColumn.style.gridColumn = '2';
+
+                // Always reload DAP servers when switching to this tab
+                loadAllDapServers();
             } else if (tab === 'mcp-traces') {
                 document.getElementById('workspaces-list').style.display = 'none';
-                document.getElementById('all-servers-list').style.display = 'none';
+                document.getElementById('lsp-servers-list').style.display = 'none';
                 document.getElementById('mcp-traces-list').style.display = 'block';
                 serversColumn.style.display = 'none';
                 consoleColumn.style.display = 'flex';
                 // 2 columns layout: mcp info | console
-                appContainer.style.gridTemplateColumns = '300px 1fr';
+                appContainer.style.gridTemplateColumns = '400px 1fr';
                 consoleColumn.style.gridColumn = '2';
 
                 // MCP clients data comes via WebSocket
@@ -425,14 +439,14 @@
             }
         }
 
-        async function loadAllServers() {
+        async function loadAllLspServers() {
             try {
                 // Use cached server configs (already loaded at startup)
                 const servers = Object.values(serverConfigs);
 
-                const container = document.getElementById('all-servers-list');
+                const container = document.getElementById('lsp-servers-list');
                 if (!container) {
-                    console.error('all-servers-list container not found');
+                    console.error('lsp-servers-list container not found');
                     return;
                 }
                 // Calculate contributedBy for all servers
@@ -476,7 +490,7 @@
             // Re-render server list to update active state (use cached configs)
             const servers = Object.values(serverConfigs);
             const contributedByMap = buildContributedByMap(servers);
-            const container = document.getElementById('all-servers-list');
+            const container = document.getElementById('lsp-servers-list');
             container.innerHTML = servers.map(server => {
                 const isActive = selectedAllServer === server.id ? 'active' : '';
                 const extensionClass = server.isExtension ? 'server-extension' : '';
@@ -500,7 +514,7 @@
                 const consoleColumn = document.querySelector('.console-container');
                 consoleColumn.style.display = 'flex';
                 // 2 columns: left sidebar (300px) + console (rest), console in position 2
-                appContainer.style.gridTemplateColumns = '300px 1fr';
+                appContainer.style.gridTemplateColumns = '400px 1fr';
                 consoleColumn.style.gridColumn = '2';
 
                 // Fetch server details
@@ -626,7 +640,7 @@
                     if (selectedWorkspace) {
                         const workspace = workspaces.find(w => w.rootUri === selectedWorkspace);
                         if (workspace) {
-                            renderServers(workspace.lspServers);
+                            renderServers(workspace.lspServers, workspace.dapServers || []);
                         } else {
                             // Selected workspace was removed, clear selection
                             selectedWorkspace = null;
@@ -729,7 +743,7 @@
             console.log('Found workspace in selectWorkspace:', workspace);
             if (workspace) {
                 console.log('Rendering servers:', workspace.lspServers);
-                renderServers(workspace.lspServers);
+                renderServers(workspace.lspServers, workspace.dapServers || []);
                 // renderServers will auto-select a server and call selectServer
                 // which will load the console, so don't show placeholder here
             } else {
@@ -814,7 +828,7 @@
                 const newServersData = JSON.stringify(workspace.lspServers);
                 if (newServersData !== lastServersData) {
                     lastServersData = newServersData;
-                    renderServers(workspace.lspServers);
+                    renderServers(workspace.lspServers, workspace.dapServers || []);
                 }
             } else {
                 console.warn('Workspace not found:', uri);
@@ -846,18 +860,38 @@
             return labels[status] || status;
         }
 
-        function renderServers(serversRuntime) {
+        function renderServers(lspServers, dapServers = []) {
             const container = document.getElementById('servers-list');
-            console.log('renderServers - container:', container, 'serversRuntime:', serversRuntime);
+            console.log('renderServers - lspServers:', lspServers, 'dapServers:', dapServers);
 
             if (!container) {
                 console.error('servers-list element not found!');
                 return;
             }
 
-            if (serversRuntime.length === 0) {
-                container.innerHTML = '<div class="servers-placeholder">No LSP servers</div>';
+            if (lspServers.length === 0 && dapServers.length === 0) {
+                container.innerHTML = '<div class="servers-placeholder">No servers</div>';
                 return;
+            }
+
+            // Render LSP servers section
+            let lspHTML = '';
+            if (lspServers.length > 0) {
+                lspHTML = renderLspServers(lspServers);
+            }
+
+            // Render DAP servers section
+            let dapHTML = '';
+            if (dapServers.length > 0) {
+                dapHTML = renderDapServers(dapServers);
+            }
+
+            container.innerHTML = lspHTML + dapHTML;
+        }
+
+        function renderLspServers(serversRuntime) {
+            if (serversRuntime.length === 0) {
+                return '';
             }
 
             // Merge runtime with configs
@@ -866,83 +900,6 @@
 
             // Calculate contributedBy for all servers
             const contributedByMap = buildContributedByMap(servers);
-
-            container.innerHTML = servers.map(server => {
-                // Check if this is an external instance (connected to IDE)
-                const isExternal = server.externalInstance != null &&
-                                   (server.status === 'CONNECTED_TO_IDE' || server.status === 'CONNECTING_TO_IDE');
-                const serverClass = isExternal ? 'server-item-external' : 'server-item-managed';
-                const extensionClass = server.isExtension ? 'server-extension' : '';
-                const extensionBadge = server.isExtension ? ' <span style="color: #999999; font-size: 0.85em;">(Extension)</span>' : '';
-
-                // Display actions based on status (no actions for extensions)
-                let actions = '';
-                if (!server.isExtension) {
-                    if (isExternal) {
-                        // For IDE-connected servers: offer to disconnect
-                        actions = `
-                            <button class="server-action-btn server-action-disconnect"
-                                    onclick='event.stopPropagation(); disconnectFromIdeAction("${server.id}")'
-                                    title="Disconnect from IDE">⏏</button>
-                        `;
-                    } else {
-                        // For MCP-managed servers
-                        if (server.status === 'RUNNING' || server.status === 'STARTING') {
-                            actions = `
-                                <button class="server-action-btn" onclick='event.stopPropagation(); restartServerAction("${server.id}")' title="Restart">↻</button>
-                                <button class="server-action-btn" onclick='event.stopPropagation(); stopServerAction("${server.id}")' title="Stop">■</button>
-                            `;
-                        } else if (server.status === 'STOPPED') {
-                            // Offer to start MCP-managed or connect to IDE
-                            actions = `
-                                <button class="server-action-btn" onclick='event.stopPropagation(); startManagedServerAction("${server.id}")' title="Start MCP-managed server">▶</button>
-                                <button class="server-action-btn" onclick='event.stopPropagation(); connectToIdeAction("${server.id}")' title="Try to connect to IDE instance">🔗</button>
-                            `;
-                        }
-                    }
-                }
-
-                // Build source indicator
-                const sourceIcon = isExternal ? '🔗' : (server.isExtension ? '🧩' : '🚀');
-                const sourceLabel = isExternal
-                    ? `Connected to IDE (port ${server.externalInstance.port}, PID ${server.externalInstance.pid})`
-                    : (server.isExtension ? 'Extension' : 'Managed by MCP');
-
-                // Build IDE info display (port/PID)
-                let ideInfo = '';
-                if (isExternal && server.externalInstance) {
-                    ideInfo = `
-                        <span class="server-ide-info">
-                            <span title="Port">:${server.externalInstance.port}</span>
-                            <span title="Process ID">PID ${server.externalInstance.pid}</span>
-                        </span>
-                    `;
-                }
-
-                // Build tooltip with command if available
-                const tooltipText = server.command ? `Command: ${server.command}` : '';
-
-                return `
-                    <div class="server-item ${serverClass} ${extensionClass} ${selectedServer?.id === server.id ? 'active' : ''}"
-                         onclick='selectServer(${JSON.stringify(server)})'
-                         ${tooltipText ? `title="${tooltipText.replace(/"/g, '&quot;')}"` : ''}>
-                        <div class="server-name">
-                            <span class="server-source-icon" title="${sourceLabel}">${sourceIcon}</span>
-                            ${server.name}${extensionBadge}
-                        </div>
-                        <div class="server-id" ${(() => { const info = formatContributeInfo(server, contributedByMap); return info.tooltip ? `title="${info.tooltip}"` : ''; })()}>${server.id}${(() => formatContributeInfo(server, contributedByMap).text)()}</div>
-                        <div>
-                            <span class="status-badge ${server.status === 'RUNNING' && !server.isReady ? 'status-running-not-ready' : 'status-' + server.status.toLowerCase()}">${formatStatusLabel(server.status, server.externalInstance)}</span>
-                            ${server.statusMessage ? `<span class="server-status-message" style="color: #888; font-size: 0.85rem; margin-left: 0.5rem;">${escapeHtml(server.statusMessage)}</span>` : ''}
-                            ${!server.isExtension ? ideInfo : ''}
-                            ${!server.isExtension && server.pid ? `<span class="server-ide-info"><span title="Process ID">${server.pid}</span></span>` : ''}
-                        </div>
-                        <div class="server-actions">
-                            ${actions}
-                        </div>
-                    </div>
-                `;
-            }).join('');
 
             // Auto-select server logic:
             // 1. If a server is selected and still exists in the list, keep it selected
@@ -965,12 +922,115 @@
                 console.log('Server to auto-select:', serverToSelect);
                 selectServer(serverToSelect);
             }
+
+            return `
+                <div style="padding: 1rem; border-bottom: 1px solid #1e1e1e;">
+                    <h3 style="margin: 0; color: #cccccc; font-size: 0.9rem;">Servers</h3>
+                </div>
+                ${servers.map(server => {
+                    // Same HTML as before
+                    const isExternal = server.externalInstance != null &&
+                                       (server.status === 'CONNECTED_TO_IDE' || server.status === 'CONNECTING_TO_IDE');
+                    const serverClass = isExternal ? 'server-item-external' : 'server-item-managed';
+                    const extensionClass = server.isExtension ? 'server-extension' : '';
+                    const extensionBadge = server.isExtension ? ' <span style="color: #999999; font-size: 0.85em;">(Extension)</span>' : '';
+
+                    let actions = '';
+                    if (!server.isExtension) {
+                        if (isExternal) {
+                            actions = `
+                                <button class="server-action-btn server-action-disconnect"
+                                        onclick='event.stopPropagation(); disconnectFromIdeAction("${server.id}")'
+                                        title="Disconnect from IDE">⏏</button>
+                            `;
+                        } else {
+                            if (server.status === 'RUNNING' || server.status === 'STARTING') {
+                                actions = `
+                                    <button class="server-action-btn" onclick='event.stopPropagation(); restartServerAction("${server.id}")' title="Restart">↻</button>
+                                    <button class="server-action-btn" onclick='event.stopPropagation(); stopServerAction("${server.id}")' title="Stop">■</button>
+                                `;
+                            } else if (server.status === 'STOPPED') {
+                                actions = `
+                                    <button class="server-action-btn" onclick='event.stopPropagation(); startManagedServerAction("${server.id}")' title="Start MCP-managed server">▶</button>
+                                    <button class="server-action-btn" onclick='event.stopPropagation(); connectToIdeAction("${server.id}")' title="Try to connect to IDE instance">🔗</button>
+                                `;
+                            }
+                        }
+                    }
+
+                    const sourceIcon = isExternal ? '🔗' : (server.isExtension ? '🧩' : '🚀');
+                    const sourceLabel = isExternal
+                        ? `Connected to IDE (port ${server.externalInstance.port}, PID ${server.externalInstance.pid})`
+                        : (server.isExtension ? 'Extension' : 'Managed by MCP');
+
+                    let ideInfo = '';
+                    if (isExternal && server.externalInstance) {
+                        ideInfo = `
+                            <span class="server-ide-info">
+                                <span title="Port">:${server.externalInstance.port}</span>
+                                <span title="Process ID">PID ${server.externalInstance.pid}</span>
+                            </span>
+                        `;
+                    }
+
+                    const tooltipText = server.command ? `Command: ${server.command}` : '';
+                    const contributedInfo = formatContributeInfo(server, contributedByMap);
+
+                    return `
+                        <div class="server-item ${serverClass} ${extensionClass} ${selectedServer?.id === server.id ? 'active' : ''}"
+                             onclick='selectServer(${JSON.stringify(server)})'
+                             ${tooltipText ? `title="${tooltipText.replace(/"/g, '&quot;')}"` : ''}>
+                            <div class="server-name">
+                                <span class="server-source-icon" title="${sourceLabel}">${sourceIcon}</span>
+                                ${server.name}${extensionBadge}
+                            </div>
+                            <div class="server-id" ${contributedInfo.tooltip ? `title="${contributedInfo.tooltip}"` : ''}>${server.id}${contributedInfo.text}</div>
+                            <div>
+                                <span class="status-badge ${server.status === 'RUNNING' && !server.isReady ? 'status-running-not-ready' : 'status-' + server.status.toLowerCase()}">${formatStatusLabel(server.status, server.externalInstance)}</span>
+                                ${server.statusMessage ? `<span class="server-status-message" style="color: #888; font-size: 0.85rem; margin-left: 0.5rem;">${escapeHtml(server.statusMessage)}</span>` : ''}
+                                ${!server.isExtension ? ideInfo : ''}
+                                ${!server.isExtension && server.pid ? `<span class="server-ide-info"><span title="Process ID">${server.pid}</span></span>` : ''}
+                            </div>
+                            <div class="server-actions">
+                                ${actions}
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            `;
+        }
+
+        function renderDapServers(dapServers) {
+            if (dapServers.length === 0) {
+                return '';
+            }
+
+            return `
+                <div style="padding: 1rem; border-bottom: 1px solid #1e1e1e; border-top: 2px solid #333;">
+                    <h3 style="margin: 0; color: #cccccc; font-size: 0.9rem;">Debuggers</h3>
+                </div>
+                ${dapServers.map(dap => {
+                    return `
+                        <div class="server-item" style="opacity: 0.8; cursor: default;">
+                            <div class="server-name">
+                                <span class="server-source-icon">🐛</span>
+                                ${dap.name}
+                            </div>
+                            <div class="server-id">${dap.id}</div>
+                            <div>
+                                <span class="status-badge" style="background: #333; color: #999;">Available</span>
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            `;
         }
 
         function selectServer(server) {
             const wasAlreadySelected = selectedServer && selectedServer.id === server.id;
             selectedServer = server;
-            renderServers(workspaces.find(w => w.rootUri === selectedWorkspace)?.lspServers || []);
+            const workspace = workspaces.find(w => w.rootUri === selectedWorkspace);
+            renderServers(workspace?.lspServers || [], workspace?.dapServers || []);
 
             // Only reload console if switching to a different server
             if (!wasAlreadySelected) {
@@ -2885,6 +2945,138 @@
             } catch (error) {
                 console.error('Failed to clear MCP traces:', error);
             }
+        }
+
+        // ========== Debuggers Tab ==========
+
+        let dapServerConfigs = {};
+        let selectedDapServer = null;
+
+        async function loadAllDapServers() {
+            try {
+                const response = await fetch('/api/admin/dap-servers');
+                const dapServers = await response.json();
+
+                // Store in map for easy access
+                dapServerConfigs = {};
+                dapServers.forEach(server => {
+                    dapServerConfigs[server.id] = server;
+                });
+
+                const container = document.getElementById('dap-servers-list');
+                if (!container) {
+                    console.error('dap-servers-list container not found');
+                    return;
+                }
+
+                if (dapServers.length === 0) {
+                    container.innerHTML = '<div class="servers-placeholder">No debuggers configured</div>';
+                    return;
+                }
+
+                container.innerHTML = dapServers.map(server => {
+                    const isActive = selectedDapServer === server.id ? 'active' : '';
+                    return `
+                        <div class="server-item ${isActive}" onclick="showDapServerDetails('${server.id}')">
+                            <div class="server-name">
+                                <span class="server-source-icon">🐛</span>
+                                ${server.name}
+                            </div>
+                            <div class="server-id">${server.id}</div>
+                        </div>
+                    `;
+                }).join('');
+
+                // Auto-select previously selected server if it exists, otherwise first server
+                if (dapServers.length > 0) {
+                    const previousServerExists = selectedDapServer && dapServers.find(s => s.id === selectedDapServer);
+                    const serverToShow = previousServerExists ? selectedDapServer : dapServers[0].id;
+                    showDapServerDetails(serverToShow);
+                }
+            } catch (error) {
+                console.error('Failed to load DAP servers:', error);
+            }
+        }
+
+        async function showDapServerDetails(serverId) {
+            selectedDapServer = serverId;
+
+            // Re-render server list to update active state
+            const dapServers = Object.values(dapServerConfigs);
+            const container = document.getElementById('dap-servers-list');
+            container.innerHTML = dapServers.map(server => {
+                const isActive = selectedDapServer === server.id ? 'active' : '';
+                return `
+                    <div class="server-item ${isActive}" onclick="showDapServerDetails('${server.id}')">
+                        <div class="server-name">
+                            <span class="server-source-icon">🐛</span>
+                            ${server.name}
+                        </div>
+                        <div class="server-id">${server.id}</div>
+                    </div>
+                `;
+            }).join('');
+
+            const server = dapServerConfigs[serverId];
+            if (!server) {
+                console.error('DAP server not found:', serverId);
+                return;
+            }
+
+            // Show console column
+            const appContainer = document.querySelector('.app-container');
+            const consoleColumn = document.querySelector('.console-container');
+            consoleColumn.style.display = 'flex';
+            appContainer.style.gridTemplateColumns = '400px 1fr';
+            consoleColumn.style.gridColumn = '2';
+
+            // Build document selector info
+            let docSelectorHTML = '<p style="color: #999;">None configured</p>';
+            if (server.documentSelector && server.documentSelector.length > 0) {
+                docSelectorHTML = server.documentSelector.map(selector => {
+                    const parts = [];
+                    if (selector.language) parts.push(`Language: <code>${selector.language}</code>`);
+                    if (selector.pattern) parts.push(`Pattern: <code>${selector.pattern}</code>`);
+                    if (selector.scheme) parts.push(`Scheme: <code>${selector.scheme}</code>`);
+                    return `<li>${parts.join(', ')}</li>`;
+                }).join('');
+                docSelectorHTML = `<ul style="margin: 0.5rem 0; padding-left: 1.5rem;">${docSelectorHTML}</ul>`;
+            }
+
+            const html = `
+                <div class="console-header">
+                    <div class="console-title">
+                        <span class="server-source-icon">🐛</span>
+                        ${server.name || server.id}
+                    </div>
+                </div>
+                <div class="details-panel" style="padding: 2rem; color: #cccccc; overflow-y: auto;">
+                    <h3 style="margin-top: 0; color: #4ec9b0;">Debug Adapter Information</h3>
+
+                    <div style="margin-bottom: 1.5rem;">
+                        <strong style="color: #569cd6;">Server ID:</strong>
+                        <p style="margin: 0.25rem 0; color: #d4d4d4;"><code>${server.id}</code></p>
+                    </div>
+
+                    ${server.description ? `
+                    <div style="margin-bottom: 1.5rem;">
+                        <strong style="color: #569cd6;">Description:</strong>
+                        <p style="margin: 0.25rem 0; color: #d4d4d4;">${server.description}</p>
+                    </div>
+                    ` : ''}
+
+                    <div style="margin-bottom: 1.5rem;">
+                        <strong style="color: #569cd6;">Supported Languages/Files:</strong>
+                        ${docSelectorHTML}
+                    </div>
+
+                    <div style="margin-top: 2rem; padding: 1rem; background: #252526; border-left: 3px solid #4ec9b0; border-radius: 4px;">
+                        <strong>Note:</strong> Debuggers are started on-demand during debug sessions. They are not automatically started with workspaces.
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('console-area').innerHTML = html;
         }
 
         // Initialize: load server configs first, then connect WebSocket
