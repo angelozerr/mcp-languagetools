@@ -19,6 +19,10 @@ This allows AI assistants and tools that support MCP to leverage the same powerf
 - [Bob IDE](https://bob.ibm.com/docs/ide)
 - And any other MCP-compatible AI assistant
 
+## Quick Start
+
+📖 **[Getting Started Guide](docs/getting-started.md)** - Get up and running in 5 minutes with a complete example
+
 ## Overview
 
 This MCP server exposes LSP features as MCP tools. Currently available tools:
@@ -37,12 +41,17 @@ More LSP capabilities (hover information, go to definition, code completion, etc
   - **IDE Connection**: Connect to existing LSP servers launched by IDEs (VS Code, IntelliJ IDEA, etc.) via socket
 
 ### Admin Console
+
 Access the admin UI at `http://localhost:7654/admin` to:
 - **Manage Workspaces**: View all active workspaces and connected MCP clients
 - **Control LSP Servers**: Install, start, stop, restart servers
 - **Monitor Status**: See real-time status of each LSP server (Starting, Running, Connected to IDE, etc.)
 - **View LSP Traces**: Debug LSP communication with detailed request/response logs
-- **Switch Modes**: Disconnect from IDE and start MCP-managed server, or vice versa
+- **Visualize Relationships**: See contribution diagrams showing how servers collaborate
+- **Monitor MCP Tools**: Watch AI tool calls in real-time
+- **DAP Support**: View debug adapters and debug sessions *(experimental)*
+
+📖 **[Read the complete Admin UI guide](docs/admin-ui.md)** for detailed workflows and examples
 
 ### Multi-Workspace Support
 - Multiple workspaces can be managed simultaneously
