@@ -11,11 +11,11 @@
         <relativePath>../../pom.xml</relativePath>
     </parent>
 
-    <artifactId>vscode-js-debug-extension</artifactId>
+    <artifactId>typescript-extension</artifactId>
     <packaging>jar</packaging>
 
-    <name>VSCode JavaScript Debugger Extension</name>
-    <description>JavaScript/TypeScript debug adapter (DAP) for MCP Language Tools</description>
+    <name>TypeScript Extension</name>
+    <description>TypeScript/JavaScript language server (LSP) and debug adapter (DAP) for MCP Language Tools</description>
 
     <build>
         <plugins>
