@@ -1,6 +1,6 @@
 package com.redhat.mcp.languagetools.server;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import com.google.gson.JsonElement;
 import com.redhat.mcp.languagetools.installer.ServerConfig;
 import com.redhat.mcp.languagetools.installer.ServerInstaller;
 import com.redhat.mcp.languagetools.installer.TaskRegistryInstaller;
@@ -20,7 +20,7 @@ public abstract class ServerConfigBase implements ServerConfig {
     protected String id;
     protected String name;
     protected String description;
-    protected JsonNode installerConfig;  // Raw JSON from installer.json
+    protected JsonElement installerConfig;  // Raw JSON from installer.json
     protected List<DocumentSelector> documentSelector = new ArrayList<>();
 
     // Trace collector (set by workspace/session when server is added)
@@ -61,11 +61,11 @@ public abstract class ServerConfigBase implements ServerConfig {
     }
 
     @Override
-    public JsonNode getInstallerConfig() {
+    public JsonElement getInstallerConfig() {
         return installerConfig;
     }
 
-    public void setInstallerConfig(JsonNode installerConfig) {
+    public void setInstallerConfig(JsonElement installerConfig) {
         this.installerConfig = installerConfig;
     }
 

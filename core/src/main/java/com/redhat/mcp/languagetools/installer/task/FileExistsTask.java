@@ -1,6 +1,7 @@
 package com.redhat.mcp.languagetools.installer.task;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import com.redhat.mcp.languagetools.installer.InstallerContext;
 import com.redhat.mcp.languagetools.trace.TraceCollector;
 
@@ -56,9 +57,10 @@ public class FileExistsTask implements InstallerTask {
         }
 
         @Override
-        public InstallerTask createTask(JsonNode config) {
-            String name = config.has("name") ? config.get("name").asText() : "Check file exists";
-            String file = config.get("file").asText();
+        public InstallerTask createTask(JsonElement config) {
+            JsonObject obj = config.getAsJsonObject();
+            String name = obj.has("name") ? obj.get("name").getAsString() : "Check file exists";
+            String file = obj.get("file").getAsString();
             return new FileExistsTask(name, file);
         }
     }

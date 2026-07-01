@@ -101,6 +101,24 @@ public class Workspace {
     }
 
     /**
+     * Register status change callback for a server.
+     * Factorized method to avoid code duplication.
+     * Works for both LSP and DAP servers since they both extend ServerBase.
+     */
+    private void registerServerStatusCallback(com.redhat.mcp.languagetools.server.ServerBase<?> server, String serverId) {
+        server.setStatusChangeCallback((oldStatus, newStatus) -> {
+            if (statusChangeCallback != null) {
+                statusChangeCallback.accept(new LspServerStatusChangeEvent(
+                        rootUri,
+                        serverId,
+                        oldStatus,
+                        newStatus
+                ));
+            }
+        });
+    }
+
+    /**
      * Add an LSP server to this workspace (serverHome calculated from PathManager).
      *
      * @param config           Server configuration
@@ -142,16 +160,7 @@ public class Workspace {
         server.setRequestRouter(createRequestRouter());
 
         // Register status change callback
-        server.setStatusChangeCallback(newStatus -> {
-            if (statusChangeCallback != null) {
-                statusChangeCallback.accept(new LspServerStatusChangeEvent(
-                        rootUri,
-                        config.getId(),
-                        server.getStatus(),  // oldStatus (we don't track it here, using current as approximation)
-                        newStatus
-                ));
-            }
-        });
+        registerServerStatusCallback(server, config.getId());
 
         lspServers.put(config.getId(), server);
         serverInfos.put(config.getId(), new ServerInfo(config, serverHome));
@@ -218,16 +227,7 @@ public class Workspace {
                 newServer.setWorkspaceConfiguration(configuration);
 
                 // Register status change callback
-                newServer.setStatusChangeCallback(newStatus -> {
-                    if (statusChangeCallback != null) {
-                        statusChangeCallback.accept(new LspServerStatusChangeEvent(
-                                rootUri,
-                                info.config.getId(),
-                                newServer.getStatus(),
-                                newStatus
-                        ));
-                    }
-                });
+                registerServerStatusCallback(newServer, info.config.getId());
 
                 lspServers.put(serverId, newServer);
 
@@ -278,16 +278,7 @@ public class Workspace {
             }
 
             // Register status change callback
-            newServer.setStatusChangeCallback(newStatus -> {
-                if (statusChangeCallback != null) {
-                    statusChangeCallback.accept(new LspServerStatusChangeEvent(
-                            rootUri,
-                            info.config.getId(),
-                            newServer.getStatus(),
-                            newStatus
-                    ));
-                }
-            });
+            registerServerStatusCallback(newServer, info.config.getId());
 
             lspServers.put(serverId, newServer);
 

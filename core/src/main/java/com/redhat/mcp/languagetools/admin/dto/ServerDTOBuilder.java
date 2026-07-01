@@ -26,7 +26,6 @@ public class ServerDTOBuilder {
             config.getDescription(),
             config.getDocumentSelector(),
             config.getCommand(),
-            config.getArgs(),
             config.getEnv(),
             config.getWorkingDirectory(),
             config.getInitializationOptions(),

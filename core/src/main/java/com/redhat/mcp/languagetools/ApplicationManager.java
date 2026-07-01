@@ -5,8 +5,8 @@ import com.redhat.mcp.languagetools.language.LanguageRegistry;
 import com.redhat.mcp.languagetools.lsp.LspContributionManager;
 import com.redhat.mcp.languagetools.lsp.server.LspServerConfig;
 import com.redhat.mcp.languagetools.lsp.server.LspServerStatusChangeEvent;
-import com.redhat.mcp.languagetools.lsp.server.ServerDescriptorLoader;
 import com.redhat.mcp.languagetools.mcp.McpClientTracker;
+import com.redhat.mcp.languagetools.server.ServerDescriptorRegistry;
 import com.redhat.mcp.languagetools.server.ServerStatus;
 import com.redhat.mcp.languagetools.lsp.trace.LspTraceCollector;
 
@@ -51,7 +51,7 @@ public class ApplicationManager {
     Event<WorkspaceChangeEvent> workspaceChangeEvent;
 
     @Inject
-    ServerDescriptorLoader serverDescriptorLoader;
+    ServerDescriptorRegistry serverDescriptorRegistry;
 
     // ----------- LSP servers
 
@@ -77,13 +77,13 @@ public class ApplicationManager {
     private final Map<String, DapServerConfig> dapServerConfigs = new ConcurrentHashMap<>();
 
     void onStart(@Observes StartupEvent ev) {
-        LOG.info("WorkspaceManager starting...");
+        LOG.info("ApplicationManager starting...");
 
         // Load all bundled LSP server descriptors
-        lspServerConfigs.putAll(serverDescriptorLoader.loadAllBundled());
+        lspServerConfigs.putAll(serverDescriptorRegistry.loadAllLspServers());
 
         // Load all bundled DAP server descriptors
-        dapServerConfigs.putAll(serverDescriptorLoader.loadAllDapBundled());
+        dapServerConfigs.putAll(serverDescriptorRegistry.loadAllDapServers());
 
         // Initialize contribution manager with loaded configs
         initializeLspContributionManager();

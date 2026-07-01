@@ -1,10 +1,10 @@
 package com.redhat.mcp.languagetools.installer.task;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import com.google.gson.JsonElement;
 
 /**
  * Factory for creating installer tasks from JSON.
- * Implementations are registered via Java SPI.
+ * Uses Gson for JSON parsing.
  */
 public interface InstallerTaskFactory {
     /**
@@ -15,8 +15,8 @@ public interface InstallerTaskFactory {
     /**
      * Creates a task from JSON configuration.
      *
-     * @param config JSON configuration for the task
+     * @param config JSON configuration for the task (Gson JsonElement)
      * @return The created task
      */
-    InstallerTask createTask(JsonNode config);
+    InstallerTask createTask(JsonElement config);
 }

@@ -1,6 +1,7 @@
 package com.redhat.mcp.languagetools.installer.task;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import com.redhat.mcp.languagetools.installer.InstallerContext;
 import com.redhat.mcp.languagetools.trace.TraceCollector;
 
@@ -53,9 +54,10 @@ public class ConfigureServerTask implements InstallerTask {
         }
 
         @Override
-        public InstallerTask createTask(JsonNode config) {
-            String name = config.has("name") ? config.get("name").asText() : "Configure server";
-            String command = config.get("command").asText();
+        public InstallerTask createTask(JsonElement config) {
+            JsonObject obj = config.getAsJsonObject();
+            String name = obj.has("name") ? obj.get("name").getAsString() : "Configure server";
+            String command = obj.get("command").getAsString();
             return new ConfigureServerTask(name, command);
         }
     }

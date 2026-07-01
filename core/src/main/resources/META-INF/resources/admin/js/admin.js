@@ -435,9 +435,47 @@
                 ext.command = changedServer.command;
             }
 
-            // Re-render if this workspace is selected
+            // Only update DOM if this workspace is selected
             if (selectedWorkspace === event.workspaceUri) {
-                renderServers(workspace.lspServers, workspace.dapSessions || [], workspace);
+                // Update the status badge for the changed server
+                updateServerStatusBadge(event.serverId, changedServer);
+
+                // Update status badges for all extensions of this server
+                for (const ext of extensions) {
+                    updateServerStatusBadge(ext.id, ext);
+                }
+            }
+        }
+
+        /**
+         * Update the status badge of a specific server in the DOM without re-rendering the entire list.
+         */
+        function updateServerStatusBadge(serverId, server) {
+            const serverElement = document.querySelector(`.server-item[data-server-id="${serverId}"]`);
+            if (!serverElement) {
+                return;
+            }
+
+            const statusBadgeContainer = serverElement.querySelector('.server-status-badge-container');
+            if (!statusBadgeContainer) {
+                return;
+            }
+
+            // Regenerate the status badge HTML
+            const statusClass = formatStatusClass(server.status);
+            const label = formatStatusLabel(server.status, server.externalInstance);
+
+            // If installing and we have progress, show a progress bar
+            if (server.status === 'INSTALLING' && server.installProgress != null) {
+                const progressPercent = Math.round(server.installProgress * 100);
+                statusBadgeContainer.innerHTML = `
+                    <span class="status-badge ${statusClass}" style="position: relative; overflow: hidden;">
+                        <span style="position: absolute; left: 0; top: 0; bottom: 0; width: ${progressPercent}%; background: rgba(76, 175, 80, 0.3); z-index: 0;"></span>
+                        <span style="position: relative; z-index: 1;">${label} (${progressPercent}%)</span>
+                    </span>
+                `;
+            } else {
+                statusBadgeContainer.innerHTML = `<span class="status-badge ${statusClass}">${label}</span>`;
             }
         }
 

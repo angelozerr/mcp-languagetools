@@ -1,6 +1,6 @@
 package com.redhat.mcp.languagetools.installer;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import com.google.gson.JsonElement;
 
 /**
  * Common interface for server configurations (LSP and DAP).
@@ -22,5 +22,5 @@ public interface ServerConfig {
      * Get the installer configuration as JSON.
      * Returns null if no installer is configured.
      */
-    JsonNode getInstallerConfig();
+    JsonElement getInstallerConfig();
 }

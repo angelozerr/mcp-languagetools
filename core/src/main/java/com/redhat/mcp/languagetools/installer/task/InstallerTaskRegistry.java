@@ -1,6 +1,6 @@
 package com.redhat.mcp.languagetools.installer.task;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import com.google.gson.JsonElement;
 import org.jboss.logging.Logger;
 
 import java.util.HashMap;
@@ -8,7 +8,8 @@ import java.util.Map;
 import java.util.ServiceLoader;
 
 /**
- * Registry for installer task factories using Java SPI.
+ * Registry for installer task factories.
+ * Uses Gson for JSON parsing.
  */
 public class InstallerTaskRegistry {
     private static final Logger LOG = Logger.getLogger(InstallerTaskRegistry.class);
@@ -32,10 +33,10 @@ public class InstallerTaskRegistry {
      * Creates a task from JSON configuration.
      *
      * @param type Task type (e.g., "download", "fileExists")
-     * @param config JSON configuration
+     * @param config JSON configuration (Gson JsonElement)
      * @return The created task, or null if factory not found
      */
-    public InstallerTask createTask(String type, JsonNode config) {
+    public InstallerTask createTask(String type, JsonElement config) {
         InstallerTaskFactory factory = factories.get(type);
         if (factory == null) {
             LOG.errorf("No factory found for task type: %s", type);

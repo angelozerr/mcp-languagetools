@@ -1,27 +1,32 @@
 package com.redhat.mcp.languagetools.dap.server;
 
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.redhat.mcp.languagetools.PathManager;
-import com.redhat.mcp.languagetools.lsp.DocumentSelector;
+import com.redhat.mcp.languagetools.config.PathConfig;
 import com.redhat.mcp.languagetools.server.ServerDescriptorLoaderBase;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.util.*;
 
 /**
  * Loads DAP server descriptors from JSON files.
+ * Uses Gson exclusively for JSON parsing.
  */
 @ApplicationScoped
 public class DapServerDescriptorLoader extends ServerDescriptorLoaderBase<DapServerConfig> {
 
     private static final Logger LOG = Logger.getLogger(DapServerDescriptorLoader.class);
+
+    // JSON field names
+    private static final String FIELD_LAUNCH = "launch";
+    private static final String FIELD_ATTACH = "attach";
+    private static final String FIELD_DEBUG_SERVER_READY_PATTERN = "debugServerReadyPattern";
+    private static final String FIELD_ENV = "env";
+    private static final String FIELD_WORKING_DIRECTORY = "workingDirectory";
 
     @Inject
     PathManager pathManager;
@@ -31,83 +36,57 @@ public class DapServerDescriptorLoader extends ServerDescriptorLoaderBase<DapSer
     }
 
     @Override
-    protected String getResourceDirectory() {
-        return "dap";
+    public String getRoot() {
+        return PathConfig.getDapDirName();
     }
 
     @Override
-    protected DapServerConfig parseServerConfig(InputStream is, String serverId) throws IOException {
-        try (InputStreamReader reader = new InputStreamReader(is, StandardCharsets.UTF_8)) {
-            JsonObject root = gson.fromJson(reader, JsonObject.class);
-            DapServerConfig config = new DapServerConfig();
-
-            // Basic fields
-            config.setId(serverId);
-            config.setName(root.has("name") ? root.get("name").getAsString() : serverId);
-            if (root.has("description")) {
-                config.setDescription(root.get("description").getAsString());
-            }
-
-            // Launch commands (OS-specific)
-            if (root.has("launch")) {
-                Map<String, String> launch = new HashMap<>();
-                root.getAsJsonObject("launch").entrySet().forEach(entry ->
-                    launch.put(entry.getKey(), entry.getValue().getAsString())
-                );
-                config.setLaunch(launch);
-            }
-
-            // Attach configuration
-            if (root.has("attach")) {
-                Map<String, Object> attach = gson.fromJson(
-                    root.get("attach"),
-                    Map.class
-                );
-                config.setAttach(attach);
-            }
-
-            // Debug server ready pattern
-            if (root.has("debugServerReadyPattern")) {
-                config.setDebugServerReadyPattern(root.get("debugServerReadyPattern").getAsString());
-            }
-
-            // Document selector
-            if (root.has("documentSelector")) {
-                List<DocumentSelector> selectors = new ArrayList<>();
-                root.getAsJsonArray("documentSelector").forEach(el -> {
-                    JsonObject selectorObj = el.getAsJsonObject();
-                    DocumentSelector selector = new DocumentSelector();
-                    if (selectorObj.has("language")) {
-                        selector.setLanguage(selectorObj.get("language").getAsString());
-                    }
-                    if (selectorObj.has("scheme")) {
-                        selector.setScheme(selectorObj.get("scheme").getAsString());
-                    }
-                    if (selectorObj.has("pattern")) {
-                        selector.setPattern(selectorObj.get("pattern").getAsString());
-                    }
-                    selectors.add(selector);
-                });
-                config.setDocumentSelector(selectors);
-            }
-
-            // Environment variables
-            if (root.has("env")) {
-                Map<String, Object> env = gson.fromJson(
-                    root.get("env"),
-                    Map.class
-                );
-                config.setEnv(env);
-            }
-
-            // Working directory
-            if (root.has("workingDirectory")) {
-                config.setWorkingDirectory(root.get("workingDirectory").getAsString());
-            }
-
-            return config;
-        }
+    protected DapServerConfig createConfig() {
+        return new DapServerConfig();
     }
 
-    // loadAllBundled() inherited from base class - auto-discovers servers
+    @Override
+    protected JsonObject loadServer(String serverId, Path serverDir, DapServerConfig config) throws IOException {
+        JsonObject jsonObject =  super.loadServer(serverId, serverDir, config);
+
+        // Launch commands (OS-specific)
+        if (jsonObject.has(FIELD_LAUNCH)) {
+            Map<String, String> launch = new HashMap<>();
+            jsonObject.getAsJsonObject(FIELD_LAUNCH).entrySet().forEach(entry ->
+                    launch.put(entry.getKey(), entry.getValue().getAsString())
+            );
+            config.setLaunch(launch);
+        }
+
+        // Attach configuration
+        if (jsonObject.has(FIELD_ATTACH)) {
+            Map<String, Object> attach = gson.fromJson(
+                    jsonObject.get(FIELD_ATTACH),
+                    Map.class
+            );
+            config.setAttach(attach);
+        }
+
+        // Debug server ready pattern
+        if (jsonObject.has(FIELD_DEBUG_SERVER_READY_PATTERN)) {
+            config.setDebugServerReadyPattern(jsonObject.get(FIELD_DEBUG_SERVER_READY_PATTERN).getAsString());
+        }
+
+        // Environment variables
+        if (jsonObject.has(FIELD_ENV)) {
+            Map<String, Object> env = gson.fromJson(
+                    jsonObject.get(FIELD_ENV),
+                    Map.class
+            );
+            config.setEnv(env);
+        }
+
+        // Working directory
+        if (jsonObject.has(FIELD_WORKING_DIRECTORY)) {
+            config.setWorkingDirectory(jsonObject.get(FIELD_WORKING_DIRECTORY).getAsString());
+        }
+
+        return jsonObject;
+    }
+
 }

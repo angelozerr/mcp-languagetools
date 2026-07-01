@@ -1,6 +1,7 @@
 package com.redhat.mcp.languagetools.installer.task;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import com.redhat.mcp.languagetools.installer.InstallerContext;
 import com.redhat.mcp.languagetools.trace.TraceCollector;
 import org.jboss.logging.Logger;
@@ -119,30 +120,34 @@ public class CopyTask implements InstallerTask {
         }
 
         @Override
-        public InstallerTask createTask(JsonNode config) {
-            String name = config.has("name") ? config.get("name").asText() : "Copy";
-            String source = config.get("source").asText();
-            String destination = config.get("destination").asText();
+        public InstallerTask createTask(JsonElement config) {
+            JsonObject obj = config.getAsJsonObject();
+            String name = obj.has("name") ? obj.get("name").getAsString() : "Copy";
+            String source = obj.get("source").getAsString();
+            String destination = obj.get("destination").getAsString();
 
             // Parse onSuccess tasks
             InstallerTask onSuccessTask = null;
-            if (config.has("onSuccess")) {
-                JsonNode onSuccess = config.get("onSuccess");
+            if (obj.has("onSuccess")) {
+                JsonElement onSuccess = obj.get("onSuccess");
                 onSuccessTask = parseTaskNode(onSuccess);
             }
 
             return new CopyTask(name, source, destination, onSuccessTask);
         }
 
-        private InstallerTask parseTaskNode(JsonNode taskNode) {
-            // Find the task type (first key in the object)
-            var fieldNames = taskNode.fieldNames();
-            if (!fieldNames.hasNext()) {
+        private InstallerTask parseTaskNode(JsonElement taskNode) {
+            if (taskNode == null || !taskNode.isJsonObject()) {
                 return null;
             }
 
-            String taskType = fieldNames.next();
-            JsonNode taskConfig = taskNode.get(taskType);
+            JsonObject taskObj = taskNode.getAsJsonObject();
+            if (taskObj.size() == 0) {
+                return null;
+            }
+
+            String taskType = taskObj.keySet().iterator().next();
+            JsonElement taskConfig = taskObj.get(taskType);
 
             return getRegistry().createTask(taskType, taskConfig);
         }

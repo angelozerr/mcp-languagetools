@@ -46,10 +46,27 @@ public abstract class ServerBase<T extends ServerConfigBase> {
     }
 
     /**
-     * Set a callback to be notified when server status changes.
+     * Functional interface for status change callback that receives both old and new status.
      */
-    public void setStatusChangeCallback(java.util.function.Consumer<ServerStatus> callback) {
-        this.statusChangeCallback = callback;
+    @FunctionalInterface
+    public interface StatusChangeCallback {
+        void onStatusChanged(ServerStatus oldStatus, ServerStatus newStatus);
+    }
+
+    /**
+     * Set a callback to be notified when server status changes.
+     * The callback receives both the old and new status.
+     */
+    public void setStatusChangeCallback(StatusChangeCallback callback) {
+        this.statusChangeCallback = callback == null ? null : new Consumer<ServerStatus>() {
+            private ServerStatus previousStatus = status;
+
+            @Override
+            public void accept(ServerStatus newStatus) {
+                callback.onStatusChanged(previousStatus, newStatus);
+                previousStatus = newStatus;
+            }
+        };
     }
 
     /**

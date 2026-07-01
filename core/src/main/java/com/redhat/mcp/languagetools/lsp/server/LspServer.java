@@ -658,23 +658,6 @@ public class LspServer extends ServerBase<LspServerConfig> {
 
         // Parse command string into arguments (simple split by spaces, respecting quotes)
         List<String> command = parseCommandLine(resolved);
-
-        // Add any additional args from config
-        for (String arg : config.getArgs()) {
-            String resolvedArg = arg
-                    .replace("${workspace}", workspaceRoot.getPath())
-                    .replace("${workspaceDataDir}", workspaceDataDir.toString())
-                    .replace("${serverHome}", serverHome.toString())
-                    .replace("${configuration}", configuration)
-                    .replace("${DATA_DIR}", workspaceDataDir.toString())
-                    .replace("${user.name}", System.getProperty("user.name"));
-
-            // Handle glob patterns (e.g., ${serverHome}/plugins/*.jar)
-            resolvedArg = resolveGlob(resolvedArg);
-
-            command.add(resolvedArg);
-        }
-
         return command;
     }
 

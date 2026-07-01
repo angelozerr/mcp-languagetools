@@ -721,7 +721,7 @@ public class DapSession implements DapEventListener {
         return dapServer;
     }
 
-    public com.redhat.mcp.languagetools.dap.server.DapServerConfig getServerConfig() {
+    public DapServerConfig getServerConfig() {
         return dapServer != null ? dapServer.getConfig() : null;
     }
 

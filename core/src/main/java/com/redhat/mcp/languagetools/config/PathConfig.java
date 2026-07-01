@@ -17,6 +17,7 @@ public class PathConfig {
     // Directory structure (fixed)
     private static final String DIR_MCP_LANG_TOOLS = ".mcp-languagetools";
     private static final String DIR_LSP = "lsp";
+    private static final String DIR_DAP = "dap";
     private static final String DIR_CONFIG = "config";
     private static final String DIR_WORKSPACES = "workspaces";
 
@@ -42,8 +43,15 @@ public class PathConfig {
     /**
      * Get the LSP servers directory name (lsp).
      */
-    public String getLspDirName() {
+    public static String getLspDirName() {
         return DIR_LSP;
+    }
+
+    /**
+     * Get the DAP servers directory name (dap).
+     */
+    public static String getDapDirName() {
+        return DIR_DAP;
     }
 
     /**

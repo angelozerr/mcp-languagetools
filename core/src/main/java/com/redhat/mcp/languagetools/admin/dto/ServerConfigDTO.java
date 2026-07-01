@@ -15,7 +15,6 @@ public record ServerConfigDTO(
     String description,
     List<DocumentSelector> documentSelector,
     Object command,
-    List<String> args,
     Map<String, String> env,
     String workingDirectory,
     Map<String, Object> initializationOptions,

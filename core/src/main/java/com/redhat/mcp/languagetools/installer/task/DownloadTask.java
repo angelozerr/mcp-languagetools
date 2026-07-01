@@ -1,6 +1,7 @@
 package com.redhat.mcp.languagetools.installer.task;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import com.redhat.mcp.languagetools.installer.InstallerContext;
 import com.redhat.mcp.languagetools.installer.ProgressIndicator;
 import com.redhat.mcp.languagetools.installer.download.DecompressorUtils;
@@ -171,53 +172,73 @@ public class DownloadTask implements InstallerTask {
         }
 
         @Override
-        public InstallerTask createTask(JsonNode config) {
-            String name = config.has("name") ? config.get("name").asText() : "Download";
-            String url = config.get("url").asText();
-            JsonNode output = config.get("output");
-            String outputDir = output.get("dir").asText();
+        public InstallerTask createTask(JsonElement config) {
+            JsonObject obj = config.getAsJsonObject();
+            String name = obj.has("name") ? obj.get("name").getAsString() : "Download";
+
+            // URL is required
+            if (!obj.has("url")) {
+                throw new IllegalArgumentException("Download task requires 'url' field");
+            }
+            String url = obj.get("url").getAsString();
+
+            // Output is required
+            if (!obj.has("output")) {
+                throw new IllegalArgumentException("Download task requires 'output' field");
+            }
+            JsonObject output = obj.get("output").getAsJsonObject();
+
+            // Output.dir is required
+            if (!output.has("dir")) {
+                throw new IllegalArgumentException("Download task requires 'output.dir' field");
+            }
+            String outputDir = output.get("dir").getAsString();
 
             // Parse output.file.name (can be a simple string or OS-specific map)
             String outputFileName = null;
-            if (output.has("file") && output.get("file").has("name")) {
-                JsonNode fileNameNode = output.get("file").get("name");
-                if (fileNameNode.isTextual()) {
+            if (output.has("file") && output.get("file").getAsJsonObject().has("name")) {
+                JsonElement fileNameNode = output.get("file").getAsJsonObject().get("name");
+                if (fileNameNode.isJsonPrimitive()) {
                     // Simple string: "bin/jdtls"
-                    outputFileName = fileNameNode.asText();
-                } else if (fileNameNode.isObject()) {
+                    outputFileName = fileNameNode.getAsString();
+                } else if (fileNameNode.isJsonObject()) {
                     // OS-specific map: {"windows": "bin/jdtls.bat", "default": "bin/jdtls"}
+                    JsonObject fileNameMap = fileNameNode.getAsJsonObject();
                     String os = System.getProperty("os.name").toLowerCase();
-                    if (os.contains("win") && fileNameNode.has("windows")) {
-                        outputFileName = fileNameNode.get("windows").asText();
-                    } else if (os.contains("mac") && fileNameNode.has("mac")) {
-                        outputFileName = fileNameNode.get("mac").asText();
-                    } else if (os.contains("nix") || os.contains("nux") && fileNameNode.has("linux")) {
-                        outputFileName = fileNameNode.get("linux").asText();
-                    } else if (fileNameNode.has("default")) {
-                        outputFileName = fileNameNode.get("default").asText();
+                    if (os.contains("win") && fileNameMap.has("windows")) {
+                        outputFileName = fileNameMap.get("windows").getAsString();
+                    } else if (os.contains("mac") && fileNameMap.has("mac")) {
+                        outputFileName = fileNameMap.get("mac").getAsString();
+                    } else if ((os.contains("nix") || os.contains("nux")) && fileNameMap.has("linux")) {
+                        outputFileName = fileNameMap.get("linux").getAsString();
+                    } else if (fileNameMap.has("default")) {
+                        outputFileName = fileNameMap.get("default").getAsString();
                     }
                 }
             }
 
             // Parse onSuccess tasks
             InstallerTask onSuccessTask = null;
-            if (config.has("onSuccess")) {
-                JsonNode onSuccess = config.get("onSuccess");
+            if (obj.has("onSuccess")) {
+                JsonElement onSuccess = obj.get("onSuccess");
                 onSuccessTask = parseTaskNode(onSuccess);
             }
 
             return new DownloadTask(name, url, outputDir, outputFileName, onSuccessTask);
         }
 
-        private InstallerTask parseTaskNode(JsonNode taskNode) {
-            // Find the task type (first key in the object)
-            var fieldNames = taskNode.fieldNames();
-            if (!fieldNames.hasNext()) {
+        private InstallerTask parseTaskNode(JsonElement taskNode) {
+            if (taskNode == null || !taskNode.isJsonObject()) {
                 return null;
             }
 
-            String taskType = fieldNames.next();
-            JsonNode taskConfig = taskNode.get(taskType);
+            JsonObject taskObj = taskNode.getAsJsonObject();
+            if (taskObj.size() == 0) {
+                return null;
+            }
+
+            String taskType = taskObj.keySet().iterator().next();
+            JsonElement taskConfig = taskObj.get(taskType);
 
             return getRegistry().createTask(taskType, taskConfig);
         }

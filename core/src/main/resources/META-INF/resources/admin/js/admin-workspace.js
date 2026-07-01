@@ -359,6 +359,7 @@
 
                     return `
                         <div class="server-item ${serverClass} ${extensionClass} ${selectedServer?.id === server.id ? 'active' : ''}"
+                             data-server-id="${server.id}"
                              onclick='selectServer(${JSON.stringify(server)})'
                              ${tooltipText ? `title="${tooltipText.replace(/"/g, '&quot;')}"` : ''}>
                             <div class="server-name">
@@ -366,7 +367,7 @@
                                 ${server.name}${extensionBadge}
                             </div>
                             <div class="server-id" ${contributedInfo.tooltip ? `title="${contributedInfo.tooltip}"` : ''}>${server.id}${contributedInfo.text}</div>
-                            <div>
+                            <div class="server-status-badge-container">
                                 ${renderStatusBadge(server)}
                                 ${server.statusMessage ? `<span class="server-status-message" style="color: #888; font-size: 0.85rem; margin-left: 0.5rem;">${escapeHtml(server.statusMessage)}</span>` : ''}
                                 ${!server.isExtension ? ideInfo : ''}

@@ -1,8 +1,8 @@
 package com.redhat.mcp.languagetools.lsp.server;
 
-import com.redhat.mcp.languagetools.server.ServerConfigBase;
 import com.redhat.mcp.languagetools.lsp.Contributes;
 import com.redhat.mcp.languagetools.lsp.DocumentSelector;
+import com.redhat.mcp.languagetools.server.ServerConfigBase;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -22,11 +22,6 @@ public class LspServerConfig extends ServerConfigBase {
      * - A map with "windows", "linux", "mac", "default" keys for OS-specific commands
      */
     private Object command;
-
-    /**
-     * Command line arguments (optional, used only with simple string command)
-     */
-    private List<String> args = new ArrayList<>();
 
     /**
      * Environment variables
@@ -75,16 +70,6 @@ public class LspServerConfig extends ServerConfigBase {
 
         public Builder command(String command) {
             config.command = command;
-            return this;
-        }
-
-        public Builder args(List<String> args) {
-            config.args = new ArrayList<>(args);
-            return this;
-        }
-
-        public Builder addArg(String arg) {
-            config.args.add(arg);
             return this;
         }
 
@@ -175,14 +160,6 @@ public class LspServerConfig extends ServerConfigBase {
         return null;
     }
 
-    public List<String> getArgs() {
-        return args;
-    }
-
-    public void setArgs(List<String> args) {
-        this.args = args;
-    }
-
     public Map<String, String> getEnv() {
         return env;
     }
@@ -229,7 +206,6 @@ public class LspServerConfig extends ServerConfigBase {
                 "id='" + id + '\'' +
                 ", name='" + name + '\'' +
                 ", command='" + command + '\'' +
-                ", args=" + args +
                 ", documentSelector=" + getDocumentSelector() +
                 '}';
     }
