@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.redhat.mcp.languagetools.installer.ServerConfig;
 import com.redhat.mcp.languagetools.installer.ServerInstaller;
 import com.redhat.mcp.languagetools.installer.TaskRegistryInstaller;
+import com.redhat.mcp.languagetools.installer.TraceProgressIndicator;
 import com.redhat.mcp.languagetools.lsp.DocumentSelector;
 import com.redhat.mcp.languagetools.trace.TraceCollector;
 
@@ -29,7 +30,7 @@ public abstract class ServerConfigBase implements ServerConfig {
     private ServerInstaller installer;
 
     // Install progress indicator (set when installation starts)
-    private com.redhat.mcp.languagetools.installer.TraceProgressIndicator installProgress;
+    private TraceProgressIndicator installProgress;
 
     // Common getters
 
@@ -115,14 +116,14 @@ public abstract class ServerConfigBase implements ServerConfig {
     /**
      * Gets the install progress indicator (used to show visual progress bar in UI).
      */
-    public com.redhat.mcp.languagetools.installer.TraceProgressIndicator getInstallProgress() {
+    public TraceProgressIndicator getInstallProgress() {
         return installProgress;
     }
 
     /**
      * Sets the install progress indicator (called when installation starts).
      */
-    public void setInstallProgress(com.redhat.mcp.languagetools.installer.TraceProgressIndicator installProgress) {
+    public void setInstallProgress(TraceProgressIndicator installProgress) {
         this.installProgress = installProgress;
     }
 }

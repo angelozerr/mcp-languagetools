@@ -38,7 +38,8 @@ public class ServerDTOBuilder {
     /**
      * Build ServerRuntimeDTO for a server in a workspace.
      */
-    public ServerRuntimeDTO buildRuntime(LspServerConfig config, Workspace workspace) {
+    public ServerRuntimeDTO buildRuntime(LspServerConfig config,
+                                         Workspace workspace) {
         String serverId = config.getId();
         LspServer lspServer = workspace.getLspServer(serverId);
 
@@ -104,6 +105,15 @@ public class ServerDTOBuilder {
             statusMessage = statusMessage.substring(0, 97) + "...";
         }
 
+        // Get install progress if status is INSTALLING
+        Double installProgress = null;
+        if (status == ServerStatus.INSTALLING) {
+            var progressIndicator = config.getInstallProgress();
+            if (progressIndicator != null) {
+                installProgress = progressIndicator.getFraction();
+            }
+        }
+
         return new ServerRuntimeDTO(
             serverId,
             status,
@@ -112,7 +122,8 @@ public class ServerDTOBuilder {
             pid,
             command,
             externalInfo,
-            parentServerId
+            parentServerId,
+            installProgress
         );
     }
 }

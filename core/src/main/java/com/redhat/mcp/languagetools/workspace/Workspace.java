@@ -2,6 +2,10 @@ package com.redhat.mcp.languagetools.workspace;
 
 import com.redhat.mcp.languagetools.PathManager;
 import com.redhat.mcp.languagetools.dap.server.DapServerConfig;
+import com.redhat.mcp.languagetools.installer.InstallResult;
+import com.redhat.mcp.languagetools.installer.InstallerContext;
+import com.redhat.mcp.languagetools.installer.ServerInstaller;
+import com.redhat.mcp.languagetools.installer.TraceProgressIndicator;
 import com.redhat.mcp.languagetools.lsp.LspContributionManager;
 import com.redhat.mcp.languagetools.lsp.LspInstanceRegistry;
 import com.redhat.mcp.languagetools.lsp.RequestRouter;
@@ -16,6 +20,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -120,7 +125,7 @@ public class Workspace {
         // Set trace collector for installation support
         if (config.getTraceCollector() == null) {
             // Create a TraceCollector wrapper around LspTraceCollector
-            config.setTraceCollector(new LspTraceCollectorWrapper(traceCollector, rootUri.toString(), config.getId(), config.getName()));
+            config.setTraceCollector(new LspTraceCollectorWrapper(traceCollector, rootUri.toString(), config.getId()));
         }
 
         LspServerContext context =
@@ -319,10 +324,10 @@ public class Workspace {
     /**
      * Ensure server is installed. Returns InstallResult or null if no installer.
      */
-    private CompletableFuture<com.redhat.mcp.languagetools.installer.InstallResult> ensureServerInstalled(
-            com.redhat.mcp.languagetools.lsp.server.LspServerConfig config) {
+    private CompletableFuture<InstallResult> ensureServerInstalled(
+            LspServerConfig config) {
 
-        com.redhat.mcp.languagetools.installer.ServerInstaller installer = config.getInstaller();
+        ServerInstaller installer = config.getInstaller();
         if (installer == null) {
             // No installer - use command from config directly
             return CompletableFuture.completedFuture(null);
@@ -330,14 +335,12 @@ public class Workspace {
 
         // Create installation context
         Path installDir = pathManager.getLspServerHome(config.getId());
-        com.redhat.mcp.languagetools.installer.TraceProgressIndicator progress =
-                new com.redhat.mcp.languagetools.installer.TraceProgressIndicator(config.getTraceCollector());
+        TraceProgressIndicator progress = new TraceProgressIndicator(config.getTraceCollector());
 
         // Store progress indicator in config so UI can access it
         config.setInstallProgress(progress);
 
-        com.redhat.mcp.languagetools.installer.InstallerContext context =
-                new com.redhat.mcp.languagetools.installer.InstallerContext(config, installDir, progress);
+        InstallerContext context = new InstallerContext(config, installDir, progress);
 
         // Add workspace-specific variables
         context.setVariable("USER_HOME", pathManager.getMcpLangToolsRoot().toString());
@@ -531,7 +534,7 @@ public class Workspace {
      * Get all MCP client connections.
      */
     public Map<String, McpClientInfo> getMcpClientConnections() {
-        return java.util.Collections.unmodifiableMap(mcpClientConnections);
+        return Collections.unmodifiableMap(mcpClientConnections);
     }
 
     private Path createWorkspaceDataDir(Path baseDir, URI rootUri) {

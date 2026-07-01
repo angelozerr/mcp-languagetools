@@ -70,7 +70,6 @@ public class DapServer extends ServerBase<DapServerConfig> {
                 context.getTraceCollector().addTrace(
                         context.getWorkspaceRoot().toString(),
                         context.getSessionId(),
-                        context.getSessionName(),
                         DapTraceMessage.MessageDirection.SENT,
                         "Starting DAP server: " + config.getName() + "\n" +
                                 "Command: " + commandStr + "\n" +
@@ -85,7 +84,6 @@ public class DapServer extends ServerBase<DapServerConfig> {
                 context.getTraceCollector().addTrace(
                         context.getWorkspaceRoot().toString(),
                         context.getSessionId(),
-                        context.getSessionName(),
                         DapTraceMessage.MessageDirection.RECEIVED,
                         "DAP server process started (PID: " + serverProcess.pid() + ")"
                 );
@@ -108,7 +106,6 @@ public class DapServer extends ServerBase<DapServerConfig> {
                     context.getTraceCollector().addTrace(
                             context.getWorkspaceRoot().toString(),
                             context.getSessionId(),
-                            context.getSessionName(),
                             direction,
                             jsonContent
                     );

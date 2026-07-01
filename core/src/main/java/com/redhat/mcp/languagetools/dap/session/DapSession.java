@@ -156,9 +156,8 @@ public class DapSession implements DapEventListener {
 
             // Send installation start message to traces
             traceCollector.addTrace(
+                workspaceContext.getWorkspaceRoot().toString(),
                 sessionId,
-                serverConfig.getId(),
-                serverConfig.getName(),
                 com.redhat.mcp.languagetools.dap.trace.DapTraceMessage.MessageDirection.SENT,
                 "INSTALL: Ensuring " + serverConfig.getName() + " is installed..."
             );
@@ -205,7 +204,6 @@ public class DapSession implements DapEventListener {
                 traceCollector.addTrace(
                     workspaceContext.getWorkspaceRoot().toString(),
                     sessionId,
-                    sessionName,
                     com.redhat.mcp.languagetools.dap.trace.DapTraceMessage.MessageDirection.RECEIVED,
                     "❌ Failed to initialize: " + ex.getMessage()
                 );

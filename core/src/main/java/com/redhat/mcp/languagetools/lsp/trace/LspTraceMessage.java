@@ -11,7 +11,6 @@ import java.time.Instant;
 public record LspTraceMessage(
     String workspaceUri,
     String serverId,
-    String serverName,
     Instant timestamp,
     MessageDirection direction,
     String jsonContent,

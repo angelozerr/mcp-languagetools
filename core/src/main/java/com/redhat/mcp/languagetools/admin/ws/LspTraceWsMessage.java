@@ -10,7 +10,6 @@ public record LspTraceWsMessage(
     String type,  // "lsp-trace"
     String workspaceUri,
     String serverId,
-    String serverName,
     String timestamp,
     String direction,
     String jsonContent,

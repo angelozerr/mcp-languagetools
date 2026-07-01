@@ -28,17 +28,15 @@ public class TracingMessageConsumer {
     private final LspTraceCollector collector;
     private final String workspaceUri;
     private final String serverId;
-    private final String serverName;
     private final Map<String, RequestMetadata> sentRequests;
     private final Map<String, RequestMetadata> receivedRequests;
     private final Clock clock;
     private final DateTimeFormatter dateTimeFormatter;
 
-    public TracingMessageConsumer(LspTraceCollector collector, String workspaceUri, String serverId, String serverName) {
+    public TracingMessageConsumer(LspTraceCollector collector, String workspaceUri, String serverId) {
         this.collector = collector;
         this.workspaceUri = workspaceUri;
         this.serverId = serverId;
-        this.serverName = serverName;
         this.sentRequests = new ConcurrentHashMap<>();
         this.receivedRequests = new ConcurrentHashMap<>();
         this.clock = Clock.systemDefaultZone();
@@ -66,7 +64,7 @@ public class TracingMessageConsumer {
             logContent = String.format("Unknown MessageConsumer type: %s", messageConsumer);
         }
 
-        collector.addTrace(workspaceUri, serverId, serverName, direction, logContent);
+        collector.addTrace(workspaceUri, serverId, direction, logContent);
     }
 
     private String consumeMessageSending(Message message, Instant now, String date) {

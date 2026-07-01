@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Generic Language Server instance.
@@ -73,7 +74,7 @@ public class LspServer extends ServerBase<LspServerConfig> {
         this.workspaceRoot = context.getWorkspaceRoot();
         this.workspaceDataDir = context.getWorkspaceDataDir();
         this.serverHome = context.getLspServerHome();
-        this.tracing = new TracingMessageConsumer(context.getTraceCollector(), workspaceRoot.toString(), config.getId(), config.getName());
+        this.tracing = new TracingMessageConsumer(context.getTraceCollector(), workspaceRoot.toString(), config.getId());
         this.allServerConfigs = context.getAllServerConfigs() != null ? context.getAllServerConfigs() : List.of();
         this.pathManager = context.getPathManager();
 
@@ -132,7 +133,6 @@ public class LspServer extends ServerBase<LspServerConfig> {
                     tracing.getCollector().addTrace(
                         workspaceRoot.toString(),
                         config.getId(),
-                        config.getName(),
                         LspTraceMessage.MessageDirection.SERVER_TO_CLIENT,
                         errorMessage
                     );
@@ -164,7 +164,6 @@ public class LspServer extends ServerBase<LspServerConfig> {
                     tracing.getCollector().addTrace(
                         workspaceRoot.toString(),
                         config.getId(),
-                        config.getName(),
                         LspTraceMessage.MessageDirection.SERVER_TO_CLIENT,
                         stackTrace.toString()
                     );
@@ -207,7 +206,6 @@ public class LspServer extends ServerBase<LspServerConfig> {
                 tracing.getCollector().addTrace(
                     workspaceRoot.toString(),
                     config.getId(),
-                    config.getName(),
                     LspTraceMessage.MessageDirection.SERVER_TO_CLIENT,
                     errorMessage
                 );
@@ -230,7 +228,6 @@ public class LspServer extends ServerBase<LspServerConfig> {
                     tracing.getCollector().addTrace(
                         workspaceRoot.toString(),
                         config.getId(),
-                        config.getName(),
                         LspTraceMessage.MessageDirection.SERVER_TO_CLIENT,
                         errorMessage
                     );
@@ -299,7 +296,6 @@ public class LspServer extends ServerBase<LspServerConfig> {
         tracing.getCollector().addTrace(
             workspaceRoot.toString(),
             config.getId(),
-            config.getName(),
             LspTraceMessage.MessageDirection.SERVER_TO_CLIENT,
             startMessage
         );
@@ -350,7 +346,6 @@ public class LspServer extends ServerBase<LspServerConfig> {
                             tracing.getCollector().addTrace(
                                 workspaceRoot.toString(),
                                 config.getId(),
-                                config.getName(),
                                 LspTraceMessage.MessageDirection.SERVER_TO_CLIENT,
                                 errorTrace
                             );
@@ -366,7 +361,6 @@ public class LspServer extends ServerBase<LspServerConfig> {
                         tracing.getCollector().addTrace(
                             workspaceRoot.toString(),
                             config.getId(),
-                            config.getName(),
                             LspTraceMessage.MessageDirection.SERVER_TO_CLIENT,
                             errorTrace
                         );
@@ -382,7 +376,6 @@ public class LspServer extends ServerBase<LspServerConfig> {
                     tracing.getCollector().addTrace(
                         workspaceRoot.toString(),
                         config.getId(),
-                        config.getName(),
                         LspTraceMessage.MessageDirection.SERVER_TO_CLIENT,
                         errorTrace
                     );
@@ -542,11 +535,11 @@ public class LspServer extends ServerBase<LspServerConfig> {
 
         // If params is already a list, use it; otherwise wrap in a list
         if (params instanceof java.util.List) {
-            commandParams.setArguments((java.util.List<Object>) params);
+            commandParams.setArguments((List<Object>) params);
         } else if (params != null) {
-            commandParams.setArguments(java.util.List.of(params));
+            commandParams.setArguments(List.of(params));
         } else {
-            commandParams.setArguments(java.util.List.of());
+            commandParams.setArguments(List.of());
         }
 
         return languageServer.getWorkspaceService()
@@ -586,7 +579,7 @@ public class LspServer extends ServerBase<LspServerConfig> {
                 // Try graceful shutdown first
                 if (languageServer != null) {
                     try {
-                        languageServer.shutdown().get(5, java.util.concurrent.TimeUnit.SECONDS);
+                        languageServer.shutdown().get(5, TimeUnit.SECONDS);
                         languageServer.exit();
                     } catch (Exception e) {
                         LOG.warnf("Graceful shutdown failed for %s: %s", config.getId(), e.getMessage());
@@ -609,14 +602,14 @@ public class LspServer extends ServerBase<LspServerConfig> {
                     serverProcess.destroyForcibly();
 
                     // Wait a bit for process to die
-                    if (!serverProcess.waitFor(3, java.util.concurrent.TimeUnit.SECONDS)) {
+                    if (!serverProcess.waitFor(3, TimeUnit.SECONDS)) {
                         LOG.errorf("Failed to kill %s process", config.getId());
                     }
                 }
 
                 // Shutdown executor
                 executorService.shutdown();
-                if (!executorService.awaitTermination(3, java.util.concurrent.TimeUnit.SECONDS)) {
+                if (!executorService.awaitTermination(3, TimeUnit.SECONDS)) {
                     executorService.shutdownNow();
                 }
 
@@ -872,7 +865,7 @@ public class LspServer extends ServerBase<LspServerConfig> {
         if (!isSocketConnection && serverProcess != null && serverProcess.isAlive()) {
             LOG.infof("Stopping our own server process to switch to IDE instance");
             try {
-                languageServer.shutdown().get(2, java.util.concurrent.TimeUnit.SECONDS);
+                languageServer.shutdown().get(2, TimeUnit.SECONDS);
                 languageServer.exit();
                 serverProcess.destroyForcibly();
             } catch (Exception e) {
@@ -947,88 +940,6 @@ public class LspServer extends ServerBase<LspServerConfig> {
      */
     protected LanguageClient createLanguageClient() {
         return new GenericLanguageClient(this);
-    }
-
-    /**
-     * Information about a bindRequest routing.
-     */
-    private static class BindRequestInfo {
-        final String targetServerId;
-        final String mode; // "executeCommand" or "direct"
-
-        BindRequestInfo(String targetServerId, String mode) {
-            this.targetServerId = targetServerId;
-            this.mode = mode;
-        }
-    }
-
-    /**
-     * Find which server this request should be routed to based on bindRequest declarations.
-     * Returns binding info (target server + mode), or null if not a bindRequest.
-     */
-    private BindRequestInfo findBindRequestInfo(String requestMethod) {
-        var config = super.getConfig();
-        LOG.infof("[%s] Looking for bindRequest routing for method: %s", config.getId(), requestMethod);
-
-        // Check our own config's contributes sections
-        if (config.getContributes() == null) {
-            LOG.warnf("[%s] No contributes section in config", config.getId());
-            return null;
-        }
-
-        if (config.getContributes().getContributions() == null) {
-            LOG.warnf("[%s] contributes.getContributions() is null", config.getId());
-            return null;
-        }
-
-        LOG.infof("[%s] Found %d contribution targets", config.getId(),
-            config.getContributes().getContributions().size());
-
-        // Look through all contributes.{serverId}.bindRequest arrays
-        for (Map.Entry<String, com.google.gson.JsonElement> entry : config.getContributes().getContributions().entrySet()) {
-            String targetServerId = entry.getKey();
-            com.google.gson.JsonElement contrib = entry.getValue();
-
-            if (!contrib.isJsonObject()) {
-                continue;
-            }
-
-            com.google.gson.JsonObject contribObj = contrib.getAsJsonObject();
-            if (!contribObj.has("bindRequest")) {
-                continue;
-            }
-
-            com.google.gson.JsonElement bindRequestElem = contribObj.get("bindRequest");
-            if (!bindRequestElem.isJsonArray()) {
-                continue;
-            }
-
-            // Check if our requestMethod is in this bindRequest array
-            com.google.gson.JsonArray bindRequests = bindRequestElem.getAsJsonArray();
-            LOG.infof("[%s] Checking %d bindRequests for target '%s'", config.getId(),
-                bindRequests.size(), targetServerId);
-
-            for (com.google.gson.JsonElement req : bindRequests) {
-                if (req.isJsonPrimitive()) {
-                    String bindMethod = req.getAsString();
-                    LOG.debugf("[%s] Comparing '%s' with '%s'", config.getId(), requestMethod, bindMethod);
-
-                    if (bindMethod.equals(requestMethod)) {
-                        // Found! Now determine the mode
-                        String mode = "executeCommand"; // Default mode
-                        if (contribObj.has("bindMode") && contribObj.get("bindMode").isJsonPrimitive()) {
-                            mode = contribObj.get("bindMode").getAsString();
-                        }
-                        LOG.infof("[%s] FOUND bindRequest match! Routing to %s (mode: %s)",
-                            config.getId(), targetServerId, mode);
-                        return new BindRequestInfo(targetServerId, mode);
-                    }
-                }
-            }
-        }
-
-        LOG.warnf("[%s] No bindRequest found for method: %s", config.getId(), requestMethod);
-        return null;
     }
 
     /**

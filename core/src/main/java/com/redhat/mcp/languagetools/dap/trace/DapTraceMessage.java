@@ -12,7 +12,6 @@ import java.time.Instant;
 public record DapTraceMessage(
     String workspaceUri,
     String sessionId,
-    String sessionName,
     Instant timestamp,
     MessageDirection direction,
     String jsonContent,

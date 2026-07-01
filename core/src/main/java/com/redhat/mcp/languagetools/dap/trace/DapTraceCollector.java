@@ -25,15 +25,14 @@ public class DapTraceCollector {
     @Inject
     Event<DapTraceMessage> traceEvent;
 
-    public void addTrace(String workspaceUri, String sessionId, String sessionName, DapTraceMessage.MessageDirection direction, String jsonContent) {
-        addTrace(workspaceUri, sessionId, sessionName, direction, jsonContent, null);
+    public void addTrace(String workspaceUri, String sessionId, DapTraceMessage.MessageDirection direction, String jsonContent) {
+        addTrace(workspaceUri, sessionId, direction, jsonContent, null);
     }
 
-    public void addTrace(String workspaceUri, String sessionId, String sessionName, DapTraceMessage.MessageDirection direction, String jsonContent, com.redhat.mcp.languagetools.trace.TraceCollector.MessageType messageType) {
+    public void addTrace(String workspaceUri, String sessionId, DapTraceMessage.MessageDirection direction, String jsonContent, com.redhat.mcp.languagetools.trace.TraceCollector.MessageType messageType) {
         DapTraceMessage message = new DapTraceMessage(
             workspaceUri,
             sessionId,
-            sessionName,
             java.time.Instant.now(),
             direction,
             jsonContent,

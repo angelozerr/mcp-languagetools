@@ -8,16 +8,6 @@ package com.redhat.mcp.languagetools.trace;
 public interface TraceCollector {
 
     /**
-     * Trace level.
-     */
-    enum Level {
-        INFO,
-        WARN,
-        ERROR,
-        DEBUG
-    }
-
-    /**
      * Message type - determines how the trace is displayed.
      */
     enum MessageType {
@@ -31,47 +21,31 @@ public interface TraceCollector {
      * Send a trace message with specific level and type.
      *
      * @param message Message to trace
-     * @param level   Trace level
      * @param type    Message type (TRACE, UPDATE, ERROR, INFO)
      */
-    void trace(String message, Level level, MessageType type);
+    void trace(String message, MessageType type);
 
     /**
      * Send a trace message with default type (TRACE).
      *
      * @param message Message to trace
-     * @param level   Trace level
      */
-    default void trace(String message, Level level) {
-        trace(message, level, MessageType.TRACE);
+    default void trace(String message) {
+        trace(message, MessageType.TRACE);
     }
 
     /**
      * Send an info trace message.
      */
     default void info(String message) {
-        trace(message, Level.INFO, MessageType.INFO);
-    }
-
-    /**
-     * Send a warning trace message.
-     */
-    default void warn(String message) {
-        trace(message, Level.WARN, MessageType.TRACE);
+        trace(message, MessageType.INFO);
     }
 
     /**
      * Send an error trace message.
      */
     default void error(String message) {
-        trace(message, Level.ERROR, MessageType.ERROR);
-    }
-
-    /**
-     * Send a debug trace message.
-     */
-    default void debug(String message) {
-        trace(message, Level.DEBUG, MessageType.TRACE);
+        trace(message, MessageType.ERROR);
     }
 
     /**
@@ -79,6 +53,6 @@ public interface TraceCollector {
      * Useful for progress indicators.
      */
     default void update(String message) {
-        trace(message, Level.INFO, MessageType.UPDATE);
+        trace(message, MessageType.UPDATE);
     }
 }

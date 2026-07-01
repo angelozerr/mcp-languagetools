@@ -14,7 +14,8 @@ public record ServerRuntimeDTO(
     Long pid,
     String command,
     ExternalInstanceInfo externalInstance,
-    String parentServerId  // For extensions: the server they extend (null for normal servers)
+    String parentServerId,  // For extensions: the server they extend (null for normal servers)
+    Double installProgress  // Install progress (0.0-1.0) when status is INSTALLING, null otherwise
 ) {
     /**
      * Information about an external LSP server instance (launched by an IDE).

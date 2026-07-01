@@ -207,6 +207,24 @@
             return labels[status] || status;
         }
 
+        function renderStatusBadge(server) {
+            const statusClass = server.status === 'RUNNING' && !server.isReady ? 'status-running-not-ready' : 'status-' + server.status.toLowerCase();
+            const label = formatStatusLabel(server.status, server.externalInstance);
+
+            // If installing and we have progress, show a progress bar
+            if (server.status === 'INSTALLING' && server.installProgress != null) {
+                const progressPercent = Math.round(server.installProgress * 100);
+                return `
+                    <span class="status-badge ${statusClass}" style="position: relative; overflow: hidden;">
+                        <span style="position: absolute; left: 0; top: 0; bottom: 0; width: ${progressPercent}%; background: rgba(76, 175, 80, 0.3); z-index: 0;"></span>
+                        <span style="position: relative; z-index: 1;">${label} (${progressPercent}%)</span>
+                    </span>
+                `;
+            }
+
+            return `<span class="status-badge ${statusClass}">${label}</span>`;
+        }
+
         function renderServers(lspServers, dapSessions = [], workspace = null) {
             const container = document.getElementById('servers-list');
             console.log('renderServers - lspServers:', lspServers, 'dapSessions:', dapSessions);
@@ -349,7 +367,7 @@
                             </div>
                             <div class="server-id" ${contributedInfo.tooltip ? `title="${contributedInfo.tooltip}"` : ''}>${server.id}${contributedInfo.text}</div>
                             <div>
-                                <span class="status-badge ${server.status === 'RUNNING' && !server.isReady ? 'status-running-not-ready' : 'status-' + server.status.toLowerCase()}">${formatStatusLabel(server.status, server.externalInstance)}</span>
+                                ${renderStatusBadge(server)}
                                 ${server.statusMessage ? `<span class="server-status-message" style="color: #888; font-size: 0.85rem; margin-left: 0.5rem;">${escapeHtml(server.statusMessage)}</span>` : ''}
                                 ${!server.isExtension ? ideInfo : ''}
                                 ${!server.isExtension && server.pid ? `<span class="server-ide-info"><span title="Process ID">${server.pid}</span></span>` : ''}

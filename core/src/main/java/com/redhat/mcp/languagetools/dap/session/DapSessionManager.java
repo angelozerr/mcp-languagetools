@@ -67,7 +67,7 @@ public class DapSessionManager implements ApplicationContext {
         String sessionId = UUID.randomUUID().toString();
         if (serverConfig.getTraceCollector() == null) {
             // Create a TraceCollector wrapper around DapTraceCollector
-            serverConfig.setTraceCollector(new DapTraceCollectorWrapper(traceCollector, sessionId, dapServerId, serverConfig.getName()));
+            serverConfig.setTraceCollector(new DapTraceCollectorWrapper(traceCollector, sessionId, dapServerId));
         }
 
         // Determine language from server config (first supported language)

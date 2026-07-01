@@ -1,5 +1,6 @@
 package com.redhat.mcp.languagetools.lsp.trace;
 
+import com.redhat.mcp.languagetools.trace.TraceCollector;
 import io.quarkus.runtime.annotations.RegisterForReflection;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Event;
@@ -26,15 +27,18 @@ public class LspTraceCollector {
     @Inject
     Event<LspTraceMessage> traceEvent;
 
-    public void addTrace(String workspaceUri, String serverId, String serverName, LspTraceMessage.MessageDirection direction, String jsonContent) {
-        addTrace(workspaceUri, serverId, serverName, direction, jsonContent, null);
+    public void addTrace(String workspaceUri, String serverId, LspTraceMessage.MessageDirection direction, String jsonContent) {
+        addTrace(workspaceUri, serverId, direction, jsonContent, null);
     }
 
-    public void addTrace(String workspaceUri, String serverId, String serverName, LspTraceMessage.MessageDirection direction, String jsonContent, com.redhat.mcp.languagetools.trace.TraceCollector.MessageType messageType) {
+    public void addTrace(String workspaceUri,
+                         String serverId,
+                         LspTraceMessage.MessageDirection direction,
+                         String jsonContent,
+                         TraceCollector.MessageType messageType) {
         LspTraceMessage message = new LspTraceMessage(
             workspaceUri,
             serverId,
-            serverName,
             Instant.now(),
             direction,
             jsonContent,

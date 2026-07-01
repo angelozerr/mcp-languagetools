@@ -10,7 +10,6 @@ public record DapTraceWsMessage(
     String type,  // "dap-trace"
     String workspaceUri,
     String sessionId,
-    String sessionName,
     String timestamp,
     String direction,
     String jsonContent,
