@@ -60,4 +60,9 @@ public interface TraceCollector {
     default void update(String message) {
         trace(message, MessageType.UPDATE);
     }
+
+    /**
+     * Add a trace message with workspace context.
+     */
+    void addTrace(String workspaceUri, String serverId, MessageDirection direction, String message);
 }

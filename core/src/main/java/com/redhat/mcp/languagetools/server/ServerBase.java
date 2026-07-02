@@ -2,14 +2,16 @@ package com.redhat.mcp.languagetools.server;
 
 import com.redhat.mcp.languagetools.lsp.RequestRouter;
 import com.redhat.mcp.languagetools.lsp.server.LspServer;
+import com.redhat.mcp.languagetools.trace.TracingMessageConsumer;
 import com.redhat.mcp.languagetools.workspace.Workspace;
 import org.jboss.logging.Logger;
 
 import java.nio.file.Path;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.function.Consumer;
 
 /**
  * Base class for server implementations (LSP and DAP).
@@ -25,19 +27,33 @@ public abstract class ServerBase<T extends ServerConfigBase> {
     private final Workspace workspace;
     protected final ExecutorService executorService;
     private final RequestRouter requestRouter;
+    private final TracingMessageConsumer.TraceCollectorAdd traceCollector;
+    private final TracingMessageConsumer tracing;
     private volatile ServerStatus status = ServerStatus.NOT_STARTED;
     private volatile String statusMessage = null;
-    private Consumer<ServerStatus> statusChangeCallback;
+    private final List<StatusChangeListener> statusChangeListeners = new CopyOnWriteArrayList<>();
 
     protected Process serverProcess;
     private volatile boolean isReady;
 
     public ServerBase(T config, Workspace workspace) {
+        this(config, workspace, config.getServerId());
+    }
+
+    /**
+     * Constructor with explicit serverId for tracing.
+     * Used by DAP to pass sessionId instead of serverId.
+     */
+    protected ServerBase(T config, Workspace workspace, String traceServerId) {
         this.config = config;
         this.workspace = workspace;
         this.executorService = Executors.newCachedThreadPool();
         // Create RequestRouter for bindRequest routing
         this.requestRouter = createRequestRouter();
+
+        var workspaceRoot = workspace.getRootUri();
+        this.traceCollector = initializeTraceCollector(workspace);
+        this.tracing = new TracingMessageConsumer(traceCollector, workspaceRoot.toString(), traceServerId);
     }
 
     /**
@@ -62,31 +78,31 @@ public abstract class ServerBase<T extends ServerConfigBase> {
     }
 
     /**
-     * Functional interface for status change callback that receives both old and new status.
+     * Functional interface for status change listener that receives both old and new status.
      */
     @FunctionalInterface
-    public interface StatusChangeCallback {
+    public interface StatusChangeListener {
         void onStatusChanged(ServerStatus oldStatus, ServerStatus newStatus);
     }
 
     /**
-     * Set a callback to be notified when server status changes.
-     * The callback receives both the old and new status.
+     * Add a listener to be notified when server status changes.
      */
-    public void setStatusChangeCallback(StatusChangeCallback callback) {
-        this.statusChangeCallback = callback == null ? null : new Consumer<ServerStatus>() {
-            private ServerStatus previousStatus = status;
-
-            @Override
-            public void accept(ServerStatus newStatus) {
-                callback.onStatusChanged(previousStatus, newStatus);
-                previousStatus = newStatus;
-            }
-        };
+    public void addStatusChangeListener(StatusChangeListener listener) {
+        if (listener != null) {
+            statusChangeListeners.add(listener);
+        }
     }
 
     /**
-     * Update server status and notify callback if registered.
+     * Remove a status change listener.
+     */
+    public void removeStatusChangeListener(StatusChangeListener listener) {
+        statusChangeListeners.remove(listener);
+    }
+
+    /**
+     * Update server status and notify all listeners.
      */
     public void setStatus(ServerStatus newStatus) {
         ServerStatus oldStatus = this.status;
@@ -97,15 +113,18 @@ public abstract class ServerBase<T extends ServerConfigBase> {
             this.statusMessage = null;
         }
 
-        LOG.infof("LspServer.setStatus: %s -> %s (callback registered: %s)",
-                oldStatus, newStatus, statusChangeCallback != null);
+        LOG.infof("Server.setStatus: %s -> %s (listeners: %d)",
+                oldStatus, newStatus, statusChangeListeners.size());
 
-        if (statusChangeCallback != null && oldStatus != newStatus) {
-            LOG.infof("Calling status change callback for %s: %s -> %s", config.getServerId(), oldStatus, newStatus);
-            try {
-                statusChangeCallback.accept(newStatus);
-            } catch (Exception e) {
-                LOG.warnf(e, "Error in status change callback for %s", config.getServerId());
+        if (oldStatus != newStatus && !statusChangeListeners.isEmpty()) {
+            LOG.infof("Notifying %d listeners for %s: %s -> %s",
+                    statusChangeListeners.size(), config.getServerId(), oldStatus, newStatus);
+            for (StatusChangeListener listener : statusChangeListeners) {
+                try {
+                    listener.onStatusChanged(oldStatus, newStatus);
+                } catch (Exception e) {
+                    LOG.warnf(e, "Error in status change listener for %s", config.getServerId());
+                }
             }
         }
     }
@@ -118,14 +137,20 @@ public abstract class ServerBase<T extends ServerConfigBase> {
         String oldMessage = this.statusMessage;
         this.statusMessage = statusMessage;
 
-        LOG.infof("[%s] setStatusMessage called: %s -> %s (callback: %s)",
-                config.getServerId(), oldMessage, statusMessage, statusChangeCallback != null);
+        LOG.infof("[%s] setStatusMessage called: %s -> %s (listeners: %d)",
+                config.getServerId(), oldMessage, statusMessage, statusChangeListeners.size());
 
-        // Notify if message changed and callback is registered
-        if (statusChangeCallback != null && !java.util.Objects.equals(oldMessage, statusMessage)) {
-            LOG.infof("[%s] Status message changed, firing callback", config.getServerId());
-            // Trigger status change callback to refresh UI
-            statusChangeCallback.accept(this.status);
+        // Notify if message changed and listeners are registered
+        if (!java.util.Objects.equals(oldMessage, statusMessage) && !statusChangeListeners.isEmpty()) {
+            LOG.infof("[%s] Status message changed, notifying %d listeners", config.getServerId(), statusChangeListeners.size());
+            // Trigger listeners to refresh UI
+            for (StatusChangeListener listener : statusChangeListeners) {
+                try {
+                    listener.onStatusChanged(this.status, this.status);
+                } catch (Exception e) {
+                    LOG.warnf(e, "Error in status change listener for %s", config.getServerId());
+                }
+            }
         }
     }
 
@@ -193,6 +218,66 @@ public abstract class ServerBase<T extends ServerConfigBase> {
     }
 
     /**
+     * Ensure server is installed before starting.
+     * Should be called at the beginning of start() in subclasses.
+     */
+    protected CompletableFuture<Void> ensureInstalled() {
+        return config.ensureInstalled(workspace.getApplication().getPathManager(), this::setStatus)
+                .thenApply(result -> null);
+    }
+
+    /**
+     * Log error with full stack trace to trace collector and update server status.
+     */
+    protected void logErrorToTrace(Exception e, com.redhat.mcp.languagetools.trace.TraceCollector traceCollector, String contextId) {
+        LOG.errorf(e, "Failed to start %s", config.getServerId());
+
+        // Build full stack trace
+        StringBuilder stackTrace = new StringBuilder();
+        stackTrace.append("[Error starting ").append(config.getName()).append("]\n");
+        Throwable current = e;
+        while (current != null) {
+            stackTrace.append(current.getClass().getName()).append(": ").append(current.getMessage()).append("\n");
+            for (StackTraceElement element : current.getStackTrace()) {
+                stackTrace.append("  at ").append(element.toString()).append("\n");
+            }
+            current = current.getCause();
+            if (current != null) {
+                stackTrace.append("Caused by: ");
+            }
+        }
+
+        // Send to trace collector
+        try {
+            traceCollector.addTrace(
+                workspace.getRootUri().toString(),
+                contextId,
+                com.redhat.mcp.languagetools.trace.TraceCollector.MessageDirection.SERVER_TO_CLIENT,
+                stackTrace.toString()
+            );
+        } catch (Exception traceEx) {
+            LOG.errorf(traceEx, "Failed to add trace for error!");
+        }
+
+        // Update status
+        setStatus(ServerStatus.ERROR);
+        setStatusMessage(e.getMessage());
+    }
+
+    /**
+     * Add error handler to a CompletableFuture that logs to trace collector.
+     */
+    protected <T> CompletableFuture<T> withErrorLogging(CompletableFuture<T> future,
+                                                        com.redhat.mcp.languagetools.trace.TraceCollector traceCollector,
+                                                        String contextId) {
+        return future.exceptionally(throwable -> {
+            Exception e = throwable instanceof Exception ? (Exception) throwable : new Exception(throwable);
+            logErrorToTrace(e, traceCollector, contextId);
+            return null;
+        });
+    }
+
+    /**
      * Create request router using the workspace to find servers.
      */
     private RequestRouter createRequestRouter() {
@@ -226,4 +311,13 @@ public abstract class ServerBase<T extends ServerConfigBase> {
         };
     }
 
+    public TracingMessageConsumer.TraceCollectorAdd getTraceCollector() {
+        return traceCollector;
+    }
+
+    public TracingMessageConsumer getTracing() {
+        return tracing;
+    }
+
+    protected abstract TracingMessageConsumer.TraceCollectorAdd initializeTraceCollector(Workspace workspace);
 }

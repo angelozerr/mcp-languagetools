@@ -5,6 +5,7 @@ import com.redhat.mcp.languagetools.server.ServerConfigBase;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -17,13 +18,19 @@ public class InstallerContext {
     private final Map<String, String> variables;
     private final Path installDir;
     private final ServerConfigBase config;
+    private final Consumer<InstallationStatus> statusChangeCallback;
 
     private static final Pattern VARIABLE_PATTERN = Pattern.compile("\\$\\{([^}]+)}|\\$([A-Z_]+)\\$");
 
-    public InstallerContext(ServerConfigBase config, Path installDir, ProgressIndicator progress) {
+    public InstallerContext(ServerConfigBase config, ProgressIndicator progress) {
+        this(config, progress, null);
+    }
+
+    public InstallerContext(ServerConfigBase config, ProgressIndicator progress, Consumer<InstallationStatus> statusChangeCallback) {
         this.config = config;
-        this.installDir = installDir;
+        this.installDir = config.getServerHome();
         this.progress = progress;
+        this.statusChangeCallback = statusChangeCallback;
         this.variables = new HashMap<>();
 
         // Initialize standard variables
@@ -33,6 +40,15 @@ public class InstallerContext {
 
         // USER_HOME and PROJECT_DIR can be set later via setVariable()
         // They are workspace-specific and should be passed from the workspace/session
+    }
+
+    /**
+     * Notify installation status change if callback is registered.
+     */
+    public void notifyInstallationStatusChange(InstallationStatus installStatus) {
+        if (statusChangeCallback != null) {
+            statusChangeCallback.accept(installStatus);
+        }
     }
 
     public ProgressIndicator getProgress() {

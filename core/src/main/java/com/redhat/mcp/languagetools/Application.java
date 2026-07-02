@@ -185,7 +185,7 @@ public class Application {
 
             if (config.canHandle(fileUri.toString(), language)) {
                 // Check if server already exists in workspace
-                if (workspace.getLspServer(config.getServerId()) == null) {
+                if (!workspace.hasLspServer(config.getServerId())) {
                     LOG.infof("Need %s for language '%s' in workspace: %s",
                             config.getName(), language, workspace.getRootUri());
 
@@ -206,7 +206,7 @@ public class Application {
                                     .thenCompose(v -> server.initialize())
                                     .exceptionally(ex -> {
                                         LOG.errorf(ex, "Failed to connect to external %s", config.getName());
-                                        workspace.setInstallationStatus(config.getServerId(), ServerStatus.START_FAILED);
+                                        // Status is already set by server via listener callback
                                         return null;
                                     });
                             serverFutures.add(future);
@@ -217,7 +217,7 @@ public class Application {
                     // No external instance - need to start our own (installation is handled by server)
                     // Add server to workspace if not already present
                     workspace.setLspContributionManager(lspContributionManager);
-                    if (workspace.getLspServer(config.getServerId()) == null) {
+                    if (!workspace.hasLspServer(config.getServerId())) {
                         workspace.addLspServer(config);
                     }
 
@@ -423,10 +423,10 @@ public class Application {
     }
 
     /**
-     * Ensure a server is installed and added to the workspace, then start it.
+     * Add server to workspace and start it (installation happens automatically in start()).
      */
-    public CompletableFuture<Void> ensureServerInstalled(String serverId, URI workspaceUri) {
-        LspServerConfig config = lspServerConfigs.get(serverId);
+    public CompletableFuture<Void> ensureServerStarted(String serverId, URI workspaceUri) {
+        LspServerConfig config = getLspServerConfig(serverId);
         if (config == null) {
             return CompletableFuture.failedFuture(new IllegalArgumentException("Unknown server: " + serverId));
         }
@@ -438,7 +438,7 @@ public class Application {
 
         // Add server to workspace if not already present
         workspace.setLspContributionManager(lspContributionManager);
-        if (workspace.getLspServer(serverId) == null) {
+        if (!workspace.hasLspServer(serverId)) {
             workspace.addLspServer(config);
         }
 

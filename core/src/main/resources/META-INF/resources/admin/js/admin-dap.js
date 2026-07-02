@@ -120,7 +120,21 @@ function showLaunchConfigForm(session, dapServerId) {
             </div>
 
             <div style="flex: 1; display: flex; flex-direction: column; min-height: 0;">
-                <label style="display: block; margin-bottom: 0.5rem; font-weight: 500; color: #cccccc;">Console:</label>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                    <label style="font-weight: 500; color: #cccccc;">Console:</label>
+                    <div class="console-controls">
+                        <label style="color: #cccccc; font-size: 0.85rem;">
+                            Trace Level:
+                            <select id="dap-trace-level" onchange="changeDapTraceLevel('${session.sessionId}', this.value)" style="margin-left: 0.5rem; background: #3e3e42; color: #cccccc; border: 1px solid #555; padding: 0.25rem 0.5rem; border-radius: 3px;">
+                                <option value="off">Off</option>
+                                <option value="messages">Messages</option>
+                                <option value="verbose" selected>Verbose</option>
+                            </select>
+                        </label>
+                        <button onclick="toggleAllDapTraces('${session.sessionId}')" id="dap-fold-button">Unfold All</button>
+                        <button onclick="clearDapConsole('${session.sessionId}')">Clear</button>
+                    </div>
+                </div>
                 <div id="dap-traces-container" style="flex: 1; overflow-y: auto; background: #1e1e1e; padding: 0.5rem; border-radius: 3px; font-family: 'Courier New', monospace; font-size: 0.85rem;">
                     <div style="color: #666;">Ready. Click ▶ to launch.</div>
                 </div>
@@ -253,7 +267,21 @@ function selectDapSession(sessionId) {
     const consoleArea = document.getElementById('console-area');
     consoleArea.innerHTML = `
         <div style="padding: 1rem; height: 100%; display: flex; flex-direction: column;">
-            <h3 style="margin: 0 0 1rem 0;">Debug Session: ${sessionId}</h3>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h3 style="margin: 0;">Debug Session: ${sessionId}</h3>
+                <div class="console-controls">
+                    <label style="color: #cccccc; font-size: 0.85rem;">
+                        Trace Level:
+                        <select id="dap-trace-level" onchange="changeDapTraceLevel('${sessionId}', this.value)" style="margin-left: 0.5rem; background: #3e3e42; color: #cccccc; border: 1px solid #555; padding: 0.25rem 0.5rem; border-radius: 3px;">
+                            <option value="off">Off</option>
+                            <option value="messages">Messages</option>
+                            <option value="verbose" selected>Verbose</option>
+                        </select>
+                    </label>
+                    <button onclick="toggleAllDapTraces('${sessionId}')" id="dap-fold-button">Unfold All</button>
+                    <button onclick="clearDapConsole('${sessionId}')">Clear</button>
+                </div>
+            </div>
             <div id="dap-traces-container" style="flex: 1; overflow-y: auto; background: #1e1e1e; padding: 0.5rem; border-radius: 3px; font-family: 'Courier New', monospace; font-size: 0.85rem;">
                 ${traces.length > 0 ? renderDapTraces(traces) : '<div style="color: #666;">No traces yet. Click Launch to start debugging.</div>'}
             </div>
@@ -262,15 +290,39 @@ function selectDapSession(sessionId) {
 }
 
 function renderDapTraces(traces) {
-    return traces.map(trace => {
-        const isError = trace.jsonContent.includes('"error"') || trace.jsonContent.includes('ErrorResponse');
-        const color = trace.direction === 'SENT' ? '#569cd6' : '#4ec9b0';
-        const errorStyle = isError ? 'color: #f48771; font-weight: bold;' : '';
+    return traces.map((trace, index) => {
+        const content = trace.jsonContent;
 
+        // Parse the trace: first line is header, rest is body (same as LSP)
+        const lines = content.split('\n');
+        const headerLine = lines[0]; // [Trace - HH:mm:ss] ... or [Starting ...]
+
+        // Detect if this is an error trace
+        const isError = headerLine.startsWith('[Error');
+        const headerColor = isError ? '#ff6b6b' : '#cccccc';
+
+        // Body is everything after the first line
+        const bodyLines = lines.slice(1);
+        const body = bodyLines.join('\n').trim();
+        const hasBody = body.length > 0;
+
+        // If no body, display without folding (like LSP)
+        if (!hasBody) {
+            return `
+                <div class="trace-line">
+                    <div style="padding: 0.25rem; font-family: 'Consolas', 'Monaco', monospace; font-size: 0.85rem; color: ${headerColor};">${escapeHtml(headerLine)}</div>
+                </div>
+            `;
+        }
+
+        // With body: header + foldable body (like LSP)
         return `
-            <div style="margin-bottom: 1rem; ${errorStyle}">
-                <div style="color: ${color};">[${trace.direction}] ${trace.timestamp}</div>
-                <pre style="margin: 0.25rem 0; white-space: pre-wrap; word-wrap: break-word; color: #d4d4d4;">${trace.jsonContent}</pre>
+            <div class="trace-line">
+                <div class="trace-header folded" onclick="toggleDapTrace(${index})" style="padding: 0.25rem; font-family: 'Consolas', 'Monaco', monospace; font-size: 0.85rem; cursor: pointer;">
+                    <span class="trace-toggle" id="dap-toggle-${index}">▶</span>
+                    <span class="trace-header-text" style="color: ${headerColor};">${escapeHtml(headerLine)}</span>
+                </div>
+                <div class="trace-body collapsed" id="dap-body-${index}" style="font-family: 'Consolas', 'Monaco', monospace; font-size: 0.85rem; color: #cccccc; white-space: pre-wrap;">${escapeHtml(body)}</div>
             </div>
         `;
     }).join('');
@@ -572,6 +624,94 @@ async function runDapInstaller(serverId) {
     }
 }
 
+/**
+ * Toggle individual DAP trace item.
+ */
+function toggleDapTrace(index) {
+    const header = document.getElementById(`dap-toggle-${index}`).parentElement;
+    const body = document.getElementById(`dap-body-${index}`);
+    const toggle = document.getElementById(`dap-toggle-${index}`);
+
+    if (body.classList.contains('collapsed')) {
+        body.classList.remove('collapsed');
+        body.classList.add('expanded');
+        header.classList.remove('folded');
+        toggle.textContent = '▼';
+    } else {
+        body.classList.remove('expanded');
+        body.classList.add('collapsed');
+        header.classList.add('folded');
+        toggle.textContent = '▶';
+    }
+}
+
+/**
+ * Toggle folding state for DAP traces.
+ */
+let dapFoldedState = {};
+
+function toggleAllDapTraces(sessionId) {
+    const container = document.getElementById('dap-traces-container');
+    const foldButton = document.getElementById('dap-fold-button');
+    const isFolded = dapFoldedState[sessionId] || false;
+
+    if (isFolded) {
+        // Unfold all
+        container.querySelectorAll('.trace-header').forEach(header => {
+            header.classList.remove('folded');
+        });
+        container.querySelectorAll('.trace-body').forEach((body, index) => {
+            body.classList.remove('collapsed');
+            body.classList.add('expanded');
+            const toggle = document.getElementById(`dap-toggle-${index}`);
+            if (toggle) toggle.textContent = '▼';
+        });
+        foldButton.textContent = 'Fold All';
+        dapFoldedState[sessionId] = false;
+    } else {
+        // Fold all
+        container.querySelectorAll('.trace-header').forEach(header => {
+            header.classList.add('folded');
+        });
+        container.querySelectorAll('.trace-body').forEach((body, index) => {
+            body.classList.remove('expanded');
+            body.classList.add('collapsed');
+            const toggle = document.getElementById(`dap-toggle-${index}`);
+            if (toggle) toggle.textContent = '▶';
+        });
+        foldButton.textContent = 'Unfold All';
+        dapFoldedState[sessionId] = true;
+    }
+}
+
+/**
+ * Clear DAP traces for a session.
+ */
+function clearDapConsole(sessionId) {
+    if (window.dapTracesBySession) {
+        window.dapTracesBySession[sessionId] = [];
+    }
+    renderDapTracesForSession(sessionId);
+}
+
+/**
+ * Change trace level for DAP session.
+ */
+let currentDapTraceLevel = {};
+
+function changeDapTraceLevel(sessionId, level) {
+    currentDapTraceLevel[sessionId] = level;
+    renderDapTracesForSession(sessionId);
+}
+
+function shouldShowDapTrace(trace, sessionId) {
+    const level = currentDapTraceLevel[sessionId] || 'verbose';
+    if (level === 'off') {
+        return false;
+    }
+    return true;
+}
+
 // Expose functions globally
 window.createNewTestSession = createNewTestSession;
 window.launchDapSession = launchDapSession;
@@ -581,3 +721,7 @@ window.renderDapTracesForSession = renderDapTracesForSession;
 window.loadAllDapServers = loadAllDapServers;
 window.showDapServerDetails = showDapServerDetails;
 window.switchDapServerTab = switchDapServerTab;
+window.toggleDapTrace = toggleDapTrace;
+window.toggleAllDapTraces = toggleAllDapTraces;
+window.clearDapConsole = clearDapConsole;
+window.changeDapTraceLevel = changeDapTraceLevel;

@@ -556,7 +556,7 @@ public class JdtLsServer extends LspServer {
      * Find the Eclipse Equinox launcher JAR and add to params.
      */
     private void addLauncherJar(java.util.List<String> params) throws java.io.IOException {
-        java.nio.file.Path pluginsDir = serverHome.resolve("plugins");
+        java.nio.file.Path pluginsDir = getServerHome().resolve("plugins");
 
         try (java.util.stream.Stream<java.nio.file.Path> files = java.nio.file.Files.walk(pluginsDir, 1)) {
             java.util.Optional<java.nio.file.Path> launcher = files
@@ -589,6 +589,6 @@ public class JdtLsServer extends LspServer {
             configDir = "config_linux";
         }
 
-        return serverHome.resolve(configDir);
+        return getServerHome().resolve(configDir);
     }
 }

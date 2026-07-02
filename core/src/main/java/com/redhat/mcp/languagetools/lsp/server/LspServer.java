@@ -45,8 +45,6 @@ public class LspServer extends ServerBase<LspServerConfig> {
 
     protected final URI workspaceRoot;
     protected final Path workspaceDataDir;
-    protected final Path serverHome;
-    protected final TracingMessageConsumer tracing;
     protected final PathManager pathManager;
 
     protected Socket socket;
@@ -63,12 +61,15 @@ public class LspServer extends ServerBase<LspServerConfig> {
         super(config, workspace);
         this.workspaceRoot = workspace.getRootUri();
         this.workspaceDataDir = workspace.getWorkspaceDataDir();
-        this.serverHome = workspace.getApplication().getPathManager().getLspServerHome(config.getServerId());
-        this.tracing = new TracingMessageConsumer(workspace.getApplication().getLspTraceCollector(), workspaceRoot.toString(), config.getServerId());
         this.pathManager = workspace.getApplication().getPathManager();
 
         // Create client features for managing capabilities
         this.clientFeatures = new LspClientFeatures(config);
+    }
+
+    @Override
+    protected TracingMessageConsumer.TraceCollectorAdd initializeTraceCollector(Workspace workspace) {
+        return workspace.getApplication().getLspTraceCollector();
     }
 
     /**
@@ -78,8 +79,10 @@ public class LspServer extends ServerBase<LspServerConfig> {
     public CompletableFuture<Void> start() {
         setStatus(ServerStatus.STARTING);
         var config = super.getConfig();
-        return CompletableFuture.runAsync(() -> {
-            try {
+
+        // Ensure server is installed first
+        return withErrorLogging(
+            ensureInstalled().thenCompose(v -> CompletableFuture.runAsync(() -> {
                 // Try to find existing instance first
                 String workspacePath = Paths.get(workspaceRoot).toString();
                 LspInstanceRegistry.InstanceInfo existingInstance = LspInstanceRegistry.findInstance(workspacePath, config.getServerId());
@@ -103,63 +106,16 @@ public class LspServer extends ServerBase<LspServerConfig> {
                 }
 
                 // No existing instance found or connection failed - launch new process
-                launchProcess();
-                startFileWatcher(workspacePath);
-
-            } catch (IOException e) {
-                LOG.errorf(e, "Failed to start %s", config.getServerId());
-                // Send error to traces
-                String errorMessage = String.format("[Error starting %s]\n%s: %s",
-                    config.getName(),
-                    e.getClass().getSimpleName(),
-                    e.getMessage());
                 try {
-                    LOG.infof("Attempting to add trace for error: %s", errorMessage);
-                    tracing.getCollector().addTrace(
-                        workspaceRoot.toString(),
-                        config.getServerId(),
-                        TraceCollector.MessageDirection.SERVER_TO_CLIENT,
-                        errorMessage
-                    );
-                    LOG.infof("Trace added successfully");
-                } catch (Exception traceEx) {
-                    LOG.errorf(traceEx, "Failed to add trace for error!");
+                    launchProcess();
+                    startFileWatcher(workspacePath);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
                 }
-                setStatus(ServerStatus.STOPPED);
-                // Don't throw - let error be visible in traces
-            } catch (Exception e) {
-                LOG.errorf(e, "Unexpected error starting %s", config.getServerId());
-                // Build full stack trace
-                StringBuilder stackTrace = new StringBuilder();
-                stackTrace.append("[Error starting ").append(config.getName()).append("]\n");
-                Throwable current = e;
-                while (current != null) {
-                    stackTrace.append(current.getClass().getName()).append(": ").append(current.getMessage()).append("\n");
-                    for (StackTraceElement element : current.getStackTrace()) {
-                        stackTrace.append("  at ").append(element.toString()).append("\n");
-                    }
-                    current = current.getCause();
-                    if (current != null) {
-                        stackTrace.append("Caused by: ");
-                    }
-                }
-
-                try {
-                    LOG.infof("Attempting to add trace for error");
-                    tracing.getCollector().addTrace(
-                        workspaceRoot.toString(),
-                        config.getServerId(),
-                        TraceCollector.MessageDirection.SERVER_TO_CLIENT,
-                        stackTrace.toString()
-                    );
-                    LOG.infof("Trace added successfully");
-                } catch (Exception traceEx) {
-                    LOG.errorf(traceEx, "Failed to add trace for error!");
-                }
-                setStatus(ServerStatus.STOPPED);
-                // Don't throw - let error be visible in traces
-            }
-        }, executorService);
+            }, executorService)),
+            getTraceCollector(),
+            config.getServerId()
+        );
     }
 
     /**
@@ -169,62 +125,27 @@ public class LspServer extends ServerBase<LspServerConfig> {
         var config = super.getConfig();
         LOG.infof("=== startManagedOnly() called for %s ===", config.getServerId());
         setStatus(ServerStatus.STARTING);
-        return CompletableFuture.runAsync(() -> {
-            LOG.infof("=== Inside CompletableFuture.runAsync for %s ===", config.getServerId());
-            try {
+
+        // Ensure server is installed first
+        return withErrorLogging(
+            ensureInstalled().thenCompose(v -> CompletableFuture.runAsync(() -> {
+                LOG.infof("=== Inside CompletableFuture.runAsync for %s ===", config.getServerId());
                 String workspacePath = Paths.get(workspaceRoot).toString();
                 LOG.infof("Workspace path: %s", workspacePath);
 
                 // Launch new process directly without checking for IDE instance
                 LOG.infof("About to call launchProcess() for %s", config.getServerId());
-                launchProcess();
-                LOG.infof("launchProcess() completed for %s", config.getServerId());
-                startFileWatcher(workspacePath);
-
-            } catch (IOException e) {
-                LOG.errorf(e, "Failed to start %s", config.getServerId());
-                // Send error to traces
-                String errorMessage = String.format("[Error starting %s]\n%s: %s",
-                    config.getName(),
-                    e.getClass().getSimpleName(),
-                    e.getMessage());
-                tracing.getCollector().addTrace(
-                    workspaceRoot.toString(),
-                    config.getServerId(),
-                    TraceCollector.MessageDirection.SERVER_TO_CLIENT,
-                    errorMessage
-                );
-                setStatus(ServerStatus.STOPPED);
-                // Don't throw - let error be visible in traces
-            } catch (Exception e) {
-                LOG.errorf(e, "Unexpected error starting %s", config.getServerId());
-                // Send error to traces (extract root cause)
-                Throwable cause = e;
-                while (cause.getCause() != null && cause.getCause() != cause) {
-                    cause = cause.getCause();
-                }
-                String errorMessage = String.format("[Error starting %s]\n%s: %s",
-                    config.getName(),
-                    cause.getClass().getSimpleName(),
-                    cause.getMessage());
-
                 try {
-                    LOG.infof("Attempting to add trace for error: %s", errorMessage);
-                    tracing.getCollector().addTrace(
-                        workspaceRoot.toString(),
-                        config.getServerId(),
-                        TraceCollector.MessageDirection.SERVER_TO_CLIENT,
-                        errorMessage
-                    );
-                    LOG.infof("Trace added successfully");
-                } catch (Exception traceEx) {
-                    LOG.errorf(traceEx, "Failed to add trace for error!");
+                    launchProcess();
+                    LOG.infof("launchProcess() completed for %s", config.getServerId());
+                    startFileWatcher(workspacePath);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
                 }
-
-                setStatus(ServerStatus.STOPPED);
-                // Don't throw - let error be visible in traces
-            }
-        }, executorService);
+            }, executorService)),
+            getTraceCollector(),
+            config.getServerId()
+        );
     }
 
     /**
@@ -251,7 +172,7 @@ public class LspServer extends ServerBase<LspServerConfig> {
                 executorService,
                 consumer -> message -> {
                     // Log the message
-                    tracing.log(message, consumer);
+                    getTracing().log(message, consumer);
                     // Forward to original consumer
                     consumer.consume(message);
                 }
@@ -276,13 +197,18 @@ public class LspServer extends ServerBase<LspServerConfig> {
         String commandStr = String.join(" ", command);
         LOG.debugf("%s command: %s", config.getServerId(), commandStr);
 
-        // Send command to traces (visible in UI)
-        String startMessage = String.format("[Starting %s]\n%s", config.getName(), commandStr);
-        tracing.getCollector().addTrace(
+        // Send startup traces (visible in UI) - separate lines, no folding
+        getTraceCollector().addTrace(
             workspaceRoot.toString(),
             config.getServerId(),
             TraceCollector.MessageDirection.SERVER_TO_CLIENT,
-            startMessage
+            String.format("Starting %s...", config.getName())
+        );
+        getTraceCollector().addTrace(
+            workspaceRoot.toString(),
+            config.getServerId(),
+            TraceCollector.MessageDirection.SERVER_TO_CLIENT,
+            String.format("Command: %s", commandStr)
         );
 
         ProcessBuilder pb = new ProcessBuilder(command);
@@ -295,11 +221,26 @@ public class LspServer extends ServerBase<LspServerConfig> {
         // Set working directory
         if (config.getWorkingDirectory() != null) {
             pb.directory(Paths.get(config.getWorkingDirectory()).toFile());
+            // Trace working directory (one line - no folding)
+            getTraceCollector().addTrace(
+                workspaceRoot.toString(),
+                config.getServerId(),
+                TraceCollector.MessageDirection.SERVER_TO_CLIENT,
+                String.format("Working directory: %s", config.getWorkingDirectory())
+            );
         }
 
         // Don't redirect error stream - we want to capture it separately
         serverProcess = pb.start();
         isSocketConnection = false;
+
+        // Trace server started (one line - no folding)
+        getTraceCollector().addTrace(
+            workspaceRoot.toString(),
+            config.getServerId(),
+            TraceCollector.MessageDirection.SERVER_TO_CLIENT,
+            String.format("LSP server process started (PID: %d)", serverProcess.pid())
+        );
 
         // Read and log stderr in background, send to trace collector
         executorService.submit(() -> {
@@ -328,7 +269,7 @@ public class LspServer extends ServerBase<LspServerConfig> {
                                 stackTraceTimestamp,
                                 config.getName(),
                                 stackTraceBuffer.toString().trim());
-                            tracing.getCollector().addTrace(
+                            getTraceCollector().addTrace(
                                 workspaceRoot.toString(),
                                 config.getServerId(),
                                 TraceCollector.MessageDirection.SERVER_TO_CLIENT,
@@ -343,7 +284,7 @@ public class LspServer extends ServerBase<LspServerConfig> {
                             java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss")),
                             config.getName(),
                             line);
-                        tracing.getCollector().addTrace(
+                        getTraceCollector().addTrace(
                             workspaceRoot.toString(),
                             config.getServerId(),
                             TraceCollector.MessageDirection.SERVER_TO_CLIENT,
@@ -358,7 +299,7 @@ public class LspServer extends ServerBase<LspServerConfig> {
                         stackTraceTimestamp,
                         config.getName(),
                         stackTraceBuffer.toString().trim());
-                    tracing.getCollector().addTrace(
+                    getTraceCollector().addTrace(
                         workspaceRoot.toString(),
                         config.getServerId(),
                         TraceCollector.MessageDirection.SERVER_TO_CLIENT,
@@ -384,7 +325,7 @@ public class LspServer extends ServerBase<LspServerConfig> {
                 .setExecutorService(executorService)
                 .wrapMessages(consumer -> message -> {
                     // Log the message
-                    tracing.log(message, consumer);
+                    getTracing().log(message, consumer);
                     // Forward to original consumer
                     consumer.consume(message);
                 })
@@ -626,6 +567,7 @@ public class LspServer extends ServerBase<LspServerConfig> {
             throw new IOException("No command configured for current OS");
         }
 
+        var serverHome = super.getServerHome();
         // Determine configuration directory based on OS
         String os = System.getProperty("os.name").toLowerCase();
         String configuration = serverHome.resolve(

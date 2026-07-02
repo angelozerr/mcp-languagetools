@@ -59,7 +59,7 @@ public class ServerDTOBuilder {
         if (parentServerId != null) {
             // Extension: use parent server's status
             LspServer parentServer = workspace.getLspServer(parentServerId);
-            status = workspace.getServerStatus(parentServerId);
+            status = workspace.getLspServerStatus(parentServerId);
             isReady = parentServer != null && parentServer.isReady();
             statusMessage = parentServer != null ? parentServer.getStatusMessage() : null;
             pid = parentServer != null ? parentServer.getPid() : null;
@@ -97,7 +97,7 @@ public class ServerDTOBuilder {
                 isReady = lspServer.isReady();
             }
 
-            status = workspace.getServerStatus(serverId);
+            status = workspace.getLspServerStatus(serverId);
         }
 
         if (statusMessage != null && statusMessage.length() > 100) {

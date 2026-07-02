@@ -12,7 +12,7 @@ import java.time.format.DateTimeFormatter;
 /**
  * Wrapper that adapts DapTraceCollector to TraceCollector interface.
  */
-class DapTraceCollectorWrapper extends TraceCollectorBase {
+public class DapTraceCollectorWrapper extends TraceCollectorBase {
 
     private final DapTraceCollector dapTraceCollector;
     private final String sessionId;
@@ -37,5 +37,10 @@ class DapTraceCollectorWrapper extends TraceCollectorBase {
             formattedMessage,
             type
         );
+    }
+
+    @Override
+    public void addTrace(String workspaceUri, String serverId, MessageDirection direction, String message) {
+        dapTraceCollector.addTrace(workspaceUri, serverId, direction, message);
     }
 }

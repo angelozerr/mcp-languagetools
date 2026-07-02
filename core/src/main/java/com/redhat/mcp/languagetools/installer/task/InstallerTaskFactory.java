@@ -1,6 +1,8 @@
 package com.redhat.mcp.languagetools.installer.task;
 
 import com.google.gson.JsonElement;
+import com.redhat.mcp.languagetools.installer.download.GitHubAssetFetcherManager;
+import com.redhat.mcp.languagetools.installer.download.MavenArtifactFetcherManager;
 
 /**
  * Factory for creating installer tasks from JSON.
@@ -19,4 +21,18 @@ public interface InstallerTaskFactory {
      * @return The created task
      */
     InstallerTask createTask(JsonElement config);
+
+    /**
+     * Gets the GitHubAssetFetcherManager singleton.
+     */
+    static GitHubAssetFetcherManager getGitHubAssetFetcherManager() {
+        return GitHubAssetFetcherManager.getInstance();
+    }
+
+    /**
+     * Gets the MavenArtifactFetcherManager singleton.
+     */
+    static MavenArtifactFetcherManager getMavenArtifactFetcherManager() {
+        return MavenArtifactFetcherManager.getInstance();
+    }
 }

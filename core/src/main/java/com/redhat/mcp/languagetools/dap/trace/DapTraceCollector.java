@@ -29,6 +29,12 @@ public class DapTraceCollector implements TracingMessageConsumer.TraceCollectorA
     Event<DapTraceMessage> traceEvent;
 
     @Override
+    public void trace(String message, TraceCollector.MessageType type) {
+        // Default implementation - subclasses can override if needed
+        // For DAP, traces should go through addTrace() with session context
+    }
+
+    @Override
     public void addTrace(String workspaceUri,
                          String sessionId,
                          TraceCollector.MessageDirection direction,

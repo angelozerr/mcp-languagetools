@@ -2,16 +2,15 @@ package com.redhat.mcp.languagetools.server;
 
 import com.google.gson.JsonElement;
 import com.redhat.mcp.languagetools.PathManager;
-import com.redhat.mcp.languagetools.installer.ServerConfig;
-import com.redhat.mcp.languagetools.installer.ServerInstaller;
-import com.redhat.mcp.languagetools.installer.TaskRegistryInstaller;
-import com.redhat.mcp.languagetools.installer.TraceProgressIndicator;
+import com.redhat.mcp.languagetools.installer.*;
 import com.redhat.mcp.languagetools.lsp.DocumentSelector;
 import com.redhat.mcp.languagetools.trace.TraceCollector;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 
 /**
  * Base class for server configurations (LSP and DAP).
@@ -35,9 +34,12 @@ public abstract class ServerConfigBase implements ServerConfig {
     // Install progress indicator (set when installation starts)
     private TraceProgressIndicator installProgress;
 
+    // Installation state - shared across all workspaces
+    private volatile CompletableFuture<InstallResult> installationFuture;
+
     public ServerConfigBase(String serverId, Path serverHome) {
         this.serverId = serverId;
-        this.serverHome =serverHome;
+        this.serverHome = serverHome;
     }
 
     // Common getters
@@ -142,6 +144,58 @@ public abstract class ServerConfigBase implements ServerConfig {
      */
     public void setInstallProgress(TraceProgressIndicator installProgress) {
         this.installProgress = installProgress;
+    }
+
+    /**
+     * Ensure server is installed.
+     * This method is thread-safe - only one installation will run even if called from multiple workspaces.
+     * Returns a CompletableFuture that completes when installation is done.
+     * If installation fails, the future is reset to null to allow retry.
+     */
+    public CompletableFuture<InstallResult> ensureInstalled(PathManager pathManager,
+                                                            Consumer<ServerStatus> serverStatusCallback) {
+        ServerInstaller installer = getInstaller();
+        if (installer == null) {
+            // No installer - server is assumed to be already available
+            return CompletableFuture.completedFuture(null);
+        }
+
+        // Double-checked locking pattern
+        if (installationFuture == null) {
+            synchronized (this) {
+                if (installationFuture == null) {
+                    // Create and start installation
+                    TraceProgressIndicator progress = new TraceProgressIndicator(traceCollector);
+                    setInstallProgress(progress);
+
+                    // Map InstallationStatus to ServerStatus
+                    Consumer<InstallationStatus> installStatusCallback = installStatus -> {
+                        ServerStatus serverStatus = switch (installStatus) {
+                            case INSTALLING -> ServerStatus.INSTALLING;
+                            case FAILED -> ServerStatus.INSTALL_FAILED;
+                            default -> null;
+                        };
+                        if (serverStatus != null && serverStatusCallback != null) {
+                            serverStatusCallback.accept(serverStatus);
+                        }
+                    };
+
+                    InstallerContext context = new InstallerContext(this, progress, installStatusCallback);
+                    context.setVariable("USER_HOME", pathManager.getMcpLangToolsRoot().toString());
+
+                    installationFuture = installer.ensureInstalled(context)
+                            .whenComplete((result, error) -> {
+                                // Reset on failure to allow retry
+                                if (error != null) {
+                                    synchronized (this) {
+                                        installationFuture = null;
+                                    }
+                                }
+                            });
+                }
+            }
+        }
+        return installationFuture;
     }
 
 }

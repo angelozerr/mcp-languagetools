@@ -57,7 +57,7 @@
         </dependency>
         <dependency>
             <groupId>com.redhat.mcp</groupId>
-            <artifactId>vscode-js-debug-extension</artifactId>
+            <artifactId>typescript-extension</artifactId>
             <version>${project.version}</version>
             <scope>runtime</scope>
         </dependency>

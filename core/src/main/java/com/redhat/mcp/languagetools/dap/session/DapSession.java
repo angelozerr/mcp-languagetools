@@ -86,6 +86,17 @@ public class DapSession implements DapEventListener {
         this.serverConfig = serverConfig;
         this.workspace = workspace;
         this.traceCollector = workspace.getApplication().getDapTraceCollector();
+
+        // Update the trace collector wrapper with the correct sessionId for installation traces
+        if (serverConfig.getTraceCollector() instanceof DapTraceCollectorWrapper) {
+            // Replace with a new wrapper that uses the session's sessionId
+            serverConfig.setTraceCollector(new DapTraceCollectorWrapper(
+                workspace.getApplication().getDapTraceCollector(),
+                workspace.getRootUri().toString(),
+                sessionId
+            ));
+        }
+
         this.dapServer = new DapServer(sessionId, serverConfig, workspace);
         // Register this session as the event listener
         this.dapServer.setEventListener(this);
@@ -95,70 +106,10 @@ public class DapSession implements DapEventListener {
 
     /**
      * Initialize the DAP server and establish connection.
-     * Automatically installs the DAP server if not already installed.
+     * Installation happens automatically inside dapServer.start().
      */
     public CompletableFuture<Void> initialize() {
         LOG.infof("Initializing DAP session: %s (%s)", sessionName, sessionId);
-
-        // Check if installation is needed
-        ServerInstaller installer = serverConfig.getInstaller();
-
-        if (installer != null) {
-            LOG.infof("DAP server has installer, ensuring installation: %s", serverConfig.getServerId());
-
-            // Send installation start message to traces
-            traceCollector.addTrace(
-                workspace.getRootUri().toString(),
-                sessionId,
-                TraceCollector.MessageDirection.CLIENT_TO_SERVER,
-                "INSTALL: Ensuring " + serverConfig.getName() + " is installed..."
-            );
-
-            // Create installation context
-            Path installDir = workspace.getApplication().getPathManager().getDapServerHome(serverConfig.getServerId());
-            TraceProgressIndicator progress = new TraceProgressIndicator(serverConfig.getTraceCollector());
-            InstallerContext context = new InstallerContext(serverConfig, installDir, progress);
-
-            // Run installation
-            return installer.ensureInstalled(context)
-            .thenCompose(installResult -> {
-                if (installResult != null) {
-                    LOG.infof("DAP server installation complete: %s (status: %s)",
-                        installResult.getInstallDir(), installResult.getStatus());
-
-                    // Update command if installer provided one
-                    if (installResult.getCommand() != null) {
-                        // For DAP, command is in launch config - would need to update it
-                        LOG.debugf("Installer provided command: %s", installResult.getCommand());
-                    }
-                }
-                return startDapServer();
-            })
-            .exceptionally(ex -> {
-                LOG.errorf(ex, "Failed to install DAP server: %s", sessionId);
-                state = SessionState.ERROR;
-
-                // Send error to traces
-                traceCollector.addTrace(
-                    workspace.getRootUri().toString(),
-                    sessionId,
-                    TraceCollector.MessageDirection.SERVER_TO_CLIENT,
-                    "❌ Installation failed: " + ex.getMessage()
-                );
-
-                // Propagate exception
-                if (ex instanceof RuntimeException) {
-                    throw (RuntimeException) ex;
-                }
-                throw new RuntimeException("Failed to install DAP server", ex);
-            });
-        } else {
-            // No installer, just start
-            return startDapServer();
-        }
-    }
-
-    private CompletableFuture<Void> startDapServer() {
         return dapServer.start()
             .thenAccept(v -> {
                 state = SessionState.INITIALIZED;

@@ -29,6 +29,12 @@ public class LspTraceCollector implements TracingMessageConsumer.TraceCollectorA
     Event<LspTraceMessage> traceEvent;
 
     @Override
+    public void trace(String message, TraceCollector.MessageType type) {
+        // Default implementation - subclasses can override if needed
+        // For LSP, traces should go through addTrace() with workspace context
+    }
+
+    @Override
     public void addTrace(String workspaceUri, String serverId, TraceCollector.MessageDirection direction, String jsonContent) {
         addTrace(workspaceUri, serverId, direction, jsonContent, TraceCollector.MessageType.TRACE);
     }

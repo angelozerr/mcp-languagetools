@@ -32,4 +32,9 @@ class LspTraceCollectorWrapper extends TraceCollectorBase {
                 type
         );
     }
+
+    @Override
+    public void addTrace(String workspaceUri, String serverId, MessageDirection direction, String message) {
+        lspTraceCollector.addTrace(workspaceUri, serverId, direction, message);
+    }
 }

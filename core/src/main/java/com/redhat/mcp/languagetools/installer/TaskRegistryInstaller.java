@@ -35,6 +35,14 @@ public class TaskRegistryInstaller implements ServerInstaller {
         this.gson = new Gson();
     }
 
+    /**
+     * Set installation status and notify context.
+     */
+    private void setStatus(InstallerContext context, InstallationStatus installStatus) {
+        status.set(installStatus);
+        context.notifyInstallationStatusChange(installStatus);
+    }
+
     @Override
     public CompletableFuture<InstallResult> ensureInstalled(InstallerContext context) {
         return CompletableFuture.supplyAsync(() -> {
@@ -64,13 +72,13 @@ public class TaskRegistryInstaller implements ServerInstaller {
                             trace.info("Server already installed");
                         }
 
-                        status.set(InstallationStatus.ALREADY_INSTALLED);
+                        setStatus(context, InstallationStatus.ALREADY_INSTALLED);
                         return new InstallResult(context.getInstallDir(), command, InstallationStatus.ALREADY_INSTALLED);
                     }
                 }
 
                 // Not installed - run installation
-                status.set(InstallationStatus.INSTALLING);
+                setStatus(context, InstallationStatus.INSTALLING);
 
                 if (trace != null) {
                     trace.info("Installing server...");
@@ -87,14 +95,14 @@ public class TaskRegistryInstaller implements ServerInstaller {
 
                 boolean success = runTask.execute(context);
                 if (!success) {
-                    status.set(InstallationStatus.FAILED);
+                    setStatus(context, InstallationStatus.FAILED);
                     throw new IllegalStateException("Installation failed");
                 }
 
                 // Extract command after installation
                 String command = extractCommand(context);
 
-                status.set(InstallationStatus.INSTALLED);
+                setStatus(context, InstallationStatus.INSTALLED);
 
                 if (trace != null) {
                     long elapsedMs = System.currentTimeMillis() - startTime;
@@ -104,7 +112,7 @@ public class TaskRegistryInstaller implements ServerInstaller {
                 return new InstallResult(context.getInstallDir(), command, InstallationStatus.INSTALLED);
 
             } catch (TraceProgressIndicator.CancellationException e) {
-                status.set(InstallationStatus.STOPPED);
+                setStatus(context, InstallationStatus.STOPPED);
                 TraceCollector trace = config.getTraceCollector();
                 if (trace != null) {
                     trace.error("Installation cancelled by user");
@@ -112,7 +120,7 @@ public class TaskRegistryInstaller implements ServerInstaller {
                 throw new InstallationException("Installation cancelled", e);
             } catch (Exception e) {
                 LOG.errorf(e, "Installation failed for %s", config.getServerId());
-                status.set(InstallationStatus.FAILED);
+                setStatus(context, InstallationStatus.FAILED);
                 TraceCollector trace = config.getTraceCollector();
                 if (trace != null) {
                     trace.error("Installation failed: " + e.getMessage());

@@ -921,6 +921,9 @@ body {
     cursor: pointer;
     padding: 2px;
     margin-right: 0.5rem;
+    display: inline-block;
+    vertical-align: top;
+    line-height: 1.2;
 }
 
 .trace-toggle:hover {

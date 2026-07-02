@@ -2,6 +2,7 @@ package com.redhat.mcp.languagetools.workspace;
 
 import com.redhat.mcp.languagetools.Application;
 import com.redhat.mcp.languagetools.dap.server.DapServerConfig;
+import com.redhat.mcp.languagetools.dap.session.DapTraceCollectorWrapper;
 import com.redhat.mcp.languagetools.installer.*;
 import com.redhat.mcp.languagetools.lsp.LspContributionManager;
 import com.redhat.mcp.languagetools.lsp.LspInstanceRegistry;
@@ -41,7 +42,6 @@ public class Workspace {
 
     private LspContributionManager extensionManager;
     private final Map<String, LspServer> lspServers = new ConcurrentHashMap<>();
-    private final Map<String, ServerStatus> installationStatus = new ConcurrentHashMap<>();
     private final Map<String, McpClientInfo> mcpClientConnections = new ConcurrentHashMap<>();
     private volatile boolean initialized = false;
     private Consumer<LspServerStatusChangeEvent> statusChangeCallback;
@@ -90,7 +90,7 @@ public class Workspace {
      * Works for both LSP and DAP servers since they both extend ServerBase.
      */
     private void registerServerStatusCallback(ServerBase<?> server) {
-        server.setStatusChangeCallback((oldStatus, newStatus) -> {
+        server.addStatusChangeListener((oldStatus, newStatus) -> {
             if (statusChangeCallback != null) {
                 statusChangeCallback.accept(new LspServerStatusChangeEvent(
                         rootUri,
@@ -190,20 +190,11 @@ public class Workspace {
             }
 
 
-            // Step 1: Install server if needed
-            return ensureServerInstalled(serverConfig)
-                    .thenCompose(installResult -> {
-                        // Step 2: Update config with installed command if installer provided one
-                        if (installResult != null && installResult.getCommand() != null) {
-                            serverConfig.setCommand(installResult.getCommand());
-                        }
-
-                        // Step 3: Start and initialize
-                        return newServer.startManagedOnly()
-                                .thenCompose(initV -> newServer.initialize())
-                                .thenRun(() -> {
-                                    LOG.infof("Started MCP-managed LSP server '%s' for workspace: %s", serverId, rootUri);
-                                });
+            // Step 1: Start and initialize (installation happens inside start())
+            return newServer.startManagedOnly()
+                    .thenCompose(initV -> newServer.initialize())
+                    .thenRun(() -> {
+                        LOG.infof("Started MCP-managed LSP server '%s' for workspace: %s", serverId, rootUri);
                     })
                     .exceptionally(ex -> {
                         LOG.errorf(ex, "Failed to start MCP-managed LSP server '%s'", serverId);
@@ -220,35 +211,6 @@ public class Workspace {
                         throw new RuntimeException("Failed to start managed server: " + ex.getMessage(), ex);
                     });
         });
-    }
-
-    /**
-     * Ensure server is installed. Returns InstallResult or null if no installer.
-     */
-    private CompletableFuture<InstallResult> ensureServerInstalled(
-            LspServerConfig config) {
-
-        ServerInstaller installer = config.getInstaller();
-        if (installer == null) {
-            // No installer - use command from config directly
-            return CompletableFuture.completedFuture(null);
-        }
-
-        // Create installation context
-        Path installDir = config.getServerHome();
-        TraceProgressIndicator progress = new TraceProgressIndicator(config.getTraceCollector());
-
-        // Store progress indicator in config so UI can access it
-        config.setInstallProgress(progress);
-
-        InstallerContext context = new InstallerContext(config, installDir, progress);
-
-        // Add workspace-specific variables
-        context.setVariable("USER_HOME", application.getPathManager().getMcpLangToolsRoot().toString());
-        context.setVariable("PROJECT_DIR", rootUri.getPath());
-
-        // Run installation
-        return installer.ensureInstalled(context);
     }
 
     /**
@@ -302,6 +264,13 @@ public class Workspace {
     }
 
     /**
+     * Check if workspace has a language server for the given ID.
+     */
+    public boolean hasLspServer(String serverId) {
+        return lspServers.containsKey(serverId);
+    }
+
+    /**
      * Get a language server by ID.
      */
     public LspServer getLspServer(String id) {
@@ -313,38 +282,24 @@ public class Workspace {
      * DAP servers are not started automatically - they are started on-demand during debug sessions.
      */
     public void addDapServer(DapServerConfig config) {
+        // Set trace collector for installation support
+        if (config.getTraceCollector() == null) {
+            // Create a TraceCollector wrapper around DapTraceCollector
+            config.setTraceCollector(new DapTraceCollectorWrapper(
+                application.getDapTraceCollector(),
+                rootUri.toString(),
+                config.getServerId()
+            ));
+        }
         LOG.infof("Added DAP server to workspace %s: %s", rootUri, config.getServerId());
     }
 
     /**
-     * Set installation status for a server.
+     * Get status for a server.
      */
-    public void setInstallationStatus(String serverId, ServerStatus status) {
-        if (status == null) {
-            installationStatus.remove(serverId);
-        } else {
-            installationStatus.put(serverId, status);
-        }
-    }
-
-    /**
-     * Get status for a server (running server or installation status).
-     */
-    public ServerStatus getServerStatus(String serverId) {
-        // Check if server is running
+    public ServerStatus getLspServerStatus(String serverId) {
         LspServer server = getLspServer(serverId);
-        if (server != null) {
-            return server.getStatus();
-        }
-
-        // Check installation status
-        ServerStatus installStatus = installationStatus.get(serverId);
-        if (installStatus != null) {
-            return installStatus;
-        }
-
-        // Default: stopped
-        return ServerStatus.STOPPED;
+        return server != null ? server.getStatus() : ServerStatus.STOPPED;
     }
 
     /**

@@ -12,9 +12,6 @@ import org.eclipse.lsp4j.debug.InitializeRequestArguments;
 import org.eclipse.lsp4j.debug.launch.DSPLauncher;
 import org.eclipse.lsp4j.debug.services.IDebugProtocolServer;
 import org.eclipse.lsp4j.jsonrpc.Launcher;
-import org.eclipse.lsp4j.jsonrpc.MessageConsumer;
-import org.eclipse.lsp4j.jsonrpc.json.MessageJsonHandler;
-import org.eclipse.lsp4j.jsonrpc.messages.Message;
 import org.jboss.logging.Logger;
 
 import java.io.IOException;
@@ -24,7 +21,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.function.UnaryOperator;
 
 /**
  * Debug Adapter Protocol (DAP) server wrapper.
@@ -34,124 +30,129 @@ import java.util.function.UnaryOperator;
 public class DapServer extends ServerBase<DapServerConfig> {
 
     private static final Logger LOG = Logger.getLogger(DapServer.class);
-    private final TracingMessageConsumer tracing;
     private final String sessionId;
 
     protected IDebugProtocolServer debugServer;
     protected DapClient dapClient;
-    private static MessageJsonHandler jsonHandler;
 
     public DapServer(String sessionId, DapServerConfig config, Workspace workspace) {
-        super(config, workspace);
+        super(config, workspace, sessionId); // Pass sessionId for tracing instead of serverId
         this.sessionId = sessionId;
-        var workspaceRoot = workspace.getRootUri();
-        this.tracing = new TracingMessageConsumer(workspace.getApplication().getDapTraceCollector(), workspaceRoot.toString(), config.getServerId());
+    }
+
+    @Override
+    protected TracingMessageConsumer.TraceCollectorAdd initializeTraceCollector(Workspace workspace) {
+        return workspace.getApplication().getDapTraceCollector();
     }
 
     /**
      * Start the debug adapter process and initialize it.
      */
     public CompletableFuture<Void> start() {
-        return CompletableFuture.runAsync(() -> {
-            var config = super.getConfig();
-            try {
-                setStatus(ServerStatus.STARTING);
-                LOG.infof("Starting DAP server: %s", config.getName());
+        // Ensure server is installed first
+        return withErrorLogging(
+            ensureInstalled().thenCompose(v -> CompletableFuture.runAsync(() -> {
+                try {
+                    var config = super.getConfig();
+                    setStatus(ServerStatus.STARTING);
+                    LOG.infof("Starting DAP server: %s", config.getName());
 
-                var serverHome = getServerHome();
+                    var serverHome = getServerHome();
 
-                // Build and launch process
-                List<String> command = buildCommand();
-                ProcessBuilder pb = new ProcessBuilder(command);
-                pb.directory(serverHome.toFile());
+                    // Build and launch process
+                    List<String> command = buildCommand();
+                    String commandStr = String.join(" ", command);
+                    LOG.debugf("DAP command: %s", commandStr);
 
-                // Set environment variables
-                if (config.getEnv() != null) {
-                    config.getEnv().forEach((key, value) ->
-                            pb.environment().put(key, value.toString()));
-                }
-
-                // Log command to trace collector
-
-                String commandStr = String.join(" ", command);
-                var traceCollector = tracing.getCollector();
-                String workspaceRootUri = getWorkspace().getRootUri().toString();
-                traceCollector.addTrace(
-                        workspaceRootUri,
-                        sessionId,
-                        TraceCollector.MessageDirection.CLIENT_TO_SERVER,
-                        "Starting DAP server: " + config.getName() + "\n" +
-                                "Command: " + commandStr + "\n" +
-                                "Working directory: " + serverHome
-                );
-
-                serverProcess = pb.start();
-                LOG.infof("DAP server process started: %s (PID: %d)",
-                        config.getServerId(), serverProcess.pid());
-
-                // Log process started
-                traceCollector.addTrace(
+                    // Send startup traces (visible in UI) - separate lines, no folding
+                    String workspaceRootUri = getWorkspace().getRootUri().toString();
+                    getTraceCollector().addTrace(
                         workspaceRootUri,
                         sessionId,
                         TraceCollector.MessageDirection.SERVER_TO_CLIENT,
-                        "DAP server process started (PID: " + serverProcess.pid() + ")"
-                );
-
-                // Create launcher with tracing
-                InputStream in = serverProcess.getInputStream();
-                OutputStream out = serverProcess.getOutputStream();
-
-                dapClient = new DapClient();
-
-                // Wrapper for tracing (like lsp4ij)
-                UnaryOperator<MessageConsumer> wrapper = consumer -> message -> {
-                    // Log trace
-                    boolean isSent = consumer.getClass().getSimpleName().equals("StreamMessageConsumer");
-                    TraceCollector.MessageDirection direction = isSent ?
-                            TraceCollector.MessageDirection.CLIENT_TO_SERVER :
-                            TraceCollector.MessageDirection.SERVER_TO_CLIENT;
-
-                    String jsonContent = toJson(message);
-                    traceCollector.addTrace(
-                            workspaceRootUri,
-                            sessionId,
-                            direction,
-                            jsonContent
+                        String.format("Starting %s...", config.getName())
+                    );
+                    getTraceCollector().addTrace(
+                        workspaceRootUri,
+                        sessionId,
+                        TraceCollector.MessageDirection.SERVER_TO_CLIENT,
+                        String.format("Command: %s", commandStr)
                     );
 
-                    // Forward to actual consumer
-                    consumer.consume(message);
-                };
+                    ProcessBuilder pb = new ProcessBuilder(command);
+                    pb.directory(serverHome.toFile());
 
-                Launcher<IDebugProtocolServer> launcher = DSPLauncher.createClientLauncher(
-                        dapClient, in, out, executorService, wrapper);
+                    // Trace working directory (one line - no folding)
+                    getTraceCollector().addTrace(
+                        workspaceRootUri,
+                        sessionId,
+                        TraceCollector.MessageDirection.SERVER_TO_CLIENT,
+                        String.format("Working directory: %s", serverHome.toString())
+                    );
 
-                debugServer = launcher.getRemoteProxy();
-                launcher.startListening();
+                    // Set environment variables
+                    if (config.getEnv() != null) {
+                        config.getEnv().forEach((key, value) ->
+                                pb.environment().put(key, value.toString()));
+                    }
 
-                // Initialize
-                InitializeRequestArguments initArgs = new InitializeRequestArguments();
-                initArgs.setClientID("mcp-languagetools");
-                initArgs.setClientName("MCP Language Tools");
-                initArgs.setAdapterID(config.getServerId());
-                initArgs.setPathFormat("path");
-                initArgs.setLinesStartAt1(true);
-                initArgs.setColumnsStartAt1(true);
+                    serverProcess = pb.start();
+                    LOG.infof("DAP server process started: %s (PID: %d)",
+                            config.getServerId(), serverProcess.pid());
 
-                CompletableFuture<Capabilities> capabilitiesFuture = debugServer.initialize(initArgs);
-                Capabilities capabilities = capabilitiesFuture.get();
+                    // Trace server started (one line - no folding)
+                    getTraceCollector().addTrace(
+                        workspaceRootUri,
+                        sessionId,
+                        TraceCollector.MessageDirection.SERVER_TO_CLIENT,
+                        String.format("DAP server process started (PID: %d)", serverProcess.pid())
+                    );
 
-                LOG.infof("DAP server initialized: %s", config.getName());
-                setStatus(ServerStatus.RUNNING);
-                setReady(true);
+                    // Create launcher with tracing
+                    InputStream in = serverProcess.getInputStream();
+                    OutputStream out = serverProcess.getOutputStream();
 
-            } catch (Exception e) {
-                LOG.errorf(e, "Failed to start DAP server: %s", config.getServerId());
-                setStatus(ServerStatus.ERROR);
-                setStatusMessage(e.getMessage());
-                throw new RuntimeException("Failed to start DAP server: " + config.getServerId(), e);
-            }
-        }, executorService);
+                    dapClient = new DapClient();
+
+                    // Wrapper for tracing - use TracingMessageConsumer like LSP
+                    Launcher<IDebugProtocolServer> launcher = DSPLauncher.createClientLauncher(
+                            dapClient, in, out, executorService,
+                            consumer -> message -> {
+                                try {
+                                    // Log the message using tracing (like LSP)
+                                    getTracing().log(message, consumer);
+                                } catch (Exception e) {
+                                    LOG.warnf(e, "Error tracing DAP message: %s", e.getMessage());
+                                }
+                                // Forward to original consumer
+                                consumer.consume(message);
+                            });
+
+                    debugServer = launcher.getRemoteProxy();
+                    launcher.startListening();
+
+                    // Initialize
+                    InitializeRequestArguments initArgs = new InitializeRequestArguments();
+                    initArgs.setClientID("mcp-languagetools");
+                    initArgs.setClientName("MCP Language Tools");
+                    initArgs.setAdapterID(config.getServerId());
+                    initArgs.setPathFormat("path");
+                    initArgs.setLinesStartAt1(true);
+                    initArgs.setColumnsStartAt1(true);
+
+                    CompletableFuture<Capabilities> capabilitiesFuture = debugServer.initialize(initArgs);
+                    Capabilities capabilities = capabilitiesFuture.get();
+
+                    LOG.infof("DAP server initialized: %s", config.getName());
+                    setStatus(ServerStatus.RUNNING);
+                    setReady(true);
+                } catch (Exception e) {
+                    throw new RuntimeException(e);
+                }
+            }, executorService)),
+            getTraceCollector(),
+            sessionId
+        );
     }
 
     /**
@@ -252,10 +253,4 @@ public class DapServer extends ServerBase<DapServerConfig> {
         }
     }
 
-    private static String toJson(Message message) {
-        if (jsonHandler == null) {
-            jsonHandler = new MessageJsonHandler(java.util.Collections.emptyMap());
-        }
-        return jsonHandler.serialize(message);
-    }
 }

@@ -111,14 +111,15 @@ public class LspServerControlResource {
             // Check if server already exists
             var existingServer = workspace.getLspServer(serverId);
             if (existingServer != null) {
-                // Server exists, just start it
-                workspace.startManagedLspServer(serverId).join();
+                // Server exists, just start it (async)
+                workspace.startManagedLspServer(serverId);
             } else {
-                // Server doesn't exist, need to install and add it first
-                application.ensureServerInstalled(serverId, workspaceUri).join();
+                // Server doesn't exist, need to add and start it first (async)
+                application.ensureServerStarted(serverId, workspaceUri);
             }
 
-            return Response.ok().entity(new StatusResponse("started")).build();
+            // Return immediately - client follows status via ServerStatus callbacks
+            return Response.ok().entity(new StatusResponse("starting")).build();
         } catch (Exception e) {
             return Response.status(500).entity(new ErrorResponse(e.getMessage())).build();
         }

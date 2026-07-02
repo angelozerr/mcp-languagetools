@@ -22,8 +22,9 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class TracingMessageConsumer {
 
-    public interface TraceCollectorAdd {
+    public interface TraceCollectorAdd extends TraceCollector {
 
+        @Override
         void addTrace(String workspaceUri,
                       String serverId,
                       TraceCollector.MessageDirection direction,
