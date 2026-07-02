@@ -4,6 +4,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.redhat.mcp.languagetools.lsp.DocumentSelector;
+import com.redhat.mcp.languagetools.workspace.Workspace;
 import org.jboss.logging.Logger;
 
 import java.io.IOException;
@@ -26,8 +27,8 @@ public class ClasspathExtensibleLspServer extends LspServer {
 
     private static final Logger LOG = Logger.getLogger(ClasspathExtensibleLspServer.class);
 
-    public ClasspathExtensibleLspServer(LspServerConfig config, LspServerContext context, com.redhat.mcp.languagetools.workspace.Workspace workspace) {
-        super(config, context, workspace);
+    public ClasspathExtensibleLspServer(LspServerConfig config, Workspace workspace) {
+        super(config, workspace);
     }
 
     /**

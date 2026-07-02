@@ -4,7 +4,7 @@ import com.redhat.mcp.languagetools.ApplicationContext;
 import com.redhat.mcp.languagetools.WorkspaceContext;
 import com.redhat.mcp.languagetools.dap.server.DapServerConfig;
 import com.redhat.mcp.languagetools.workspace.Workspace;
-import com.redhat.mcp.languagetools.ApplicationManager;
+import com.redhat.mcp.languagetools.Application;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
@@ -29,7 +29,7 @@ public class DapSessionManager implements ApplicationContext {
     private static final Logger LOG = Logger.getLogger(DapSessionManager.class);
 
     @Inject
-    ApplicationManager applicationManager;
+    Application application;
 
     @Inject
     com.redhat.mcp.languagetools.PathManager pathManager;
@@ -52,7 +52,7 @@ public class DapSessionManager implements ApplicationContext {
             workspaceUri, dapServerId, sessionName);
 
         // Find workspace
-        Workspace workspace = applicationManager.getWorkspaces().get(workspaceUri);
+        Workspace workspace = application.getWorkspaces().get(workspaceUri);
         if (workspace == null) {
             throw new IllegalArgumentException("Workspace not found: " + workspaceUri);
         }
@@ -74,15 +74,13 @@ public class DapSessionManager implements ApplicationContext {
         String language = extractLanguageFromConfig(serverConfig);
 
         // Create session
-        WorkspaceContext wsContext = createWorkspaceContext(workspace);
-
         DapSession session = new DapSession(
             sessionId,
             language,
             sessionName,
             serverConfig,
             this,
-            wsContext,
+            workspace,
             traceCollector
         );
 
@@ -107,7 +105,7 @@ public class DapSessionManager implements ApplicationContext {
         LOG.infof("Creating debug session for language '%s' in workspace %s", language, workspaceUri);
 
         // Find workspace
-        Workspace workspace = applicationManager.getWorkspaces().get(workspaceUri);
+        Workspace workspace = application.getWorkspaces().get(workspaceUri);
         if (workspace == null) {
             return CompletableFuture.failedFuture(
                 new IllegalArgumentException("Workspace not found: " + workspaceUri)
@@ -124,15 +122,13 @@ public class DapSessionManager implements ApplicationContext {
 
         // Create session
         String sessionId = UUID.randomUUID().toString();
-        WorkspaceContext wsContext = createWorkspaceContext(workspace);
-
         DapSession session = new DapSession(
             sessionId,
             language,
             sessionName,
             serverConfig,
             this,
-            wsContext,
+            workspace,
             traceCollector
         );
 
@@ -238,7 +234,7 @@ public class DapSessionManager implements ApplicationContext {
     public List<String> listSupportedLanguages() {
         Set<String> languages = new HashSet<>();
 
-        Map<String, DapServerConfig> dapConfigs = applicationManager.getDapServerConfigs();
+        Map<String, DapServerConfig> dapConfigs = application.getDapServerConfigs();
         for (DapServerConfig config : dapConfigs.values()) {
             if (config.getDocumentSelector() != null) {
                 config.getDocumentSelector().forEach(selector -> {
@@ -279,7 +275,7 @@ public class DapSessionManager implements ApplicationContext {
      */
     private DapServerConfig findDapServerById(Workspace workspace, String dapServerId) {
         // First check global DAP servers
-        Map<String, DapServerConfig> globalDapServers = applicationManager.getDapServerConfigs();
+        Map<String, DapServerConfig> globalDapServers = application.getDapServerConfigs();
         DapServerConfig config = globalDapServers.get(dapServerId);
         if (config != null) {
             return config;
@@ -317,7 +313,7 @@ public class DapSessionManager implements ApplicationContext {
         }
 
         // Fallback to global DAP servers
-        Map<String, DapServerConfig> globalDapServers = applicationManager.getDapServerConfigs();
+        Map<String, DapServerConfig> globalDapServers = application.getDapServerConfigs();
         for (DapServerConfig config : globalDapServers.values()) {
             if (supportsLanguage(config, language)) {
                 return config;
@@ -337,23 +333,6 @@ public class DapSessionManager implements ApplicationContext {
 
         return config.getDocumentSelector().stream()
             .anyMatch(selector -> language.equalsIgnoreCase(selector.getLanguage()));
-    }
-
-    /**
-     * Create a WorkspaceContext from a Workspace.
-     */
-    private WorkspaceContext createWorkspaceContext(Workspace workspace) {
-        return new WorkspaceContext() {
-            @Override
-            public URI getWorkspaceRoot() {
-                return workspace.getRootUri();
-            }
-
-            @Override
-            public java.nio.file.Path getWorkspaceDataDir() {
-                return workspace.getWorkspaceDataDir();
-            }
-        };
     }
 
     // ========== ApplicationContext Implementation ==========

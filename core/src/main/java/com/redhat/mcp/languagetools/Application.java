@@ -37,9 +37,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * Workspaces are created dynamically on-demand.
  */
 @ApplicationScoped
-public class ApplicationManager {
+public class Application {
 
-    private static final Logger LOG = Logger.getLogger(ApplicationManager.class);
+    private static final Logger LOG = Logger.getLogger(Application.class);
 
     @Inject
     LanguageRegistry languageRegistry;
@@ -116,7 +116,7 @@ public class ApplicationManager {
         boolean isNewWorkspace = !workspaces.containsKey(normalizedUri);
 
         Workspace workspace = workspaces.computeIfAbsent(normalizedUri, uri -> {
-            Workspace ws = new Workspace(uri, pathManager.getWorkspaceDataDir(), lspTraceCollector, pathManager);
+            Workspace ws = new Workspace(uri, this);
 
             // Register callback for LSP server status changes
             ws.setServerStatusChangeCallback(event -> {
@@ -456,6 +456,14 @@ public class ApplicationManager {
                     LOG.errorf(ex, "Failed to start %s", config.getName());
                     return null;
                 });
+    }
+
+    public PathManager getPathManager() {
+        return pathManager;
+    }
+
+    public LspTraceCollector getLspTraceCollector() {
+        return lspTraceCollector;
     }
 }
 

@@ -6,6 +6,7 @@ import com.redhat.mcp.languagetools.lsp.*;
 import com.redhat.mcp.languagetools.lsp.client.GenericLanguageClient;
 import com.redhat.mcp.languagetools.server.ServerBase;
 import com.redhat.mcp.languagetools.server.ServerStatus;
+import com.redhat.mcp.languagetools.workspace.Workspace;
 import com.redhat.mcp.languagetools.workspace.WorkspaceConfiguration;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.Launcher;
@@ -29,9 +30,7 @@ import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
@@ -44,18 +43,17 @@ public class LspServer extends ServerBase<LspServerConfig> {
 
     private static final Logger LOG = Logger.getLogger(LspServer.class);
 
-    protected final LspServerContext context;
     protected final URI workspaceRoot;
     protected final Path workspaceDataDir;
     protected final Path serverHome;
     protected final TracingMessageConsumer tracing;
-    protected final List<LspServerConfig> allServerConfigs;
+    protected final Collection<LspServerConfig> allServerConfigs;
     protected final PathManager pathManager;
 
     protected Socket socket;
     protected LanguageServer languageServer;
     private final Map<String, List<Diagnostic>> diagnosticsCache = new ConcurrentHashMap<>();
-    private final java.util.Set<String> openedFiles = ConcurrentHashMap.newKeySet();
+    private final Set<String> openedFiles = ConcurrentHashMap.newKeySet();
     private boolean isSocketConnection = false;
     private InstanceFileWatcher fileWatcher;
     private LspInstanceRegistry.InstanceInfo currentInstance;
@@ -63,22 +61,19 @@ public class LspServer extends ServerBase<LspServerConfig> {
     protected LspContributionManager extensionManager;
     protected RequestRouter requestRouter;
     private final LspClientFeatures clientFeatures;
-    private com.redhat.mcp.languagetools.workspace.Workspace workspace;
 
     public RequestRouter getRequestRouter() {
         return requestRouter;
     }
 
-    public LspServer(LspServerConfig config, LspServerContext context, com.redhat.mcp.languagetools.workspace.Workspace workspace) {
-        super(config);
-        this.context = context;
-        this.workspace = workspace;
-        this.workspaceRoot = context.getWorkspaceRoot();
-        this.workspaceDataDir = context.getWorkspaceDataDir();
-        this.serverHome = context.getLspServerHome();
-        this.tracing = new TracingMessageConsumer(context.getTraceCollector(), workspaceRoot.toString(), config.getId());
-        this.allServerConfigs = context.getAllServerConfigs() != null ? context.getAllServerConfigs() : List.of();
-        this.pathManager = context.getPathManager();
+    public LspServer(LspServerConfig config, Workspace workspace) {
+        super(config, workspace);
+        this.workspaceRoot = workspace.getRootUri();
+        this.workspaceDataDir = workspace.getWorkspaceDataDir();
+        this.serverHome = workspace.getApplication().getPathManager().getLspServerHome(config.getId());
+        this.tracing = new TracingMessageConsumer(workspace.getApplication().getLspTraceCollector(), workspaceRoot.toString(), config.getId());
+        this.allServerConfigs = workspace.getApplication().getLspServerConfigs() != null ? workspace.getApplication().getLspServerConfigs().values(): Set.of();
+        this.pathManager = workspace.getApplication().getPathManager();
 
         // Create client features for managing capabilities
         this.clientFeatures = new LspClientFeatures(config);
@@ -94,7 +89,7 @@ public class LspServer extends ServerBase<LspServerConfig> {
     private RequestRouter createRequestRouter() {
         return (targetServerId, method, params, mode) -> {
             // Look up the target server via workspace
-            LspServer targetServer = workspace.getLspServer(targetServerId);
+            LspServer targetServer = getWorkspace().getLspServer(targetServerId);
 
             if (targetServer == null) {
                 LOG.warnf("Target server '%s' not found for bindRequest: %s", targetServerId, method);
@@ -120,10 +115,6 @@ public class LspServer extends ServerBase<LspServerConfig> {
                         }
                     });
         };
-    }
-
-    public LspServerContext getContext() {
-        return context;
     }
 
     /**

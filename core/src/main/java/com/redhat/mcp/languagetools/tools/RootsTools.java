@@ -8,7 +8,7 @@ import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
 
 import com.redhat.mcp.languagetools.workspace.Workspace;
-import com.redhat.mcp.languagetools.ApplicationManager;
+import com.redhat.mcp.languagetools.Application;
 
 import java.net.URI;
 import java.util.List;
@@ -26,7 +26,7 @@ public class RootsTools {
     private static final Logger LOG = Logger.getLogger(RootsTools.class);
 
     @Inject
-    ApplicationManager applicationManager;
+    Application application;
 
     @Tool(description = "List all workspace roots provided by the MCP client. " +
                         "NOTE: This feature is deprecated, prefer using cwd parameter in other tools.")
@@ -81,7 +81,7 @@ public class RootsTools {
                     URI rootUri = URI.create(root.uri());
                     LOG.infof("Initializing workspace: %s (%s)", root.name(), rootUri);
 
-                    Workspace workspace = applicationManager.getOrCreateWorkspace(rootUri);
+                    Workspace workspace = application.getOrCreateWorkspace(rootUri);
 
                     result.append(String.format("✓ %s: initialized with %d language servers\n",
                         root.name() != null ? root.name() : rootUri.toString(),

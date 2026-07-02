@@ -8,7 +8,7 @@ import com.redhat.mcp.languagetools.admin.dto.ErrorResponse;
 import com.redhat.mcp.languagetools.admin.dto.ServerConfigDTO;
 import com.redhat.mcp.languagetools.admin.dto.ServerDTOBuilder;
 import com.redhat.mcp.languagetools.lsp.server.LspServerConfig;
-import com.redhat.mcp.languagetools.ApplicationManager;
+import com.redhat.mcp.languagetools.Application;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
@@ -25,7 +25,7 @@ import java.nio.file.Files;
 public class ServerDetailsResource {
 
     @Inject
-    ApplicationManager applicationManager;
+    Application application;
 
     @Inject
     PathManager pathManager;
@@ -38,7 +38,7 @@ public class ServerDetailsResource {
     @GET
     @Path("/{serverId}/details")
     public ServerConfigDTO getServerDetails(@PathParam("serverId") String serverId) {
-        LspServerConfig config = applicationManager.getLspServerConfigs().get(serverId);
+        LspServerConfig config = application.getLspServerConfigs().get(serverId);
 
         if (config == null) {
             throw new NotFoundException("Server not found: " + serverId);

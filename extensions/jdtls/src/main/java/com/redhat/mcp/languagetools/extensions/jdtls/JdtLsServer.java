@@ -5,13 +5,12 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.redhat.mcp.languagetools.lsp.server.LspServer;
 import com.redhat.mcp.languagetools.lsp.server.LspServerConfig;
-import com.redhat.mcp.languagetools.lsp.server.LspServerContext;
+import com.redhat.mcp.languagetools.workspace.Workspace;
 import org.eclipse.lsp4j.services.LanguageClient;
 import org.jboss.logging.Logger;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -34,8 +33,8 @@ public class JdtLsServer extends LspServer {
 
     private JdtLsLanguageClient jdtClient;
 
-    public JdtLsServer(LspServerConfig config, LspServerContext context, com.redhat.mcp.languagetools.workspace.Workspace workspace) {
-        super(config, context, workspace);
+    public JdtLsServer(LspServerConfig config, Workspace workspace) {
+        super(config, workspace);
     }
 
     /**

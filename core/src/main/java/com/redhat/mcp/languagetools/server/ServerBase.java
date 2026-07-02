@@ -1,5 +1,6 @@
 package com.redhat.mcp.languagetools.server;
 
+import com.redhat.mcp.languagetools.workspace.Workspace;
 import org.jboss.logging.Logger;
 
 import java.util.concurrent.CompletableFuture;
@@ -18,6 +19,7 @@ public abstract class ServerBase<T extends ServerConfigBase> {
     private static final Logger LOG = Logger.getLogger(ServerBase.class);
 
     private final T config;
+    private final Workspace workspace;
     protected final ExecutorService executorService;
     private volatile ServerStatus status = ServerStatus.NOT_STARTED;
     private volatile String statusMessage = null;
@@ -26,8 +28,9 @@ public abstract class ServerBase<T extends ServerConfigBase> {
     protected Process serverProcess;
     private volatile boolean isReady;
 
-    public ServerBase(T config) {
+    public ServerBase(T config, Workspace workspace) {
         this.config = config;
+        this.workspace = workspace;
         this.executorService = Executors.newCachedThreadPool();
     }
 
@@ -166,5 +169,9 @@ public abstract class ServerBase<T extends ServerConfigBase> {
             serverProcess.destroy();
             setStatus(ServerStatus.STOPPED);
         }
+    }
+
+    public Workspace getWorkspace() {
+        return workspace;
     }
 }

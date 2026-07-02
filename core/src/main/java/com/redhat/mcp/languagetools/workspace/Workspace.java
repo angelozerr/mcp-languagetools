@@ -1,5 +1,6 @@
 package com.redhat.mcp.languagetools.workspace;
 
+import com.redhat.mcp.languagetools.Application;
 import com.redhat.mcp.languagetools.PathManager;
 import com.redhat.mcp.languagetools.dap.server.DapServerConfig;
 import com.redhat.mcp.languagetools.installer.InstallResult;
@@ -8,7 +9,6 @@ import com.redhat.mcp.languagetools.installer.ServerInstaller;
 import com.redhat.mcp.languagetools.installer.TraceProgressIndicator;
 import com.redhat.mcp.languagetools.lsp.LspContributionManager;
 import com.redhat.mcp.languagetools.lsp.LspInstanceRegistry;
-import com.redhat.mcp.languagetools.lsp.RequestRouter;
 import com.redhat.mcp.languagetools.lsp.server.*;
 import com.redhat.mcp.languagetools.lsp.trace.LspTraceCollector;
 import com.redhat.mcp.languagetools.server.ServerStatus;
@@ -36,10 +36,13 @@ public class Workspace {
     private static final Logger LOG = Logger.getLogger(Workspace.class);
 
     private final URI rootUri;
+    private final Application application;
+
     private final Path workspaceDataDir;
-    private final LspTraceCollector traceCollector;
+    private final LspTraceCollector lspTraceCollector;
     private final PathManager pathManager;
     private final WorkspaceConfiguration configuration;
+
     private LspContributionManager extensionManager;
     private final Map<String, LspServer> lspServers = new ConcurrentHashMap<>();
     private final Map<String, DapServerConfig> dapServerConfigs = new ConcurrentHashMap<>();
@@ -69,14 +72,13 @@ public class Workspace {
     }
 
     public Workspace(URI rootUri,
-                     Path workspaceDataDir,
-                     LspTraceCollector traceCollector,
-                     PathManager pathManager) {
+                     Application application) {
         this.rootUri = rootUri;
-        this.workspaceDataDir = createWorkspaceDataDir(workspaceDataDir, rootUri);
-        this.traceCollector = traceCollector;
-        this.pathManager = pathManager;
-        this.configuration = new WorkspaceConfiguration(java.nio.file.Paths.get(rootUri));
+        this.application = application;
+        this.workspaceDataDir = createWorkspaceDataDir(application.getPathManager().getWorkspaceDataDir(), rootUri);
+        this.lspTraceCollector = application.getLspTraceCollector();
+        this.pathManager = application.getPathManager();
+        this.configuration = new WorkspaceConfiguration(Paths.get(rootUri));
     }
 
     /**
@@ -143,14 +145,10 @@ public class Workspace {
         // Set trace collector for installation support
         if (config.getTraceCollector() == null) {
             // Create a TraceCollector wrapper around LspTraceCollector
-            config.setTraceCollector(new LspTraceCollectorWrapper(traceCollector, rootUri.toString(), config.getId()));
+            config.setTraceCollector(new LspTraceCollectorWrapper(lspTraceCollector, rootUri.toString(), config.getId()));
         }
 
-        LspServerContext context =
-                LspServerFactoryRegistry.createContext(
-                        pathManager, allServerConfigs, rootUri, workspaceDataDir, serverHome, traceCollector, this);
-
-        LspServer server = LspServerFactoryRegistry.createServer(config, context, this);
+        LspServer server = LspServerFactoryRegistry.createServer(config, this);
         server.setWorkspaceConfiguration(configuration);
         if (extensionManager != null) {
             server.setLspContributionManager(extensionManager);
@@ -175,7 +173,7 @@ public class Workspace {
             return CompletableFuture.failedFuture(new IllegalArgumentException("Server not found: " + serverId));
         }
 
-        LspServer oldServer = lspServers.get(serverId);
+        LspServer oldServer = getLspServer(serverId);
 
         return CompletableFuture.runAsync(() -> {
             try {
@@ -185,9 +183,7 @@ public class Workspace {
                 }
 
                 // Create new server instance using factory
-                LspServerContext newContext = LspServerFactoryRegistry.createContext(
-                        pathManager, allServerConfigs, rootUri, workspaceDataDir, info.serverHome, traceCollector, this);
-                LspServer newServer = LspServerFactoryRegistry.createServer(info.config, newContext, this);
+                LspServer newServer = LspServerFactoryRegistry.createServer(info.config, this);
                 newServer.setWorkspaceConfiguration(configuration);
 
                 // Register status change callback
@@ -229,11 +225,10 @@ public class Workspace {
             shutdownFuture = CompletableFuture.completedFuture(null);
         }
 
-        return shutdownFuture.thenCompose(v -> {
+        return shutdownFuture
+                .thenCompose(v -> {
             // Create new server instance BEFORE installation so we can set INSTALLING status
-            LspServerContext newContext = LspServerFactoryRegistry.createContext(
-                    pathManager, allServerConfigs, rootUri, workspaceDataDir, info.serverHome, traceCollector, this);
-            LspServer newServer = LspServerFactoryRegistry.createServer(info.config, newContext, this);
+            LspServer newServer = LspServerFactoryRegistry.createServer(info.config, this);
             newServer.setWorkspaceConfiguration(configuration);
 
             // Set status to INSTALLING if installer exists (BEFORE adding to lspServers map)
@@ -411,7 +406,7 @@ public class Workspace {
      */
     public ServerStatus getServerStatus(String serverId) {
         // Check if server is running
-        LspServer server = lspServers.get(serverId);
+        LspServer server = getLspServer(serverId);
         if (server != null) {
             return server.getStatus();
         }
@@ -511,6 +506,10 @@ public class Workspace {
         } catch (Exception e) {
             throw new RuntimeException("Failed to create workspace data directory", e);
         }
+    }
+
+    public Application getApplication() {
+        return application;
     }
 }
 

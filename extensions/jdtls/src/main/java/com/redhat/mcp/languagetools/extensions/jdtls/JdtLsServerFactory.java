@@ -2,8 +2,8 @@ package com.redhat.mcp.languagetools.extensions.jdtls;
 
 import com.redhat.mcp.languagetools.lsp.server.LspServer;
 import com.redhat.mcp.languagetools.lsp.server.LspServerConfig;
-import com.redhat.mcp.languagetools.lsp.server.LspServerContext;
 import com.redhat.mcp.languagetools.lsp.server.LspServerFactory;
+import com.redhat.mcp.languagetools.workspace.Workspace;
 
 /**
  * Factory for creating JDT.LS custom server instances.
@@ -16,7 +16,7 @@ public class JdtLsServerFactory implements LspServerFactory {
     }
 
     @Override
-    public LspServer createServer(LspServerConfig config, LspServerContext context, com.redhat.mcp.languagetools.workspace.Workspace workspace) {
-        return new JdtLsServer(config, context, workspace);
+    public LspServer createServer(LspServerConfig config, Workspace workspace) {
+        return new JdtLsServer(config, workspace);
     }
 }

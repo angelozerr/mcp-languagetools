@@ -5,7 +5,7 @@ import com.redhat.mcp.languagetools.admin.dto.ServerConfigDTO;
 import com.redhat.mcp.languagetools.admin.dto.ServerDTOBuilder;
 import com.redhat.mcp.languagetools.admin.dto.StatusResponse;
 import com.redhat.mcp.languagetools.workspace.Workspace;
-import com.redhat.mcp.languagetools.ApplicationManager;
+import com.redhat.mcp.languagetools.Application;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
@@ -22,7 +22,7 @@ public class LspServerControlResource {
     private static final Logger LOG = Logger.getLogger(LspServerControlResource.class);
 
     @Inject
-    ApplicationManager applicationManager;
+    Application application;
 
     @Inject
     ServerDTOBuilder serverDTOBuilder;
@@ -35,7 +35,7 @@ public class LspServerControlResource {
     public List<ServerConfigDTO> listAllServers() {
         LOG.info("listAllServers() called");
         try {
-            var configs = applicationManager.getLspServerConfigs();
+            var configs = application.getLspServerConfigs();
             LOG.infof("Found %d server configs", configs.size());
 
             var result = configs.values().stream()
@@ -56,7 +56,7 @@ public class LspServerControlResource {
                                 @PathParam("serverId") String serverId) {
         try {
             URI workspaceUri = URI.create(workspaceUriParam);
-            Workspace workspace = applicationManager.getWorkspaces().get(workspaceUri);
+            Workspace workspace = application.getWorkspaces().get(workspaceUri);
 
             if (workspace == null) {
                 return Response.status(404).entity("Workspace not found").build();
@@ -80,7 +80,7 @@ public class LspServerControlResource {
                                    @PathParam("serverId") String serverId) {
         try {
             URI workspaceUri = URI.create(workspaceUriParam);
-            Workspace workspace = applicationManager.getWorkspaces().get(workspaceUri);
+            Workspace workspace = application.getWorkspaces().get(workspaceUri);
 
             if (workspace == null) {
                 return Response.status(404).entity("Workspace not found").build();
@@ -101,7 +101,7 @@ public class LspServerControlResource {
                                         @PathParam("serverId") String serverId) {
         try {
             URI workspaceUri = URI.create(workspaceUriParam);
-            Workspace workspace = applicationManager.getWorkspaces().get(workspaceUri);
+            Workspace workspace = application.getWorkspaces().get(workspaceUri);
 
             if (workspace == null) {
                 return Response.status(404).entity("Workspace not found").build();
@@ -114,7 +114,7 @@ public class LspServerControlResource {
                 workspace.startManagedLspServer(serverId).join();
             } else {
                 // Server doesn't exist, need to install and add it first
-                applicationManager.ensureServerInstalled(serverId, workspaceUri).join();
+                application.ensureServerInstalled(serverId, workspaceUri).join();
             }
 
             return Response.ok().entity(new StatusResponse("started")).build();
@@ -129,7 +129,7 @@ public class LspServerControlResource {
                                        @PathParam("serverId") String serverId) {
         try {
             URI workspaceUri = URI.create(workspaceUriParam);
-            Workspace workspace = applicationManager.getWorkspaces().get(workspaceUri);
+            Workspace workspace = application.getWorkspaces().get(workspaceUri);
 
             if (workspace == null) {
                 return Response.status(404).entity("Workspace not found").build();
@@ -154,7 +154,7 @@ public class LspServerControlResource {
                                   @PathParam("serverId") String serverId) {
         try {
             URI workspaceUri = URI.create(workspaceUriParam);
-            Workspace workspace = applicationManager.getWorkspaces().get(workspaceUri);
+            Workspace workspace = application.getWorkspaces().get(workspaceUri);
 
             if (workspace == null) {
                 return Response.status(404).entity("Workspace not found").build();

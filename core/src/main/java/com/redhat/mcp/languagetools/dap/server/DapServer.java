@@ -5,6 +5,7 @@ import com.redhat.mcp.languagetools.dap.client.DapEventListener;
 import com.redhat.mcp.languagetools.dap.trace.DapTraceMessage;
 import com.redhat.mcp.languagetools.server.ServerBase;
 import com.redhat.mcp.languagetools.server.ServerStatus;
+import com.redhat.mcp.languagetools.workspace.Workspace;
 import org.eclipse.lsp4j.debug.Capabilities;
 import org.eclipse.lsp4j.debug.InitializeRequestArguments;
 import org.eclipse.lsp4j.debug.launch.DSPLauncher;
@@ -39,8 +40,8 @@ public class DapServer extends ServerBase<DapServerConfig> {
     protected DapClient dapClient;
     private static MessageJsonHandler jsonHandler;
 
-    public DapServer(DapServerConfig config, DapServerContext context) {
-        super(config);
+    public DapServer(DapServerConfig config, Workspace workspace, DapServerContext context) {
+        super(config, workspace);
         this.context = context;
     }
 

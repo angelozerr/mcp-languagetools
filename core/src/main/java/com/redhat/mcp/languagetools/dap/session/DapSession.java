@@ -12,6 +12,7 @@ import com.redhat.mcp.languagetools.dap.trace.DapTraceMessage;
 import com.redhat.mcp.languagetools.installer.InstallerContext;
 import com.redhat.mcp.languagetools.installer.ServerInstaller;
 import com.redhat.mcp.languagetools.installer.TraceProgressIndicator;
+import com.redhat.mcp.languagetools.workspace.Workspace;
 import org.eclipse.lsp4j.debug.*;
 import org.eclipse.lsp4j.debug.Thread;
 import org.eclipse.lsp4j.debug.services.IDebugProtocolServer;
@@ -44,8 +45,8 @@ public class DapSession implements DapEventListener {
     private final DapServerConfig serverConfig;
     private final DapServer dapServer;
     private final ApplicationContext appContext;
-    private final WorkspaceContext workspaceContext;
     private final com.redhat.mcp.languagetools.dap.trace.DapTraceCollector traceCollector;
+    private final Workspace workspace;
 
     private SessionState state = SessionState.CREATED;
     private final Map<String, BreakpointInfo> breakpoints = new ConcurrentHashMap<>();
@@ -84,14 +85,14 @@ public class DapSession implements DapEventListener {
                       String sessionName,
                       DapServerConfig serverConfig,
                       ApplicationContext appContext,
-                      WorkspaceContext workspaceContext,
+                      Workspace workspace,
                       DapTraceCollector traceCollector) {
         this.sessionId = sessionId;
         this.language = language;
         this.sessionName = sessionName;
         this.serverConfig = serverConfig;
         this.appContext = appContext;
-        this.workspaceContext = workspaceContext;
+        this.workspace = workspace;
         this.traceCollector = traceCollector;
 
         // Create DapServer instance with context
@@ -131,16 +132,16 @@ public class DapSession implements DapEventListener {
 
             @Override
             public URI getWorkspaceRoot() {
-                return workspaceContext.getWorkspaceRoot();
+                return workspace.getRootUri();
             }
 
             @Override
             public Path getWorkspaceDataDir() {
-                return workspaceContext.getWorkspaceDataDir();
+                return workspace.getWorkspaceDataDir();
             }
         };
 
-        this.dapServer = new DapServer(serverConfig, dapContext);
+        this.dapServer = new DapServer(serverConfig, workspace, dapContext);
 
         // Register this session as the event listener
         this.dapServer.setEventListener(this);
@@ -163,7 +164,7 @@ public class DapSession implements DapEventListener {
 
             // Send installation start message to traces
             traceCollector.addTrace(
-                workspaceContext.getWorkspaceRoot().toString(),
+                workspace.getRootUri().toString(),
                 sessionId,
                 DapTraceMessage.MessageDirection.SENT,
                 "INSTALL: Ensuring " + serverConfig.getName() + " is installed..."
@@ -195,7 +196,7 @@ public class DapSession implements DapEventListener {
 
                 // Send error to traces
                 traceCollector.addTrace(
-                    workspaceContext.getWorkspaceRoot().toString(),
+                    workspace.getRootUri().toString(),
                     sessionId,
                     DapTraceMessage.MessageDirection.RECEIVED,
                     "❌ Installation failed: " + ex.getMessage()
@@ -225,7 +226,7 @@ public class DapSession implements DapEventListener {
 
                 // Send error to traces
                 traceCollector.addTrace(
-                    workspaceContext.getWorkspaceRoot().toString(),
+                    workspace.getRootUri().toString(),
                     sessionId,
                     DapTraceMessage.MessageDirection.RECEIVED,
                     "❌ Failed to initialize: " + ex.getMessage()
@@ -267,7 +268,7 @@ public class DapSession implements DapEventListener {
 
             // Add workspace folder if not present
             if (!launchConfig.containsKey("cwd")) {
-                launchConfig.put("cwd", workspaceContext.getWorkspaceRoot().getPath());
+                launchConfig.put("cwd", workspace.getRootUri().getPath());
             }
 
             return server.launch(launchConfig)
@@ -725,7 +726,7 @@ public class DapSession implements DapEventListener {
         return dapServer != null ? dapServer.getConfig() : null;
     }
 
-    public WorkspaceContext getWorkspaceContext() {
-        return workspaceContext;
+    public Workspace getWorkspace() {
+        return workspace;
     }
 }

@@ -2,7 +2,7 @@ package com.redhat.mcp.languagetools.dap.tools;
 
 import com.redhat.mcp.languagetools.dap.session.DapSession;
 import com.redhat.mcp.languagetools.dap.session.DapSessionManager;
-import com.redhat.mcp.languagetools.ApplicationManager;
+import com.redhat.mcp.languagetools.Application;
 import io.quarkiverse.mcp.server.Tool;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
@@ -29,7 +29,7 @@ public class DapDebugTools {
     DapSessionManager sessionManager;
 
     @Inject
-    ApplicationManager applicationManager;
+    Application application;
 
     // ========== Session Management ==========
 

@@ -12,7 +12,7 @@ import com.redhat.mcp.languagetools.lsp.trace.LspTraceMessage;
 import com.redhat.mcp.languagetools.mcp.trace.McpTrace;
 import com.redhat.mcp.languagetools.workspace.Workspace;
 import com.redhat.mcp.languagetools.workspace.WorkspaceChangeEvent;
-import com.redhat.mcp.languagetools.ApplicationManager;
+import com.redhat.mcp.languagetools.Application;
 import io.quarkiverse.mcp.server.runtime.ConnectionManager;
 import io.quarkiverse.mcp.server.runtime.McpConnectionBase;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -38,7 +38,7 @@ public class AdminWebSocketEndpoint {
     private static final Logger LOG = Logger.getLogger(AdminWebSocketEndpoint.class);
 
     @Inject
-    ApplicationManager applicationManager;
+    Application application;
 
     @Inject
     ConnectionManager connectionManager;
@@ -117,7 +117,7 @@ public class AdminWebSocketEndpoint {
     private void sendLspTraceHistory(Session session) {
         try {
             // Get all workspaces and their servers
-            for (var workspace : applicationManager.getWorkspaces().values()) {
+            for (var workspace : application.getWorkspaces().values()) {
                 for (var serverId : workspace.getAllLspServers().keySet()) {
                     // Get last 200 traces for this server
                     var traces = lspTraceCollector.getTracesForWorkspaceAndServer(
@@ -318,7 +318,7 @@ public class AdminWebSocketEndpoint {
      * Get current workspaces (copied from AdminResource logic).
      */
     private List<WorkspaceDTO> getCurrentWorkspaces() {
-        return applicationManager.getWorkspaces().entrySet().stream()
+        return application.getWorkspaces().entrySet().stream()
                 .map(entry -> toWorkspaceDTO(entry.getKey(), entry.getValue()))
                 .toList();
     }
@@ -360,7 +360,7 @@ public class AdminWebSocketEndpoint {
      * Convert workspace to DTO (copied from AdminResource).
      */
     private WorkspaceDTO toWorkspaceDTO(URI uri, Workspace workspace) {
-        var allServerConfigs = applicationManager.getLspServerConfigs();
+        var allServerConfigs = application.getLspServerConfigs();
 
         // Build runtime DTOs for all LSP servers in this workspace
         List<ServerRuntimeDTO> servers = allServerConfigs.values().stream()

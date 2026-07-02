@@ -1,5 +1,7 @@
 package com.redhat.mcp.languagetools.lsp.server;
 
+import com.redhat.mcp.languagetools.workspace.Workspace;
+
 /**
  * SPI interface for creating custom LSP server implementations.
  * Extensions implement this interface and register via ServiceLoader.
@@ -15,8 +17,7 @@ public interface LspServerFactory {
      * Create a custom LSP server instance.
      *
      * @param config This server's configuration
-     * @param context Server creation context with all dependencies
      * @param workspace The workspace this server belongs to
      */
-    LspServer createServer(LspServerConfig config, LspServerContext context, com.redhat.mcp.languagetools.workspace.Workspace workspace);
+    LspServer createServer(LspServerConfig config, Workspace workspace);
 }
