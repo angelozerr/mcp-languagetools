@@ -1,6 +1,5 @@
-package com.redhat.mcp.languagetools.lsp.trace;
+package com.redhat.mcp.languagetools.trace;
 
-import com.google.gson.GsonBuilder;
 import org.eclipse.lsp4j.jsonrpc.MessageConsumer;
 import org.eclipse.lsp4j.jsonrpc.RemoteEndpoint;
 import org.eclipse.lsp4j.jsonrpc.json.MessageJsonHandler;
@@ -23,9 +22,17 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class TracingMessageConsumer {
 
+    public interface TraceCollectorAdd {
+
+        void addTrace(String workspaceUri,
+                      String serverId,
+                      TraceCollector.MessageDirection direction,
+                      String logContent);
+    }
+
     private static MessageJsonHandler toStringInstance;
 
-    private final LspTraceCollector collector;
+    private final TraceCollectorAdd collector;
     private final String workspaceUri;
     private final String serverId;
     private final Map<String, RequestMetadata> sentRequests;
@@ -33,7 +40,7 @@ public class TracingMessageConsumer {
     private final Clock clock;
     private final DateTimeFormatter dateTimeFormatter;
 
-    public TracingMessageConsumer(LspTraceCollector collector, String workspaceUri, String serverId) {
+    public TracingMessageConsumer(TraceCollectorAdd collector, String workspaceUri, String serverId) {
         this.collector = collector;
         this.workspaceUri = workspaceUri;
         this.serverId = serverId;
@@ -50,17 +57,17 @@ public class TracingMessageConsumer {
         final Instant now = clock.instant();
         final String date = dateTimeFormatter.format(now);
 
-        LspTraceMessage.MessageDirection direction;
+        TraceCollector.MessageDirection direction;
         String logContent;
 
         if (messageConsumer instanceof StreamMessageConsumer) {
-            direction = LspTraceMessage.MessageDirection.CLIENT_TO_SERVER;
+            direction = TraceCollector.MessageDirection.CLIENT_TO_SERVER;
             logContent = consumeMessageSending(message, now, date);
         } else if (messageConsumer instanceof RemoteEndpoint) {
-            direction = LspTraceMessage.MessageDirection.SERVER_TO_CLIENT;
+            direction = TraceCollector.MessageDirection.SERVER_TO_CLIENT;
             logContent = consumeMessageReceiving(message, now, date);
         } else {
-            direction = LspTraceMessage.MessageDirection.SERVER_TO_CLIENT;
+            direction = TraceCollector.MessageDirection.SERVER_TO_CLIENT;
             logContent = String.format("Unknown MessageConsumer type: %s", messageConsumer);
         }
 
@@ -163,7 +170,7 @@ public class TracingMessageConsumer {
         return requestMetadata != null ? String.valueOf(now.toEpochMilli() - requestMetadata.start.toEpochMilli()) : "?";
     }
 
-    public LspTraceCollector getCollector() {
+    public TraceCollectorAdd getCollector() {
         return collector;
     }
 

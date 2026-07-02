@@ -1,13 +1,7 @@
 package com.redhat.mcp.languagetools.workspace;
 
 import com.redhat.mcp.languagetools.lsp.trace.LspTraceCollector;
-import com.redhat.mcp.languagetools.lsp.trace.LspTraceMessage;
-import com.redhat.mcp.languagetools.trace.TraceCollector;
 import com.redhat.mcp.languagetools.trace.TraceCollectorBase;
-
-import java.time.Instant;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 
 /**
  * Wrapper that adapts LspTraceCollector to TraceCollector interface.
@@ -33,7 +27,7 @@ class LspTraceCollectorWrapper extends TraceCollectorBase {
         lspTraceCollector.addTrace(
                 workspaceUri,
                 serverId,
-                LspTraceMessage.MessageDirection.CLIENT_TO_SERVER,
+                MessageDirection.CLIENT_TO_SERVER,
                 formattedMessage,
                 type
         );

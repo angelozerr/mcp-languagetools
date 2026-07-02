@@ -33,7 +33,7 @@ class DapTraceCollectorWrapper extends TraceCollectorBase {
         dapTraceCollector.addTrace(
             sessionId,
             serverId,
-            DapTraceMessage.MessageDirection.SENT,
+            MessageDirection.CLIENT_TO_SERVER,
             formattedMessage,
             type
         );

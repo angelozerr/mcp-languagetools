@@ -13,12 +13,7 @@ public record DapTraceMessage(
     String workspaceUri,
     String sessionId,
     Instant timestamp,
-    MessageDirection direction,
+    TraceCollector.MessageDirection direction,
     String jsonContent,
     TraceCollector.MessageType messageType  // null = TRACE (default)
-) {
-    public enum MessageDirection {
-        SENT,
-        RECEIVED
-    }
-}
+) {}

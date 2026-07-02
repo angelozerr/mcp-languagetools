@@ -1,6 +1,7 @@
 package com.redhat.mcp.languagetools.lsp.trace;
 
 import com.redhat.mcp.languagetools.trace.TraceCollector;
+import com.redhat.mcp.languagetools.trace.TracingMessageConsumer;
 import io.quarkus.runtime.annotations.RegisterForReflection;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Event;
@@ -17,7 +18,7 @@ import java.util.concurrent.ConcurrentLinkedDeque;
  */
 @ApplicationScoped
 @RegisterForReflection
-public class LspTraceCollector {
+public class LspTraceCollector implements TracingMessageConsumer.TraceCollectorAdd {
 
     private static final Logger LOG = Logger.getLogger(LspTraceCollector.class);
     private static final int MAX_TRACE_MESSAGES = 1000;
@@ -27,13 +28,14 @@ public class LspTraceCollector {
     @Inject
     Event<LspTraceMessage> traceEvent;
 
-    public void addTrace(String workspaceUri, String serverId, LspTraceMessage.MessageDirection direction, String jsonContent) {
-        addTrace(workspaceUri, serverId, direction, jsonContent, null);
+    @Override
+    public void addTrace(String workspaceUri, String serverId, TraceCollector.MessageDirection direction, String jsonContent) {
+        addTrace(workspaceUri, serverId, direction, jsonContent, TraceCollector.MessageType.TRACE);
     }
 
     public void addTrace(String workspaceUri,
                          String serverId,
-                         LspTraceMessage.MessageDirection direction,
+                         TraceCollector.MessageDirection direction,
                          String jsonContent,
                          TraceCollector.MessageType messageType) {
         LspTraceMessage message = new LspTraceMessage(

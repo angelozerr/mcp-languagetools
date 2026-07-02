@@ -24,6 +24,7 @@ import org.jboss.logging.Logger;
 
 import java.io.IOException;
 import java.net.URI;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -117,7 +118,7 @@ public class AdminWebSocketEndpoint {
     private void sendLspTraceHistory(Session session) {
         try {
             // Get all workspaces and their servers
-            for (var workspace : application.getWorkspaces().values()) {
+            for (var workspace : application.getWorkspaces()) {
                 for (var serverId : workspace.getAllLspServers().keySet()) {
                     // Get last 200 traces for this server
                     var traces = lspTraceCollector.getTracesForWorkspaceAndServer(
@@ -318,8 +319,9 @@ public class AdminWebSocketEndpoint {
      * Get current workspaces (copied from AdminResource logic).
      */
     private List<WorkspaceDTO> getCurrentWorkspaces() {
-        return application.getWorkspaces().entrySet().stream()
-                .map(entry -> toWorkspaceDTO(entry.getKey(), entry.getValue()))
+        return application.getWorkspaces()
+                .stream()
+                .map(workspace -> toWorkspaceDTO(workspace))
                 .toList();
     }
 
@@ -359,16 +361,18 @@ public class AdminWebSocketEndpoint {
     /**
      * Convert workspace to DTO (copied from AdminResource).
      */
-    private WorkspaceDTO toWorkspaceDTO(URI uri, Workspace workspace) {
+    private WorkspaceDTO toWorkspaceDTO(Workspace workspace) {
         var allServerConfigs = application.getLspServerConfigs();
 
         // Build runtime DTOs for all LSP servers in this workspace
-        List<ServerRuntimeDTO> servers = allServerConfigs.values().stream()
+        List<ServerRuntimeDTO> servers = allServerConfigs.values()
+                .stream()
                 .map(config -> serverDTOBuilder.buildRuntime(config, workspace))
                 .toList();
 
         // Build DAP server DTOs for this workspace
-        List<DapServerDTO> dapServers = workspace.getDapServerConfigs().values().stream()
+        List<DapServerDTO> dapServers = workspace.getDapServerConfigs().values()
+                .stream()
                 .map(config -> new DapServerDTO(
                     config.getId(),
                     config.getName(),
@@ -377,8 +381,9 @@ public class AdminWebSocketEndpoint {
                 ))
                 .toList();
 
-        java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ISO_INSTANT;
-        java.util.List<WorkspaceDTO.McpClientInfo> mcpClients = workspace.getMcpClientConnections().values().stream()
+        DateTimeFormatter formatter = DateTimeFormatter.ISO_INSTANT;
+        List<WorkspaceDTO.McpClientInfo> mcpClients = workspace.getMcpClientConnections().values()
+                .stream()
                 .map(clientInfo -> new WorkspaceDTO.McpClientInfo(
                         clientInfo.name(),
                         formatter.format(clientInfo.connectedAt())
@@ -386,8 +391,9 @@ public class AdminWebSocketEndpoint {
                 .toList();
 
         // Build DAP session DTOs for this workspace (empty list for now, updated via AdminResource)
-        java.util.List<WorkspaceDTO.DapSessionDTO> dapSessions = java.util.Collections.emptyList();
+        List<WorkspaceDTO.DapSessionDTO> dapSessions = Collections.emptyList();
 
+        var uri = workspace.getRootUri();
         return new WorkspaceDTO(uri, workspace.isInitialized(), mcpClients, servers, dapServers, dapSessions);
     }
 }

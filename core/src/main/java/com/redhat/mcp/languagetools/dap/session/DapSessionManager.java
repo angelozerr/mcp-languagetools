@@ -1,7 +1,5 @@
 package com.redhat.mcp.languagetools.dap.session;
 
-import com.redhat.mcp.languagetools.ApplicationContext;
-import com.redhat.mcp.languagetools.WorkspaceContext;
 import com.redhat.mcp.languagetools.dap.server.DapServerConfig;
 import com.redhat.mcp.languagetools.workspace.Workspace;
 import com.redhat.mcp.languagetools.Application;
@@ -24,7 +22,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * - Match debug adapters to languages/file types
  */
 @ApplicationScoped
-public class DapSessionManager implements ApplicationContext {
+public class DapSessionManager {
 
     private static final Logger LOG = Logger.getLogger(DapSessionManager.class);
 
@@ -52,7 +50,7 @@ public class DapSessionManager implements ApplicationContext {
             workspaceUri, dapServerId, sessionName);
 
         // Find workspace
-        Workspace workspace = application.getWorkspaces().get(workspaceUri);
+        Workspace workspace = application.getWorkspace(workspaceUri);
         if (workspace == null) {
             throw new IllegalArgumentException("Workspace not found: " + workspaceUri);
         }
@@ -79,7 +77,6 @@ public class DapSessionManager implements ApplicationContext {
             language,
             sessionName,
             serverConfig,
-            this,
             workspace,
             traceCollector
         );
@@ -105,7 +102,7 @@ public class DapSessionManager implements ApplicationContext {
         LOG.infof("Creating debug session for language '%s' in workspace %s", language, workspaceUri);
 
         // Find workspace
-        Workspace workspace = application.getWorkspaces().get(workspaceUri);
+        Workspace workspace = application.getWorkspace(workspaceUri);
         if (workspace == null) {
             return CompletableFuture.failedFuture(
                 new IllegalArgumentException("Workspace not found: " + workspaceUri)
@@ -127,7 +124,6 @@ public class DapSessionManager implements ApplicationContext {
             language,
             sessionName,
             serverConfig,
-            this,
             workspace,
             traceCollector
         );
@@ -333,13 +329,6 @@ public class DapSessionManager implements ApplicationContext {
 
         return config.getDocumentSelector().stream()
             .anyMatch(selector -> language.equalsIgnoreCase(selector.getLanguage()));
-    }
-
-    // ========== ApplicationContext Implementation ==========
-
-    @Override
-    public com.redhat.mcp.languagetools.PathManager getPathManager() {
-        return pathManager;
     }
 
     // ========== Cleanup ==========

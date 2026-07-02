@@ -6,9 +6,11 @@ import com.redhat.mcp.languagetools.lsp.*;
 import com.redhat.mcp.languagetools.lsp.client.GenericLanguageClient;
 import com.redhat.mcp.languagetools.server.ServerBase;
 import com.redhat.mcp.languagetools.server.ServerStatus;
+import com.redhat.mcp.languagetools.trace.TraceCollector;
 import com.redhat.mcp.languagetools.workspace.Workspace;
 import com.redhat.mcp.languagetools.workspace.WorkspaceConfiguration;
 import org.eclipse.lsp4j.*;
+import org.eclipse.lsp4j.jsonrpc.Endpoint;
 import org.eclipse.lsp4j.jsonrpc.Launcher;
 import org.eclipse.lsp4j.launch.LSPLauncher;
 import org.eclipse.lsp4j.services.LanguageClient;
@@ -18,7 +20,7 @@ import org.jboss.logging.Logger;
 import com.redhat.mcp.languagetools.lsp.client.LspCapability;
 import com.redhat.mcp.languagetools.lsp.client.LspClientFeatures;
 import com.redhat.mcp.languagetools.lsp.trace.LspTraceMessage;
-import com.redhat.mcp.languagetools.lsp.trace.TracingMessageConsumer;
+import com.redhat.mcp.languagetools.trace.TracingMessageConsumer;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -62,10 +64,6 @@ public class LspServer extends ServerBase<LspServerConfig> {
     protected RequestRouter requestRouter;
     private final LspClientFeatures clientFeatures;
 
-    public RequestRouter getRequestRouter() {
-        return requestRouter;
-    }
-
     public LspServer(LspServerConfig config, Workspace workspace) {
         super(config, workspace);
         this.workspaceRoot = workspace.getRootUri();
@@ -78,43 +76,7 @@ public class LspServer extends ServerBase<LspServerConfig> {
         // Create client features for managing capabilities
         this.clientFeatures = new LspClientFeatures(config);
 
-        // Create RequestRouter for bindRequest routing
-        this.requestRouter = createRequestRouter();
         LOG.infof("[%s] RequestRouter created in constructor", config.getId());
-    }
-
-    /**
-     * Create request router using the workspace to find servers.
-     */
-    private RequestRouter createRequestRouter() {
-        return (targetServerId, method, params, mode) -> {
-            // Look up the target server via workspace
-            LspServer targetServer = getWorkspace().getLspServer(targetServerId);
-
-            if (targetServer == null) {
-                LOG.warnf("Target server '%s' not found for bindRequest: %s", targetServerId, method);
-                return CompletableFuture.failedFuture(
-                        new IllegalStateException("Target server not found: " + targetServerId)
-                );
-            }
-
-            // Wait for target server to be ready before routing (important for JDT.LS)
-            LOG.debugf("Routing request %s to server %s (mode: %s), waiting for server to be ready...",
-                    method, targetServerId, mode);
-
-            return targetServer.waitUntilReady(30000) // 30 seconds timeout
-                    .thenCompose(v -> {
-                        LOG.debugf("Server %s is ready, routing request %s", targetServerId, method);
-
-                        if ("direct".equals(mode)) {
-                            // Direct JSON-RPC request
-                            return targetServer.sendRequest(method, params);
-                        } else {
-                            // Default: workspace/executeCommand (for JDT.LS delegate handlers)
-                            return targetServer.sendCommandRequest(method, params);
-                        }
-                    });
-        };
     }
 
     /**
@@ -164,7 +126,7 @@ public class LspServer extends ServerBase<LspServerConfig> {
                     tracing.getCollector().addTrace(
                         workspaceRoot.toString(),
                         config.getId(),
-                        LspTraceMessage.MessageDirection.SERVER_TO_CLIENT,
+                        TraceCollector.MessageDirection.SERVER_TO_CLIENT,
                         errorMessage
                     );
                     LOG.infof("Trace added successfully");
@@ -195,7 +157,7 @@ public class LspServer extends ServerBase<LspServerConfig> {
                     tracing.getCollector().addTrace(
                         workspaceRoot.toString(),
                         config.getId(),
-                        LspTraceMessage.MessageDirection.SERVER_TO_CLIENT,
+                        TraceCollector.MessageDirection.SERVER_TO_CLIENT,
                         stackTrace.toString()
                     );
                     LOG.infof("Trace added successfully");
@@ -237,7 +199,7 @@ public class LspServer extends ServerBase<LspServerConfig> {
                 tracing.getCollector().addTrace(
                     workspaceRoot.toString(),
                     config.getId(),
-                    LspTraceMessage.MessageDirection.SERVER_TO_CLIENT,
+                    TraceCollector.MessageDirection.SERVER_TO_CLIENT,
                     errorMessage
                 );
                 setStatus(ServerStatus.STOPPED);
@@ -259,7 +221,7 @@ public class LspServer extends ServerBase<LspServerConfig> {
                     tracing.getCollector().addTrace(
                         workspaceRoot.toString(),
                         config.getId(),
-                        LspTraceMessage.MessageDirection.SERVER_TO_CLIENT,
+                        TraceCollector.MessageDirection.SERVER_TO_CLIENT,
                         errorMessage
                     );
                     LOG.infof("Trace added successfully");
@@ -327,7 +289,7 @@ public class LspServer extends ServerBase<LspServerConfig> {
         tracing.getCollector().addTrace(
             workspaceRoot.toString(),
             config.getId(),
-            LspTraceMessage.MessageDirection.SERVER_TO_CLIENT,
+            TraceCollector.MessageDirection.SERVER_TO_CLIENT,
             startMessage
         );
 
@@ -377,7 +339,7 @@ public class LspServer extends ServerBase<LspServerConfig> {
                             tracing.getCollector().addTrace(
                                 workspaceRoot.toString(),
                                 config.getId(),
-                                LspTraceMessage.MessageDirection.SERVER_TO_CLIENT,
+                                TraceCollector.MessageDirection.SERVER_TO_CLIENT,
                                 errorTrace
                             );
                             stackTraceBuffer.setLength(0);
@@ -392,7 +354,7 @@ public class LspServer extends ServerBase<LspServerConfig> {
                         tracing.getCollector().addTrace(
                             workspaceRoot.toString(),
                             config.getId(),
-                            LspTraceMessage.MessageDirection.SERVER_TO_CLIENT,
+                            TraceCollector.MessageDirection.SERVER_TO_CLIENT,
                             errorTrace
                         );
                     }
@@ -407,7 +369,7 @@ public class LspServer extends ServerBase<LspServerConfig> {
                     tracing.getCollector().addTrace(
                         workspaceRoot.toString(),
                         config.getId(),
-                        LspTraceMessage.MessageDirection.SERVER_TO_CLIENT,
+                        TraceCollector.MessageDirection.SERVER_TO_CLIENT,
                         errorTrace
                     );
                 }
@@ -534,7 +496,7 @@ public class LspServer extends ServerBase<LspServerConfig> {
         }
 
         // Send directly via Endpoint (JSON-RPC)
-        if (languageServer instanceof org.eclipse.lsp4j.jsonrpc.Endpoint endpoint) {
+        if (languageServer instanceof Endpoint endpoint) {
             return endpoint.request(method, params)
                 .thenApply(result -> (Object) result);
         }
@@ -610,7 +572,8 @@ public class LspServer extends ServerBase<LspServerConfig> {
                 // Try graceful shutdown first
                 if (languageServer != null) {
                     try {
-                        languageServer.shutdown().get(5, TimeUnit.SECONDS);
+                        languageServer.shutdown()
+                                .get(5, TimeUnit.SECONDS);
                         languageServer.exit();
                     } catch (Exception e) {
                         LOG.warnf("Graceful shutdown failed for %s: %s", config.getId(), e.getMessage());

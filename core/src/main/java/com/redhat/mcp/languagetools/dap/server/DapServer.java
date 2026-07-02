@@ -2,7 +2,8 @@ package com.redhat.mcp.languagetools.dap.server;
 
 import com.redhat.mcp.languagetools.dap.client.DapClient;
 import com.redhat.mcp.languagetools.dap.client.DapEventListener;
-import com.redhat.mcp.languagetools.dap.trace.DapTraceMessage;
+import com.redhat.mcp.languagetools.trace.TraceCollector;
+import com.redhat.mcp.languagetools.trace.TracingMessageConsumer;
 import com.redhat.mcp.languagetools.server.ServerBase;
 import com.redhat.mcp.languagetools.server.ServerStatus;
 import com.redhat.mcp.languagetools.workspace.Workspace;
@@ -19,6 +20,7 @@ import org.jboss.logging.Logger;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -33,16 +35,20 @@ import java.util.function.UnaryOperator;
 public class DapServer extends ServerBase<DapServerConfig> {
 
     private static final Logger LOG = Logger.getLogger(DapServer.class);
-
-    protected final DapServerContext context;
+    private final Path serverHome;
+    private final TracingMessageConsumer tracing;
+    private final String sessionId;
 
     protected IDebugProtocolServer debugServer;
     protected DapClient dapClient;
     private static MessageJsonHandler jsonHandler;
 
-    public DapServer(DapServerConfig config, Workspace workspace, DapServerContext context) {
+    public DapServer(String sessionId, DapServerConfig config, Workspace workspace) {
         super(config, workspace);
-        this.context = context;
+        this.sessionId = sessionId;
+        var workspaceRoot = workspace.getRootUri();
+        this.serverHome = workspace.getApplication().getPathManager().getDapServerHome(config.getId());
+        this.tracing = new TracingMessageConsumer(workspace.getApplication().getDapTraceCollector(), workspaceRoot.toString(), config.getId());
     }
 
     /**
@@ -58,7 +64,7 @@ public class DapServer extends ServerBase<DapServerConfig> {
                 // Build and launch process
                 List<String> command = buildCommand();
                 ProcessBuilder pb = new ProcessBuilder(command);
-                pb.directory(context.getDapServerHome().toFile());
+                pb.directory(serverHome.toFile());
 
                 // Set environment variables
                 if (config.getEnv() != null) {
@@ -67,14 +73,17 @@ public class DapServer extends ServerBase<DapServerConfig> {
                 }
 
                 // Log command to trace collector
+
                 String commandStr = String.join(" ", command);
-                context.getTraceCollector().addTrace(
-                        context.getWorkspaceRoot().toString(),
-                        context.getSessionId(),
-                        DapTraceMessage.MessageDirection.SENT,
+                var traceCollector = tracing.getCollector();
+                String workspaceRootUri = getWorkspace().getRootUri().toString();
+                traceCollector.addTrace(
+                        workspaceRootUri,
+                        sessionId,
+                        TraceCollector.MessageDirection.CLIENT_TO_SERVER,
                         "Starting DAP server: " + config.getName() + "\n" +
                                 "Command: " + commandStr + "\n" +
-                                "Working directory: " + context.getDapServerHome()
+                                "Working directory: " + serverHome
                 );
 
                 serverProcess = pb.start();
@@ -82,10 +91,10 @@ public class DapServer extends ServerBase<DapServerConfig> {
                         config.getId(), serverProcess.pid());
 
                 // Log process started
-                context.getTraceCollector().addTrace(
-                        context.getWorkspaceRoot().toString(),
-                        context.getSessionId(),
-                        DapTraceMessage.MessageDirection.RECEIVED,
+                traceCollector.addTrace(
+                        workspaceRootUri,
+                        sessionId,
+                        TraceCollector.MessageDirection.SERVER_TO_CLIENT,
                         "DAP server process started (PID: " + serverProcess.pid() + ")"
                 );
 
@@ -99,14 +108,14 @@ public class DapServer extends ServerBase<DapServerConfig> {
                 UnaryOperator<MessageConsumer> wrapper = consumer -> message -> {
                     // Log trace
                     boolean isSent = consumer.getClass().getSimpleName().equals("StreamMessageConsumer");
-                    DapTraceMessage.MessageDirection direction = isSent ?
-                            DapTraceMessage.MessageDirection.SENT :
-                            DapTraceMessage.MessageDirection.RECEIVED;
+                    TraceCollector.MessageDirection direction = isSent ?
+                            TraceCollector.MessageDirection.CLIENT_TO_SERVER :
+                            TraceCollector.MessageDirection.SERVER_TO_CLIENT;
 
                     String jsonContent = toJson(message);
-                    context.getTraceCollector().addTrace(
-                            context.getWorkspaceRoot().toString(),
-                            context.getSessionId(),
+                    traceCollector.addTrace(
+                            workspaceRootUri,
+                            sessionId,
                             direction,
                             jsonContent
                     );
@@ -191,10 +200,10 @@ public class DapServer extends ServerBase<DapServerConfig> {
         }
 
         // Substitute variables
-        String resolved = cmd
-                .replace("${workspace}", context.getWorkspaceRoot().getPath())
-                .replace("${workspaceDataDir}", context.getWorkspaceDataDir().toString())
-                .replace("${context.getDapServerHome()}", context.getDapServerHome().toString());
+        String resolved = cmd;
+                //.replace("${workspace}", context.getWorkspaceRoot().getPath())
+                //.replace("${workspaceDataDir}", context.getWorkspaceDataDir().toString())
+                //.replace("${context.getDapServerHome()}", context.getDapServerHome().toString());
 
         // Simple parsing (split by spaces, respecting quotes)
         List<String> command = new ArrayList<>();

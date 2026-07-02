@@ -1,6 +1,7 @@
 package com.redhat.mcp.languagetools;
 
 import com.redhat.mcp.languagetools.dap.server.DapServerConfig;
+import com.redhat.mcp.languagetools.dap.trace.DapTraceCollector;
 import com.redhat.mcp.languagetools.language.LanguageRegistry;
 import com.redhat.mcp.languagetools.lsp.LspContributionManager;
 import com.redhat.mcp.languagetools.lsp.server.LspServerConfig;
@@ -25,10 +26,7 @@ import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -63,6 +61,11 @@ public class Application {
 
     @Inject
     Event<LspServerStatusChangeEvent> lspServerStatusChangeEvent;
+
+    // ----------- DAP servers
+
+    @Inject
+    DapTraceCollector dapTraceCollector;
 
     // ----------- MCP servers
 
@@ -385,11 +388,14 @@ public class Application {
         return URI.create(uriStr);
     }
 
+    public Workspace getWorkspace(URI uri) {
+        return workspaces.get(uri);
+    }
     /**
      * Get all active workspaces.
      */
-    public Map<URI, Workspace> getWorkspaces() {
-        return Map.copyOf(workspaces);
+    public Collection<Workspace> getWorkspaces() {
+        return workspaces.values();
     }
 
     public Map<String, LspServerConfig> getLspServerConfigs() {
@@ -464,6 +470,10 @@ public class Application {
 
     public LspTraceCollector getLspTraceCollector() {
         return lspTraceCollector;
+    }
+
+    public DapTraceCollector getDapTraceCollector() {
+        return dapTraceCollector;
     }
 }
 

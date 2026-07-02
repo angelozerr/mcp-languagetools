@@ -9,6 +9,7 @@ import com.redhat.mcp.languagetools.workspace.Workspace;
 import com.redhat.mcp.languagetools.Application;
 
 import java.net.URI;
+import java.util.Collection;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -27,17 +28,16 @@ public class WorkspaceTools {
                         "Workspaces are initialized automatically when using diagnostics tools.")
     public String listWorkspaces() {
         try {
-            Map<URI, Workspace> workspaces = application.getWorkspaces();
-
+            Collection<Workspace> workspaces = application.getWorkspaces();
             if (workspaces.isEmpty()) {
                 return "No workspaces currently active";
             }
 
-            return workspaces.entrySet().stream()
-                    .map(entry -> String.format("- %s (%d language servers, initialized: %s)",
-                            entry.getKey(),
-                            entry.getValue().getAllLspServers().size(),
-                            entry.getValue().isInitialized()))
+            return workspaces.stream()
+                    .map(workspace -> String.format("- %s (%d language servers, initialized: %s)",
+                            workspace.getRootUri(),
+                            workspace.getAllLspServers().size(),
+                            workspace.isInitialized()))
                     .collect(Collectors.joining("\n", "Active workspaces:\n", ""));
 
         } catch (Exception e) {

@@ -1,24 +1,19 @@
 package com.redhat.mcp.languagetools.dap.session;
 
-import com.redhat.mcp.languagetools.ApplicationContext;
-import com.redhat.mcp.languagetools.PathManager;
-import com.redhat.mcp.languagetools.WorkspaceContext;
 import com.redhat.mcp.languagetools.dap.client.DapEventListener;
 import com.redhat.mcp.languagetools.dap.server.DapServer;
 import com.redhat.mcp.languagetools.dap.server.DapServerConfig;
-import com.redhat.mcp.languagetools.dap.server.DapServerContext;
 import com.redhat.mcp.languagetools.dap.trace.DapTraceCollector;
-import com.redhat.mcp.languagetools.dap.trace.DapTraceMessage;
 import com.redhat.mcp.languagetools.installer.InstallerContext;
 import com.redhat.mcp.languagetools.installer.ServerInstaller;
 import com.redhat.mcp.languagetools.installer.TraceProgressIndicator;
+import com.redhat.mcp.languagetools.trace.TraceCollector;
 import com.redhat.mcp.languagetools.workspace.Workspace;
 import org.eclipse.lsp4j.debug.*;
 import org.eclipse.lsp4j.debug.Thread;
 import org.eclipse.lsp4j.debug.services.IDebugProtocolServer;
 import org.jboss.logging.Logger;
 
-import java.net.URI;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -44,9 +39,8 @@ public class DapSession implements DapEventListener {
     private final String sessionName;
     private final DapServerConfig serverConfig;
     private final DapServer dapServer;
-    private final ApplicationContext appContext;
-    private final com.redhat.mcp.languagetools.dap.trace.DapTraceCollector traceCollector;
     private final Workspace workspace;
+    private final DapTraceCollector traceCollector;
 
     private SessionState state = SessionState.CREATED;
     private final Map<String, BreakpointInfo> breakpoints = new ConcurrentHashMap<>();
@@ -84,65 +78,15 @@ public class DapSession implements DapEventListener {
                       String language,
                       String sessionName,
                       DapServerConfig serverConfig,
-                      ApplicationContext appContext,
                       Workspace workspace,
                       DapTraceCollector traceCollector) {
         this.sessionId = sessionId;
         this.language = language;
         this.sessionName = sessionName;
         this.serverConfig = serverConfig;
-        this.appContext = appContext;
         this.workspace = workspace;
-        this.traceCollector = traceCollector;
-
-        // Create DapServer instance with context
-        Path serverHome = appContext.getPathManager().getDapServerHome(serverConfig.getId());
-
-        // Create DAP server context
-        DapServerContext dapContext = new DapServerContext() {
-            @Override
-            public ApplicationContext getApplicationContext() {
-                return appContext;
-            }
-
-            @Override
-            public PathManager getPathManager() {
-                return appContext.getPathManager();
-            }
-
-            @Override
-            public Path getDapServerHome() {
-                return serverHome;
-            }
-
-            @Override
-            public DapTraceCollector getTraceCollector() {
-                return traceCollector;
-            }
-
-            @Override
-            public String getSessionId() {
-                return sessionId;
-            }
-
-            @Override
-            public String getSessionName() {
-                return sessionName;
-            }
-
-            @Override
-            public URI getWorkspaceRoot() {
-                return workspace.getRootUri();
-            }
-
-            @Override
-            public Path getWorkspaceDataDir() {
-                return workspace.getWorkspaceDataDir();
-            }
-        };
-
-        this.dapServer = new DapServer(serverConfig, workspace, dapContext);
-
+        this.traceCollector = workspace.getApplication().getDapTraceCollector();
+        this.dapServer = new DapServer(sessionId, serverConfig, workspace);
         // Register this session as the event listener
         this.dapServer.setEventListener(this);
     }
@@ -166,12 +110,12 @@ public class DapSession implements DapEventListener {
             traceCollector.addTrace(
                 workspace.getRootUri().toString(),
                 sessionId,
-                DapTraceMessage.MessageDirection.SENT,
+                TraceCollector.MessageDirection.CLIENT_TO_SERVER,
                 "INSTALL: Ensuring " + serverConfig.getName() + " is installed..."
             );
 
             // Create installation context
-            Path installDir = appContext.getPathManager().getDapServerHome(serverConfig.getId());
+            Path installDir = workspace.getApplication().getPathManager().getDapServerHome(serverConfig.getId());
             TraceProgressIndicator progress = new TraceProgressIndicator(serverConfig.getTraceCollector());
             InstallerContext context = new InstallerContext(serverConfig, installDir, progress);
 
@@ -198,7 +142,7 @@ public class DapSession implements DapEventListener {
                 traceCollector.addTrace(
                     workspace.getRootUri().toString(),
                     sessionId,
-                    DapTraceMessage.MessageDirection.RECEIVED,
+                    TraceCollector.MessageDirection.SERVER_TO_CLIENT,
                     "❌ Installation failed: " + ex.getMessage()
                 );
 
@@ -228,7 +172,7 @@ public class DapSession implements DapEventListener {
                 traceCollector.addTrace(
                     workspace.getRootUri().toString(),
                     sessionId,
-                    DapTraceMessage.MessageDirection.RECEIVED,
+                    TraceCollector.MessageDirection.SERVER_TO_CLIENT,
                     "❌ Failed to initialize: " + ex.getMessage()
                 );
 

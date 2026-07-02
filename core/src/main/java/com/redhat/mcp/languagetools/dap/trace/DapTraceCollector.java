@@ -1,11 +1,14 @@
 package com.redhat.mcp.languagetools.dap.trace;
 
+import com.redhat.mcp.languagetools.trace.TracingMessageConsumer;
+import com.redhat.mcp.languagetools.trace.TraceCollector;
 import io.quarkus.runtime.annotations.RegisterForReflection;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Event;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedDeque;
 
@@ -15,7 +18,7 @@ import java.util.concurrent.ConcurrentLinkedDeque;
  */
 @ApplicationScoped
 @RegisterForReflection
-public class DapTraceCollector {
+public class DapTraceCollector implements TracingMessageConsumer.TraceCollectorAdd {
 
     private static final Logger LOG = Logger.getLogger(DapTraceCollector.class);
     private static final int MAX_TRACE_MESSAGES = 1000;
@@ -25,15 +28,23 @@ public class DapTraceCollector {
     @Inject
     Event<DapTraceMessage> traceEvent;
 
-    public void addTrace(String workspaceUri, String sessionId, DapTraceMessage.MessageDirection direction, String jsonContent) {
-        addTrace(workspaceUri, sessionId, direction, jsonContent, null);
+    @Override
+    public void addTrace(String workspaceUri,
+                         String sessionId,
+                         TraceCollector.MessageDirection direction,
+                         String jsonContent) {
+        addTrace(workspaceUri, sessionId, direction, jsonContent, TraceCollector.MessageType.TRACE);
     }
 
-    public void addTrace(String workspaceUri, String sessionId, DapTraceMessage.MessageDirection direction, String jsonContent, com.redhat.mcp.languagetools.trace.TraceCollector.MessageType messageType) {
+    public void addTrace(String workspaceUri,
+                         String sessionId,
+                         TraceCollector.MessageDirection direction,
+                         String jsonContent,
+                         TraceCollector.MessageType messageType) {
         DapTraceMessage message = new DapTraceMessage(
             workspaceUri,
             sessionId,
-            java.time.Instant.now(),
+            Instant.now(),
             direction,
             jsonContent,
             messageType

@@ -56,7 +56,7 @@ public class LspServerControlResource {
                                 @PathParam("serverId") String serverId) {
         try {
             URI workspaceUri = URI.create(workspaceUriParam);
-            Workspace workspace = application.getWorkspaces().get(workspaceUri);
+            Workspace workspace = application.getWorkspace(workspaceUri);
 
             if (workspace == null) {
                 return Response.status(404).entity("Workspace not found").build();
@@ -80,7 +80,7 @@ public class LspServerControlResource {
                                    @PathParam("serverId") String serverId) {
         try {
             URI workspaceUri = URI.create(workspaceUriParam);
-            Workspace workspace = application.getWorkspaces().get(workspaceUri);
+            Workspace workspace = application.getWorkspace(workspaceUri);
 
             if (workspace == null) {
                 return Response.status(404).entity("Workspace not found").build();
@@ -101,7 +101,7 @@ public class LspServerControlResource {
                                         @PathParam("serverId") String serverId) {
         try {
             URI workspaceUri = URI.create(workspaceUriParam);
-            Workspace workspace = application.getWorkspaces().get(workspaceUri);
+            Workspace workspace = application.getWorkspace(workspaceUri);
 
             if (workspace == null) {
                 return Response.status(404).entity("Workspace not found").build();
@@ -129,7 +129,7 @@ public class LspServerControlResource {
                                        @PathParam("serverId") String serverId) {
         try {
             URI workspaceUri = URI.create(workspaceUriParam);
-            Workspace workspace = application.getWorkspaces().get(workspaceUri);
+            Workspace workspace = application.getWorkspace(workspaceUri);
 
             if (workspace == null) {
                 return Response.status(404).entity("Workspace not found").build();
@@ -154,7 +154,7 @@ public class LspServerControlResource {
                                   @PathParam("serverId") String serverId) {
         try {
             URI workspaceUri = URI.create(workspaceUriParam);
-            Workspace workspace = application.getWorkspaces().get(workspaceUri);
+            Workspace workspace = application.getWorkspace(workspaceUri);
 
             if (workspace == null) {
                 return Response.status(404).entity("Workspace not found").build();

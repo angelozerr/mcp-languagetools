@@ -14,6 +14,7 @@ import jakarta.ws.rs.core.Response;
 import org.jboss.logging.Logger;
 
 import java.net.URI;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -45,8 +46,9 @@ public class AdminResource {
      */
 
     private List<WorkspaceDTO> getCurrentWorkspaces() {
-        return application.getWorkspaces().entrySet().stream()
-                .map(entry -> toDTO(entry.getKey(), entry.getValue()))
+        return application.getWorkspaces()
+                .stream()
+                .map(workspace -> toDTO(workspace))
                 .toList();
     }
 
@@ -54,11 +56,11 @@ public class AdminResource {
     @Path("/workspaces/{uri}")
     public WorkspaceDTO getWorkspace(@PathParam("uri") String uriParam) {
         URI uri = URI.create(uriParam);
-        Workspace workspace = application.getWorkspaces().get(uri);
+        Workspace workspace = application.getWorkspace(uri);
         if (workspace == null) {
             throw new NotFoundException("Workspace not found: " + uri);
         }
-        return toDTO(uri, workspace);
+        return toDTO(workspace);
     }
 
     /**
@@ -76,7 +78,8 @@ public class AdminResource {
                 .build();
     }
 
-    private WorkspaceDTO toDTO(URI uri, Workspace workspace) {
+    private WorkspaceDTO toDTO(Workspace workspace) {
+        var uri = workspace.getRootUri();
         // Get all available server descriptors
         var allServerConfigs = application.getLspServerConfigs();
 
@@ -91,8 +94,8 @@ public class AdminResource {
                 .collect(Collectors.toList());
 
         // Build MCP client info with timestamps
-        java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ISO_INSTANT;
-        java.util.List<WorkspaceDTO.McpClientInfo> mcpClients = workspace.getMcpClientConnections().values().stream()
+        DateTimeFormatter formatter = DateTimeFormatter.ISO_INSTANT;
+        List<WorkspaceDTO.McpClientInfo> mcpClients = workspace.getMcpClientConnections().values().stream()
                 .map(clientInfo -> new WorkspaceDTO.McpClientInfo(
                     clientInfo.name(),
                     formatter.format(clientInfo.connectedAt())

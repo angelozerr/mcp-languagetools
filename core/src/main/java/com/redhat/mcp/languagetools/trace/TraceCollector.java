@@ -17,6 +17,11 @@ public interface TraceCollector {
         INFO     // Info message
     }
 
+    enum MessageDirection {
+        CLIENT_TO_SERVER,
+        SERVER_TO_CLIENT
+    }
+
     /**
      * Send a trace message with specific level and type.
      *

@@ -12,12 +12,8 @@ public record LspTraceMessage(
     String workspaceUri,
     String serverId,
     Instant timestamp,
-    MessageDirection direction,
+    TraceCollector.MessageDirection direction,
     String jsonContent,
     TraceCollector.MessageType messageType  // null = TRACE (default)
 ) {
-    public enum MessageDirection {
-        CLIENT_TO_SERVER,
-        SERVER_TO_CLIENT
-    }
 }
