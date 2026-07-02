@@ -76,7 +76,7 @@ public class LspRequestExecutor {
                             .map(server -> strategy.executeRequest(server, lspParams)
                                     .exceptionally(ex -> {
                                         LOG.warnf("Failed to execute %s on server %s: %s",
-                                                strategy.getCapability(), server.getConfig().getId(), ex.getMessage());
+                                                strategy.getCapability(), server.getConfig().getServerId(), ex.getMessage());
                                         return strategy.getEmptyResult();
                                     }))
                             .toList();

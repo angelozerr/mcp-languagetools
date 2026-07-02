@@ -1,16 +1,13 @@
 package com.redhat.mcp.languagetools.workspace;
 
 import com.redhat.mcp.languagetools.Application;
-import com.redhat.mcp.languagetools.PathManager;
 import com.redhat.mcp.languagetools.dap.server.DapServerConfig;
-import com.redhat.mcp.languagetools.installer.InstallResult;
-import com.redhat.mcp.languagetools.installer.InstallerContext;
-import com.redhat.mcp.languagetools.installer.ServerInstaller;
-import com.redhat.mcp.languagetools.installer.TraceProgressIndicator;
+import com.redhat.mcp.languagetools.installer.*;
 import com.redhat.mcp.languagetools.lsp.LspContributionManager;
 import com.redhat.mcp.languagetools.lsp.LspInstanceRegistry;
 import com.redhat.mcp.languagetools.lsp.server.*;
 import com.redhat.mcp.languagetools.lsp.trace.LspTraceCollector;
+import com.redhat.mcp.languagetools.server.ServerBase;
 import com.redhat.mcp.languagetools.server.ServerStatus;
 import org.jboss.logging.Logger;
 
@@ -19,10 +16,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
@@ -35,33 +29,22 @@ public class Workspace {
 
     private static final Logger LOG = Logger.getLogger(Workspace.class);
 
-    private final URI rootUri;
     private final Application application;
 
+    // Workspace
+    private final URI rootUri;
     private final Path workspaceDataDir;
-    private final LspTraceCollector lspTraceCollector;
-    private final PathManager pathManager;
     private final WorkspaceConfiguration configuration;
+
+    // LSP
+    private final LspTraceCollector lspTraceCollector;
 
     private LspContributionManager extensionManager;
     private final Map<String, LspServer> lspServers = new ConcurrentHashMap<>();
-    private final Map<String, DapServerConfig> dapServerConfigs = new ConcurrentHashMap<>();
-    private final Map<String, ServerInfo> serverInfos = new ConcurrentHashMap<>();
     private final Map<String, ServerStatus> installationStatus = new ConcurrentHashMap<>();
-    private List<LspServerConfig> allServerConfigs = new ArrayList<>();
     private final Map<String, McpClientInfo> mcpClientConnections = new ConcurrentHashMap<>();
     private volatile boolean initialized = false;
     private Consumer<LspServerStatusChangeEvent> statusChangeCallback;
-
-    private static class ServerInfo {
-        final LspServerConfig config;
-        final Path serverHome;
-
-        ServerInfo(LspServerConfig config, Path serverHome) {
-            this.config = config;
-            this.serverHome = serverHome;
-        }
-    }
 
     public record McpClientInfo(
             String connectionId,
@@ -77,7 +60,6 @@ public class Workspace {
         this.application = application;
         this.workspaceDataDir = createWorkspaceDataDir(application.getPathManager().getWorkspaceDataDir(), rootUri);
         this.lspTraceCollector = application.getLspTraceCollector();
-        this.pathManager = application.getPathManager();
         this.configuration = new WorkspaceConfiguration(Paths.get(rootUri));
     }
 
@@ -107,12 +89,12 @@ public class Workspace {
      * Factorized method to avoid code duplication.
      * Works for both LSP and DAP servers since they both extend ServerBase.
      */
-    private void registerServerStatusCallback(com.redhat.mcp.languagetools.server.ServerBase<?> server, String serverId) {
+    private void registerServerStatusCallback(ServerBase<?> server) {
         server.setStatusChangeCallback((oldStatus, newStatus) -> {
             if (statusChangeCallback != null) {
                 statusChangeCallback.accept(new LspServerStatusChangeEvent(
                         rootUri,
-                        serverId,
+                        server.getId(),
                         oldStatus,
                         newStatus
                 ));
@@ -124,42 +106,19 @@ public class Workspace {
      * Add an LSP server to this workspace (serverHome calculated from PathManager).
      *
      * @param config           Server configuration
-     * @param allServerConfigs All server configurations (for reading contributes)
      */
-    public void addLspServer(LspServerConfig config, List<LspServerConfig> allServerConfigs) {
-        Path serverHome = pathManager.getLspServerHome(config.getId());
-        addLspServer(config, serverHome, allServerConfigs);
-    }
-
-    /**
-     * Add a language server to this workspace.
-     *
-     * @param config           Server configuration
-     * @param serverHome       Server installation directory
-     * @param allServerConfigs All server configurations (for reading contributes)
-     */
-    public void addLspServer(LspServerConfig config, Path serverHome, List<LspServerConfig> allServerConfigs) {
-        // Store allServerConfigs for later use (reconnect, etc.)
-        this.allServerConfigs = allServerConfigs;
-
+    public void addLspServer(LspServerConfig config) {
         // Set trace collector for installation support
         if (config.getTraceCollector() == null) {
             // Create a TraceCollector wrapper around LspTraceCollector
-            config.setTraceCollector(new LspTraceCollectorWrapper(lspTraceCollector, rootUri.toString(), config.getId()));
+            config.setTraceCollector(new LspTraceCollectorWrapper(lspTraceCollector, rootUri.toString(), config.getServerId()));
         }
 
-        LspServer server = LspServerFactoryRegistry.createServer(config, this);
-        server.setWorkspaceConfiguration(configuration);
+        LspServer server = createLspServer(config);
         if (extensionManager != null) {
             server.setLspContributionManager(extensionManager);
         }
-
-        // Register status change callback
-        registerServerStatusCallback(server, config.getId());
-
-        lspServers.put(config.getId(), server);
-        serverInfos.put(config.getId(), new ServerInfo(config, serverHome));
-        LOG.infof("Added LSP server '%s' to workspace: %s", config.getId(), rootUri);
+        LOG.infof("Added LSP server '%s' to workspace: %s", config.getServerId(), rootUri);
     }
 
 
@@ -168,8 +127,8 @@ public class Workspace {
      * Will try to connect to IDE instance if available.
      */
     public CompletableFuture<Void> restartLspServer(String serverId) {
-        ServerInfo info = serverInfos.get(serverId);
-        if (info == null) {
+        LspServerConfig serverConfig = application.getLspServerConfig(serverId);
+        if (serverConfig == null) {
             return CompletableFuture.failedFuture(new IllegalArgumentException("Server not found: " + serverId));
         }
 
@@ -183,12 +142,7 @@ public class Workspace {
                 }
 
                 // Create new server instance using factory
-                LspServer newServer = LspServerFactoryRegistry.createServer(info.config, this);
-                newServer.setWorkspaceConfiguration(configuration);
-
-                // Register status change callback
-                registerServerStatusCallback(newServer, info.config.getId());
-
+                LspServer newServer = createLspServer(serverConfig);
                 lspServers.put(serverId, newServer);
 
                 // Start and initialize (will detect IDE instance)
@@ -210,12 +164,12 @@ public class Workspace {
      * Handles installation if needed before starting.
      */
     public CompletableFuture<Void> startManagedLspServer(String serverId) {
-        ServerInfo info = serverInfos.get(serverId);
-        if (info == null) {
+        LspServerConfig serverConfig = application.getLspServerConfig(serverId);
+        if (serverConfig == null) {
             return CompletableFuture.failedFuture(new IllegalArgumentException("Server not found: " + serverId));
         }
 
-        LspServer oldServer = lspServers.get(serverId);
+        LspServer oldServer = getLspServer(serverId);
 
         // Shutdown old server if it exists
         CompletableFuture<Void> shutdownFuture;
@@ -228,34 +182,21 @@ public class Workspace {
         return shutdownFuture
                 .thenCompose(v -> {
             // Create new server instance BEFORE installation so we can set INSTALLING status
-            LspServer newServer = LspServerFactoryRegistry.createServer(info.config, this);
-            newServer.setWorkspaceConfiguration(configuration);
+            LspServer newServer = createLspServer(serverConfig);
 
             // Set status to INSTALLING if installer exists (BEFORE adding to lspServers map)
-            if (info.config.getInstaller() != null) {
+            if (serverConfig.getInstaller() != null) {
                 newServer.setStatus(ServerStatus.INSTALLING);
             }
 
-            // Register status change callback
-            registerServerStatusCallback(newServer, info.config.getId());
-
-            lspServers.put(serverId, newServer);
 
             // Step 1: Install server if needed
-            return ensureServerInstalled(info.config)
+            return ensureServerInstalled(serverConfig)
                     .thenCompose(installResult -> {
                         // Step 2: Update config with installed command if installer provided one
                         if (installResult != null && installResult.getCommand() != null) {
-                            info.config.setCommand(installResult.getCommand());
+                            serverConfig.setCommand(installResult.getCommand());
                         }
-
-                        // Use installDir from result, or fallback to original serverHome
-                        Path serverHome = installResult != null && installResult.getInstallDir() != null
-                                ? installResult.getInstallDir()
-                                : info.serverHome;
-
-                        // Update serverHome in info
-                        serverInfos.put(serverId, new ServerInfo(info.config, serverHome));
 
                         // Step 3: Start and initialize
                         return newServer.startManagedOnly()
@@ -269,8 +210,8 @@ public class Workspace {
 
                         // Update server status based on the type of failure
                         Throwable cause = ex.getCause();
-                        if (cause instanceof com.redhat.mcp.languagetools.installer.InstallationException
-                                || ex instanceof com.redhat.mcp.languagetools.installer.InstallationException) {
+                        if (cause instanceof InstallationException
+                                || ex instanceof InstallationException) {
                             newServer.setStatus(ServerStatus.INSTALL_FAILED);
                         } else {
                             newServer.setStatus(ServerStatus.START_FAILED);
@@ -294,7 +235,7 @@ public class Workspace {
         }
 
         // Create installation context
-        Path installDir = pathManager.getLspServerHome(config.getId());
+        Path installDir = config.getServerHome();
         TraceProgressIndicator progress = new TraceProgressIndicator(config.getTraceCollector());
 
         // Store progress indicator in config so UI can access it
@@ -303,7 +244,7 @@ public class Workspace {
         InstallerContext context = new InstallerContext(config, installDir, progress);
 
         // Add workspace-specific variables
-        context.setVariable("USER_HOME", pathManager.getMcpLangToolsRoot().toString());
+        context.setVariable("USER_HOME", application.getPathManager().getMcpLangToolsRoot().toString());
         context.setVariable("PROJECT_DIR", rootUri.getPath());
 
         // Run installation
@@ -372,22 +313,7 @@ public class Workspace {
      * DAP servers are not started automatically - they are started on-demand during debug sessions.
      */
     public void addDapServer(DapServerConfig config) {
-        dapServerConfigs.put(config.getId(), config);
-        LOG.infof("Added DAP server to workspace %s: %s", rootUri, config.getId());
-    }
-
-    /**
-     * Get a DAP server configuration by ID.
-     */
-    public DapServerConfig getDapServerConfig(String id) {
-        return dapServerConfigs.get(id);
-    }
-
-    /**
-     * Get all DAP server configurations for this workspace.
-     */
-    public Map<String, DapServerConfig> getDapServerConfigs() {
-        return Map.copyOf(dapServerConfigs);
+        LOG.infof("Added DAP server to workspace %s: %s", rootUri, config.getServerId());
     }
 
     /**
@@ -419,13 +345,6 @@ public class Workspace {
 
         // Default: stopped
         return ServerStatus.STOPPED;
-    }
-
-    /**
-     * Get all language servers.
-     */
-    public Map<String, LspServer> getAllLspServers() {
-        return Map.copyOf(lspServers);
     }
 
     /**
@@ -511,5 +430,23 @@ public class Workspace {
     public Application getApplication() {
         return application;
     }
+
+    // LSP servers
+
+    public Collection<LspServer> getLspServers() {
+        return lspServers.values();
+    }
+
+    private LspServer createLspServer(LspServerConfig serverConfig) {
+        // Create new server instance using factory
+        LspServer newServer = LspServerFactoryRegistry.createServer(serverConfig, this);
+        lspServers.put(newServer.getId(), newServer);
+        // Register status change callback
+        registerServerStatusCallback(newServer);
+        return newServer;
+    }
+
+    // DAP servers
+
 }
 

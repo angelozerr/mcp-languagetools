@@ -28,11 +28,13 @@ public class PathManager {
         return pathConfig.getMcpLangToolsDir();
     }
 
+    // ----------------------- LSP configuration
+
     /**
      * Get the directory where LSP servers are installed (~/.mcp-languagetools/lsp)
      */
     public Path getLspServersDir() {
-        return getMcpLangToolsRoot().resolve(pathConfig.getLspDirName());
+        return getMcpLangToolsRoot().resolve(PathConfig.getLspDirName());
     }
 
     /**
@@ -42,11 +44,13 @@ public class PathManager {
         return getLspServersDir().resolve(serverId);
     }
 
+    // ----------------------- DAP configuration
+
     /**
      * Get the directory where DAP servers are installed (~/.mcp-languagetools/dap)
      */
     public Path getDapServersDir() {
-        return getMcpLangToolsRoot().resolve("dap");
+        return getMcpLangToolsRoot().resolve(PathConfig.getDapDirName());
     }
 
     /**
@@ -55,6 +59,8 @@ public class PathManager {
     public Path getDapServerHome(String serverId) {
         return getDapServersDir().resolve(serverId);
     }
+
+    // Workspace configuration
 
     /**
      * Get the config directory root (~/.mcp-languagetools/config)
@@ -67,7 +73,7 @@ public class PathManager {
      * Get the config directory for LSP servers (~/.mcp-languagetools/config/lsp)
      */
     public Path getLspConfigDir() {
-        return getConfigDir().resolve(pathConfig.getLspDirName());
+        return getConfigDir().resolve(PathConfig.getLspDirName());
     }
 
     /**

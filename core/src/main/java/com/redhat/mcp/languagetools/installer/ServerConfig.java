@@ -2,6 +2,8 @@ package com.redhat.mcp.languagetools.installer;
 
 import com.google.gson.JsonElement;
 
+import java.nio.file.Path;
+
 /**
  * Common interface for server configurations (LSP and DAP).
  * Provides access to installer configuration.
@@ -11,7 +13,9 @@ public interface ServerConfig {
     /**
      * Get the server ID.
      */
-    String getId();
+    String getServerId();
+
+    Path getServerHome();
 
     /**
      * Get the server name.

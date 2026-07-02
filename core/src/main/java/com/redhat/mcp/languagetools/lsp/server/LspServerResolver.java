@@ -46,10 +46,11 @@ public class LspServerResolver {
         return application.getWorkspaceForFile(document.getUri())
                 .thenApply(workspace -> {
                     // Get all LSP servers from workspace
-                    var allServers = workspace.getAllLspServers();
+                    var allServers = workspace.getLspServers();
 
                     // Filter servers based on the predicate
-                    return allServers.values().stream()
+                    return allServers
+                            .stream()
                             .filter(filter)
                             .collect(Collectors.toList());
                 });
@@ -70,10 +71,11 @@ public class LspServerResolver {
         return application.getWorkspaceForPath(cwd)
                 .thenApply(workspace -> {
                     // Get all LSP servers from workspace
-                    var allServers = workspace.getAllLspServers();
+                    var allServers = workspace.getLspServers();
 
                     // Filter servers based on the predicate
-                    return allServers.values().stream()
+                    return allServers
+                            .stream()
                             .filter(filter)
                             .collect(Collectors.toList());
                 });

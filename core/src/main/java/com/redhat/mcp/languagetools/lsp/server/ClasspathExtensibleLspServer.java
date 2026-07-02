@@ -38,24 +38,24 @@ public class ClasspathExtensibleLspServer extends LspServer {
     @Override
     protected List<String> buildCommand() throws IOException {
         var config = super.getConfig();
-        LOG.infof("ClasspathExtensibleLspServer.buildCommand() called for %s", config.getId());
+        LOG.infof("ClasspathExtensibleLspServer.buildCommand() called for %s", config.getServerId());
 
         // Get base command from config
         List<String> baseCommand = super.buildCommand();
-        LOG.infof("Base command for %s: %s", config.getId(), String.join(" ", baseCommand));
+        LOG.infof("Base command for %s: %s", config.getServerId(), String.join(" ", baseCommand));
 
         // Collect classpath contributions for this server
         List<Path> classpathExtensions = collectClasspathExtensions();
-        LOG.infof("Collected %d classpath extensions for %s", classpathExtensions.size(), config.getId());
+        LOG.infof("Collected %d classpath extensions for %s", classpathExtensions.size(), config.getServerId());
 
         if (classpathExtensions.isEmpty()) {
             // No extensions, return base command as-is
-            LOG.infof("No classpath extensions, returning base command for %s", config.getId());
+            LOG.infof("No classpath extensions, returning base command for %s", config.getServerId());
             return baseCommand;
         }
 
         // Inject extensions into classpath
-        LOG.infof("Injecting %d extensions into %s classpath", classpathExtensions.size(), config.getId());
+        LOG.infof("Injecting %d extensions into %s classpath", classpathExtensions.size(), config.getServerId());
         return injectClasspathExtensions(baseCommand, classpathExtensions);
     }
 
@@ -70,7 +70,7 @@ public class ClasspathExtensibleLspServer extends LspServer {
         }
 
         var config = super.getConfig();
-        Map<String, JsonElement> contributions = extensionManager.getContributionsFor(config.getId());
+        Map<String, JsonElement> contributions = extensionManager.getContributionsFor(config.getServerId());
 
         for (Map.Entry<String, JsonElement> entry : contributions.entrySet()) {
             String contributorId = entry.getKey();
@@ -87,7 +87,7 @@ public class ClasspathExtensibleLspServer extends LspServer {
                     jarsArray.forEach(el -> jarPaths.add(el.getAsString()));
 
                     // Register parent relationship: contributor is an extension of this server
-                    extensionManager.registerParentServer(contributorId, config.getId());
+                    extensionManager.registerParentServer(contributorId, config.getServerId());
 
                     // Extract resources from JAR if contributor has no installer
                     ensureContributorResourcesExtracted(contributorId, jarPaths);
@@ -96,7 +96,7 @@ public class ClasspathExtensibleLspServer extends LspServer {
                     extensions.addAll(resolvedJars);
 
                     LOG.infof("Added %d classpath entries from %s to %s",
-                             resolvedJars.size(), contributorId, config.getId());
+                             resolvedJars.size(), contributorId, config.getServerId());
                 }
 
                 // Merge documentSelector
@@ -153,11 +153,11 @@ public class ClasspathExtensibleLspServer extends LspServer {
 
         var config = super.getConfig();
         if (!foundClasspath) {
-            LOG.warnf("Could not inject classpath contributions into %s command (no -cp or -jar found)", config.getId());
+            LOG.warnf("Could not inject classpath contributions into %s command (no -cp or -jar found)", config.getServerId());
             return baseCommand;
         }
 
-        LOG.infof("Injected %d classpath entries into %s", extensions.size(), config.getId());
+        LOG.infof("Injected %d classpath entries into %s", extensions.size(), config.getServerId());
         return newCommand;
     }
 
@@ -198,7 +198,7 @@ public class ClasspathExtensibleLspServer extends LspServer {
                 }
 
                 currentSelectors.add(selector);
-                LOG.infof("Merged documentSelector into %s: %s", config.getId(), selector);
+                LOG.infof("Merged documentSelector into %s: %s", config.getServerId(), selector);
             }
         });
     }

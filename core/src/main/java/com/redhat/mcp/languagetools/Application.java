@@ -39,6 +39,7 @@ public class Application {
 
     private static final Logger LOG = Logger.getLogger(Application.class);
 
+    // Global
     @Inject
     LanguageRegistry languageRegistry;
 
@@ -46,10 +47,11 @@ public class Application {
     PathManager pathManager;
 
     @Inject
-    Event<WorkspaceChangeEvent> workspaceChangeEvent;
-
-    @Inject
     ServerDescriptorRegistry serverDescriptorRegistry;
+
+    // Workspace
+    @Inject
+    Event<WorkspaceChangeEvent> workspaceChangeEvent;
 
     // ----------- LSP servers
 
@@ -79,7 +81,7 @@ public class Application {
     private final Map<String, LspServerConfig> lspServerConfigs = new ConcurrentHashMap<>();
     private final Map<String, DapServerConfig> dapServerConfigs = new ConcurrentHashMap<>();
 
-    void onStart(@Observes StartupEvent ev) {
+    void onStart(@Observes StartupEvent ignoredEv) {
         LOG.info("ApplicationManager starting...");
 
         // Load all bundled LSP server descriptors
@@ -113,12 +115,12 @@ public class Application {
      */
     public Workspace getOrCreateWorkspace(URI rootUri) {
         // Normalize URI
-        URI normalizedUri = normalizeUri(rootUri);
+        URI workspaceUri = normalizeUri(rootUri);
 
         // Get or create workspace (without initialization)
-        boolean isNewWorkspace = !workspaces.containsKey(normalizedUri);
+        boolean isNewWorkspace = !workspaces.containsKey(workspaceUri);
 
-        Workspace workspace = workspaces.computeIfAbsent(normalizedUri, uri -> {
+        Workspace workspace = workspaces.computeIfAbsent(workspaceUri, uri -> {
             Workspace ws = new Workspace(uri, this);
 
             // Register callback for LSP server status changes
@@ -134,10 +136,7 @@ public class Application {
 
         // Fire event if workspace was just created
         if (isNewWorkspace) {
-            workspaceChangeEvent.fire(new WorkspaceChangeEvent(
-                WorkspaceChangeEvent.Type.CREATED,
-                normalizedUri
-            ));
+            sendWorkspaceChangeEvent(WorkspaceChangeEvent.Type.CREATED, workspaceUri);
         }
 
         // Add current MCP client to this workspace
@@ -145,7 +144,7 @@ public class Application {
         String connectionId = mcpClientTracker.getCurrentConnectionId();
 
         LOG.infof("Adding MCP client to workspace %s: name=%s, connectionId=%s",
-                 normalizedUri, clientName, connectionId);
+                 workspaceUri, clientName, connectionId);
 
         boolean isNewClient = workspace.addMcpClient(connectionId, clientName);
 
@@ -186,28 +185,28 @@ public class Application {
 
             if (config.canHandle(fileUri.toString(), language)) {
                 // Check if server already exists in workspace
-                if (workspace.getLspServer(config.getId()) == null) {
+                if (workspace.getLspServer(config.getServerId()) == null) {
                     LOG.infof("Need %s for language '%s' in workspace: %s",
                             config.getName(), language, workspace.getRootUri());
 
                     // Check if there's an external instance (launched by IDE) first
-                    var externalInstance = workspace.getExternalInstance(config.getId());
+                    var externalInstance = workspace.getExternalInstance(config.getServerId());
                     if (externalInstance != null) {
                         LOG.infof("Found external %s instance (port %d, PID %d), skipping installation",
                                  config.getName(), externalInstance.port, externalInstance.pid);
 
                         // No need to install (external instance), add server to workspace
                         workspace.setLspContributionManager(lspContributionManager);
-                        workspace.addLspServer(config, new ArrayList<>(lspServerConfigs.values()));
+                        workspace.addLspServer(config);
 
                         // Start and initialize (will connect to socket)
-                        var server = workspace.getLspServer(config.getId());
+                        var server = workspace.getLspServer(config.getServerId());
                         if (server != null) {
                             CompletableFuture<Void> future = server.start()
                                     .thenCompose(v -> server.initialize())
                                     .exceptionally(ex -> {
                                         LOG.errorf(ex, "Failed to connect to external %s", config.getName());
-                                        workspace.setInstallationStatus(config.getId(), ServerStatus.START_FAILED);
+                                        workspace.setInstallationStatus(config.getServerId(), ServerStatus.START_FAILED);
                                         return null;
                                     });
                             serverFutures.add(future);
@@ -218,12 +217,12 @@ public class Application {
                     // No external instance - need to start our own (installation is handled by server)
                     // Add server to workspace if not already present
                     workspace.setLspContributionManager(lspContributionManager);
-                    if (workspace.getLspServer(config.getId()) == null) {
-                        workspace.addLspServer(config, new ArrayList<>(lspServerConfigs.values()));
+                    if (workspace.getLspServer(config.getServerId()) == null) {
+                        workspace.addLspServer(config);
                     }
 
                     // Start managed server (handles installation automatically)
-                    CompletableFuture<Void> future = workspace.startManagedLspServer(config.getId())
+                    CompletableFuture<Void> future = workspace.startManagedLspServer(config.getServerId())
                             .exceptionally(ex -> {
                                 LOG.errorf(ex, "Failed to start %s", config.getName());
                                 return null;
@@ -241,7 +240,7 @@ public class Application {
             return CompletableFuture.completedFuture(null);
         }
 
-        return CompletableFuture.allOf(serverFutures.toArray(new CompletableFuture[serverFutures.size()]));
+        return CompletableFuture.allOf(serverFutures.toArray(new CompletableFuture[0]));
     }
 
     /**
@@ -270,7 +269,7 @@ public class Application {
                         return false;
                     });
 
-                if (canHandle && workspace.getDapServerConfig(config.getId()) == null) {
+                if (canHandle && workspace.getApplication().getDapServerConfig(config.getServerId()) == null) {
                     workspace.addDapServer(config);
                     LOG.infof("Added DAP server %s for language '%s' in workspace: %s",
                         config.getName(), language, workspace.getRootUri());
@@ -398,23 +397,11 @@ public class Application {
         return workspaces.values();
     }
 
-    public Map<String, LspServerConfig> getLspServerConfigs() {
-        return Map.copyOf(lspServerConfigs);
-    }
-
-    /**
-     * Get all DAP server configurations (debug adapters).
-     * Used by Qute DAP to discover available debug adapters.
-     */
-    public Map<String, DapServerConfig> getDapServerConfigs() {
-        return Map.copyOf(dapServerConfigs);
-    }
-
     /**
      * Close a workspace: shutdown all its LSP servers and remove it from memory.
      */
     public CompletableFuture<Void> closeWorkspace(URI workspaceUri) {
-        Workspace workspace = workspaces.get(workspaceUri);
+        Workspace workspace = getWorkspace(workspaceUri);
         if (workspace == null) {
             LOG.warnf("Workspace not found: %s", workspaceUri);
             return CompletableFuture.completedFuture(null);
@@ -423,16 +410,15 @@ public class Application {
         LOG.infof("Closing workspace: %s", workspaceUri);
 
         // Shutdown all servers in this workspace
-        return workspace.shutdown().thenRun(() -> {
+        return workspace
+                .shutdown()
+                .thenRun(() -> {
             // Remove from active workspaces
             workspaces.remove(workspaceUri);
             LOG.infof("Workspace closed and removed from memory: %s", workspaceUri);
 
             // Fire workspace closed event
-            workspaceChangeEvent.fire(new WorkspaceChangeEvent(
-                WorkspaceChangeEvent.Type.CLOSED,
-                workspaceUri
-            ));
+            sendWorkspaceChangeEvent(WorkspaceChangeEvent.Type.CLOSED, workspaceUri);
         });
     }
 
@@ -453,7 +439,7 @@ public class Application {
         // Add server to workspace if not already present
         workspace.setLspContributionManager(lspContributionManager);
         if (workspace.getLspServer(serverId) == null) {
-            workspace.addLspServer(config, new ArrayList<>(lspServerConfigs.values()));
+            workspace.addLspServer(config);
         }
 
         // Start managed server (handles installation automatically)
@@ -468,12 +454,47 @@ public class Application {
         return pathManager;
     }
 
+    // LSP servers
+
+    public LspServerConfig getLspServerConfig(String serverId) {
+        return lspServerConfigs.get(serverId);
+    }
+
+    /**
+     * Get all LSP server configuration
+     *
+     * @return all LSP server configuration
+     */
+    public Collection<LspServerConfig> getLspServerConfigs() {
+        return lspServerConfigs.values();
+    }
+
     public LspTraceCollector getLspTraceCollector() {
         return lspTraceCollector;
+    }
+
+    // DAP servers
+
+    public DapServerConfig getDapServerConfig(String serverId) {
+        return dapServerConfigs.get(serverId);
+    }
+
+    /**
+     * Get all LSP server configuration
+     *
+     * @return all LSP server configuration
+     */
+    public Collection<DapServerConfig> getDapServerConfigs() {
+        return dapServerConfigs.values();
     }
 
     public DapTraceCollector getDapTraceCollector() {
         return dapTraceCollector;
     }
+
+    private void sendWorkspaceChangeEvent(WorkspaceChangeEvent.Type type, URI workspaceUri) {
+        workspaceChangeEvent.fire(new WorkspaceChangeEvent(type, workspaceUri));
+    }
+
 }
 

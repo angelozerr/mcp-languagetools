@@ -23,7 +23,6 @@ import jakarta.websocket.server.ServerEndpoint;
 import org.jboss.logging.Logger;
 
 import java.io.IOException;
-import java.net.URI;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -119,11 +118,11 @@ public class AdminWebSocketEndpoint {
         try {
             // Get all workspaces and their servers
             for (var workspace : application.getWorkspaces()) {
-                for (var serverId : workspace.getAllLspServers().keySet()) {
+                for (var server : workspace.getLspServers()) {
                     // Get last 200 traces for this server
                     var traces = lspTraceCollector.getTracesForWorkspaceAndServer(
                         workspace.getRootUri().toString(),
-                        serverId,
+                        server.getId(),
                         200
                     );
 
@@ -131,7 +130,7 @@ public class AdminWebSocketEndpoint {
                     for (var trace : traces) {
                         LspTraceWsMessage msg = new LspTraceWsMessage(
                             "lsp-trace",
-                            trace.workspaceUri().toString(),
+                            trace.workspaceUri(),
                             trace.serverId(),
                             trace.timestamp().toString(),
                             trace.direction().name(),
@@ -179,7 +178,7 @@ public class AdminWebSocketEndpoint {
     void onLspTrace(@Observes LspTraceMessage trace) {
         LspTraceWsMessage msg = new LspTraceWsMessage(
                 "lsp-trace",
-                trace.workspaceUri().toString(),
+                trace.workspaceUri(),
                 trace.serverId(),
                 trace.timestamp().toString(),
                 trace.direction().name(),
@@ -321,7 +320,7 @@ public class AdminWebSocketEndpoint {
     private List<WorkspaceDTO> getCurrentWorkspaces() {
         return application.getWorkspaces()
                 .stream()
-                .map(workspace -> toWorkspaceDTO(workspace))
+                .map(this::toWorkspaceDTO)
                 .toList();
     }
 
@@ -362,19 +361,19 @@ public class AdminWebSocketEndpoint {
      * Convert workspace to DTO (copied from AdminResource).
      */
     private WorkspaceDTO toWorkspaceDTO(Workspace workspace) {
-        var allServerConfigs = application.getLspServerConfigs();
+        var serverConfigs = application.getLspServerConfigs();
 
         // Build runtime DTOs for all LSP servers in this workspace
-        List<ServerRuntimeDTO> servers = allServerConfigs.values()
+        List<ServerRuntimeDTO> servers = serverConfigs
                 .stream()
                 .map(config -> serverDTOBuilder.buildRuntime(config, workspace))
                 .toList();
 
         // Build DAP server DTOs for this workspace
-        List<DapServerDTO> dapServers = workspace.getDapServerConfigs().values()
+        List<DapServerDTO> dapServers = workspace.getApplication().getDapServerConfigs()
                 .stream()
                 .map(config -> new DapServerDTO(
-                    config.getId(),
+                    config.getServerId(),
                     config.getName(),
                     config.getDescription(),
                     config.getDocumentSelector()

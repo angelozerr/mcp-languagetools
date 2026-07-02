@@ -2,6 +2,7 @@ package com.redhat.mcp.languagetools.server;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
+import com.redhat.mcp.languagetools.PathManager;
 import com.redhat.mcp.languagetools.lsp.DocumentSelector;
 import org.jboss.logging.Logger;
 
@@ -24,6 +25,8 @@ import java.util.List;
 public abstract class ServerDescriptorLoaderBase<T extends ServerConfigBase> {
 
     private static final Logger LOG = Logger.getLogger(ServerDescriptorLoaderBase.class);
+
+    // Json file names
     private static final String SERVER_CONFIG_FILE = "server.json";
     private static final String INSTALLER_CONFIG_FILE = "installer.json";
 
@@ -48,7 +51,7 @@ public abstract class ServerDescriptorLoaderBase<T extends ServerConfigBase> {
     /**
      * Create a new instance of the config.
      */
-    protected abstract T createConfig();
+    protected abstract T createConfig(String serverId, PathManager pathManager);
 
     /**
      * Load a bundled server configuration from a directory.
@@ -57,9 +60,10 @@ public abstract class ServerDescriptorLoaderBase<T extends ServerConfigBase> {
      * @param serverDir Directory containing server.json and installer.json
      * @return Loaded server configuration
      */
-    public final T loadBundled(Path serverDir) throws IOException {
-        T config = createConfig();
+    public final T loadBundled(Path serverDir, PathManager pathManager) throws IOException {
         String serverId = serverDir.getFileName().toString();
+
+        T config = createConfig(serverId, pathManager);
         loadConfig(serverId, serverDir, config);
         return config;
     }
@@ -70,9 +74,9 @@ public abstract class ServerDescriptorLoaderBase<T extends ServerConfigBase> {
         // Load installer.json
         try {
             loadInstaller(serverId, serverDir, config);
-            LOG.debugf("Loaded installer config for: %s", config.getId());
+            LOG.debugf("Loaded installer config for: %s", config.getServerId());
         } catch (IOException e) {
-            LOG.debugf("Failed to load installer config for %s: %s", config.getId(), e.getMessage());
+            LOG.debugf("Failed to load installer config for %s: %s", config.getServerId(), e.getMessage());
         }
     }
 
@@ -96,7 +100,6 @@ public abstract class ServerDescriptorLoaderBase<T extends ServerConfigBase> {
         JsonObject jsonObject = loadJson(serverFile);
 
         // Common fields
-        config.setId(serverId);
         config.setName(jsonObject.has(FIELD_NAME) ? jsonObject.get(FIELD_NAME).getAsString() : serverId);
 
         if (jsonObject.has(FIELD_DESCRIPTION)) {

@@ -35,10 +35,11 @@ public class LspServerControlResource {
     public List<ServerConfigDTO> listAllServers() {
         LOG.info("listAllServers() called");
         try {
-            var configs = application.getLspServerConfigs();
-            LOG.infof("Found %d server configs", configs.size());
+            var serverConfigs = application.getLspServerConfigs();
+            LOG.infof("Found %d server configs", serverConfigs.size());
 
-            var result = configs.values().stream()
+            var result = serverConfigs
+                    .stream()
                     .map(serverDTOBuilder::buildConfig)
                     .toList();
 
@@ -62,7 +63,7 @@ public class LspServerControlResource {
                 return Response.status(404).entity("Workspace not found").build();
             }
 
-            var server = workspace.getAllLspServers().get(serverId);
+            var server = workspace.getLspServer(serverId);
             if (server == null) {
                 return Response.status(404).entity("Server not found").build();
             }
@@ -135,7 +136,7 @@ public class LspServerControlResource {
                 return Response.status(404).entity("Workspace not found").build();
             }
 
-            var server = workspace.getAllLspServers().get(serverId);
+            var server = workspace.getLspServer(serverId);
             if (server == null) {
                 return Response.status(404).entity("Server not found").build();
             }

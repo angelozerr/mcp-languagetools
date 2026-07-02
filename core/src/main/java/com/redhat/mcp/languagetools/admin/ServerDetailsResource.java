@@ -38,7 +38,7 @@ public class ServerDetailsResource {
     @GET
     @Path("/{serverId}/details")
     public ServerConfigDTO getServerDetails(@PathParam("serverId") String serverId) {
-        LspServerConfig config = application.getLspServerConfigs().get(serverId);
+        LspServerConfig config = application.getLspServerConfig(serverId);
 
         if (config == null) {
             throw new NotFoundException("Server not found: " + serverId);

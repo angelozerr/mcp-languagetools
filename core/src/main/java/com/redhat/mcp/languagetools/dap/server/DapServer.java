@@ -20,7 +20,6 @@ import org.jboss.logging.Logger;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -35,7 +34,6 @@ import java.util.function.UnaryOperator;
 public class DapServer extends ServerBase<DapServerConfig> {
 
     private static final Logger LOG = Logger.getLogger(DapServer.class);
-    private final Path serverHome;
     private final TracingMessageConsumer tracing;
     private final String sessionId;
 
@@ -47,8 +45,7 @@ public class DapServer extends ServerBase<DapServerConfig> {
         super(config, workspace);
         this.sessionId = sessionId;
         var workspaceRoot = workspace.getRootUri();
-        this.serverHome = workspace.getApplication().getPathManager().getDapServerHome(config.getId());
-        this.tracing = new TracingMessageConsumer(workspace.getApplication().getDapTraceCollector(), workspaceRoot.toString(), config.getId());
+        this.tracing = new TracingMessageConsumer(workspace.getApplication().getDapTraceCollector(), workspaceRoot.toString(), config.getServerId());
     }
 
     /**
@@ -60,6 +57,8 @@ public class DapServer extends ServerBase<DapServerConfig> {
             try {
                 setStatus(ServerStatus.STARTING);
                 LOG.infof("Starting DAP server: %s", config.getName());
+
+                var serverHome = getServerHome();
 
                 // Build and launch process
                 List<String> command = buildCommand();
@@ -88,7 +87,7 @@ public class DapServer extends ServerBase<DapServerConfig> {
 
                 serverProcess = pb.start();
                 LOG.infof("DAP server process started: %s (PID: %d)",
-                        config.getId(), serverProcess.pid());
+                        config.getServerId(), serverProcess.pid());
 
                 // Log process started
                 traceCollector.addTrace(
@@ -134,7 +133,7 @@ public class DapServer extends ServerBase<DapServerConfig> {
                 InitializeRequestArguments initArgs = new InitializeRequestArguments();
                 initArgs.setClientID("mcp-languagetools");
                 initArgs.setClientName("MCP Language Tools");
-                initArgs.setAdapterID(config.getId());
+                initArgs.setAdapterID(config.getServerId());
                 initArgs.setPathFormat("path");
                 initArgs.setLinesStartAt1(true);
                 initArgs.setColumnsStartAt1(true);
@@ -147,10 +146,10 @@ public class DapServer extends ServerBase<DapServerConfig> {
                 setReady(true);
 
             } catch (Exception e) {
-                LOG.errorf(e, "Failed to start DAP server: %s", config.getId());
+                LOG.errorf(e, "Failed to start DAP server: %s", config.getServerId());
                 setStatus(ServerStatus.ERROR);
                 setStatusMessage(e.getMessage());
-                throw new RuntimeException("Failed to start DAP server: " + config.getId(), e);
+                throw new RuntimeException("Failed to start DAP server: " + config.getServerId(), e);
             }
         }, executorService);
     }
@@ -184,7 +183,7 @@ public class DapServer extends ServerBase<DapServerConfig> {
                 LOG.infof("DAP server stopped: %s", config.getName());
 
             } catch (Exception e) {
-                LOG.errorf(e, "Error stopping DAP server: %s", config.getId());
+                LOG.errorf(e, "Error stopping DAP server: %s", config.getServerId());
             }
         }, executorService);
     }
@@ -214,7 +213,7 @@ public class DapServer extends ServerBase<DapServerConfig> {
             if (c == '"') {
                 inQuotes = !inQuotes;
             } else if (c == ' ' && !inQuotes) {
-                if (current.length() > 0) {
+                if (!current.isEmpty()) {
                     command.add(current.toString());
                     current.setLength(0);
                 }
@@ -223,7 +222,7 @@ public class DapServer extends ServerBase<DapServerConfig> {
             }
         }
 
-        if (current.length() > 0) {
+        if (!current.isEmpty()) {
             command.add(current.toString());
         }
 

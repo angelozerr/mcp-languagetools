@@ -43,7 +43,7 @@ public class TaskRegistryInstaller implements ServerInstaller {
                 // Parse installer.json
                 JsonElement installerConfigJson = config.getInstallerConfig();
                 if (installerConfigJson == null || !installerConfigJson.isJsonObject()) {
-                    throw new IllegalStateException("No installer configuration found for " + config.getId());
+                    throw new IllegalStateException("No installer configuration found for " + config.getServerId());
                 }
 
                 JsonObject installerConfig = installerConfigJson.getAsJsonObject();
@@ -111,7 +111,7 @@ public class TaskRegistryInstaller implements ServerInstaller {
                 }
                 throw new InstallationException("Installation cancelled", e);
             } catch (Exception e) {
-                LOG.errorf(e, "Installation failed for %s", config.getId());
+                LOG.errorf(e, "Installation failed for %s", config.getServerId());
                 status.set(InstallationStatus.FAILED);
                 TraceCollector trace = config.getTraceCollector();
                 if (trace != null) {
@@ -167,7 +167,7 @@ public class TaskRegistryInstaller implements ServerInstaller {
         String command = context.getVariable("SERVER_COMMAND");
 
         if (command == null) {
-            LOG.warnf("No command configured for %s", config.getId());
+            LOG.warnf("No command configured for %s", config.getServerId());
         }
 
         return command;

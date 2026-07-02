@@ -41,8 +41,8 @@ public class DapServerDescriptorLoader extends ServerDescriptorLoaderBase<DapSer
     }
 
     @Override
-    protected DapServerConfig createConfig() {
-        return new DapServerConfig();
+    protected DapServerConfig createConfig(String serverId, PathManager pathManager) {
+        return new DapServerConfig(serverId, pathManager.getDapServerHome(serverId));
     }
 
     @Override

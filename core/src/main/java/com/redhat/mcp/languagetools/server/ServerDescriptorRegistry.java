@@ -1,5 +1,6 @@
 package com.redhat.mcp.languagetools.server;
 
+import com.redhat.mcp.languagetools.PathManager;
 import com.redhat.mcp.languagetools.dap.server.DapServerConfig;
 import com.redhat.mcp.languagetools.dap.server.DapServerDescriptorLoader;
 import com.redhat.mcp.languagetools.lsp.server.LspServerConfig;
@@ -26,6 +27,9 @@ public class ServerDescriptorRegistry {
     private static final Logger LOG = Logger.getLogger(ServerDescriptorRegistry.class);
 
     private final Map<String, ServerDescriptorLoaderBase<?>> loaders = new HashMap<>();
+
+    @Inject
+    PathManager pathManager;
 
     @Inject
     LspServerDescriptorLoader lspServerDescriptorLoader;
@@ -159,7 +163,7 @@ public class ServerDescriptorRegistry {
                            ServerDescriptorLoaderBase<?> loader = loaders.get(root);
                            if (loader != null) {
                                try {
-                                   ServerConfigBase config = loader.loadBundled(serverDir);
+                                   ServerConfigBase config = loader.loadBundled(serverDir, pathManager);
                                    configs.put(serverId, config);
                                    LOG.infof("Loaded server: %s from %s", serverId, root);
                                } catch (Exception e) {

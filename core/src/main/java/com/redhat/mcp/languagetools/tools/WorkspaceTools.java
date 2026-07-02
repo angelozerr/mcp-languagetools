@@ -8,9 +8,7 @@ import org.jboss.logging.Logger;
 import com.redhat.mcp.languagetools.workspace.Workspace;
 import com.redhat.mcp.languagetools.Application;
 
-import java.net.URI;
 import java.util.Collection;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
@@ -36,7 +34,7 @@ public class WorkspaceTools {
             return workspaces.stream()
                     .map(workspace -> String.format("- %s (%d language servers, initialized: %s)",
                             workspace.getRootUri(),
-                            workspace.getAllLspServers().size(),
+                            workspace.getLspServers().size(),
                             workspace.isInitialized()))
                     .collect(Collectors.joining("\n", "Active workspaces:\n", ""));
 
@@ -55,9 +53,10 @@ public class WorkspaceTools {
                 return "No language servers configured";
             }
 
-            return servers.values().stream()
+            return servers
+                    .stream()
                     .map(config -> String.format("- %s (%s): %s",
-                            config.getId(),
+                            config.getServerId(),
                             config.getName(),
                             config.getDescription() != null ? config.getDescription() : "No description"))
                     .collect(Collectors.joining("\n", "Configured language servers:\n", ""));

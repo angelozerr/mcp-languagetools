@@ -21,7 +21,7 @@ public class ServerDTOBuilder {
      */
     public ServerConfigDTO buildConfig(LspServerConfig config) {
         return new ServerConfigDTO(
-            config.getId(),
+            config.getServerId(),
             config.getName(),
             config.getDescription(),
             config.getDocumentSelector(),
@@ -39,7 +39,7 @@ public class ServerDTOBuilder {
      */
     public ServerRuntimeDTO buildRuntime(LspServerConfig config,
                                          Workspace workspace) {
-        String serverId = config.getId();
+        String serverId = config.getServerId();
         LspServer lspServer = workspace.getLspServer(serverId);
 
         // Check if this is an extension with a parent server

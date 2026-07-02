@@ -87,7 +87,7 @@ public class JdtLsServer extends LspServer {
         // First, ensure all bundles are extracted from resources to filesystem
         ensureBundlesExtracted();
 
-        for (LspServerConfig serverConfig : allServerConfigs) {
+        for (LspServerConfig serverConfig : getWorkspace().getApplication().getLspServerConfigs()) {
             if (serverConfig.getContributes() == null) {
                 continue;
             }
@@ -107,7 +107,7 @@ public class JdtLsServer extends LspServer {
             JsonArray bundles = jdtlsObj.getAsJsonArray("bundles");
             for (JsonElement bundleElem : bundles) {
                 String bundlePattern = bundleElem.getAsString();
-                List<String> resolved = resolveBundlePaths(serverConfig.getId(), bundlePattern);
+                List<String> resolved = resolveBundlePaths(serverConfig.getServerId(), bundlePattern);
                 bundlePaths.addAll(resolved);
             }
         }
@@ -222,20 +222,13 @@ public class JdtLsServer extends LspServer {
         return pathManager.getLspServerHome(serverId);
     }
 
-    /**
-     * Simple wildcard matching (supports * only).
-     */
-    private boolean matchesPattern(String fileName, String pattern) {
-        String regex = pattern.replace(".", "\\.").replace("*", ".*");
-        return fileName.matches(regex);
-    }
 
     /**
      * Ensure all bundles from contributes.jdtls are extracted from resources to filesystem.
      * This is needed because JDT.LS requires filesystem paths for bundles.
      */
     private void ensureBundlesExtracted() {
-        for (LspServerConfig serverConfig : allServerConfigs) {
+        for (LspServerConfig serverConfig : getWorkspace().getApplication().getLspServerConfigs()) {
             if (serverConfig.getContributes() == null) {
                 continue;
             }
@@ -255,7 +248,7 @@ public class JdtLsServer extends LspServer {
             JsonArray bundles = jdtlsObj.getAsJsonArray("bundles");
             for (JsonElement bundleElem : bundles) {
                 String bundlePattern = bundleElem.getAsString();
-                extractBundleFromResources(serverConfig.getId(), bundlePattern);
+                extractBundleFromResources(serverConfig.getServerId(), bundlePattern);
             }
         }
     }
@@ -478,7 +471,8 @@ public class JdtLsServer extends LspServer {
      * Add VM arguments from workspace configuration (java.jdt.ls.vmargs).
      * Similar to vscode-java's parseVMargs().
      */
-    private void addVMArgs(java.util.List<String> params) {
+    private void addVMArgs(List<String> params) {
+        var workspaceConfiguration = getWorkspace().getConfiguration();
         if (workspaceConfiguration == null) {
             LOG.debug("No workspace configuration available, skipping vmargs");
             return;

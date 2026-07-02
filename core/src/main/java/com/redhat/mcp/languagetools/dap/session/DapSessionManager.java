@@ -1,6 +1,7 @@
 package com.redhat.mcp.languagetools.dap.session;
 
 import com.redhat.mcp.languagetools.dap.server.DapServerConfig;
+import com.redhat.mcp.languagetools.dap.trace.DapTraceCollector;
 import com.redhat.mcp.languagetools.workspace.Workspace;
 import com.redhat.mcp.languagetools.Application;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -30,10 +31,7 @@ public class DapSessionManager {
     Application application;
 
     @Inject
-    com.redhat.mcp.languagetools.PathManager pathManager;
-
-    @Inject
-    com.redhat.mcp.languagetools.dap.trace.DapTraceCollector traceCollector;
+    DapTraceCollector traceCollector;
 
     private final Map<String, DapSession> sessions = new ConcurrentHashMap<>();
 
@@ -230,8 +228,7 @@ public class DapSessionManager {
     public List<String> listSupportedLanguages() {
         Set<String> languages = new HashSet<>();
 
-        Map<String, DapServerConfig> dapConfigs = application.getDapServerConfigs();
-        for (DapServerConfig config : dapConfigs.values()) {
+        for (DapServerConfig config : application.getDapServerConfigs()) {
             if (config.getDocumentSelector() != null) {
                 config.getDocumentSelector().forEach(selector -> {
                     if (selector.getLanguage() != null) {
@@ -271,15 +268,15 @@ public class DapSessionManager {
      */
     private DapServerConfig findDapServerById(Workspace workspace, String dapServerId) {
         // First check global DAP servers
-        Map<String, DapServerConfig> globalDapServers = application.getDapServerConfigs();
-        DapServerConfig config = globalDapServers.get(dapServerId);
+        DapServerConfig config = application.getDapServerConfig(dapServerId);
         if (config != null) {
             return config;
         }
 
         // Then check workspace-specific DAP servers
-        Map<String, DapServerConfig> workspaceDapServers = workspace.getDapServerConfigs();
-        return workspaceDapServers.get(dapServerId);
+       // Map<String, DapServerConfig> workspaceDapServers = workspace.getDapServerConfigs();
+        //return workspaceDapServers.get(dapServerId);
+        return null;
     }
 
     /**
@@ -293,7 +290,7 @@ public class DapSessionManager {
             }
         }
         // Fallback: derive from server ID
-        return config.getId();
+        return config.getServerId();
     }
 
     /**
@@ -301,20 +298,20 @@ public class DapSessionManager {
      */
     private DapServerConfig findDapServerForLanguage(Workspace workspace, String language) {
         // First check workspace-specific DAP servers
-        Map<String, DapServerConfig> workspaceDapServers = workspace.getDapServerConfigs();
-        for (DapServerConfig config : workspaceDapServers.values()) {
+        var workspaceDapServers = workspace.getApplication().getDapServerConfigs();
+        for (DapServerConfig config : workspaceDapServers) {
             if (supportsLanguage(config, language)) {
                 return config;
             }
         }
 
         // Fallback to global DAP servers
-        Map<String, DapServerConfig> globalDapServers = application.getDapServerConfigs();
+        /*Map<String, DapServerConfig> globalDapServers = application.getDapServerConfigs();
         for (DapServerConfig config : globalDapServers.values()) {
             if (supportsLanguage(config, language)) {
                 return config;
             }
-        }
+        }*/
 
         return null;
     }

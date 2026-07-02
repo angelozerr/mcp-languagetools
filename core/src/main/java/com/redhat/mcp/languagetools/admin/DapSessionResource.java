@@ -44,7 +44,7 @@ public class DapSessionResource {
             var response = Map.of(
                 "sessionId", session.getSessionId(),
                 "sessionName", session.getSessionName(),
-                "dapServerId", session.getServerConfig().getId(),
+                "dapServerId", session.getServerConfig().getServerId(),
                 "state", session.getState().name(),
                 "language", session.getLanguage()
             );

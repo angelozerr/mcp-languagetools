@@ -23,7 +23,6 @@ import java.util.*;
 @ApplicationScoped
 public class LspServerDescriptorLoader extends ServerDescriptorLoaderBase<LspServerConfig> {
 
-    private static final Logger LOG = Logger.getLogger(LspServerDescriptorLoader.class);
     private static final String SERVER_EXTENSION_CONFIG_FILE = "server-extension.json";
 
     // JSON field names
@@ -33,17 +32,14 @@ public class LspServerDescriptorLoader extends ServerDescriptorLoaderBase<LspSer
     private static final String FIELD_INITIALIZATION_OPTIONS = "initializationOptions";
     private static final String FIELD_CONTRIBUTES = "contributes";
 
-    @Inject
-    PathManager pathManager;
-
     @Override
     public String getRoot() {
         return PathConfig.getLspDirName();
     }
 
     @Override
-    protected LspServerConfig createConfig() {
-        return new LspServerConfig();
+    protected LspServerConfig createConfig(String serverId, PathManager pathManager) {
+        return new LspServerConfig(serverId, pathManager);
     }
 
     @Override

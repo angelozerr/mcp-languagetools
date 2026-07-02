@@ -5,6 +5,7 @@ import com.redhat.mcp.languagetools.lsp.server.LspServer;
 import com.redhat.mcp.languagetools.workspace.Workspace;
 import org.jboss.logging.Logger;
 
+import java.nio.file.Path;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -46,11 +47,18 @@ public abstract class ServerBase<T extends ServerConfigBase> {
         return config;
     }
 
+    public Path getServerHome() {
+        return config.getServerHome();
+    }
     /**
      * Get the current server status.
      */
     public final ServerStatus getStatus() {
         return status;
+    }
+
+    public String getId() {
+        return config.getServerId();
     }
 
     /**
@@ -93,11 +101,11 @@ public abstract class ServerBase<T extends ServerConfigBase> {
                 oldStatus, newStatus, statusChangeCallback != null);
 
         if (statusChangeCallback != null && oldStatus != newStatus) {
-            LOG.infof("Calling status change callback for %s: %s -> %s", config.getId(), oldStatus, newStatus);
+            LOG.infof("Calling status change callback for %s: %s -> %s", config.getServerId(), oldStatus, newStatus);
             try {
                 statusChangeCallback.accept(newStatus);
             } catch (Exception e) {
-                LOG.warnf(e, "Error in status change callback for %s", config.getId());
+                LOG.warnf(e, "Error in status change callback for %s", config.getServerId());
             }
         }
     }
@@ -111,11 +119,11 @@ public abstract class ServerBase<T extends ServerConfigBase> {
         this.statusMessage = statusMessage;
 
         LOG.infof("[%s] setStatusMessage called: %s -> %s (callback: %s)",
-                config.getId(), oldMessage, statusMessage, statusChangeCallback != null);
+                config.getServerId(), oldMessage, statusMessage, statusChangeCallback != null);
 
         // Notify if message changed and callback is registered
         if (statusChangeCallback != null && !java.util.Objects.equals(oldMessage, statusMessage)) {
-            LOG.infof("[%s] Status message changed, firing callback", config.getId());
+            LOG.infof("[%s] Status message changed, firing callback", config.getServerId());
             // Trigger status change callback to refresh UI
             statusChangeCallback.accept(this.status);
         }
@@ -169,7 +177,7 @@ public abstract class ServerBase<T extends ServerConfigBase> {
      */
     public void stop() {
         if (serverProcess != null && serverProcess.isAlive()) {
-            LOG.infof("Stopping server: %s", config.getId());
+            LOG.infof("Stopping server: %s", config.getServerId());
             setStatus(ServerStatus.STOPPING);
             serverProcess.destroy();
             setStatus(ServerStatus.STOPPED);

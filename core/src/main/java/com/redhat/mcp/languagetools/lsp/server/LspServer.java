@@ -8,7 +8,6 @@ import com.redhat.mcp.languagetools.server.ServerBase;
 import com.redhat.mcp.languagetools.server.ServerStatus;
 import com.redhat.mcp.languagetools.trace.TraceCollector;
 import com.redhat.mcp.languagetools.workspace.Workspace;
-import com.redhat.mcp.languagetools.workspace.WorkspaceConfiguration;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.Endpoint;
 import org.eclipse.lsp4j.jsonrpc.Launcher;
@@ -19,7 +18,6 @@ import org.jboss.logging.Logger;
 
 import com.redhat.mcp.languagetools.lsp.client.LspCapability;
 import com.redhat.mcp.languagetools.lsp.client.LspClientFeatures;
-import com.redhat.mcp.languagetools.lsp.trace.LspTraceMessage;
 import com.redhat.mcp.languagetools.trace.TracingMessageConsumer;
 
 import java.io.BufferedReader;
@@ -49,7 +47,6 @@ public class LspServer extends ServerBase<LspServerConfig> {
     protected final Path workspaceDataDir;
     protected final Path serverHome;
     protected final TracingMessageConsumer tracing;
-    protected final Collection<LspServerConfig> allServerConfigs;
     protected final PathManager pathManager;
 
     protected Socket socket;
@@ -59,24 +56,19 @@ public class LspServer extends ServerBase<LspServerConfig> {
     private boolean isSocketConnection = false;
     private InstanceFileWatcher fileWatcher;
     private LspInstanceRegistry.InstanceInfo currentInstance;
-    protected WorkspaceConfiguration workspaceConfiguration;
     protected LspContributionManager extensionManager;
-    protected RequestRouter requestRouter;
     private final LspClientFeatures clientFeatures;
 
     public LspServer(LspServerConfig config, Workspace workspace) {
         super(config, workspace);
         this.workspaceRoot = workspace.getRootUri();
         this.workspaceDataDir = workspace.getWorkspaceDataDir();
-        this.serverHome = workspace.getApplication().getPathManager().getLspServerHome(config.getId());
-        this.tracing = new TracingMessageConsumer(workspace.getApplication().getLspTraceCollector(), workspaceRoot.toString(), config.getId());
-        this.allServerConfigs = workspace.getApplication().getLspServerConfigs() != null ? workspace.getApplication().getLspServerConfigs().values(): Set.of();
+        this.serverHome = workspace.getApplication().getPathManager().getLspServerHome(config.getServerId());
+        this.tracing = new TracingMessageConsumer(workspace.getApplication().getLspTraceCollector(), workspaceRoot.toString(), config.getServerId());
         this.pathManager = workspace.getApplication().getPathManager();
 
         // Create client features for managing capabilities
         this.clientFeatures = new LspClientFeatures(config);
-
-        LOG.infof("[%s] RequestRouter created in constructor", config.getId());
     }
 
     /**
@@ -90,7 +82,7 @@ public class LspServer extends ServerBase<LspServerConfig> {
             try {
                 // Try to find existing instance first
                 String workspacePath = Paths.get(workspaceRoot).toString();
-                LspInstanceRegistry.InstanceInfo existingInstance = LspInstanceRegistry.findInstance(workspacePath, config.getId());
+                LspInstanceRegistry.InstanceInfo existingInstance = LspInstanceRegistry.findInstance(workspacePath, config.getServerId());
 
                 if (existingInstance != null) {
                     // Connect to existing instance via socket
@@ -99,7 +91,7 @@ public class LspServer extends ServerBase<LspServerConfig> {
                         connectToSocket(existingInstance.port);
                         currentInstance = existingInstance;
                         LOG.infof("Connected to existing %s instance on port %d (PID: %d)",
-                            config.getId(), existingInstance.port, existingInstance.pid);
+                            config.getServerId(), existingInstance.port, existingInstance.pid);
                         startFileWatcher(workspacePath);
                         return;
                     } catch (IOException e) {
@@ -115,7 +107,7 @@ public class LspServer extends ServerBase<LspServerConfig> {
                 startFileWatcher(workspacePath);
 
             } catch (IOException e) {
-                LOG.errorf(e, "Failed to start %s", config.getId());
+                LOG.errorf(e, "Failed to start %s", config.getServerId());
                 // Send error to traces
                 String errorMessage = String.format("[Error starting %s]\n%s: %s",
                     config.getName(),
@@ -125,7 +117,7 @@ public class LspServer extends ServerBase<LspServerConfig> {
                     LOG.infof("Attempting to add trace for error: %s", errorMessage);
                     tracing.getCollector().addTrace(
                         workspaceRoot.toString(),
-                        config.getId(),
+                        config.getServerId(),
                         TraceCollector.MessageDirection.SERVER_TO_CLIENT,
                         errorMessage
                     );
@@ -136,7 +128,7 @@ public class LspServer extends ServerBase<LspServerConfig> {
                 setStatus(ServerStatus.STOPPED);
                 // Don't throw - let error be visible in traces
             } catch (Exception e) {
-                LOG.errorf(e, "Unexpected error starting %s", config.getId());
+                LOG.errorf(e, "Unexpected error starting %s", config.getServerId());
                 // Build full stack trace
                 StringBuilder stackTrace = new StringBuilder();
                 stackTrace.append("[Error starting ").append(config.getName()).append("]\n");
@@ -156,7 +148,7 @@ public class LspServer extends ServerBase<LspServerConfig> {
                     LOG.infof("Attempting to add trace for error");
                     tracing.getCollector().addTrace(
                         workspaceRoot.toString(),
-                        config.getId(),
+                        config.getServerId(),
                         TraceCollector.MessageDirection.SERVER_TO_CLIENT,
                         stackTrace.toString()
                     );
@@ -171,26 +163,26 @@ public class LspServer extends ServerBase<LspServerConfig> {
     }
 
     /**
-     * Start a MCP-managed language server process only (do not connect to IDE instance).
+     * Start MCP-managed language server process only (do not connect to IDE instance).
      */
     public CompletableFuture<Void> startManagedOnly() {
         var config = super.getConfig();
-        LOG.infof("=== startManagedOnly() called for %s ===", config.getId());
+        LOG.infof("=== startManagedOnly() called for %s ===", config.getServerId());
         setStatus(ServerStatus.STARTING);
         return CompletableFuture.runAsync(() -> {
-            LOG.infof("=== Inside CompletableFuture.runAsync for %s ===", config.getId());
+            LOG.infof("=== Inside CompletableFuture.runAsync for %s ===", config.getServerId());
             try {
                 String workspacePath = Paths.get(workspaceRoot).toString();
                 LOG.infof("Workspace path: %s", workspacePath);
 
                 // Launch new process directly without checking for IDE instance
-                LOG.infof("About to call launchProcess() for %s", config.getId());
+                LOG.infof("About to call launchProcess() for %s", config.getServerId());
                 launchProcess();
-                LOG.infof("launchProcess() completed for %s", config.getId());
+                LOG.infof("launchProcess() completed for %s", config.getServerId());
                 startFileWatcher(workspacePath);
 
             } catch (IOException e) {
-                LOG.errorf(e, "Failed to start %s", config.getId());
+                LOG.errorf(e, "Failed to start %s", config.getServerId());
                 // Send error to traces
                 String errorMessage = String.format("[Error starting %s]\n%s: %s",
                     config.getName(),
@@ -198,14 +190,14 @@ public class LspServer extends ServerBase<LspServerConfig> {
                     e.getMessage());
                 tracing.getCollector().addTrace(
                     workspaceRoot.toString(),
-                    config.getId(),
+                    config.getServerId(),
                     TraceCollector.MessageDirection.SERVER_TO_CLIENT,
                     errorMessage
                 );
                 setStatus(ServerStatus.STOPPED);
                 // Don't throw - let error be visible in traces
             } catch (Exception e) {
-                LOG.errorf(e, "Unexpected error starting %s", config.getId());
+                LOG.errorf(e, "Unexpected error starting %s", config.getServerId());
                 // Send error to traces (extract root cause)
                 Throwable cause = e;
                 while (cause.getCause() != null && cause.getCause() != cause) {
@@ -220,7 +212,7 @@ public class LspServer extends ServerBase<LspServerConfig> {
                     LOG.infof("Attempting to add trace for error: %s", errorMessage);
                     tracing.getCollector().addTrace(
                         workspaceRoot.toString(),
-                        config.getId(),
+                        config.getServerId(),
                         TraceCollector.MessageDirection.SERVER_TO_CLIENT,
                         errorMessage
                     );
@@ -240,7 +232,7 @@ public class LspServer extends ServerBase<LspServerConfig> {
      */
     private void connectToSocket(int port) throws IOException {
         var config = super.getConfig();
-        LOG.infof("Connecting to %s on localhost:%d", config.getId(), port);
+        LOG.infof("Connecting to %s on localhost:%d", config.getServerId(), port);
 
         socket = new Socket("localhost", port);
         isSocketConnection = true;
@@ -268,7 +260,7 @@ public class LspServer extends ServerBase<LspServerConfig> {
         languageServer = launcher.getRemoteProxy();
         launcher.startListening();
 
-        LOG.infof("Socket connection established to %s on port %d", config.getId(), port);
+        LOG.infof("Socket connection established to %s on port %d", config.getServerId(), port);
     }
 
     /**
@@ -276,19 +268,19 @@ public class LspServer extends ServerBase<LspServerConfig> {
      */
     protected void launchProcess() throws IOException {
         var config = super.getConfig();
-        LOG.infof("Launching new %s process for workspace: %s", config.getId(), workspaceRoot);
+        LOG.infof("Launching new %s process for workspace: %s", config.getServerId(), workspaceRoot);
 
-        LOG.infof("Building command for %s...", config.getId());
+        LOG.infof("Building command for %s...", config.getServerId());
         List<String> command = buildCommand();
-        LOG.infof("Command built successfully for %s: %d args", config.getId(), command.size());
+        LOG.infof("Command built successfully for %s: %d args", config.getServerId(), command.size());
         String commandStr = String.join(" ", command);
-        LOG.debugf("%s command: %s", config.getId(), commandStr);
+        LOG.debugf("%s command: %s", config.getServerId(), commandStr);
 
         // Send command to traces (visible in UI)
         String startMessage = String.format("[Starting %s]\n%s", config.getName(), commandStr);
         tracing.getCollector().addTrace(
             workspaceRoot.toString(),
-            config.getId(),
+            config.getServerId(),
             TraceCollector.MessageDirection.SERVER_TO_CLIENT,
             startMessage
         );
@@ -317,7 +309,7 @@ public class LspServer extends ServerBase<LspServerConfig> {
                 String stackTraceTimestamp = null;
 
                 while ((line = reader.readLine()) != null) {
-                    LOG.errorf("[%s stderr] %s", config.getId(), line);
+                    LOG.errorf("[%s stderr] %s", config.getServerId(), line);
 
                     String trimmed = line.trim();
                     boolean isStackTraceLine = trimmed.startsWith("at ") && trimmed.contains("(") && trimmed.contains(")");
@@ -338,7 +330,7 @@ public class LspServer extends ServerBase<LspServerConfig> {
                                 stackTraceBuffer.toString().trim());
                             tracing.getCollector().addTrace(
                                 workspaceRoot.toString(),
-                                config.getId(),
+                                config.getServerId(),
                                 TraceCollector.MessageDirection.SERVER_TO_CLIENT,
                                 errorTrace
                             );
@@ -353,7 +345,7 @@ public class LspServer extends ServerBase<LspServerConfig> {
                             line);
                         tracing.getCollector().addTrace(
                             workspaceRoot.toString(),
-                            config.getId(),
+                            config.getServerId(),
                             TraceCollector.MessageDirection.SERVER_TO_CLIENT,
                             errorTrace
                         );
@@ -368,7 +360,7 @@ public class LspServer extends ServerBase<LspServerConfig> {
                         stackTraceBuffer.toString().trim());
                     tracing.getCollector().addTrace(
                         workspaceRoot.toString(),
-                        config.getId(),
+                        config.getServerId(),
                         TraceCollector.MessageDirection.SERVER_TO_CLIENT,
                         errorTrace
                     );
@@ -401,7 +393,7 @@ public class LspServer extends ServerBase<LspServerConfig> {
         languageServer = launcher.getRemoteProxy();
         launcher.startListening();
 
-        LOG.infof("%s process started for workspace: %s", config.getId(), workspaceRoot);
+        LOG.infof("%s process started for workspace: %s", config.getServerId(), workspaceRoot);
 
         // Set initial status message - server is RUNNING but not ready yet
         // Will be overridden by "Ready" after initialization,
@@ -417,12 +409,12 @@ public class LspServer extends ServerBase<LspServerConfig> {
         // If connected to external instance (IDE), server is already initialized
         if (isSocketConnection && currentInstance != null) {
             LOG.infof("%s already initialized by IDE (port %d, PID %d)",
-                     config.getId(), currentInstance.port, currentInstance.pid);
+                     config.getServerId(), currentInstance.port, currentInstance.pid);
             setStatus(ServerStatus.CONNECTED_TO_IDE);
             return CompletableFuture.completedFuture(null);
         }
 
-        LOG.infof("Initializing %s for workspace: %s", config.getId(), workspaceRoot);
+        LOG.infof("Initializing %s for workspace: %s", config.getServerId(), workspaceRoot);
 
         InitializeParams params = new InitializeParams();
         params.setRootUri(workspaceRoot.toString());
@@ -465,7 +457,7 @@ public class LspServer extends ServerBase<LspServerConfig> {
 
         return languageServer.initialize(params)
                 .thenCompose(initResult -> {
-                    LOG.infof("%s initialized for workspace: %s", config.getId(), workspaceRoot);
+                    LOG.infof("%s initialized for workspace: %s", config.getServerId(), workspaceRoot);
 
                     // Pass server capabilities to client features
                     clientFeatures.setServerCapabilities(initResult.getCapabilities());
@@ -545,7 +537,7 @@ public class LspServer extends ServerBase<LspServerConfig> {
      */
     public CompletableFuture<Void> shutdown() {
         var config = super.getConfig();
-        LOG.infof("Shutting down %s for workspace: %s", config.getId(), workspaceRoot);
+        LOG.infof("Shutting down %s for workspace: %s", config.getServerId(), workspaceRoot);
 
         // Set status based on current connection type
         if (isSocketConnection && currentInstance != null) {
@@ -576,7 +568,7 @@ public class LspServer extends ServerBase<LspServerConfig> {
                                 .get(5, TimeUnit.SECONDS);
                         languageServer.exit();
                     } catch (Exception e) {
-                        LOG.warnf("Graceful shutdown failed for %s: %s", config.getId(), e.getMessage());
+                        LOG.warnf("Graceful shutdown failed for %s: %s", config.getServerId(), e.getMessage());
                     }
                 }
 
@@ -584,7 +576,7 @@ public class LspServer extends ServerBase<LspServerConfig> {
                 if (isSocketConnection && socket != null) {
                     try {
                         socket.close();
-                        LOG.infof("Closed socket connection to %s", config.getId());
+                        LOG.infof("Closed socket connection to %s", config.getServerId());
                     } catch (IOException e) {
                         LOG.warnf("Failed to close socket: %s", e.getMessage());
                     }
@@ -592,12 +584,12 @@ public class LspServer extends ServerBase<LspServerConfig> {
 
                 // Force kill process if still alive (only if we launched it)
                 if (!isSocketConnection && serverProcess != null && serverProcess.isAlive()) {
-                    LOG.infof("Force killing %s process", config.getId());
+                    LOG.infof("Force killing %s process", config.getServerId());
                     serverProcess.destroyForcibly();
 
                     // Wait a bit for process to die
                     if (!serverProcess.waitFor(3, TimeUnit.SECONDS)) {
-                        LOG.errorf("Failed to kill %s process", config.getId());
+                        LOG.errorf("Failed to kill %s process", config.getServerId());
                     }
                 }
 
@@ -607,11 +599,11 @@ public class LspServer extends ServerBase<LspServerConfig> {
                     executorService.shutdownNow();
                 }
 
-                LOG.infof("%s shut down for workspace: %s", config.getId(), workspaceRoot);
+                LOG.infof("%s shut down for workspace: %s", config.getServerId(), workspaceRoot);
                 setStatus(ServerStatus.STOPPED);
 
             } catch (Exception e) {
-                LOG.errorf(e, "Error during shutdown of %s", config.getId());
+                LOG.errorf(e, "Error during shutdown of %s", config.getServerId());
                 setStatus(ServerStatus.STOPPED);
             }
         }, executorService);
@@ -651,8 +643,7 @@ public class LspServer extends ServerBase<LspServerConfig> {
                 .replace("${user.name}", System.getProperty("user.name"));
 
         // Parse command string into arguments (simple split by spaces, respecting quotes)
-        List<String> command = parseCommandLine(resolved);
-        return command;
+        return parseCommandLine(resolved);
     }
 
     /**
@@ -752,20 +743,6 @@ public class LspServer extends ServerBase<LspServerConfig> {
     }
 
     /**
-     * Set workspace configuration (called by Workspace after server creation).
-     */
-    public void setWorkspaceConfiguration(com.redhat.mcp.languagetools.workspace.WorkspaceConfiguration configuration) {
-        this.workspaceConfiguration = configuration;
-    }
-
-    /**
-     * Get workspace configuration.
-     */
-    protected com.redhat.mcp.languagetools.workspace.WorkspaceConfiguration getWorkspaceConfiguration() {
-        return workspaceConfiguration;
-    }
-
-    /**
      * Set extension manager (called by Workspace after server creation).
      */
     public void setLspContributionManager(LspContributionManager extensionManager) {
@@ -777,13 +754,6 @@ public class LspServer extends ServerBase<LspServerConfig> {
      */
     protected LspContributionManager getLspContributionManager() {
         return extensionManager;
-    }
-
-    /**
-     * Set request router for delegating requests to other servers (bindRequest mechanism).
-     */
-    public void setRequestRouter(RequestRouter router) {
-        this.requestRouter = router;
     }
 
     /**
@@ -815,12 +785,12 @@ public class LspServer extends ServerBase<LspServerConfig> {
         try {
             fileWatcher = new InstanceFileWatcher(
                 workspacePath,
-                config.getId(),
+                config.getServerId(),
                 this::handleInstanceChanged,
                 this::handleInstanceRemoved
             );
             fileWatcher.start();
-            LOG.infof("Started instance file watcher for %s", config.getId());
+            LOG.infof("Started instance file watcher for %s", config.getServerId());
         } catch (IOException e) {
             LOG.warnf("Failed to start instance file watcher: %s", e.getMessage());
         }
@@ -866,9 +836,8 @@ public class LspServer extends ServerBase<LspServerConfig> {
             currentInstance = newInstance;
 
             // Re-initialize with new instance
-            initialize().thenRun(() -> {
-                LOG.infof("Successfully switched to new instance (PID: %d, port: %d)", newInstance.pid, newInstance.port);
-            });
+            initialize()
+                    .thenRun(() -> LOG.infof("Successfully switched to new instance (PID: %d, port: %d)", newInstance.pid, newInstance.port));
         } catch (IOException e) {
             LOG.errorf(e, "Failed to connect to new instance, will try to restart our own server");
             handleInstanceRemoved();
@@ -900,9 +869,8 @@ public class LspServer extends ServerBase<LspServerConfig> {
             // Launch our own server
             try {
                 launchProcess();
-                initialize().thenRun(() -> {
-                    LOG.infof("Successfully launched our own server after instance removal");
-                });
+                initialize()
+                        .thenRun(() -> LOG.infof("Successfully launched our own server after instance removal"));
             } catch (IOException e) {
                 LOG.errorf(e, "Failed to launch server after instance removal");
                 setStatus(ServerStatus.STOPPED);
@@ -954,11 +922,11 @@ public class LspServer extends ServerBase<LspServerConfig> {
             }
 
             com.google.gson.JsonObject servers = root.getAsJsonObject("servers");
-            if (!servers.has(config.getId())) {
+            if (!servers.has(config.getServerId())) {
                 return "verbose";
             }
 
-            com.google.gson.JsonObject serverConfig = servers.getAsJsonObject(config.getId());
+            com.google.gson.JsonObject serverConfig = servers.getAsJsonObject(config.getServerId());
             if (!serverConfig.has("trace")) {
                 return "verbose";
             }

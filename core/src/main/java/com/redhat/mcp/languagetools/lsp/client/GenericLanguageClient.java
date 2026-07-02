@@ -80,7 +80,7 @@ public class GenericLanguageClient implements LanguageClient, Endpoint {
 
     @Override
     public void showMessage(MessageParams messageParams) {
-        LOG.infof("%s message: %s", lspServer.getConfig().getId(), messageParams.getMessage());
+        LOG.infof("%s message: %s", lspServer.getConfig().getServerId(), messageParams.getMessage());
     }
 
     @Override
@@ -90,19 +90,19 @@ public class GenericLanguageClient implements LanguageClient, Endpoint {
 
     @Override
     public void logMessage(MessageParams message) {
-        LOG.infof("%s log: %s", lspServer.getConfig().getId(), message.getMessage());
+        LOG.infof("%s log: %s", lspServer.getConfig().getServerId(), message.getMessage());
     }
 
     @Override
     public CompletableFuture<Void> registerCapability(RegistrationParams params) {
-        LOG.infof("[%s] Registering capabilities", lspServer.getConfig().getId());
+        LOG.infof("[%s] Registering capabilities", lspServer.getConfig().getServerId());
         lspServer.getClientFeatures().registerCapability(params);
         return CompletableFuture.completedFuture(null);
     }
 
     @Override
     public CompletableFuture<Void> unregisterCapability(UnregistrationParams params) {
-        LOG.infof("[%s] Unregistering capabilities", lspServer.getConfig().getId());
+        LOG.infof("[%s] Unregistering capabilities", lspServer.getConfig().getServerId());
         lspServer.getClientFeatures().unregisterCapability(params);
         return CompletableFuture.completedFuture(null);
     }
@@ -114,7 +114,7 @@ public class GenericLanguageClient implements LanguageClient, Endpoint {
         // Current server ID (the one receiving the custom request from its LSP server)
         // Example: "microprofile" receives "microprofile/java/projectInfo"
         //      or: "qute" receives "qute/template/project"
-        String serverId = lspServer.getConfig().getId();
+        String serverId = lspServer.getConfig().getServerId();
         LOG.infof("[%s] GenericLanguageClient.request() called for: %s", serverId, method);
 
         // Check if this is a bindRequest declared in server.json
@@ -157,7 +157,7 @@ public class GenericLanguageClient implements LanguageClient, Endpoint {
         // Current server ID (the one receiving the custom notification from its LSP server)
         // Example: "microprofile" receives "microprofile/propertiesChanged"
         //      or: "qute" receives "qute/dataModelChanged"
-        String serverId = lspServer.getConfig().getId();
+        String serverId = lspServer.getConfig().getServerId();
         LOG.debugf("[%s] GenericLanguageClient.notify() called: %s", serverId, method);
 
         // Check if this is a bindNotification declared in server.json
@@ -209,27 +209,27 @@ public class GenericLanguageClient implements LanguageClient, Endpoint {
 
         if (config.getContributes() == null || config.getContributes().getContributions() == null) {
             LOG.debugf("[%s] No contributes found for findBindInfo(%s, %s)",
-                config.getId(), method, bindKey);
+                config.getServerId(), method, bindKey);
             return null;
         }
 
         LOG.debugf("[%s] Searching for %s in %d contributions",
-            config.getId(), method, config.getContributes().getContributions().size());
+            config.getServerId(), method, config.getContributes().getContributions().size());
 
         for (Map.Entry<String, JsonElement> entry : config.getContributes().getContributions().entrySet()) {
             String targetServerId = entry.getKey();
             JsonElement contrib = entry.getValue();
 
-            LOG.debugf("[%s] Checking contribution to target server: %s", config.getId(), targetServerId);
+            LOG.debugf("[%s] Checking contribution to target server: %s", config.getServerId(), targetServerId);
 
             if (!contrib.isJsonObject()) {
-                LOG.debugf("[%s] Contribution is not JsonObject, skipping", config.getId());
+                LOG.debugf("[%s] Contribution is not JsonObject, skipping", config.getServerId());
                 continue;
             }
 
             JsonObject contribObj = contrib.getAsJsonObject();
             if (!contribObj.has(bindKey)) {
-                LOG.debugf("[%s] No %s found in contribution to %s", config.getId(), bindKey, targetServerId);
+                LOG.debugf("[%s] No %s found in contribution to %s", config.getServerId(), bindKey, targetServerId);
                 continue;
             }
 

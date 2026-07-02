@@ -1,6 +1,7 @@
 package com.redhat.mcp.languagetools.server;
 
 import com.google.gson.JsonElement;
+import com.redhat.mcp.languagetools.PathManager;
 import com.redhat.mcp.languagetools.installer.ServerConfig;
 import com.redhat.mcp.languagetools.installer.ServerInstaller;
 import com.redhat.mcp.languagetools.installer.TaskRegistryInstaller;
@@ -8,6 +9,7 @@ import com.redhat.mcp.languagetools.installer.TraceProgressIndicator;
 import com.redhat.mcp.languagetools.lsp.DocumentSelector;
 import com.redhat.mcp.languagetools.trace.TraceCollector;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -17,7 +19,8 @@ import java.util.List;
  */
 public abstract class ServerConfigBase implements ServerConfig {
 
-    protected String id;
+    private final String serverId;
+    private final Path serverHome;
     protected String name;
     protected String description;
     protected JsonElement installerConfig;  // Raw JSON from installer.json
@@ -32,15 +35,21 @@ public abstract class ServerConfigBase implements ServerConfig {
     // Install progress indicator (set when installation starts)
     private TraceProgressIndicator installProgress;
 
+    public ServerConfigBase(String serverId, Path serverHome) {
+        this.serverId = serverId;
+        this.serverHome =serverHome;
+    }
+
     // Common getters
 
     @Override
-    public String getId() {
-        return id;
+    public String getServerId() {
+        return serverId;
     }
 
-    public void setId(String id) {
-        this.id = id;
+    @Override
+    public Path getServerHome() {
+        return serverHome;
     }
 
     @Override
@@ -114,6 +123,14 @@ public abstract class ServerConfigBase implements ServerConfig {
     }
 
     /**
+     * Check if this server can handle the given file.
+     */
+    public boolean canHandle(String uri, String language) {
+        return getDocumentSelector().stream()
+                .anyMatch(selector -> selector.matches(uri, language));
+    }
+
+    /**
      * Gets the install progress indicator (used to show visual progress bar in UI).
      */
     public TraceProgressIndicator getInstallProgress() {
@@ -126,4 +143,5 @@ public abstract class ServerConfigBase implements ServerConfig {
     public void setInstallProgress(TraceProgressIndicator installProgress) {
         this.installProgress = installProgress;
     }
+
 }

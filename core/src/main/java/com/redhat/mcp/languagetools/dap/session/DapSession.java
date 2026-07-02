@@ -104,7 +104,7 @@ public class DapSession implements DapEventListener {
         ServerInstaller installer = serverConfig.getInstaller();
 
         if (installer != null) {
-            LOG.infof("DAP server has installer, ensuring installation: %s", serverConfig.getId());
+            LOG.infof("DAP server has installer, ensuring installation: %s", serverConfig.getServerId());
 
             // Send installation start message to traces
             traceCollector.addTrace(
@@ -115,7 +115,7 @@ public class DapSession implements DapEventListener {
             );
 
             // Create installation context
-            Path installDir = workspace.getApplication().getPathManager().getDapServerHome(serverConfig.getId());
+            Path installDir = workspace.getApplication().getPathManager().getDapServerHome(serverConfig.getServerId());
             TraceProgressIndicator progress = new TraceProgressIndicator(serverConfig.getTraceCollector());
             InstallerContext context = new InstallerContext(serverConfig, installDir, progress);
 

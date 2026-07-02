@@ -7,7 +7,6 @@ import jakarta.inject.Inject;
 import org.eclipse.lsp4j.Diagnostic;
 import org.jboss.logging.Logger;
 
-import com.redhat.mcp.languagetools.lsp.server.LspServer;
 import com.redhat.mcp.languagetools.lsp.annotations.RequireDidOpen;
 import com.redhat.mcp.languagetools.tools.ToolArgDescriptions;
 import com.redhat.mcp.languagetools.workspace.Workspace;
@@ -46,16 +45,15 @@ public class DiagnosticsTools {
             StringBuilder result = new StringBuilder();
             result.append("Diagnostics for: ").append(uri).append("\n\n");
 
-            Map<String, LspServer> servers = ws.getAllLspServers();
+            var servers = ws.getLspServers();
             if (servers.isEmpty()) {
                 return "No language servers available in workspace";
             }
 
             boolean foundDiagnostics = false;
 
-            for (Map.Entry<String, LspServer> entry : servers.entrySet()) {
-                String serverId = entry.getKey();
-                LspServer server = entry.getValue();
+            for (var server : servers) {
+                String serverId = server.getId();
 
                 List<Diagnostic> diagnostics = server.getDiagnosticsCache().get(fileUri);
 
@@ -104,16 +102,15 @@ public class DiagnosticsTools {
             StringBuilder result = new StringBuilder();
             result.append("All diagnostics for workspace: ").append(uri).append("\n\n");
 
-            Map<String, LspServer> servers = ws.getAllLspServers();
+            var servers = ws.getLspServers();
             if (servers.isEmpty()) {
                 return "No language servers available in workspace";
             }
 
             boolean foundDiagnostics = false;
 
-            for (Map.Entry<String, LspServer> entry : servers.entrySet()) {
-                String serverId = entry.getKey();
-                LspServer server = entry.getValue();
+            for (var server : servers) {
+                String serverId = server.getId();
 
                 Map<String, List<Diagnostic>> allDiagnostics = server.getDiagnosticsCache();
 

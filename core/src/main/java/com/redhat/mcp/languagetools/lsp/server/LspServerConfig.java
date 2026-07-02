@@ -1,12 +1,11 @@
 package com.redhat.mcp.languagetools.lsp.server;
 
+import com.redhat.mcp.languagetools.PathManager;
+import com.redhat.mcp.languagetools.config.PathConfig;
 import com.redhat.mcp.languagetools.lsp.Contributes;
-import com.redhat.mcp.languagetools.lsp.DocumentSelector;
 import com.redhat.mcp.languagetools.server.ServerConfigBase;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -49,74 +48,8 @@ public class LspServerConfig extends ServerConfigBase {
      */
     private Contributes contributes;
 
-    public LspServerConfig() {
-    }
-
-    public LspServerConfig(String id) {
-        this.id = id;
-    }
-
-    // Builder pattern
-    public static Builder builder(String id) {
-        return new Builder(id);
-    }
-
-    public static class Builder {
-        private final LspServerConfig config;
-
-        public Builder(String id) {
-            this.config = new LspServerConfig(id);
-        }
-
-        public Builder command(String command) {
-            config.command = command;
-            return this;
-        }
-
-        public Builder documentSelector(List<DocumentSelector> selectors) {
-            config.setDocumentSelector(new ArrayList<>(selectors));
-            return this;
-        }
-
-        public Builder addDocumentSelector(DocumentSelector selector) {
-            config.getDocumentSelector().add(selector);
-            return this;
-        }
-
-        public Builder env(Map<String, String> env) {
-            config.env = new HashMap<>(env);
-            return this;
-        }
-
-        public Builder workingDirectory(String dir) {
-            config.workingDirectory = dir;
-            return this;
-        }
-
-        public Builder initializationOptions(Map<String, Object> options) {
-            config.initializationOptions = new HashMap<>(options);
-            return this;
-        }
-
-        public LspServerConfig build() {
-            // Command is required unless this is a contribution-only config
-            if (config.command == null && config.contributes == null) {
-                throw new IllegalStateException("command or contributes is required");
-            }
-            // documentSelector is optional for contribution-only configs
-            if (config.getDocumentSelector().isEmpty() && config.command != null) {
-                throw new IllegalStateException("documentSelector is required for servers with command");
-            }
-            return config;
-        }
-    }
-
-    /**
-     * Check if this server can handle the given file.
-     */
-    public boolean canHandle(String uri, String language) {
-        return getDocumentSelector().stream()
-                .anyMatch(selector -> selector.matches(uri, language));
+    public LspServerConfig(String serverId, PathManager pathManager) {
+        super(serverId, pathManager.getLspServerHome(serverId));
     }
 
     /**
@@ -203,7 +136,7 @@ public class LspServerConfig extends ServerConfigBase {
     @Override
     public String toString() {
         return "LspServerConfig{" +
-                "id='" + id + '\'' +
+                "id='" + getServerId() + '\'' +
                 ", name='" + name + '\'' +
                 ", command='" + command + '\'' +
                 ", documentSelector=" + getDocumentSelector() +

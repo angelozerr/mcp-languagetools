@@ -15,6 +15,7 @@ import org.jboss.logging.Logger;
 
 import java.net.URI;
 import java.time.format.DateTimeFormatter;
+import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -81,17 +82,18 @@ public class AdminResource {
     private WorkspaceDTO toDTO(Workspace workspace) {
         var uri = workspace.getRootUri();
         // Get all available server descriptors
-        var allServerConfigs = application.getLspServerConfigs();
+        var serverConfigs = application.getLspServerConfigs();
 
         // Build runtime DTOs for all LSP servers in this workspace
-        List<ServerRuntimeDTO> servers = allServerConfigs.values().stream()
+        List<ServerRuntimeDTO> servers = serverConfigs
+                .stream()
                 .map(config -> serverDTOBuilder.buildRuntime(config, workspace))
                 .toList();
 
         // Build DAP server DTOs for this workspace
-        List<DapServerDTO> dapServers = workspace.getDapServerConfigs().values().stream()
+        List<DapServerDTO> dapServers = Collections.emptyList(); /*workspace.getDapServerConfigs().values().stream()
                 .map(this::toDapDTO)
-                .collect(Collectors.toList());
+                .collect(Collectors.toList());*/
 
         // Build MCP client info with timestamps
         DateTimeFormatter formatter = DateTimeFormatter.ISO_INSTANT;
@@ -108,7 +110,7 @@ public class AdminResource {
                 .map(session -> new WorkspaceDTO.DapSessionDTO(
                     session.getSessionId(),
                     session.getSessionName(),
-                    session.getServerConfig().getId(),
+                    session.getServerConfig().getServerId(),
                     session.getState().name(),
                     session.getLanguage()
                 ))
@@ -127,14 +129,15 @@ public class AdminResource {
     @GET
     @Path("/dap-servers")
     public List<DapServerDTO> listDapServers() {
-        return application.getDapServerConfigs().values().stream()
+        return application.getDapServerConfigs()
+                .stream()
                 .map(this::toDapDTO)
                 .collect(Collectors.toList());
     }
 
     private DapServerDTO toDapDTO(DapServerConfig config) {
         return new DapServerDTO(
-            config.getId(),
+            config.getServerId(),
             config.getName(),
             config.getDescription(),
             config.getDocumentSelector()

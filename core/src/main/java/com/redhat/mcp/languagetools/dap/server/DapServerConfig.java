@@ -2,6 +2,7 @@ package com.redhat.mcp.languagetools.dap.server;
 
 import com.redhat.mcp.languagetools.server.ServerConfigBase;
 
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -16,6 +17,10 @@ public class DapServerConfig extends ServerConfigBase {
     private String debugServerReadyPattern;
     private Map<String, Object> env = new HashMap<>();
     private String workingDirectory;
+
+    public DapServerConfig(String serverId, Path serverHome) {
+        super(serverId, serverHome);
+    }
 
     // Getters and setters (id, name, description, installer, documentSelector, trace inherited from ServerConfigBase)
 

@@ -28,7 +28,7 @@ public class InstallerContext {
 
         // Initialize standard variables
         variables.put("SERVER_HOME", installDir.toString());
-        variables.put("SERVER_ID", config.getId());
+        variables.put("SERVER_ID", config.getServerId());
         variables.put("SERVER_NAME", config.getName());
 
         // USER_HOME and PROJECT_DIR can be set later via setVariable()

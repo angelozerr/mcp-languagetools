@@ -85,7 +85,7 @@ public class RootsTools {
 
                     result.append(String.format("✓ %s: initialized with %d language servers\n",
                         root.name() != null ? root.name() : rootUri.toString(),
-                        workspace.getAllLspServers().size()));
+                        workspace.getLspServers().size()));
                     successCount++;
 
                 } catch (Exception e) {

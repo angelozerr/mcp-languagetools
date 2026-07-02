@@ -48,7 +48,7 @@ public class LspContributionManager {
         LOG.infof("Analyzing contributions from %d servers", allConfigs.size());
 
         for (LspServerConfig config : allConfigs.values()) {
-            LOG.infof("Checking server: %s, hasContributes: %s", config.getId(), config.getContributes() != null);
+            LOG.infof("Checking server: %s, hasContributes: %s", config.getServerId(), config.getContributes() != null);
 
             if (config.getContributes() == null) {
                 continue;
@@ -57,7 +57,7 @@ public class LspContributionManager {
             // Check all contribution targets
             for (String targetServerId : allConfigs.keySet()) {
                 if (config.getContributes().hasContribution(targetServerId)) {
-                    LOG.infof("Server %s contributes to %s", config.getId(), targetServerId);
+                    LOG.infof("Server %s contributes to %s", config.getServerId(), targetServerId);
                     com.google.gson.JsonElement contribution = config.getContributes().getContribution(targetServerId);
 
                     if (contribution != null && contribution.isJsonObject()) {
@@ -66,8 +66,8 @@ public class LspContributionManager {
 
                         // If contributing via classpath, register parent relationship
                         if (contribObj.has("classpath")) {
-                            registerParentServer(config.getId(), targetServerId);
-                            LOG.infof("Registered parent relationship at startup: %s extends %s", config.getId(), targetServerId);
+                            registerParentServer(config.getServerId(), targetServerId);
+                            LOG.infof("Registered parent relationship at startup: %s extends %s", config.getServerId(), targetServerId);
                         }
                     }
                 }
@@ -116,10 +116,10 @@ public class LspContributionManager {
                 if (jdtlsObj.has("bundles") && jdtlsObj.get("bundles").isJsonArray()) {
                     for (com.google.gson.JsonElement bundleElem : jdtlsObj.getAsJsonArray("bundles")) {
                         String bundlePath = bundleElem.getAsString();
-                        Path absolutePath = resolveExtensionPath(config.getId(), bundlePath);
+                        Path absolutePath = resolveExtensionPath(config.getServerId(), bundlePath);
                         if (absolutePath != null) {
                             extensions.add(absolutePath);
-                            LOG.infof("Collected bundle from %s: %s", config.getId(), absolutePath);
+                            LOG.infof("Collected bundle from %s: %s", config.getServerId(), absolutePath);
                         }
                     }
                 }
@@ -145,8 +145,8 @@ public class LspContributionManager {
 
             if (config.getContributes().hasContribution(targetServerId)) {
                 com.google.gson.JsonElement contribution = config.getContributes().getContribution(targetServerId);
-                contributions.put(config.getId(), contribution);
-                LOG.infof("Server %s contributes to %s", config.getId(), targetServerId);
+                contributions.put(config.getServerId(), contribution);
+                LOG.infof("Server %s contributes to %s", config.getServerId(), targetServerId);
             }
         }
 

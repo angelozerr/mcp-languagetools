@@ -1,14 +1,9 @@
 package com.redhat.mcp.languagetools.lsp.server;
 
-import com.redhat.mcp.languagetools.PathManager;
-import com.redhat.mcp.languagetools.lsp.trace.LspTraceCollector;
 import com.redhat.mcp.languagetools.workspace.Workspace;
 import org.jboss.logging.Logger;
 
-import java.net.URI;
-import java.nio.file.Path;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.ServiceLoader;
 
@@ -42,14 +37,14 @@ public class LspServerFactoryRegistry {
     public static LspServer createServer(LspServerConfig config, Workspace workspace) {
 
         // Check for custom factory (highest priority)
-        LspServerFactory factory = factories.get(config.getId());
+        LspServerFactory factory = factories.get(config.getServerId());
         if (factory != null) {
-            LOG.infof("Creating custom LSP server for %s (workspace: %s)", config.getId(), workspace.getRootUri());
+            LOG.infof("Creating custom LSP server for %s (workspace: %s)", config.getServerId(), workspace.getRootUri());
             return factory.createServer(config, workspace);
         }
 
         // Default: use classpath-extensible server (supports jarExtensions contributions)
-        LOG.debugf("Creating classpath-extensible LSP server for %s", config.getId());
+        LOG.debugf("Creating classpath-extensible LSP server for %s", config.getServerId());
         return new ClasspathExtensibleLspServer(config, workspace);
     }
 }

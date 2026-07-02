@@ -59,7 +59,7 @@ public class ContributionDTOBuilder {
 
                             // Resolve patterns for path-based contributions (bundles, classpath)
                             if (shouldResolvePatterns(key)) {
-                                values = resolvePatterns(config.getId(), values);
+                                values = resolvePatterns(config.getServerId(), values);
                             }
 
                             data.put(key, values);

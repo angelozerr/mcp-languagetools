@@ -126,7 +126,7 @@ public class RequireDidOpenInterceptor {
 
         // Find servers that handle this file
         List<LspServer> serversToNotify = new ArrayList<>();
-        for (LspServer server : workspace.getAllLspServers().values()) {
+        for (LspServer server : workspace.getLspServers()) {
             if (server.getConfig().canHandle(fileUri, detectLanguage(uri, annotation.languageId()))) {
                 serversToNotify.add(server);
             }
@@ -174,9 +174,9 @@ public class RequireDidOpenInterceptor {
 
                 server.getLanguageServer().getTextDocumentService().didOpen(params);
                 server.markFileOpened(fileUri);
-                LOG.debugf("Sent didOpen for %s to %s", fileUri, server.getConfig().getId());
+                LOG.debugf("Sent didOpen for %s to %s", fileUri, server.getConfig().getServerId());
             } catch (Exception e) {
-                LOG.warnf(e, "Failed to send didOpen for %s to %s", fileUri, server.getConfig().getId());
+                LOG.warnf(e, "Failed to send didOpen for %s to %s", fileUri, server.getConfig().getServerId());
             }
         }
 
@@ -194,9 +194,9 @@ public class RequireDidOpenInterceptor {
 
                     server.getLanguageServer().getTextDocumentService().didClose(params);
                     server.markFileClosed(fileUri);
-                    LOG.debugf("Sent didClose for %s to %s", fileUri, server.getConfig().getId());
+                    LOG.debugf("Sent didClose for %s to %s", fileUri, server.getConfig().getServerId());
                 } catch (Exception e) {
-                    LOG.warnf(e, "Failed to send didClose for %s to %s", fileUri, server.getConfig().getId());
+                    LOG.warnf(e, "Failed to send didClose for %s to %s", fileUri, server.getConfig().getServerId());
                 }
             }
         }
