@@ -24,6 +24,40 @@
         window.serverConfigs = serverConfigs;
 
         /**
+         * Format status into CSS class name.
+         */
+        function formatStatusClass(status, isReady) {
+            if (status === 'RUNNING' && !isReady) {
+                return 'status-running-not-ready';
+            }
+            return 'status-' + status.toLowerCase();
+        }
+
+        /**
+         * Format status label for display.
+         */
+        function formatStatusLabel(status, externalInstance) {
+            const labels = {
+                'NOT_STARTED': 'Not Started',
+                'INSTALLING': 'Installing',
+                'STARTING': 'Starting',
+                'RUNNING': 'Running',
+                'STOPPING': 'Stopping',
+                'STOPPED': 'Stopped',
+                'ERROR': 'Error',
+                'CONNECTED_TO_IDE': 'Connected to IDE'
+            };
+
+            // If connected to IDE and we have client info, show it
+            if (status === 'CONNECTED_TO_IDE' && externalInstance && externalInstance.clientName) {
+                const version = externalInstance.clientVersion ? ` ${externalInstance.clientVersion}` : '';
+                return `Connected to ${externalInstance.clientName}${version}`;
+            }
+
+            return labels[status] || status;
+        }
+
+        /**
          * Load global server configurations (called once at startup).
          */
         async function loadServerConfigs() {
@@ -198,6 +232,9 @@
                 case 'dap-trace':
                     handleDapTrace(message);
                     break;
+                case 'dap-session-update':
+                    handleDapSessionUpdate(message);
+                    break;
                 case 'mcp-trace':
                     handleMcpTrace(message);
                     break;
@@ -251,6 +288,18 @@
             if (trace.workspaceUri === selectedWorkspace && trace.serverId === currentServerId) {
                 console.log('Refreshing console for current server');
                 renderConsole();
+            }
+        }
+
+        /**
+         * Handle DAP session update from WebSocket.
+         */
+        function handleDapSessionUpdate(message) {
+            console.log('DAP session update:', message.eventType, message.sessionId);
+
+            // Delegate to admin-dap.js
+            if (typeof window.onDapSessionUpdate === 'function') {
+                window.onDapSessionUpdate(message);
             }
         }
 
@@ -462,7 +511,7 @@
             }
 
             // Regenerate the status badge HTML
-            const statusClass = formatStatusClass(server.status);
+            const statusClass = formatStatusClass(server.status, server.isReady);
             const label = formatStatusLabel(server.status, server.externalInstance);
 
             // If installing and we have progress, show a progress bar

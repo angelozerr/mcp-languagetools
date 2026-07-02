@@ -246,6 +246,37 @@ body {
     border-left-color: #007acc;
 }
 
+/* DAP session items */
+.dap-session-item:hover {
+    background: #2a2d2e;
+}
+
+.dap-session-item.active {
+    background: #2a2d2e;
+    border-left: 2px solid #007acc;
+}
+
+/* Session icons - keep them small and fixed size */
+.dap-session-item > span:first-child {
+    font-size: 0.7rem;
+    line-height: 1;
+    display: inline-block;
+    width: 0.8rem;
+    min-width: 0.8rem;
+    text-align: center;
+    flex-shrink: 0;
+    vertical-align: middle;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
 /* Visual distinction for external (IDE) servers */
 .server-item-external {
     background: #1a2a1a;
@@ -334,6 +365,9 @@ body {
     font-size: 0.7rem;
     font-weight: bold;
     display: inline-block;
+    text-transform: none;
+    min-width: 4.5rem;
+    text-align: center;
 }
 
 .status-starting { background: #ffa500; color: white; }
@@ -344,6 +378,7 @@ body {
 .status-installing { background: #ffc107; color: black; }
 .status-install_failed { background: #dc3545; color: white; }
 .status-start_failed { background: #ff6b6b; color: white; }
+.status-error { background: #dc3545; color: white; }
 .status-switching { background: #17a2b8; color: white; }
 .status-connecting_to_ide { background: #9b59b6; color: white; }
 .status-connected_to_ide { background: #00897b; color: white; font-weight: 600; }

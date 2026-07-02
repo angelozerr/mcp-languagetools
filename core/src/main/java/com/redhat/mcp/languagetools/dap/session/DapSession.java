@@ -38,7 +38,7 @@ public class DapSession implements DapEventListener {
     private final String language;
     private final String sessionName;
     private final DapServerConfig serverConfig;
-    private final DapServer dapServer;
+    private DapServer dapServer; // Not final - can be recreated after error
     private final Workspace workspace;
     private final DapTraceCollector traceCollector;
 
@@ -50,7 +50,6 @@ public class DapSession implements DapEventListener {
 
     public enum SessionState {
         CREATED,
-        INITIALIZED,
         RUNNING,
         PAUSED,
         TERMINATED,
@@ -100,6 +99,23 @@ public class DapSession implements DapEventListener {
         this.dapServer = new DapServer(sessionId, serverConfig, workspace);
         // Register this session as the event listener
         this.dapServer.setEventListener(this);
+        // Listen to server status changes to update session state
+        this.dapServer.addStatusChangeListener(this::onServerStatusChanged);
+    }
+
+    /**
+     * Called when the DAP server status changes.
+     * Propagates ERROR status to the session.
+     * Note: DapSessionManager also listens to status changes and fires WebSocket events.
+     */
+    private void onServerStatusChanged(com.redhat.mcp.languagetools.server.ServerStatus oldStatus,
+                                       com.redhat.mcp.languagetools.server.ServerStatus newStatus) {
+        LOG.infof("DAP server status changed for session %s: %s -> %s", sessionId, oldStatus, newStatus);
+
+        // Propagate ERROR status to session state
+        if (newStatus == com.redhat.mcp.languagetools.server.ServerStatus.ERROR) {
+            state = SessionState.ERROR;
+        }
     }
 
     // ========== Lifecycle ==========
@@ -112,7 +128,7 @@ public class DapSession implements DapEventListener {
         LOG.infof("Initializing DAP session: %s (%s)", sessionName, sessionId);
         return dapServer.start()
             .thenAccept(v -> {
-                state = SessionState.INITIALIZED;
+                // Server is now RUNNING, session stays CREATED until launch
                 LOG.infof("DAP session initialized: %s", sessionId);
             })
             .exceptionally(ex -> {
@@ -147,15 +163,29 @@ public class DapSession implements DapEventListener {
     public CompletableFuture<Map<String, Object>> launch(Map<String, Object> launchConfig) {
         LOG.infof("Launching debug session: %s with config: %s", sessionId, launchConfig);
 
-        // Initialize if not already done (includes installation if needed)
+        // Restart server if not running (first launch or after crash)
         CompletableFuture<Void> initFuture;
-        if (state == SessionState.CREATED) {
+        var serverStatus = dapServer.getStatus();
+        LOG.infof("Launch requested: sessionState=%s, serverStatus=%s", state, serverStatus);
+
+        if (state == SessionState.CREATED
+            || serverStatus == com.redhat.mcp.languagetools.server.ServerStatus.NOT_STARTED
+            || serverStatus == com.redhat.mcp.languagetools.server.ServerStatus.START_FAILED
+            || serverStatus == com.redhat.mcp.languagetools.server.ServerStatus.STOPPED) {
+            LOG.infof("Server not running, starting and initializing...");
             initFuture = initialize();
         } else {
+            LOG.infof("Server already running, skipping init");
             initFuture = CompletableFuture.completedFuture(null);
         }
 
         return initFuture.thenCompose(v -> {
+            // Verify server is actually running before sending launch
+            if (dapServer.getStatus() != com.redhat.mcp.languagetools.server.ServerStatus.RUNNING) {
+                return CompletableFuture.failedFuture(new IllegalStateException(
+                    "DAP server not running (status: " + dapServer.getStatus() + ")"));
+            }
+
             IDebugProtocolServer server = dapServer.getDebugServer();
             if (server == null) {
                 return CompletableFuture.failedFuture(new IllegalStateException("DAP server not initialized"));

@@ -77,7 +77,11 @@ public class LspServer extends ServerBase<LspServerConfig> {
      * First tries to connect to an existing instance via socket, falls back to launching a new process.
      */
     public CompletableFuture<Void> start() {
-        setStatus(ServerStatus.STARTING);
+        // Common startup checks and preparation
+        if (!checkAndPrepareStart()) {
+            return CompletableFuture.completedFuture(null);
+        }
+
         var config = super.getConfig();
 
         // Ensure server is installed first
@@ -242,74 +246,8 @@ public class LspServer extends ServerBase<LspServerConfig> {
             String.format("LSP server process started (PID: %d)", serverProcess.pid())
         );
 
-        // Read and log stderr in background, send to trace collector
-        executorService.submit(() -> {
-            try (var reader = new BufferedReader(new InputStreamReader(serverProcess.getErrorStream()))) {
-                String line;
-                StringBuilder stackTraceBuffer = new StringBuilder();
-                String stackTraceTimestamp = null;
-
-                while ((line = reader.readLine()) != null) {
-                    LOG.errorf("[%s stderr] %s", config.getServerId(), line);
-
-                    String trimmed = line.trim();
-                    boolean isStackTraceLine = trimmed.startsWith("at ") && trimmed.contains("(") && trimmed.contains(")");
-                    boolean isExceptionLine = trimmed.contains("Exception:") || trimmed.contains("Error:");
-
-                    if (isStackTraceLine || (isExceptionLine && stackTraceBuffer.isEmpty())) {
-                        // Start or continue stack trace buffering
-                        if (stackTraceBuffer.isEmpty()) {
-                            stackTraceTimestamp = java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss"));
-                        }
-                        stackTraceBuffer.append(line).append("\n");
-                    } else {
-                        // Flush buffered stack trace if any
-                        if (!stackTraceBuffer.isEmpty()) {
-                            String errorTrace = String.format("[Error - %s] %s stderr: %s",
-                                stackTraceTimestamp,
-                                config.getName(),
-                                stackTraceBuffer.toString().trim());
-                            getTraceCollector().addTrace(
-                                workspaceRoot.toString(),
-                                config.getServerId(),
-                                TraceCollector.MessageDirection.SERVER_TO_CLIENT,
-                                errorTrace
-                            );
-                            stackTraceBuffer.setLength(0);
-                            stackTraceTimestamp = null;
-                        }
-
-                        // Send current line as regular error
-                        String errorTrace = String.format("[Error - %s] %s stderr: %s",
-                            java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss")),
-                            config.getName(),
-                            line);
-                        getTraceCollector().addTrace(
-                            workspaceRoot.toString(),
-                            config.getServerId(),
-                            TraceCollector.MessageDirection.SERVER_TO_CLIENT,
-                            errorTrace
-                        );
-                    }
-                }
-
-                // Flush remaining stack trace at end of stream
-                if (!stackTraceBuffer.isEmpty()) {
-                    String errorTrace = String.format("[Error - %s] %s stderr: %s",
-                        stackTraceTimestamp,
-                        config.getName(),
-                        stackTraceBuffer.toString().trim());
-                    getTraceCollector().addTrace(
-                        workspaceRoot.toString(),
-                        config.getServerId(),
-                        TraceCollector.MessageDirection.SERVER_TO_CLIENT,
-                        errorTrace
-                    );
-                }
-            } catch (Exception e) {
-                LOG.debugf("Error stream reader closed: %s", e.getMessage());
-            }
-        });
+        // Start monitoring stderr for errors (uses shared implementation from ServerBase)
+        startStderrMonitoring(workspaceRoot.toString(), config.getServerId());
 
         // Create LSP client (subclasses can override to provide custom client)
         LanguageClient client = createLanguageClient();

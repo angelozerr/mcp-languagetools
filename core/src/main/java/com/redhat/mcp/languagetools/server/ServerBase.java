@@ -25,7 +25,7 @@ public abstract class ServerBase<T extends ServerConfigBase> {
 
     private final T config;
     private final Workspace workspace;
-    protected final ExecutorService executorService;
+    protected ExecutorService executorService; // Not final - can be recreated after error
     private final RequestRouter requestRouter;
     private final TracingMessageConsumer.TraceCollectorAdd traceCollector;
     private final TracingMessageConsumer tracing;
@@ -127,6 +127,50 @@ public abstract class ServerBase<T extends ServerConfigBase> {
                 }
             }
         }
+
+        // Cleanup resources when entering terminal states
+        if (newStatus == ServerStatus.ERROR
+            || newStatus == ServerStatus.START_FAILED
+            || newStatus == ServerStatus.STOPPED) {
+            cleanupResources();
+        }
+    }
+
+    /**
+     * Recreate the executor service (used when restarting after error).
+     */
+    protected synchronized void recreateExecutorService() {
+        // Shutdown old executor if it exists (don't wait - threads will die naturally)
+        if (executorService != null && !executorService.isShutdown()) {
+            LOG.infof("Shutting down old executor service before recreating");
+            executorService.shutdownNow(); // Interrupt threads but don't wait
+        }
+
+        // Create new executor service immediately
+        executorService = Executors.newCachedThreadPool();
+        LOG.infof("Recreated executor service for %s", config.getServerId());
+    }
+
+    /**
+     * Cleanup resources (threads, processes) when server enters error state.
+     * This is called synchronously when setStatus(ERROR) happens, so must be FAST.
+     * Can be overridden by subclasses to add custom cleanup.
+     */
+    protected void cleanupResources() {
+        LOG.infof("Cleaning up resources for %s (status: %s)", config.getServerId(), status);
+
+        // Kill the server process if still running
+        if (serverProcess != null) {
+            if (serverProcess.isAlive()) {
+                LOG.infof("Destroying server process (PID: %d)", serverProcess.pid());
+                serverProcess.destroyForcibly();
+            }
+            serverProcess = null; // Always null it out
+        }
+
+        // DON'T shutdown executor - it would reject future start() attempts
+        // Just let monitoring threads die naturally when streams close
+        LOG.infof("Resources cleaned for %s (executor kept alive)", config.getServerId());
     }
 
     public final String getStatusMessage() {
@@ -152,6 +196,93 @@ public abstract class ServerBase<T extends ServerConfigBase> {
                 }
             }
         }
+    }
+
+    /**
+     * Start monitoring stderr from the server process.
+     * Captures errors and sends them to the trace collector.
+     * Common implementation for both LSP and DAP servers.
+     *
+     * @param workspaceOrSessionId Workspace URI for LSP, sessionId for DAP
+     * @param serverId Server ID for LSP, sessionId for DAP
+     */
+    protected void startStderrMonitoring(String workspaceOrSessionId, String serverId) {
+        executorService.submit(() -> {
+            try (var reader = new java.io.BufferedReader(new java.io.InputStreamReader(serverProcess.getErrorStream()))) {
+                String line;
+                StringBuilder stackTraceBuffer = new StringBuilder();
+                String stackTraceTimestamp = null;
+
+                while ((line = reader.readLine()) != null && !Thread.currentThread().isInterrupted()) {
+                    LOG.errorf("[%s stderr] %s", config.getServerId(), line);
+
+                    String trimmed = line.trim();
+                    boolean isStackTraceLine = trimmed.startsWith("at ") && trimmed.contains("(") && trimmed.contains(")");
+                    boolean isExceptionLine = trimmed.contains("Exception:") || trimmed.contains("Error:");
+
+                    if (isStackTraceLine || (isExceptionLine && stackTraceBuffer.isEmpty())) {
+                        // Start or continue stack trace buffering
+                        if (stackTraceBuffer.isEmpty()) {
+                            stackTraceTimestamp = java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss"));
+                        }
+                        stackTraceBuffer.append(line).append("\n");
+                    } else {
+                        // Flush buffered stack trace if any
+                        if (!stackTraceBuffer.isEmpty()) {
+                            String errorTrace = String.format("[Error - %s] %s stderr: %s",
+                                stackTraceTimestamp,
+                                config.getName(),
+                                stackTraceBuffer.toString().trim());
+                            getTraceCollector().addTrace(
+                                workspaceOrSessionId,
+                                serverId,
+                                com.redhat.mcp.languagetools.trace.TraceCollector.MessageDirection.SERVER_TO_CLIENT,
+                                errorTrace
+                            );
+                            stackTraceBuffer.setLength(0);
+                            stackTraceTimestamp = null;
+                        }
+
+                        // Send current line as regular error
+                        String errorTrace = String.format("[Error - %s] %s stderr: %s",
+                            java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss")),
+                            config.getName(),
+                            line);
+                        getTraceCollector().addTrace(
+                            workspaceOrSessionId,
+                            serverId,
+                            com.redhat.mcp.languagetools.trace.TraceCollector.MessageDirection.SERVER_TO_CLIENT,
+                            errorTrace
+                        );
+                    }
+                }
+
+                // Flush any remaining stack trace
+                if (!stackTraceBuffer.isEmpty()) {
+                    String errorTrace = String.format("[Error - %s] %s stderr: %s",
+                        stackTraceTimestamp,
+                        config.getName(),
+                        stackTraceBuffer.toString().trim());
+                    getTraceCollector().addTrace(
+                        workspaceOrSessionId,
+                        serverId,
+                        com.redhat.mcp.languagetools.trace.TraceCollector.MessageDirection.SERVER_TO_CLIENT,
+                        errorTrace
+                    );
+                }
+
+                LOG.infof("Stderr monitor for %s ended", config.getServerId());
+            } catch (java.io.IOException e) {
+                // Stream closed or interrupted - expected during shutdown
+                if (!Thread.currentThread().isInterrupted()) {
+                    LOG.errorf(e, "Error reading stderr for %s", config.getServerId());
+                } else {
+                    LOG.infof("Stderr monitor interrupted for %s", config.getServerId());
+                }
+            } catch (Exception e) {
+                LOG.errorf(e, "Unexpected error in stderr monitor for %s", config.getServerId());
+            }
+        });
     }
 
     /**
@@ -224,6 +355,29 @@ public abstract class ServerBase<T extends ServerConfigBase> {
     protected CompletableFuture<Void> ensureInstalled() {
         return config.ensureInstalled(workspace.getApplication().getPathManager(), this::setStatus)
                 .thenApply(result -> null);
+    }
+
+    /**
+     * Check if server can start and prepare for starting.
+     * Returns true if can proceed, false if should skip (already running).
+     * Common logic for both LSP and DAP servers.
+     */
+    protected boolean checkAndPrepareStart() {
+        // Don't restart if already running or starting
+        if (getStatus() == ServerStatus.RUNNING || getStatus() == ServerStatus.STARTING) {
+            LOG.warnf("Server already running/starting (status: %s), ignoring start call", getStatus());
+            return false;
+        }
+
+        // If restarting, kill old process first
+        if (serverProcess != null && serverProcess.isAlive()) {
+            LOG.infof("Killing old server process before restart (PID: %d)", serverProcess.pid());
+            serverProcess.destroyForcibly();
+        }
+
+        // Set status to STARTING
+        setStatus(ServerStatus.STARTING);
+        return true;
     }
 
     /**

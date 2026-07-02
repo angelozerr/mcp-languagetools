@@ -407,44 +407,64 @@
                     `;
 
                     return `
-                        <div class="server-item" style="opacity: 0.8; cursor: default;">
+                        <div class="server-item" data-dap-server="${server.id}" style="opacity: 0.8; cursor: default;">
                             <div class="server-name">
                                 <span class="server-source-icon">🐛</span>
                                 ${server.name}
                             </div>
                             <div class="server-id">${server.id}</div>
-                            <div>
-                                <span class="status-badge ${isInstalled ? 'status-running' : 'status-stopped'}">${isInstalled ? 'Installed' : 'Not Installed'}</span>
-                            </div>
                             <div class="server-actions">
                                 ${actions}
                             </div>
                         </div>
                         ${sessions.map(session => {
-                            const stateIcon = session.state === 'RUNNING' ? '▶️' : session.state === 'PAUSED' ? '⏸️' : '⏹️';
-                            const statusClass = session.state === 'RUNNING' ? 'status-running' : session.state === 'PAUSED' ? 'status-running-not-ready' : 'status-stopped';
+                            // Determine icon based on serverStatus first, then session state
+                            let stateIcon = '<span>⏹️</span>';
+                            let statusText = session.state ? session.state.charAt(0) + session.state.slice(1).toLowerCase() : '';
+                            let finalStatusClass = 'status-stopped';
 
-                            // Actions for sessions
-                            let sessionActions = '';
-                            if (session.state === 'CREATED') {
-                                sessionActions = `<button class="server-action-btn" onclick='event.stopPropagation(); deleteDapSession("${session.sessionId}")' title="Delete">🗑️</button>`;
+                            if (session.serverStatus === 'INSTALLING') {
+                                stateIcon = '<span>⏳</span>';
+                                statusText = 'Installing';
+                                finalStatusClass = 'status-installing';
+                            } else if (session.serverStatus === 'STARTING') {
+                                stateIcon = '<span>⏳</span>';
+                                statusText = 'Starting';
+                                finalStatusClass = 'status-starting';
                             } else if (session.state === 'RUNNING') {
-                                sessionActions = `<button class="server-action-btn" onclick='event.stopPropagation(); pauseDapSession("${session.sessionId}")' title="Pause">⏸</button>`;
+                                stateIcon = '<span>▶️</span>';
+                                statusText = 'Running';
+                                finalStatusClass = 'status-running';
+                            } else if (session.state === 'PAUSED') {
+                                stateIcon = '<span>⏸️</span>';
+                                statusText = 'Paused';
+                                finalStatusClass = 'status-running-not-ready';
+                            } else if (session.state === 'ERROR' || session.serverStatus === 'START_FAILED' || session.serverStatus === 'ERROR') {
+                                stateIcon = '<span>❌</span>';
+                                statusText = 'Error';
+                                finalStatusClass = 'status-error';
+                            }
+
+                            // Determine action buttons
+                            const isStopped = session.state === 'CREATED' || session.serverStatus === 'STOPPED' || session.serverStatus === 'START_FAILED' || session.serverStatus === 'ERROR';
+                            const isRunningOrStarting = session.state === 'RUNNING' || session.serverStatus === 'STARTING' || session.serverStatus === 'INSTALLING';
+
+                            let actions = '';
+                            if (isStopped) {
+                                actions = `
+                                    <button class="server-action-btn" onclick='event.stopPropagation(); selectDapSession("${session.sessionId}"); setTimeout(() => { const btn = document.getElementById("dap-launch-btn-${session.sessionId}"); if(btn) btn.click(); }, 100);' title="Launch" style="font-size: 0.7rem; padding: 0.15rem 0.3rem;">▶</button>
+                                    <button class="server-action-btn" onclick='event.stopPropagation(); deleteDapSession("${session.sessionId}")' title="Delete" style="font-size: 0.7rem; padding: 0.15rem 0.3rem;">🗑️</button>
+                                `;
+                            } else if (isRunningOrStarting) {
+                                actions = `<button class="server-action-btn" onclick='event.stopPropagation(); stopDapSession("${session.sessionId}")' title="Stop" style="font-size: 0.7rem; padding: 0.15rem 0.3rem;">⏹</button>`;
                             }
 
                             return `
-                                <div class="server-item" style="margin-left: 1.5rem; border-left: 2px solid #3a3a3a;" onclick="selectDapSession('${session.sessionId}')">
-                                    <div class="server-name">
-                                        <span class="server-source-icon">${stateIcon}</span>
-                                        ${session.sessionName}
-                                    </div>
-                                    <div class="server-id">${session.language}</div>
-                                    <div>
-                                        <span class="status-badge ${statusClass}">${session.state}</span>
-                                    </div>
-                                    <div class="server-actions">
-                                        ${sessionActions}
-                                    </div>
+                                <div data-session-id="${session.sessionId}" class="dap-session-item" style="margin-left: 2rem; padding: 0.25rem 0.5rem; display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.85rem; opacity: 0.9; border-radius: 4px; transition: background-color 0.2s;" onclick="selectDapSession('${session.sessionId}')">
+                                    ${stateIcon}
+                                    <span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${session.sessionName}</span>
+                                    <span class="status-badge ${finalStatusClass}" style="font-size: 0.7rem; padding: 0.1rem 0.4rem;">${statusText}</span>
+                                    ${actions}
                                 </div>
                             `;
                         }).join('')}

@@ -29,24 +29,24 @@ public class DapSessionResource {
     @POST
     public Response createSession(CreateDapSessionRequest request) {
         LOG.infof("Creating DAP session: workspace=%s, dapServerId=%s, name=%s",
-            request.workspaceUri(), request.dapServerId(), request.sessionName());
+                request.workspaceUri(), request.dapServerId(), request.sessionName());
 
         try {
             URI workspaceUri = URI.create(request.workspaceUri());
 
             DapSession session = sessionManager.createSession(
-                workspaceUri,
-                request.dapServerId(),
-                request.sessionName()
+                    workspaceUri,
+                    request.dapServerId(),
+                    request.sessionName()
             );
 
             // Return session info
             var response = Map.of(
-                "sessionId", session.getSessionId(),
-                "sessionName", session.getSessionName(),
-                "dapServerId", session.getServerConfig().getServerId(),
-                "state", session.getState().name(),
-                "language", session.getLanguage()
+                    "sessionId", session.getSessionId(),
+                    "sessionName", session.getSessionName(),
+                    "dapServerId", session.getServerConfig().getServerId(),
+                    "state", session.getState().name(),
+                    "language", session.getLanguage()
             );
 
             return Response.ok(response).build();
@@ -54,8 +54,8 @@ public class DapSessionResource {
         } catch (Exception e) {
             LOG.errorf(e, "Failed to create DAP session");
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-                .entity(ErrorResponse.fromException(e))
-                .build();
+                    .entity(ErrorResponse.fromException(e))
+                    .build();
         }
     }
 
@@ -71,24 +71,73 @@ public class DapSessionResource {
             DapSession session = sessionManager.getSession(sessionId);
             if (session == null) {
                 return Response.status(Response.Status.NOT_FOUND)
-                    .entity(Map.of("error", "Session not found: " + sessionId))
-                    .build();
+                        .entity(Map.of("error", "Session not found: " + sessionId))
+                        .build();
             }
 
-            // Launch the session (wait for completion)
-            Map<String, Object> result = session.launch(launchConfig).join();
+            // Launch the session asynchronously (don't block HTTP thread!)
+            session.launch(launchConfig).whenComplete((result, error) -> {
+                if (error != null) {
+                    LOG.errorf(error, "DAP session launch failed: %s", sessionId);
+                } else {
+                    LOG.infof("DAP session launched successfully: %s", sessionId);
+                }
+            });
 
-            return Response.ok(Map.of(
-                "status", "launched",
-                "sessionId", sessionId,
-                "result", result
+            // Return immediately - client will get status updates via WebSocket
+            return Response.accepted(Map.of(
+                    "status", "launching",
+                    "sessionId", sessionId,
+                    "message", "Launch started, monitor status via WebSocket"
             )).build();
 
         } catch (Exception e) {
-            LOG.errorf(e, "Failed to launch DAP session");
+            LOG.errorf(e, "Failed to start DAP session launch");
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-                .entity(ErrorResponse.fromException(e))
-                .build();
+                    .entity(ErrorResponse.fromException(e))
+                    .build();
+        }
+    }
+
+    /**
+     * Stop a running DAP session.
+     */
+    @POST
+    @Path("/{sessionId}/stop")
+    public Response stopSession(@PathParam("sessionId") String sessionId) {
+        LOG.infof("Stopping DAP session: sessionId=%s", sessionId);
+
+        try {
+            DapSession session = sessionManager.getSession(sessionId);
+            if (session == null) {
+                return Response.status(Response.Status.NOT_FOUND)
+                        .entity(Map.of("error", "Session not found: " + sessionId))
+                        .build();
+            }
+
+            // Terminate the session asynchronously
+            session
+                    .terminate()
+                    .whenComplete((result, error) -> {
+                        if (error != null) {
+                            LOG.errorf(error, "DAP session terminate failed: %s", sessionId);
+                        } else {
+                            LOG.infof("DAP session terminated successfully: %s", sessionId);
+                        }
+                    });
+
+            // Return immediately
+            return Response.accepted(Map.of(
+                    "status", "stopping",
+                    "sessionId", sessionId,
+                    "message", "Stop requested"
+            )).build();
+
+        } catch (Exception e) {
+            LOG.errorf(e, "Failed to stop DAP session");
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(ErrorResponse.fromException(e))
+                    .build();
         }
     }
 
@@ -104,22 +153,22 @@ public class DapSessionResource {
             DapSession session = sessionManager.getSession(sessionId);
             if (session == null) {
                 return Response.status(Response.Status.NOT_FOUND)
-                    .entity(Map.of("error", "Session not found: " + sessionId))
-                    .build();
+                        .entity(Map.of("error", "Session not found: " + sessionId))
+                        .build();
             }
 
             sessionManager.removeSession(sessionId);
 
             return Response.ok(Map.of(
-                "status", "deleted",
-                "sessionId", sessionId
+                    "status", "deleted",
+                    "sessionId", sessionId
             )).build();
 
         } catch (Exception e) {
             LOG.errorf(e, "Failed to delete DAP session");
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-                .entity(Map.of("error", e.getMessage()))
-                .build();
+                    .entity(Map.of("error", e.getMessage()))
+                    .build();
         }
     }
 }

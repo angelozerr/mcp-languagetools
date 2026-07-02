@@ -21,6 +21,7 @@ public record WorkspaceDTO(
         String sessionName,
         String dapServerId,
         String state,
-        String language
+        String language,
+        String serverStatus  // INSTALLING, STARTING, RUNNING, etc.
     ) {}
 }

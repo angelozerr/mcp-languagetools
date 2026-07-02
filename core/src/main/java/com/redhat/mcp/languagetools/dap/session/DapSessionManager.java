@@ -33,6 +33,9 @@ public class DapSessionManager {
     @Inject
     DapTraceCollector traceCollector;
 
+    @Inject
+    jakarta.enterprise.event.Event<DapSessionEvent> sessionEvent;
+
     private final Map<String, DapSession> sessions = new ConcurrentHashMap<>();
 
     /**
@@ -81,6 +84,31 @@ public class DapSessionManager {
 
         sessions.put(sessionId, session);
         LOG.infof("Created session %s for %s (%s)", sessionId, language, sessionName);
+
+        // Register status change listener on the DAP server
+        session.getDapServer().addStatusChangeListener((oldStatus, newStatus) -> {
+            LOG.infof("DAP server status changed: session=%s, %s -> %s", sessionId, oldStatus, newStatus);
+            // Fire event to notify UI with status change
+            if (sessionEvent != null) {
+                sessionEvent.fire(new DapSessionEvent(
+                    DapSessionEvent.Type.STATE_CHANGED,
+                    sessionId,
+                    workspaceUri.toString(),
+                    oldStatus.name(),
+                    newStatus.name()
+                ));
+                LOG.infof("Fired STATE_CHANGED event for session %s: %s -> %s", sessionId, oldStatus, newStatus);
+            } else {
+                LOG.errorf("sessionEvent is null! Cannot fire STATE_CHANGED event");
+            }
+        });
+
+        // Fire CDI event for WebSocket notification
+        sessionEvent.fire(new DapSessionEvent(
+            DapSessionEvent.Type.CREATED,
+            sessionId,
+            workspaceUri.toString()
+        ));
 
         // Don't initialize yet - initialization (including installation) happens on first launch
         return session;
@@ -177,6 +205,15 @@ public class DapSessionManager {
      */
     public DapSession getSession(String sessionId) {
         return sessions.get(sessionId);
+    }
+
+    /**
+     * Get all sessions for a specific workspace.
+     */
+    public List<DapSession> getSessionsForWorkspace(URI workspaceUri) {
+        return sessions.values().stream()
+                .filter(session -> session.getWorkspace().getRootUri().equals(workspaceUri))
+                .toList();
     }
 
     /**

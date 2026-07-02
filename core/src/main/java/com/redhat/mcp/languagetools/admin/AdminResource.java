@@ -112,7 +112,8 @@ public class AdminResource {
                     session.getSessionName(),
                     session.getServerConfig().getServerId(),
                     session.getState().name(),
-                    session.getLanguage()
+                    session.getLanguage(),
+                    session.getDapServer().getStatus().name()  // Add server status
                 ))
                 .collect(Collectors.toList());
 
