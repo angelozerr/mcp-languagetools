@@ -37,16 +37,15 @@ public class LspServerConfig extends ServerConfigBase {
      */
     private Map<String, Object> initializationOptions = new HashMap<>();
 
-    /**
-     * True if this is a pure extension (server-extension.json), false if it's a server (server.json).
-     * Extensions contribute to other servers but don't run a separate process.
-     */
-    private boolean isExtension;
+    private String parentServerId;
 
-    /**
-     * Contributions (VS Code-like extension system)
-     */
-    private Contributes contributes;
+    public String getParentServerId() {
+        return parentServerId;
+    }
+
+    public void setParentServerId(String parentServerId) {
+        this.parentServerId = parentServerId;
+    }
 
     public LspServerConfig(String serverId, PathManager pathManager) {
         super(serverId, pathManager.getLspServerHome(serverId));
@@ -56,7 +55,7 @@ public class LspServerConfig extends ServerConfigBase {
      * Check if this is a contribution-only config (no command, only contributes to other servers).
      */
     public boolean isContributionOnly() {
-        return command == null && contributes != null;
+        return command == null && getContributes() != null;
     }
 
     // Getters and setters (id, name, description, installer inherited from ServerConfigBase)
@@ -118,19 +117,7 @@ public class LspServerConfig extends ServerConfigBase {
     }
 
     public boolean isExtension() {
-        return isExtension;
-    }
-
-    public void setExtension(boolean extension) {
-        isExtension = extension;
-    }
-
-    public Contributes getContributes() {
-        return contributes;
-    }
-
-    public void setContributes(Contributes contributes) {
-        this.contributes = contributes;
+        return parentServerId != null;
     }
 
     @Override
@@ -142,4 +129,5 @@ public class LspServerConfig extends ServerConfigBase {
                 ", documentSelector=" + getDocumentSelector() +
                 '}';
     }
+
 }

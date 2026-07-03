@@ -20,10 +20,8 @@ import com.redhat.mcp.languagetools.lsp.client.LspCapability;
 import com.redhat.mcp.languagetools.lsp.client.LspClientFeatures;
 import com.redhat.mcp.languagetools.trace.TracingMessageConsumer;
 
-import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.Socket;
 import java.net.URI;
@@ -54,7 +52,6 @@ public class LspServer extends ServerBase<LspServerConfig> {
     private boolean isSocketConnection = false;
     private InstanceFileWatcher fileWatcher;
     private LspInstanceRegistry.InstanceInfo currentInstance;
-    protected LspContributionManager extensionManager;
     private final LspClientFeatures clientFeatures;
 
     public LspServer(LspServerConfig config, Workspace workspace) {
@@ -496,7 +493,7 @@ public class LspServer extends ServerBase<LspServerConfig> {
      * - ${serverHome} → language server installation directory
      * - ${configuration} → OS-specific config directory
      * - ${DATA_DIR} → workspace data directory
-     * - ${user.name} → system user name
+     * - ${user.name} → system username
      */
     protected List<String> buildCommand() throws IOException {
         var config = super.getConfig();
@@ -556,42 +553,6 @@ public class LspServer extends ServerBase<LspServerConfig> {
         return args;
     }
 
-    /**
-     * Resolve glob patterns in paths (e.g., /path/to/*.jar)
-     */
-    private String resolveGlob(String path) throws IOException {
-        if (!path.contains("*")) {
-            return path;
-        }
-
-        // Simple glob resolution: find first match
-        int starIndex = path.indexOf('*');
-        int lastSlash = path.lastIndexOf('/', starIndex);
-        if (lastSlash == -1) {
-            return path;
-        }
-
-        Path dir = Paths.get(path.substring(0, lastSlash));
-        String pattern = path.substring(lastSlash + 1);
-
-        if (!Files.exists(dir)) {
-            return path;
-        }
-
-        // Find first matching file
-        try (var stream = Files.list(dir)) {
-            String globRegex = pattern
-                    .replace(".", "\\.")
-                    .replace("*", ".*");
-
-            return stream
-                    .filter(p -> p.getFileName().toString().matches(globRegex))
-                    .findFirst()
-                    .map(Path::toString)
-                    .orElse(path);
-        }
-    }
-
     public LanguageServer getLanguageServer() {
         return languageServer;
     }
@@ -620,20 +581,6 @@ public class LspServer extends ServerBase<LspServerConfig> {
 
     public LspInstanceRegistry.InstanceInfo getCurrentInstance() {
         return currentInstance;
-    }
-
-    /**
-     * Set extension manager (called by Workspace after server creation).
-     */
-    public void setLspContributionManager(LspContributionManager extensionManager) {
-        this.extensionManager = extensionManager;
-    }
-
-    /**
-     * Get extension manager.
-     */
-    protected LspContributionManager getLspContributionManager() {
-        return extensionManager;
     }
 
     /**

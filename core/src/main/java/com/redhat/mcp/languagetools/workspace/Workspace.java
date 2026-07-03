@@ -4,7 +4,6 @@ import com.redhat.mcp.languagetools.Application;
 import com.redhat.mcp.languagetools.dap.server.DapServerConfig;
 import com.redhat.mcp.languagetools.dap.session.DapTraceCollectorWrapper;
 import com.redhat.mcp.languagetools.installer.*;
-import com.redhat.mcp.languagetools.lsp.LspContributionManager;
 import com.redhat.mcp.languagetools.lsp.LspInstanceRegistry;
 import com.redhat.mcp.languagetools.lsp.server.*;
 import com.redhat.mcp.languagetools.lsp.trace.LspTraceCollector;
@@ -40,7 +39,6 @@ public class Workspace {
     // LSP
     private final LspTraceCollector lspTraceCollector;
 
-    private LspContributionManager extensionManager;
     private final Map<String, LspServer> lspServers = new ConcurrentHashMap<>();
     private final Map<String, McpClientInfo> mcpClientConnections = new ConcurrentHashMap<>();
     private volatile boolean initialized = false;
@@ -61,20 +59,6 @@ public class Workspace {
         this.workspaceDataDir = createWorkspaceDataDir(application.getPathManager().getWorkspaceDataDir(), rootUri);
         this.lspTraceCollector = application.getLspTraceCollector();
         this.configuration = new WorkspaceConfiguration(Paths.get(rootUri));
-    }
-
-    /**
-     * Set LSP contribution manager for this workspace.
-     */
-    public void setLspContributionManager(LspContributionManager extensionManager) {
-        this.extensionManager = extensionManager;
-    }
-
-    /**
-     * Get the LSP contribution manager for this workspace.
-     */
-    public LspContributionManager getLspContributionManager() {
-        return extensionManager;
     }
 
     /**
@@ -113,11 +97,7 @@ public class Workspace {
             // Create a TraceCollector wrapper around LspTraceCollector
             config.setTraceCollector(new LspTraceCollectorWrapper(lspTraceCollector, rootUri.toString(), config.getServerId()));
         }
-
-        LspServer server = createLspServer(config);
-        if (extensionManager != null) {
-            server.setLspContributionManager(extensionManager);
-        }
+        createLspServer(config);
         LOG.infof("Added LSP server '%s' to workspace: %s", config.getServerId(), rootUri);
     }
 
@@ -160,7 +140,7 @@ public class Workspace {
     }
 
     /**
-     * Start a MCP-managed LSP server only (do not connect to IDE instance).
+     * Start an MCP-managed LSP server only (do not connect to IDE instance).
      * Handles installation if needed before starting.
      */
     public CompletableFuture<Void> startManagedLspServer(String serverId) {
@@ -193,9 +173,7 @@ public class Workspace {
             // Step 1: Start and initialize (installation happens inside start())
             return newServer.startManagedOnly()
                     .thenCompose(initV -> newServer.initialize())
-                    .thenRun(() -> {
-                        LOG.infof("Started MCP-managed LSP server '%s' for workspace: %s", serverId, rootUri);
-                    })
+                    .thenRun(() -> LOG.infof("Started MCP-managed LSP server '%s' for workspace: %s", serverId, rootUri))
                     .exceptionally(ex -> {
                         LOG.errorf(ex, "Failed to start MCP-managed LSP server '%s'", serverId);
 
@@ -334,9 +312,6 @@ public class Workspace {
         return configuration;
     }
 
-    /**
-     * Add an MCP client name to this workspace.
-     */
     /**
      * Add an MCP client to this workspace.
      *

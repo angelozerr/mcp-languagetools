@@ -42,13 +42,6 @@ public class ServerDTOBuilder {
         String serverId = config.getServerId();
         LspServer lspServer = workspace.getLspServer(serverId);
 
-        // Check if this is an extension with a parent server
-        String parentServerId = null;
-        var contributionManager = workspace.getLspContributionManager();
-        if (contributionManager != null) {
-            parentServerId = contributionManager.getParentServerId(serverId);
-        }
-
         ServerRuntimeDTO.ExternalInstanceInfo externalInfo = null;
         Long pid = null;
         String command = null;
@@ -56,6 +49,7 @@ public class ServerDTOBuilder {
         String statusMessage = null;
         boolean isReady = false;
 
+        String parentServerId = config.getParentServerId() ;
         if (parentServerId != null) {
             // Extension: use parent server's status
             LspServer parentServer = workspace.getLspServer(parentServerId);

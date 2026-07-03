@@ -3,6 +3,7 @@ package com.redhat.mcp.languagetools.server;
 import com.google.gson.JsonElement;
 import com.redhat.mcp.languagetools.PathManager;
 import com.redhat.mcp.languagetools.installer.*;
+import com.redhat.mcp.languagetools.lsp.Contributes;
 import com.redhat.mcp.languagetools.lsp.DocumentSelector;
 import com.redhat.mcp.languagetools.trace.TraceCollector;
 
@@ -24,6 +25,11 @@ public abstract class ServerConfigBase implements ServerConfig {
     protected String description;
     protected JsonElement installerConfig;  // Raw JSON from installer.json
     protected List<DocumentSelector> documentSelector = new ArrayList<>();
+
+    /**
+     * Contributions (VS Code-like extension system)
+     */
+    private Contributes contributes;
 
     // Trace collector (set by workspace/session when server is added)
     protected TraceCollector traceCollector;
@@ -124,12 +130,39 @@ public abstract class ServerConfigBase implements ServerConfig {
         this.documentSelector = documentSelector;
     }
 
+    public Contributes getContributes() {
+        return contributes;
+    }
+
+    public void setContributes(Contributes contributes) {
+        this.contributes = contributes;
+    }
+
     /**
      * Check if this server can handle the given file.
      */
     public boolean canHandle(String uri, String language) {
         return getDocumentSelector().stream()
                 .anyMatch(selector -> selector.matches(uri, language));
+    }
+
+    /**
+     * Get the resource base path for this server in the classpath.
+     * For example: "/lsp/quarkus" for quarkus, "/dap/vscode-js-debug" for vscode-js-debug.
+     * Derived from serverHome path structure.
+     */
+    public String getResourceBasePath() {
+        // serverHome is like: /.../lsp/quarkus or /.../dap/vscode-js-debug
+        // We extract the last 2 segments: lsp/quarkus or dap/vscode-js-debug
+        Path parent = serverHome.getParent();  // lsp or dap
+        if (parent != null) {
+            Path grandParent = parent.getParent();
+            if (grandParent != null) {
+                return "/" + parent.getFileName() + "/" + serverHome.getFileName();
+            }
+        }
+        // Fallback
+        return "/lsp/" + serverId;
     }
 
     /**

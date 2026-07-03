@@ -3,12 +3,11 @@ package com.redhat.mcp.languagetools;
 import com.redhat.mcp.languagetools.dap.server.DapServerConfig;
 import com.redhat.mcp.languagetools.dap.trace.DapTraceCollector;
 import com.redhat.mcp.languagetools.language.LanguageRegistry;
-import com.redhat.mcp.languagetools.lsp.LspContributionManager;
 import com.redhat.mcp.languagetools.lsp.server.LspServerConfig;
 import com.redhat.mcp.languagetools.lsp.server.LspServerStatusChangeEvent;
 import com.redhat.mcp.languagetools.mcp.McpClientTracker;
+import com.redhat.mcp.languagetools.server.ServerConfigBase;
 import com.redhat.mcp.languagetools.server.ServerDescriptorRegistry;
-import com.redhat.mcp.languagetools.server.ServerStatus;
 import com.redhat.mcp.languagetools.lsp.trace.LspTraceCollector;
 
 import com.redhat.mcp.languagetools.workspace.Workspace;
@@ -56,9 +55,6 @@ public class Application {
     // ----------- LSP servers
 
     @Inject
-    LspContributionManager lspContributionManager;
-
-    @Inject
     LspTraceCollector lspTraceCollector;
 
     @Inject
@@ -81,6 +77,12 @@ public class Application {
     private final Map<String, LspServerConfig> lspServerConfigs = new ConcurrentHashMap<>();
     private final Map<String, DapServerConfig> dapServerConfigs = new ConcurrentHashMap<>();
 
+    private final ContributionManager contributionManager;
+
+    public Application() {
+        this.contributionManager = new ContributionManager(this);
+    }
+
     void onStart(@Observes StartupEvent ignoredEv) {
         LOG.info("ApplicationManager starting...");
 
@@ -90,8 +92,7 @@ public class Application {
         // Load all bundled DAP server descriptors
         dapServerConfigs.putAll(serverDescriptorRegistry.loadAllDapServers());
 
-        // Initialize contribution manager with loaded configs
-        initializeLspContributionManager();
+
 
         LOG.infof("Loaded %d LSP server descriptors", lspServerConfigs.size());
         LOG.infof("Loaded %d DAP server descriptors", dapServerConfigs.size());
@@ -100,13 +101,6 @@ public class Application {
     void onShutdown(@Observes ShutdownEvent ev) {
         LOG.info("Shutting down all workspaces...");
         shutdownAll().join();
-    }
-
-    /**
-     * Initialize the LspContributionManager with current server configs.
-     */
-    private void initializeLspContributionManager() {
-        lspContributionManager.initialize(lspServerConfigs);
     }
 
     /**
@@ -196,7 +190,6 @@ public class Application {
                                  config.getName(), externalInstance.port, externalInstance.pid);
 
                         // No need to install (external instance), add server to workspace
-                        workspace.setLspContributionManager(lspContributionManager);
                         workspace.addLspServer(config);
 
                         // Start and initialize (will connect to socket)
@@ -216,7 +209,6 @@ public class Application {
 
                     // No external instance - need to start our own (installation is handled by server)
                     // Add server to workspace if not already present
-                    workspace.setLspContributionManager(lspContributionManager);
                     if (!workspace.hasLspServer(config.getServerId())) {
                         workspace.addLspServer(config);
                     }
@@ -431,13 +423,12 @@ public class Application {
             return CompletableFuture.failedFuture(new IllegalArgumentException("Unknown server: " + serverId));
         }
 
-        Workspace workspace = workspaces.get(normalizeUri(workspaceUri));
+        Workspace workspace = getWorkspace(normalizeUri(workspaceUri));
         if (workspace == null) {
             return CompletableFuture.failedFuture(new IllegalArgumentException("Workspace not found: " + workspaceUri));
         }
 
         // Add server to workspace if not already present
-        workspace.setLspContributionManager(lspContributionManager);
         if (!workspace.hasLspServer(serverId)) {
             workspace.addLspServer(config);
         }
@@ -496,5 +487,8 @@ public class Application {
         workspaceChangeEvent.fire(new WorkspaceChangeEvent(type, workspaceUri));
     }
 
+    public ContributionManager getContributionManager() {
+        return contributionManager;
+    }
 }
 

@@ -23,14 +23,15 @@ import java.util.*;
 @ApplicationScoped
 public class LspServerDescriptorLoader extends ServerDescriptorLoaderBase<LspServerConfig> {
 
-    private static final String SERVER_EXTENSION_CONFIG_FILE = "server-extension.json";
-
     // JSON field names
     private static final String FIELD_COMMAND = "command";
     private static final String FIELD_ENV = "env";
     private static final String FIELD_WORKING_DIRECTORY = "workingDirectory";
     private static final String FIELD_INITIALIZATION_OPTIONS = "initializationOptions";
     private static final String FIELD_CONTRIBUTES = "contributes";
+
+    // Extension (ex: Quarkus, Liberty LemMinx)
+    private static final String PARENT_SERVER_ID = "parentServerId" ;
 
     @Override
     public String getRoot() {
@@ -44,46 +45,39 @@ public class LspServerDescriptorLoader extends ServerDescriptorLoaderBase<LspSer
 
     @Override
     protected JsonObject loadServer(String serverId, Path serverDir, LspServerConfig config) throws IOException {
-        // server-extension.json
-        Path serverExtensionFile = serverDir.resolve(SERVER_EXTENSION_CONFIG_FILE);
-        if (Files.exists(serverExtensionFile)) {
-            config.setExtension(true);
-            JsonObject jsonObject = super.loadServerFromFile(serverId, serverExtensionFile, config);;
-            // Contributions
-            fillContributions(config, jsonObject);
-            return jsonObject;
-        }
-
         // server.json
         JsonObject jsonObject = super.loadServer(serverId, serverDir, config);
-        config.setExtension(false);
         // Command
+        if (jsonObject.has(PARENT_SERVER_ID)) {
+            // Server extension
+            config.setParentServerId(jsonObject.get(PARENT_SERVER_ID).getAsString());
+        } else
         if (jsonObject.has(FIELD_COMMAND)) {
+            // Command
             config.setCommand(jsonObject.get(FIELD_COMMAND).getAsString());
-        }
+            // Environment variables
+            if (jsonObject.has(FIELD_ENV)) {
+                Map<String, String> env = new HashMap<>();
+                jsonObject.getAsJsonObject(FIELD_ENV).entrySet().forEach(entry ->
+                        env.put(entry.getKey(), entry.getValue().getAsString())
+                );
+                config.setEnv(env);
+            }
 
-        // Environment variables
-        if (jsonObject.has(FIELD_ENV)) {
-            Map<String, String> env = new HashMap<>();
-            jsonObject.getAsJsonObject(FIELD_ENV).entrySet().forEach(entry ->
-                    env.put(entry.getKey(), entry.getValue().getAsString())
-            );
-            config.setEnv(env);
-        }
+            // Working directory
+            if (jsonObject.has(FIELD_WORKING_DIRECTORY)) {
+                config.setWorkingDirectory(jsonObject.get(FIELD_WORKING_DIRECTORY).getAsString());
+            }
 
-        // Working directory
-        if (jsonObject.has(FIELD_WORKING_DIRECTORY)) {
-            config.setWorkingDirectory(jsonObject.get(FIELD_WORKING_DIRECTORY).getAsString());
-        }
+            // Initialization options
+            if (jsonObject.has(FIELD_INITIALIZATION_OPTIONS)) {
+                Map<String, Object> initOptions = gson.fromJson(
+                        jsonObject.get(FIELD_INITIALIZATION_OPTIONS),
+                        Map.class
+                );
+                config.setInitializationOptions(initOptions);
+            }
 
-
-        // Initialization options
-        if (jsonObject.has(FIELD_INITIALIZATION_OPTIONS)) {
-            Map<String, Object> initOptions = gson.fromJson(
-                    jsonObject.get(FIELD_INITIALIZATION_OPTIONS),
-                    Map.class
-            );
-            config.setInitializationOptions(initOptions);
         }
 
         // Contributions
