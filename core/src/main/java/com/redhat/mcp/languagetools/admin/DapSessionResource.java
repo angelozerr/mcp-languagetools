@@ -2,8 +2,10 @@ package com.redhat.mcp.languagetools.admin;
 
 import com.redhat.mcp.languagetools.admin.dto.CreateDapSessionRequest;
 import com.redhat.mcp.languagetools.admin.dto.ErrorResponse;
+import com.redhat.mcp.languagetools.dap.server.DapServerConfig;
 import com.redhat.mcp.languagetools.dap.session.DapSession;
 import com.redhat.mcp.languagetools.dap.session.DapSessionManager;
+import com.redhat.mcp.languagetools.Application;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
@@ -11,6 +13,7 @@ import jakarta.ws.rs.core.Response;
 import org.jboss.logging.Logger;
 
 import java.net.URI;
+import java.util.List;
 import java.util.Map;
 
 @Path("/api/admin/dap/sessions")
@@ -22,6 +25,9 @@ public class DapSessionResource {
 
     @Inject
     DapSessionManager sessionManager;
+
+    @Inject
+    Application application;
 
     /**
      * Create a new DAP session for testing.
@@ -173,6 +179,43 @@ public class DapSessionResource {
             LOG.errorf(e, "Failed to delete DAP session");
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
                     .entity(Map.of("error", e.getMessage()))
+                    .build();
+        }
+    }
+
+    /**
+     * Get launch configuration templates for a specific DAP server.
+     * Templates are loaded from /dap/{serverId}/*.json resources.
+     *
+     * @param serverId DAP server ID (e.g., "vscode-js-debug")
+     * @return List of template objects with "name", "label", and "body" fields
+     */
+    @GET
+    @Path("/templates/{serverId}")
+    public Response getLaunchConfigurationTemplates(@PathParam("serverId") String serverId) {
+        LOG.infof("Getting launch configuration templates for serverId=%s", serverId);
+
+        try {
+            // Find the DAP server config
+            DapServerConfig serverConfig = application.getDapServerConfig(serverId);
+            if (serverConfig == null) {
+                return Response.status(Response.Status.NOT_FOUND)
+                        .entity(Map.of("error", "DAP server not found: " + serverId))
+                        .build();
+            }
+
+            // Get templates from the server config
+            List<Map<String, Object>> templates = serverConfig.getConfigurationTemplates();
+
+            return Response.ok(Map.of(
+                    "serverId", serverId,
+                    "templates", templates
+            )).build();
+
+        } catch (Exception e) {
+            LOG.errorf(e, "Failed to get launch configuration templates");
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(ErrorResponse.fromException(e))
                     .build();
         }
     }

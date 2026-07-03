@@ -151,6 +151,12 @@ function showLaunchConfigForm(session, dapServerId) {
                             🗑️
                         </button>
                     </div>
+                    <select
+                        id="launch-template-selector-${sessionId}"
+                        onchange="applyLaunchTemplate('${session.sessionId}', this.value)"
+                        style="padding: 0.2rem 0.4rem; background: #252526; color: #cccccc; border: 1px solid #3a3a3a; border-radius: 3px; font-size: 0.85rem; cursor: pointer;">
+                        <option value="">Select template...</option>
+                    </select>
                 </div>
                 <textarea
                     id="launch-config-editor"
@@ -190,6 +196,11 @@ function showLaunchConfigForm(session, dapServerId) {
     sessionDiv.style.height = '100%';
     sessionDiv.innerHTML = sessionHTML;
     consoleArea.appendChild(sessionDiv);
+
+    // Load launch configuration templates for this DAP server
+    if (dapServerId) {
+        loadLaunchConfigurationTemplates(sessionId, dapServerId);
+    }
 
     // Clear DAP server selection
     selectedDapServer = null;
@@ -247,11 +258,7 @@ function getDefaultLaunchConfig(dapServerId) {
             console: 'integratedTerminal'
         },
         'vscode-js-debug': {
-            type: 'pwa-node',  // IMPORTANT: must be "pwa-node" not "node" for vscode-js-debug
-            request: 'launch',
-            name: 'Launch Program',
-            program: '${workspaceFolder}/index.js',
-            skipFiles: ['<node_internals>/**']
+            // Empty - use templates from selector
         }
     };
 
@@ -1210,6 +1217,71 @@ function closeDapSearch() {
     // TODO: Implement close search for DAP
 }
 
+/**
+ * Load launch configuration templates for a DAP server.
+ * Called when a debug session is displayed.
+ */
+async function loadLaunchConfigurationTemplates(sessionId, serverId) {
+    try {
+        const response = await fetch(`/api/admin/dap/sessions/templates/${serverId}`);
+        if (!response.ok) {
+            console.warn(`No templates found for ${serverId}`);
+            return;
+        }
+
+        const data = await response.json();
+        const templates = data.templates || [];
+
+        // Populate the template selector
+        const selector = document.getElementById(`launch-template-selector-${sessionId}`);
+        if (!selector) return;
+
+        // Clear existing options (except the first "Select template..." option)
+        selector.innerHTML = '<option value="">Select template...</option>';
+
+        // Add template options
+        templates.forEach((template, index) => {
+            const option = document.createElement('option');
+            option.value = index;
+            option.textContent = template.label;
+            option.dataset.body = template.body;
+            selector.appendChild(option);
+        });
+
+        // Store templates on the selector for later use
+        selector.dataset.templates = JSON.stringify(templates);
+
+    } catch (error) {
+        console.error('Failed to load launch configuration templates:', error);
+    }
+}
+
+/**
+ * Apply a selected launch configuration template to the editor.
+ */
+function applyLaunchTemplate(sessionId, templateIndex) {
+    if (!templateIndex) return; // "Select template..." option
+
+    const selector = document.getElementById(`launch-template-selector-${sessionId}`);
+    if (!selector) return;
+
+    const templates = JSON.parse(selector.dataset.templates || '[]');
+    const template = templates[templateIndex];
+    if (!template) return;
+
+    // Parse and pretty-print the template JSON
+    try {
+        const json = JSON.parse(template.body);
+        const editor = document.getElementById('launch-config-editor');
+        editor.value = JSON.stringify(json, null, 2);
+
+        // Reset selector to "Select template..."
+        selector.value = '';
+    } catch (error) {
+        console.error('Failed to apply template:', error);
+    }
+}
+
 // Expose functions globally
 window.createNewTestSession = createNewTestSession;
 window.launchDapSession = launchDapSession;
@@ -1225,3 +1297,5 @@ window.toggleAllDapTraces = toggleAllDapTraces;
 window.clearDapConsole = clearDapConsole;
 window.changeDapTraceLevel = changeDapTraceLevel;
 window.onDapSessionUpdate = onDapSessionUpdate;
+window.loadLaunchConfigurationTemplates = loadLaunchConfigurationTemplates;
+window.applyLaunchTemplate = applyLaunchTemplate;

@@ -121,4 +121,70 @@ public class DapServerConfig extends ServerConfigBase {
     public void setTransport(TransportType transport) {
         this.transport = transport;
     }
+
+    /**
+     * Get configuration templates (launch/attach snippets) for this DAP server.
+     * Templates are loaded from /dap/{serverId}/*.json in the classpath.
+     * Returns a list of template objects with "name", "label", and "body" fields.
+     */
+    public java.util.List<Map<String, Object>> getConfigurationTemplates() {
+        java.util.List<Map<String, Object>> templates = new java.util.ArrayList<>();
+
+        try {
+            // List all JSON files in /dap/{serverId}/ directory
+            String resourcePath = "/dap/" + getServerId();
+            java.net.URL resourceUrl = getClass().getResource(resourcePath);
+
+            if (resourceUrl == null) {
+                return templates; // No templates directory for this server
+            }
+
+            // Read files from JAR or filesystem
+            java.nio.file.Path dirPath;
+            if (resourceUrl.toURI().getScheme().equals("jar")) {
+                // Running from JAR
+                java.nio.file.FileSystem fs = java.nio.file.FileSystems.newFileSystem(
+                    resourceUrl.toURI(),
+                    java.util.Collections.emptyMap()
+                );
+                dirPath = fs.getPath(resourcePath);
+            } else {
+                // Running from filesystem (development)
+                dirPath = java.nio.file.Paths.get(resourceUrl.toURI());
+            }
+
+            // List all .json files that start with "attach." or "launch."
+            try (java.util.stream.Stream<java.nio.file.Path> paths = java.nio.file.Files.list(dirPath)) {
+                paths.filter(path -> {
+                         String fileName = path.getFileName().toString();
+                         return fileName.endsWith(".json") &&
+                                (fileName.startsWith("attach.") || fileName.startsWith("launch."));
+                     })
+                     .forEach(path -> {
+                         try {
+                             String content = java.nio.file.Files.readString(path);
+                             com.google.gson.JsonObject json = com.google.gson.JsonParser.parseString(content).getAsJsonObject();
+
+                             // Extract template info
+                             String fileName = path.getFileName().toString();
+                             String name = fileName.replace(".json", "");
+                             String label = json.has("name") ? json.get("name").getAsString() : name;
+
+                             Map<String, Object> template = new java.util.HashMap<>();
+                             template.put("name", name);
+                             template.put("label", label);
+                             template.put("body", content);
+
+                             templates.add(template);
+                         } catch (Exception e) {
+                             // Skip invalid template files
+                         }
+                     });
+            }
+        } catch (Exception e) {
+            // No templates available or error reading them
+        }
+
+        return templates;
+    }
 }
