@@ -1,18 +1,15 @@
 package com.redhat.mcp.languagetools.dap.server;
 
 import com.redhat.mcp.languagetools.dap.client.DapClient;
-import com.redhat.mcp.languagetools.dap.client.DapEventListener;
 import com.redhat.mcp.languagetools.dap.trace.DapTraceCollector;
 import com.redhat.mcp.languagetools.dap.transport.SocketTransportStreams;
 import com.redhat.mcp.languagetools.dap.transport.StdioTransportStreams;
 import com.redhat.mcp.languagetools.dap.transport.TransportStreams;
-import com.redhat.mcp.languagetools.dap.transport.TransportType;
 import com.redhat.mcp.languagetools.trace.TraceCollector;
 import com.redhat.mcp.languagetools.trace.TracingMessageConsumer;
 import com.redhat.mcp.languagetools.server.ServerBase;
 import com.redhat.mcp.languagetools.server.ServerStatus;
 import com.redhat.mcp.languagetools.workspace.Workspace;
-import org.eclipse.lsp4j.debug.Capabilities;
 import org.eclipse.lsp4j.debug.InitializeRequestArguments;
 import org.eclipse.lsp4j.debug.launch.DSPLauncher;
 import org.eclipse.lsp4j.debug.services.IDebugProtocolServer;
@@ -28,7 +25,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -117,8 +113,8 @@ public class DapServer extends ServerBase<DapServerConfig> {
         // Ensure server is installed first
         return withErrorLogging(
             ensureInstalled().thenCompose(v -> startServerProcess())
-                .thenCompose(readyTracker -> waitForServerReady(readyTracker))
-                .thenCompose(result -> createLauncher(result)),
+                .thenCompose(this::waitForServerReady)
+                .thenCompose(this::createLauncher),
             getTraceCollector(),
             sessionId
         );
@@ -164,7 +160,7 @@ public class DapServer extends ServerBase<DapServerConfig> {
                     workspaceRootUri,
                     sessionId,
                     TraceCollector.MessageDirection.SERVER_TO_CLIENT,
-                    String.format("Working directory: %s", workspaceDir.toString())
+                    String.format("Working directory: %s", workspaceDir)
                 );
 
                 // Set environment variables
@@ -185,23 +181,7 @@ public class DapServer extends ServerBase<DapServerConfig> {
                 );
 
                 // Create server ready tracker
-                ServerReadyConfig readyConfig = config.getServerReadyConfig();
-                if (allocatedPort != null && readyConfig.getPort() == null) {
-                    readyConfig = new ServerReadyConfig("127.0.0.1", allocatedPort);
-                }
-
-                DAPServerReadyTracker readyTracker = new DAPServerReadyTracker(
-                    readyConfig,
-                    serverProcess,
-                    line -> {
-                        getTraceCollector().addTrace(
-                            workspaceRootUri,
-                            sessionId,
-                            TraceCollector.MessageDirection.SERVER_TO_CLIENT,
-                            line
-                        );
-                    }
-                );
+                DAPServerReadyTracker readyTracker = getServerReadyTracker(config, workspaceRootUri);
 
                 // Start monitoring stderr for errors
                 startStderrMonitoring(workspaceRootUri, sessionId);
@@ -246,17 +226,28 @@ public class DapServer extends ServerBase<DapServerConfig> {
         }, executorService);
     }
 
-    /**
-     * Container for tracker and init args.
-     */
-    private static class ServerReadyResult {
-        final DAPServerReadyTracker tracker;
-        final InitializeRequestArguments initArgs;
-
-        ServerReadyResult(DAPServerReadyTracker tracker, InitializeRequestArguments initArgs) {
-            this.tracker = tracker;
-            this.initArgs = initArgs;
+    private DAPServerReadyTracker getServerReadyTracker(DapServerConfig config, String workspaceRootUri) {
+        ServerReadyConfig readyConfig = config.getServerReadyConfig();
+        if (allocatedPort != null && readyConfig.getPort() == null) {
+            readyConfig = new ServerReadyConfig("127.0.0.1", allocatedPort);
         }
+
+        return new DAPServerReadyTracker(
+            readyConfig,
+            serverProcess,
+            line -> getTraceCollector().addTrace(
+                    workspaceRootUri,
+                sessionId,
+                TraceCollector.MessageDirection.SERVER_TO_CLIENT,
+                line
+            )
+        );
+    }
+
+    /**
+         * Container for tracker and init args.
+         */
+        private record ServerReadyResult(DAPServerReadyTracker tracker, InitializeRequestArguments initArgs) {
     }
 
     /**
@@ -302,7 +293,6 @@ public class DapServer extends ServerBase<DapServerConfig> {
     private CompletableFuture<Void> createLauncher(ServerReadyResult result) {
         return CompletableFuture.supplyAsync(() -> {
             try {
-                var config = getConfig();
                 var tracker = result.tracker;
                 var initArgs = result.initArgs;
 
@@ -471,7 +461,7 @@ public class DapServer extends ServerBase<DapServerConfig> {
         }
 
         // Substitute ${port} if present - allocate a free port (for TCP mode DAP servers)
-        Integer port = null;
+        Integer port;
         if (cmd.contains("${port}")) {
             port = getAvailablePort();
             cmd = cmd.replace("${port}", String.valueOf(port));
@@ -542,15 +532,52 @@ public class DapServer extends ServerBase<DapServerConfig> {
                 ? serverProcess.pid() : null;
     }
 
-    // Setters
-
     /**
-     * Set the event listener for DAP events (typically a DapSession).
+     * Start monitoring stderr from the DAP server process.
+     * Errors are sent to the trace collector in real-time.
      */
-    public void setEventListener(DapEventListener listener) {
-        if (dapClient != null) {
-            dapClient.setEventListener(listener);
+    protected void startStderrMonitoring(String workspaceRootUri, String sessionId) {
+        if (serverProcess == null) {
+            return;
         }
+
+        executorService.submit(() -> {
+            try (java.io.BufferedReader reader = new java.io.BufferedReader(
+                    new java.io.InputStreamReader(serverProcess.getErrorStream()))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    String errorLine = line;
+                    var config = super.getConfig();
+                    LOG.warnf("%s stderr: %s", config.getName(), errorLine);
+
+                    // Send to trace collector with ERROR messageType so it appears in red
+                    if (getTraceCollector() instanceof DapTraceCollector) {
+                        ((DapTraceCollector) getTraceCollector()).addTrace(
+                            workspaceRootUri,
+                            sessionId,
+                            TraceCollector.MessageDirection.SERVER_TO_CLIENT,
+                            errorLine,
+                            TraceCollector.MessageType.ERROR
+                        );
+                    } else {
+                        getTraceCollector().addTrace(
+                            workspaceRootUri,
+                            sessionId,
+                            TraceCollector.MessageDirection.SERVER_TO_CLIENT,
+                            String.format("[Error - %s] %s stderr: %s",
+                                java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss")),
+                                config.getName(),
+                                errorLine)
+                        );
+                    }
+                }
+            } catch (IOException e) {
+                if (serverProcess != null && serverProcess.isAlive()) {
+                    var config = super.getConfig();
+                    LOG.errorf(e, "Error reading stderr from %s", config.getName());
+                }
+            }
+        });
     }
 
 }
