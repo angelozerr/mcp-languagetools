@@ -100,13 +100,12 @@ async function showServerDetails(serverId) {
 
         // Build details HTML
         const serverIcon = details.isExtension ? '🧩' : '🚀';
-        const hasContributions = details.contributes && Object.keys(details.contributes).length > 0;
 
         // Overview tab content
         const detailsHTML = buildServerDetailsHTML(details, servers);
 
-        // Contributions tab content
-        const contributionsHTML = hasContributions ? buildContributionsHTML(details) : '';
+        // Contributions tab content (use same function as workspace)
+        const contributionsHTML = formatContributionsSection(details, servers);
 
         const html = `
             <div class="console-header">
@@ -116,7 +115,7 @@ async function showServerDetails(serverId) {
                 </div>
                 <div class="console-tabs">
                     <button class="tab-button ${currentServerTab === 'overview' ? 'active' : ''}" onclick="switchServerTab('overview')">Overview</button>
-                    ${hasContributions ? `<button class="tab-button ${currentServerTab === 'contributions' ? 'active' : ''}" onclick="switchServerTab('contributions')">Contributions</button>` : ''}
+                    <button class="tab-button ${currentServerTab === 'contributions' ? 'active' : ''}" onclick="switchServerTab('contributions')">Contributions</button>
                     <button class="tab-button ${currentServerTab === 'install' ? 'active' : ''}" onclick="switchServerTab('install')">Install</button>
                 </div>
             </div>
@@ -129,14 +128,12 @@ async function showServerDetails(serverId) {
                         </div>
                     </div>
                 </div>
-                ${hasContributions ? `
                 <div id="server-contributions-tab" class="tab-panel ${currentServerTab === 'contributions' ? 'active' : ''}" style="overflow-y: auto;">
                     <div id="server-diagram-container" style="width: 100%; height: 400px; background: #1e1e1e; border-bottom: 1px solid #333;"></div>
                     <div class="details-panel" style="padding: 2rem; color: #cccccc;">
-                        ${contributionsHTML}
+                        ${contributionsHTML || '<p class="detail-value">No contributions</p>'}
                     </div>
                 </div>
-                ` : ''}
                 <div id="server-install-tab" class="tab-panel ${currentServerTab === 'install' ? 'active' : ''}">
                     <div class="install-panel">
                         <h3>Installer Configuration</h3>
@@ -295,6 +292,11 @@ function switchServerTab(tabName) {
     if (selectedAllServer) {
         showServerDetails(selectedAllServer);
     }
+
+    // Render diagram when switching to contributions tab
+    if (tabName === 'contributions' && window.currentDiagramServers && window.currentDiagramServerId) {
+        setTimeout(() => renderServerDiagram(window.currentDiagramServers, window.currentDiagramServerId), 100);
+    }
 }
 
 /**
@@ -416,14 +418,7 @@ function formatContributeInfo(server, contributedByMap) {
     return { text, tooltip };
 }
 
-/**
- * Render server diagram (contributions visualization).
- */
-function renderServerDiagram(servers, selectedServerId) {
-    // Diagram rendering logic - uses D3.js or similar
-    // (Existing implementation from admin.js - not copying entire code here)
-    console.log('Rendering diagram for server:', selectedServerId);
-}
+// renderServerDiagram() is defined in diagram.js - do not override it here
 
 // Expose functions globally
 window.loadAllLspServers = loadAllLspServers;
