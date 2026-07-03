@@ -263,6 +263,21 @@
             }
 
             container.innerHTML = headerHTML + tabsHTML + contentHTML;
+
+            // Auto-select DAP session after rendering
+            if (currentWorkspaceTab === 'debuggers' && dapSessions.length > 0) {
+                setTimeout(() => {
+                    // Try to restore last selected session from currentDapSessionId
+                    const lastSelected = window.currentDapSessionId;
+                    const sessionToSelect = lastSelected && dapSessions.find(s => s.sessionId === lastSelected)
+                        ? lastSelected
+                        : dapSessions[0].sessionId;
+
+                    if (typeof window.selectDapSession === 'function') {
+                        window.selectDapSession(sessionToSelect);
+                    }
+                }, 50);
+            }
         }
 
         function switchWorkspaceTab(tab) {

@@ -1,5 +1,6 @@
 package com.redhat.mcp.languagetools.dap.server;
 
+import com.redhat.mcp.languagetools.dap.transport.TransportType;
 import com.redhat.mcp.languagetools.server.ServerConfigBase;
 
 import java.nio.file.Path;
@@ -15,6 +16,9 @@ public class DapServerConfig extends ServerConfigBase {
     private Map<String, String> launch;  // OS-specific launch commands
     private Map<String, Object> attach;  // Attach configuration
     private String debugServerReadyPattern;
+    private DebugServerWaitStrategy debugServerWaitStrategy = DebugServerWaitStrategy.TIMEOUT;
+    private Integer connectTimeout = 500; // Default 500ms
+    private TransportType transport = TransportType.STDIO; // Default to stdio
     private Map<String, Object> env = new HashMap<>();
     private String workingDirectory;
 
@@ -66,6 +70,34 @@ public class DapServerConfig extends ServerConfigBase {
         this.debugServerReadyPattern = debugServerReadyPattern;
     }
 
+    public DebugServerWaitStrategy getDebugServerWaitStrategy() {
+        return debugServerWaitStrategy;
+    }
+
+    public void setDebugServerWaitStrategy(DebugServerWaitStrategy debugServerWaitStrategy) {
+        this.debugServerWaitStrategy = debugServerWaitStrategy;
+    }
+
+    public Integer getConnectTimeout() {
+        return connectTimeout;
+    }
+
+    public void setConnectTimeout(Integer connectTimeout) {
+        this.connectTimeout = connectTimeout;
+    }
+
+    /**
+     * Get the ServerReadyConfig based on the wait strategy.
+     */
+    public ServerReadyConfig getServerReadyConfig() {
+        return switch (debugServerWaitStrategy) {
+            case TIMEOUT -> new ServerReadyConfig(connectTimeout != null ? connectTimeout : 500);
+            case TRACE -> debugServerReadyPattern != null
+                ? new ServerReadyConfig(debugServerReadyPattern)
+                : new ServerReadyConfig(500);
+        };
+    }
+
     public Map<String, Object> getEnv() {
         return env;
     }
@@ -80,5 +112,13 @@ public class DapServerConfig extends ServerConfigBase {
 
     public void setWorkingDirectory(String workingDirectory) {
         this.workingDirectory = workingDirectory;
+    }
+
+    public TransportType getTransport() {
+        return transport;
+    }
+
+    public void setTransport(TransportType transport) {
+        this.transport = transport;
     }
 }

@@ -139,7 +139,8 @@ public class DapDebugTools {
             launchConfig.putAll(additionalArgs);
         }
 
-        return session.launch(launchConfig).join();
+        // Launch in debug mode by default (true)
+        return session.launch(launchConfig, true).join();
     }
 
     @Tool(description = "Attach debugger to an already running process by process ID.")

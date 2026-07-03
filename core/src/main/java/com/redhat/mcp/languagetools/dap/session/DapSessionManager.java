@@ -103,6 +103,21 @@ public class DapSessionManager {
             }
         });
 
+        // Register session state change listener
+        session.setStateChangeCallback(() -> {
+            LOG.infof("DAP session state changed: session=%s, new state=%s", sessionId, session.getState());
+            // Fire event to notify UI
+            if (sessionEvent != null) {
+                sessionEvent.fire(new DapSessionEvent(
+                    DapSessionEvent.Type.STATE_CHANGED,
+                    sessionId,
+                    workspaceUri.toString(),
+                    null,  // No old/new state for now
+                    session.getState().name()
+                ));
+            }
+        });
+
         // Fire CDI event for WebSocket notification
         sessionEvent.fire(new DapSessionEvent(
             DapSessionEvent.Type.CREATED,

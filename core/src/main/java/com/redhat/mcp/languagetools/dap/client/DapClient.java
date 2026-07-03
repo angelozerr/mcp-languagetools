@@ -2,11 +2,22 @@ package com.redhat.mcp.languagetools.dap.client;
 
 import org.eclipse.lsp4j.debug.*;
 import org.eclipse.lsp4j.debug.services.IDebugProtocolClient;
+import org.eclipse.lsp4j.debug.services.IDebugProtocolServer;
 import org.jboss.logging.Logger;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
 
 /**
  * DAP client implementation that receives events from the debug adapter.
  * Routes events to a registered DapEventListener (typically a DapSession).
+ *
+ * Supports parent-child relationships for nested debug sessions (e.g., when debugging
+ * spawned processes in Node.js).
  */
 public class DapClient implements IDebugProtocolClient {
 
@@ -14,14 +25,70 @@ public class DapClient implements IDebugProtocolClient {
 
     private DapEventListener eventListener;
 
+    // Initialization state tracking (like lsp4ij)
+    // Package-private so DapServer can access if needed (though now it's in DapClient.connectAndInitialize)
+    final CompletableFuture<Capabilities> capabilitiesFuture = new CompletableFuture<>();
+    final CompletableFuture<Void> initializedEventFuture = new CompletableFuture<>();
+
+    // Parent-child session support
+    private DapClient parentClient;
+    private final List<DapClient> childrenClients = new ArrayList<>();
+
+    // Factory for creating child debug sessions
+    private Function<Map<String, Object>, CompletableFuture<DapClient>> childSessionFactory;
+
     public DapClient() {
+    }
+
+    /**
+     * Create a child client with a parent reference.
+     */
+    public DapClient(DapClient parentClient) {
+        this.parentClient = parentClient;
     }
 
     public void setEventListener(DapEventListener listener) {
         this.eventListener = listener;
     }
 
+    /**
+     * Set the factory for creating child debug sessions.
+     * This is called when the debug adapter requests to start a new debugging session
+     * (e.g., for debugging spawned processes).
+     *
+     * @param factory function that takes DAP parameters and returns a CompletableFuture of DapClient
+     */
+    public void setChildSessionFactory(Function<Map<String, Object>, CompletableFuture<DapClient>> factory) {
+        this.childSessionFactory = factory;
+    }
+
+    public DapClient getParentClient() {
+        return parentClient;
+    }
+
+    public List<DapClient> getChildrenClients() {
+        return new ArrayList<>(childrenClients);
+    }
+
     // ========== Event Notifications from Debug Adapter ==========
+
+    @Override
+    public void initialized() {
+        LOG.info("Initialized event received");
+        // Complete the future (like lsp4ij)
+        initializedEventFuture.complete(null);
+
+        if (eventListener != null) {
+            eventListener.onInitialized();
+        }
+    }
+
+    /**
+     * Get the capabilities from initialize response.
+     */
+    public org.eclipse.lsp4j.debug.Capabilities getCapabilities() {
+        return capabilitiesFuture.getNow(null);
+    }
 
     @Override
     public void stopped(StoppedEventArguments args) {
@@ -147,5 +214,220 @@ public class DapClient implements IDebugProtocolClient {
         if (eventListener != null) {
             eventListener.onMemory(args);
         }
+    }
+
+    // ========== Reverse Requests (from server to client) ==========
+
+    /**
+     * Called when the debug adapter wants to start a new debug session.
+     * This is used for debugging child processes (e.g., Node.js spawns).
+     *
+     * @param args the start debugging request arguments containing the configuration
+     * @return a CompletableFuture that completes when the child session is started
+     */
+    @Override
+    public CompletableFuture<Void> startDebugging(StartDebuggingRequestArguments args) {
+        LOG.infof("StartDebugging request received: %s", args.getRequest());
+
+        if (childSessionFactory == null) {
+            LOG.warnf("No child session factory configured, cannot start child debug session");
+            return CompletableFuture.failedFuture(
+                new IllegalStateException("Child session factory not configured")
+            );
+        }
+
+        // Extract configuration from the request
+        Map<String, Object> configuration = new HashMap<>();
+        if (args.getConfiguration() != null && args.getConfiguration() instanceof Map) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> config = (Map<String, Object>) args.getConfiguration();
+            configuration.putAll(config);
+        }
+
+        // NOTE: Don't add "request" field - vscode-js-debug child sessions don't need it
+        // The server already knows this is a launch for the pending target
+        // If we add "request": 0 (int enum), it causes the launch to fail
+
+        LOG.debugf("Starting child debug session with config: %s", configuration);
+
+        // Create the child session using the factory
+        return childSessionFactory.apply(configuration)
+            .thenAccept(childClient -> {
+                // Track the child client
+                childClient.parentClient = this;
+                childrenClients.add(childClient);
+                LOG.infof("Child debug session started successfully, total children: %d", childrenClients.size());
+            })
+            .exceptionally(ex -> {
+                LOG.errorf(ex, "Failed to start child debug session");
+                return null;
+            });
+    }
+
+    /**
+     * Called when the debug adapter wants to run a command in a terminal.
+     *
+     * @param args the run in terminal request arguments
+     * @return a CompletableFuture with the process ID if successful
+     */
+    @Override
+    public CompletableFuture<RunInTerminalResponse> runInTerminal(RunInTerminalRequestArguments args) {
+        LOG.infof("RunInTerminal request: kind=%s, title=%s", args.getKind(), args.getTitle());
+
+        // For now, return a not implemented response
+        // In a full implementation, this would launch a terminal and return the process ID
+        RunInTerminalResponse response = new RunInTerminalResponse();
+        response.setProcessId(0);
+
+        LOG.warnf("RunInTerminal not fully implemented yet");
+        return CompletableFuture.completedFuture(response);
+    }
+
+    /**
+     * Terminate all child debug sessions.
+     */
+    public CompletableFuture<Void> terminateChildSessions() {
+        if (childrenClients.isEmpty()) {
+            return CompletableFuture.completedFuture(null);
+        }
+
+        LOG.infof("Terminating %d child debug sessions", childrenClients.size());
+
+        List<CompletableFuture<Void>> futures = new ArrayList<>();
+        for (DapClient child : childrenClients) {
+            // Recursively terminate children's children
+            futures.add(child.terminateChildSessions());
+        }
+
+        return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
+            .thenRun(() -> {
+                childrenClients.clear();
+                LOG.infof("All child debug sessions terminated");
+            });
+    }
+
+    // ========== Initialization (like lsp4ij DAPClient.connectToServer + initialize) ==========
+
+    /**
+     * Connect to the DAP server and initialize the debug session.
+     * This follows the exact lsp4ij sequence:
+     * 1. initialize request → response (capabilities)
+     * 2. launch/attach request → response
+     * 3. Wait for initialized event
+     * 4. configurationDone request
+     *
+     * @param debugServer the debug protocol server proxy
+     * @param dapParameters the DAP parameters (launch/attach configuration)
+     * @param isDebug true if debugging (will set breakpoints), false for run without debugging
+     * @return CompletableFuture that completes when initialization is done
+     */
+    public CompletableFuture<Void> connectAndInitialize(
+            IDebugProtocolServer debugServer,
+            Map<String, Object> dapParameters,
+            boolean isDebug,
+            String serverId) {
+
+        LOG.infof("Starting DAP connectAndInitialize sequence");
+
+        // Prepare InitializeRequestArguments (like lsp4ij)
+        InitializeRequestArguments initArgs = new InitializeRequestArguments();
+        initArgs.setClientID("mcp-languagetools");
+        initArgs.setClientName("MCP Language Tools");
+
+        // Like lsp4ij: use "type" from dapParameters if present, else use serverId
+        String adapterId = serverId;
+        if (dapParameters.get("type") instanceof String type) {
+            adapterId = type;
+        }
+        LOG.infof("Using adapterId: %s (from type in dapParameters or serverId)", adapterId);
+        initArgs.setAdapterID(adapterId);
+
+        initArgs.setPathFormat("path");
+        initArgs.setLinesStartAt1(true);
+        initArgs.setColumnsStartAt1(true);
+        initArgs.setSupportsRunInTerminalRequest(true);
+        initArgs.setSupportsStartDebuggingRequest(true);
+        initArgs.setSupportsVariableType(true);
+        initArgs.setSupportsVariablePaging(false);
+
+        // Step 1: Send initialize, THEN launch (like lsp4ij - both run in parallel with configurationDone)
+        CompletableFuture<?> launchAttachFuture = debugServer.initialize(initArgs)
+            .thenAccept(capabilities -> {
+                LOG.infof("Received capabilities from initialize");
+                if (capabilities == null) {
+                    LOG.warnf("Debug adapter returned null capabilities, using default");
+                    capabilities = new org.eclipse.lsp4j.debug.Capabilities();
+                }
+                capabilitiesFuture.complete(capabilities);
+            })
+            .thenCompose(unused -> {
+                LOG.infof("Sending launch request");
+                return debugServer.launch(dapParameters);
+            })
+            .handle((q, t) -> {
+                if (t != null) {
+                    LOG.errorf(t, "Error during initialize/launch");
+                    if (eventListener != null) {
+                        eventListener.onOutput(createErrorOutput(
+                            "Error during initialize/launch: " + t.getMessage()));
+                    }
+                    initializedEventFuture.completeExceptionally(t);
+                }
+                return q;
+            });
+
+        // Step 2: Wait for initialized event, then configurationDone (like lsp4ij - runs in parallel with launch)
+        CompletableFuture<Void> configurationDoneFuture = CompletableFuture
+            .allOf(initializedEventFuture, capabilitiesFuture)
+            .thenCompose(v -> {
+                LOG.infof("Received initialized event and capabilities, sending configurationDone");
+                org.eclipse.lsp4j.debug.Capabilities caps = getCapabilities();
+
+                // Only send configurationDone if supported
+                if (caps != null && Boolean.TRUE.equals(caps.getSupportsConfigurationDoneRequest())) {
+                    return debugServer.configurationDone(
+                        new org.eclipse.lsp4j.debug.ConfigurationDoneArguments());
+                }
+                LOG.infof("Server doesn't support configurationDone, skipping");
+                return CompletableFuture.completedFuture(null);
+            });
+
+        // Wait for BOTH futures to complete (like lsp4ij)
+        return CompletableFuture.allOf(launchAttachFuture, configurationDoneFuture)
+            .thenCompose(v -> {
+                LOG.infof("DAP session initialized, requesting threads");
+                // After configurationDone, request threads (like lsp4ij)
+                return debugServer.threads()
+                    .thenAccept(threadsResponse -> {
+                        LOG.infof("Received threads response: %d threads",
+                            threadsResponse.getThreads() != null ? threadsResponse.getThreads().length : 0);
+                    })
+                    .exceptionally(t -> {
+                        LOG.warnf(t, "Failed to get threads (non-fatal)");
+                        return null;
+                    });
+            })
+            .thenRun(() -> {
+                LOG.infof("DAP session fully initialized and ready");
+            })
+            .exceptionally(t -> {
+                LOG.errorf(t, "Error during DAP initialization sequence");
+                // Send error to UI
+                if (eventListener != null) {
+                    eventListener.onOutput(createErrorOutput(
+                        "DAP initialization failed: " + t.getMessage()));
+                }
+                throw new RuntimeException("DAP initialization failed", t);
+            });
+    }
+
+    /**
+     * Helper to create error output for UI display.
+     */
+    private OutputEventArguments createErrorOutput(String message) {
+        var output = new OutputEventArguments();
+        output.setCategory("stderr");
+        output.setOutput("❌ " + message + "\n");
+        return output;
     }
 }

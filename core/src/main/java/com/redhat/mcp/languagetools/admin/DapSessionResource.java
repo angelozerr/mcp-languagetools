@@ -64,8 +64,12 @@ public class DapSessionResource {
      */
     @POST
     @Path("/{sessionId}/launch")
-    public Response launchSession(@PathParam("sessionId") String sessionId, Map<String, Object> launchConfig) {
-        LOG.infof("Launching DAP session: sessionId=%s, config=%s", sessionId, launchConfig);
+    public Response launchSession(
+            @PathParam("sessionId") String sessionId,
+            @QueryParam("debugMode") @DefaultValue("true") boolean debugMode,
+            Map<String, Object> launchConfig) {
+
+        LOG.infof("Launching DAP session: sessionId=%s, debugMode=%s, config=%s", sessionId, debugMode, launchConfig);
 
         try {
             DapSession session = sessionManager.getSession(sessionId);
@@ -76,7 +80,7 @@ public class DapSessionResource {
             }
 
             // Launch the session asynchronously (don't block HTTP thread!)
-            session.launch(launchConfig).whenComplete((result, error) -> {
+            session.launch(launchConfig, debugMode).whenComplete((result, error) -> {
                 if (error != null) {
                     LOG.errorf(error, "DAP session launch failed: %s", sessionId);
                 } else {
@@ -88,6 +92,7 @@ public class DapSessionResource {
             return Response.accepted(Map.of(
                     "status", "launching",
                     "sessionId", sessionId,
+                    "debugMode", debugMode,
                     "message", "Launch started, monitor status via WebSocket"
             )).build();
 

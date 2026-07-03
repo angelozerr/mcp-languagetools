@@ -115,12 +115,21 @@ function showLaunchConfigForm(session, dapServerId) {
                     <label style="font-weight: 500; color: #cccccc;">Launch Configuration</label>
                     <div style="display: flex; gap: 0;">
                         <button
+                            id="dap-debug-btn-${sessionId}"
+                            onclick="debugDapSession('${session.sessionId}')"
+                            style="padding: 0.1rem 0.2rem; background: transparent; color: #569cd6; border: none; cursor: pointer; font-size: 1rem; display: flex; align-items: center; border-radius: 3px; transition: background 0.2s;"
+                            onmouseover="this.style.background='rgba(86, 156, 214, 0.2)'"
+                            onmouseout="this.style.background='transparent'"
+                            title="Debug (with breakpoints)">
+                            🐛
+                        </button>
+                        <button
                             id="dap-launch-btn-${sessionId}"
                             onclick="launchDapSession('${session.sessionId}')"
                             style="padding: 0.1rem 0.2rem; background: transparent; color: #4ec9b0; border: none; cursor: pointer; font-size: 1rem; display: flex; align-items: center; border-radius: 3px; transition: background 0.2s;"
                             onmouseover="this.style.background='rgba(78, 201, 176, 0.2)'"
                             onmouseout="this.style.background='transparent'"
-                            title="Launch debug session">
+                            title="Run (without debugging)">
                             ▶
                         </button>
                         <button
@@ -221,7 +230,7 @@ function showSessionDiv(sessionId) {
     const traces = window.dapTracesBySession?.[sessionId] || [];
     const tracesContainer = document.getElementById(`dap-traces-container-${sessionId}`);
     if (tracesContainer && traces.length > 0) {
-        tracesContainer.innerHTML = renderDapTraces(traces);
+        tracesContainer.innerHTML = renderDapTraces(traces, sessionId);
     }
 }
 
@@ -238,7 +247,7 @@ function getDefaultLaunchConfig(dapServerId) {
             console: 'integratedTerminal'
         },
         'vscode-js-debug': {
-            type: 'node',
+            type: 'pwa-node',  // IMPORTANT: must be "pwa-node" not "node" for vscode-js-debug
             request: 'launch',
             name: 'Launch Program',
             program: '${workspaceFolder}/index.js',
@@ -255,14 +264,29 @@ function getDefaultLaunchConfig(dapServerId) {
 }
 
 /**
- * Launch a DAP session with the provided configuration.
+ * Debug a DAP session with the provided configuration (with breakpoints).
+ */
+async function debugDapSession(sessionId) {
+    await launchDapSessionInternal(sessionId, true); // debugMode = true
+}
+
+/**
+ * Launch a DAP session with the provided configuration (without debugging).
  */
 async function launchDapSession(sessionId) {
+    await launchDapSessionInternal(sessionId, false); // debugMode = false
+}
+
+/**
+ * Internal function to launch/debug a DAP session.
+ */
+async function launchDapSessionInternal(sessionId, debugMode) {
     try {
         const configText = document.getElementById('launch-config-editor').value;
         const launchConfig = JSON.parse(configText);
 
-        const response = await fetch(`/api/admin/dap/sessions/${sessionId}/launch`, {
+        // Pass debugMode as query parameter (not in config)
+        const response = await fetch(`/api/admin/dap/sessions/${sessionId}/launch?debugMode=${debugMode}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(launchConfig)
@@ -276,7 +300,7 @@ async function launchDapSession(sessionId) {
         const result = await response.json();
 
         // Traces will appear in the dap-traces-container below
-        console.log('Launch result:', result);
+        console.log(`${debugMode ? 'Debug' : 'Run'} result:`, result);
 
         // Notify workspace list to refresh
         if (typeof window.loadWorkspaces === 'function') {
@@ -284,7 +308,7 @@ async function launchDapSession(sessionId) {
         }
 
     } catch (error) {
-        console.error('Error launching session:', error);
+        console.error(`Error ${debugMode ? 'debugging' : 'launching'} session:`, error);
 
         // Parse error response
         let errorData = null;
@@ -298,7 +322,7 @@ async function launchDapSession(sessionId) {
         // Add error to traces (don't replace existing traces)
         const tracesContainer = document.getElementById(`dap-traces-container-${sessionId}`);
         if (tracesContainer && typeof window.formatErrorWithFolding === 'function') {
-            const errorHtml = window.formatErrorWithFolding('Failed to Launch', errorData);
+            const errorHtml = window.formatErrorWithFolding(`Failed to ${debugMode ? 'Debug' : 'Launch'}`, errorData);
             tracesContainer.insertAdjacentHTML('beforeend', errorHtml);
             // Scroll to bottom to show the error
             tracesContainer.scrollTop = tracesContainer.scrollHeight;
@@ -418,25 +442,39 @@ async function selectDapSession(sessionId) {
     }
 }
 
-function renderDapTraces(traces) {
+function renderDapTraces(traces, sessionId) {
+    const level = currentDapTraceLevel[sessionId] || 'verbose';
+
     return traces.map((trace, index) => {
+        // Filter based on trace level
+        if (!shouldShowDapTrace(trace, sessionId)) {
+            return ''; // Don't show if level is 'off'
+        }
+
         const content = trace.jsonContent;
 
         // Parse the trace: first line is header, rest is body (same as LSP)
         const lines = content.split('\n');
         const headerLine = lines[0]; // [Trace - HH:mm:ss] ... or [Starting ...]
 
-        // Detect if this is an error trace
-        const isError = headerLine.startsWith('[Error');
-        const headerColor = isError ? '#ff6b6b' : '#cccccc';
+        // Assign colors based on messageType (not text content)
+        let headerColor = '#cccccc';  // Default gray
+        if (trace.messageType === 'ERROR') {
+            headerColor = '#ff6b6b';  // Red for errors/stderr
+        } else if (trace.messageType === 'INFO') {
+            headerColor = '#569cd6';  // Blue for console/stdout output
+        } else if (trace.messageType === 'UPDATE') {
+            headerColor = '#4ec9b0';  // Cyan for progress updates
+        }
+        // TRACE type stays gray (default)
 
         // Body is everything after the first line
         const bodyLines = lines.slice(1);
         const body = bodyLines.join('\n').trim();
         const hasBody = body.length > 0;
 
-        // If no body, display without folding (like LSP)
-        if (!hasBody) {
+        // If no body OR level is 'messages', display header only (no folding)
+        if (!hasBody || level === 'messages') {
             return `
                 <div class="trace-line">
                     <div style="padding: 0.25rem; font-family: 'Consolas', 'Monaco', monospace; font-size: 0.85rem; color: ${headerColor};">${escapeHtml(headerLine)}</div>
@@ -444,7 +482,7 @@ function renderDapTraces(traces) {
             `;
         }
 
-        // With body: header + foldable body (like LSP)
+        // With body AND level is 'verbose': header + foldable body (like LSP)
         return `
             <div class="trace-line">
                 <div class="trace-header folded" onclick="toggleDapTrace(${index})" style="padding: 0.25rem; font-family: 'Consolas', 'Monaco', monospace; font-size: 0.85rem; cursor: pointer;">
@@ -471,7 +509,7 @@ function renderDapTracesForSession(sessionId) {
     }
 
     const traces = window.dapTracesBySession?.[sessionId] || [];
-    container.innerHTML = traces.length > 0 ? renderDapTraces(traces) : '<div style="color: #666;">No traces yet.</div>';
+    container.innerHTML = traces.length > 0 ? renderDapTraces(traces, sessionId) : '<div style="color: #666;">No traces yet.</div>';
 
     // Auto-scroll to bottom
     container.scrollTop = container.scrollHeight;
@@ -834,6 +872,13 @@ function changeDapTraceLevel(sessionId, level) {
 }
 
 function shouldShowDapTrace(trace, sessionId) {
+    // Always show program outputs (INFO/ERROR) regardless of trace level
+    // These are console/stdout/stderr outputs, not DAP protocol traces
+    if (trace.messageType === 'INFO' || trace.messageType === 'ERROR') {
+        return true;
+    }
+
+    // For TRACE messages, respect the trace level
     const level = currentDapTraceLevel[sessionId] || 'verbose';
     if (level === 'off') {
         return false;
@@ -970,11 +1015,12 @@ async function updateSessionInDOM(message) {
             sessionStatusBadge.textContent = statusText;
         }
 
-        // Update Launch/Stop buttons state based on status
+        // Update Debug/Launch/Stop buttons state based on status
+        const debugBtn = document.getElementById(`dap-debug-btn-${message.sessionId}`);
         const launchBtn = document.getElementById(`dap-launch-btn-${message.sessionId}`);
         const stopBtn = document.getElementById(`dap-stop-btn-${message.sessionId}`);
 
-        if (launchBtn && stopBtn) {
+        if (debugBtn && launchBtn && stopBtn) {
             // Determine button states based on status
             const isRunning = message.newStatus === 'RUNNING';
             const isStarting = message.newStatus === 'STARTING' || message.newStatus === 'INSTALLING';
@@ -982,6 +1028,11 @@ async function updateSessionInDOM(message) {
 
             const canLaunch = isStopped || (!isRunning && !isStarting);
             const canStop = isRunning || isStarting;
+
+            // Update Debug button (same state as Launch)
+            debugBtn.disabled = !canLaunch;
+            debugBtn.style.opacity = canLaunch ? '1' : '0.3';
+            debugBtn.style.cursor = canLaunch ? 'pointer' : 'not-allowed';
 
             // Update Launch button
             launchBtn.disabled = !canLaunch;
@@ -1062,8 +1113,8 @@ function createSessionHTML(session) {
     let actions = '';
     if (isStopped) {
         actions = `
-            <button class="server-action-btn" onclick='event.stopPropagation(); selectDapSession("${session.sessionId}"); setTimeout(() => { const btn = document.getElementById("dap-launch-btn-${session.sessionId}"); if(btn) btn.click(); }, 100);' title="Launch" style="font-size: 0.7rem; padding: 0.15rem 0.3rem;">▶</button>
-            <button class="server-action-btn" onclick='event.stopPropagation(); deleteDapSession("${session.sessionId}")' title="Delete" style="font-size: 0.7rem; padding: 0.15rem 0.3rem;">🗑️</button>
+            <button class="server-action-btn" onclick='event.stopPropagation(); selectDapSession("${session.sessionId}"); setTimeout(() => { const btn = document.getElementById("dap-launch-btn-${session.sessionId}"); if(btn) btn.click(); }, 100);' title="Run (without debugging)" style="font-size: 0.7rem; padding: 0.15rem 0.3rem;">▶</button>
+            <button class="server-action-btn" onclick='event.stopPropagation(); selectDapSession("${session.sessionId}"); setTimeout(() => { const btn = document.getElementById("dap-debug-btn-${session.sessionId}"); if(btn) btn.click(); }, 100);' title="Debug (with breakpoints)" style="font-size: 0.7rem; padding: 0.15rem 0.3rem;">🐛</button>
         `;
     } else if (isRunningOrStarting) {
         actions = `<button class="server-action-btn" onclick='event.stopPropagation(); stopDapSession("${session.sessionId}")' title="Stop" style="font-size: 0.7rem; padding: 0.15rem 0.3rem;">⏹</button>`;
@@ -1077,6 +1128,86 @@ function createSessionHTML(session) {
             ${actions}
         </div>
     `;
+}
+
+// ============================================
+// Keyboard shortcuts for DAP console (Ctrl+A, Ctrl+F)
+// ============================================
+
+let dapFullTextSelected = false;
+
+document.addEventListener('keydown', (e) => {
+    const dapTracesContainer = document.getElementById(`dap-traces-container-${window.currentDapSessionId}`);
+
+    // Ctrl+A to select all DAP console content
+    if (e.ctrlKey && e.key === 'a' && dapTracesContainer && window.currentDapSessionId) {
+        const activeElement = document.activeElement;
+        if (activeElement.tagName !== 'INPUT' && activeElement.tagName !== 'TEXTAREA') {
+            e.preventDefault();
+            selectAllDapConsoleContent();
+        }
+    }
+
+    // Ctrl+C after Ctrl+A to copy full content (including folded)
+    if (e.ctrlKey && e.key === 'c' && dapFullTextSelected && window.currentDapSessionId) {
+        e.preventDefault();
+        copyFullDapConsoleContent();
+    }
+
+    // Ctrl+F to open search in DAP console
+    if (e.ctrlKey && e.key === 'f' && dapTracesContainer && window.currentDapSessionId) {
+        e.preventDefault();
+        openDapSearch();
+    }
+
+    // Escape to close search
+    if (e.key === 'Escape') {
+        closeDapSearch();
+    }
+});
+
+// Reset flag when clicking
+document.addEventListener('mousedown', () => {
+    dapFullTextSelected = false;
+});
+
+function selectAllDapConsoleContent() {
+    const container = document.getElementById(`dap-traces-container-${window.currentDapSessionId}`);
+    if (!container) return;
+
+    const range = document.createRange();
+    range.selectNodeContents(container);
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
+
+    dapFullTextSelected = true;
+    container.focus();
+}
+
+function copyFullDapConsoleContent() {
+    const traces = window.dapTracesBySession?.[window.currentDapSessionId] || [];
+
+    let fullText = '';
+    traces.forEach(trace => {
+        fullText += trace.jsonContent + '\n\n';
+    });
+
+    navigator.clipboard.writeText(fullText).then(() => {
+        dapFullTextSelected = false;
+    }).catch(err => {
+        console.error('Failed to copy DAP console:', err);
+        dapFullTextSelected = false;
+    });
+}
+
+function openDapSearch() {
+    // TODO: Implement search box for DAP (similar to LSP)
+    console.log('DAP search not yet implemented');
+}
+
+function closeDapSearch() {
+    // TODO: Implement close search for DAP
 }
 
 // Expose functions globally

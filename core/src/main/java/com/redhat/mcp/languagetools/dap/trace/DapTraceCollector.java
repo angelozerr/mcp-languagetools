@@ -28,6 +28,13 @@ public class DapTraceCollector implements TracingMessageConsumer.TraceCollectorA
     @Inject
     Event<DapTraceMessage> traceEvent;
 
+    // Reference to the DAP server for checking trace level
+    private com.redhat.mcp.languagetools.dap.server.DapServer server;
+
+    public void setServer(com.redhat.mcp.languagetools.dap.server.DapServer server) {
+        this.server = server;
+    }
+
     @Override
     public void trace(String message, TraceCollector.MessageType type) {
         // Default implementation - subclasses can override if needed

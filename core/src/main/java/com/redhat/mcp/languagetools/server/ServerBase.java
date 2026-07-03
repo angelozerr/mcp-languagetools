@@ -8,6 +8,7 @@ import org.jboss.logging.Logger;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
@@ -137,21 +138,6 @@ public abstract class ServerBase<T extends ServerConfigBase> {
     }
 
     /**
-     * Recreate the executor service (used when restarting after error).
-     */
-    protected synchronized void recreateExecutorService() {
-        // Shutdown old executor if it exists (don't wait - threads will die naturally)
-        if (executorService != null && !executorService.isShutdown()) {
-            LOG.infof("Shutting down old executor service before recreating");
-            executorService.shutdownNow(); // Interrupt threads but don't wait
-        }
-
-        // Create new executor service immediately
-        executorService = Executors.newCachedThreadPool();
-        LOG.infof("Recreated executor service for %s", config.getServerId());
-    }
-
-    /**
      * Cleanup resources (threads, processes) when server enters error state.
      * This is called synchronously when setStatus(ERROR) happens, so must be FAST.
      * Can be overridden by subclasses to add custom cleanup.
@@ -185,7 +171,7 @@ public abstract class ServerBase<T extends ServerConfigBase> {
                 config.getServerId(), oldMessage, statusMessage, statusChangeListeners.size());
 
         // Notify if message changed and listeners are registered
-        if (!java.util.Objects.equals(oldMessage, statusMessage) && !statusChangeListeners.isEmpty()) {
+        if (!Objects.equals(oldMessage, statusMessage) && !statusChangeListeners.isEmpty()) {
             LOG.infof("[%s] Status message changed, notifying %d listeners", config.getServerId(), statusChangeListeners.size());
             // Trigger listeners to refresh UI
             for (StatusChangeListener listener : statusChangeListeners) {

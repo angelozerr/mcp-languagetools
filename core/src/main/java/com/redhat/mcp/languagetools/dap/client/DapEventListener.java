@@ -9,6 +9,12 @@ import org.eclipse.lsp4j.debug.*;
 public interface DapEventListener {
 
     /**
+     * Called when the debug adapter is initialized and ready to receive configuration.
+     * This is sent after the initialize response.
+     */
+    void onInitialized();
+
+    /**
      * Called when execution stops (breakpoint hit, step complete, pause, etc.).
      */
     void onStopped(StoppedEventArguments event);
