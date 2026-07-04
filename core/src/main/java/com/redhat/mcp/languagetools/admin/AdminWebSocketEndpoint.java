@@ -1,15 +1,14 @@
 package com.redhat.mcp.languagetools.admin;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.redhat.mcp.languagetools.admin.dto.DapServerDTO;
-import com.redhat.mcp.languagetools.admin.dto.McpClientDTO;
-import com.redhat.mcp.languagetools.admin.dto.ServerDTOBuilder;
-import com.redhat.mcp.languagetools.admin.dto.ServerRuntimeDTO;
-import com.redhat.mcp.languagetools.admin.dto.WorkspaceDTO;
+import com.redhat.mcp.languagetools.admin.dto.*;
 import com.redhat.mcp.languagetools.admin.ws.*;
+import com.redhat.mcp.languagetools.dap.session.DapSessionManager;
 import com.redhat.mcp.languagetools.lsp.server.LspServerStatusChangeEvent;
+import com.redhat.mcp.languagetools.lsp.trace.LspTraceCollector;
 import com.redhat.mcp.languagetools.lsp.trace.LspTraceMessage;
 import com.redhat.mcp.languagetools.mcp.trace.McpTrace;
+import com.redhat.mcp.languagetools.mcp.trace.McpTraceCollector;
 import com.redhat.mcp.languagetools.workspace.Workspace;
 import com.redhat.mcp.languagetools.workspace.WorkspaceChangeEvent;
 import com.redhat.mcp.languagetools.Application;
@@ -47,16 +46,19 @@ public class AdminWebSocketEndpoint {
     ObjectMapper objectMapper;
 
     @Inject
-    com.redhat.mcp.languagetools.lsp.trace.LspTraceCollector lspTraceCollector;
+    LspTraceCollector lspTraceCollector;
 
     @Inject
-    com.redhat.mcp.languagetools.mcp.trace.McpTraceCollector mcpTraceCollector;
+    McpTraceCollector mcpTraceCollector;
 
     @Inject
     ServerDTOBuilder serverDTOBuilder;
 
     @Inject
-    com.redhat.mcp.languagetools.dap.session.DapSessionManager dapSessionManager;
+    DapSessionManager dapSessionManager;
+
+    @Inject
+    ContributionDTOBuilder contributionBuilder;
 
     // Thread-safe set of active WebSocket sessions
     private final Set<Session> sessions = Collections.newSetFromMap(new ConcurrentHashMap<>());
@@ -399,7 +401,8 @@ public class AdminWebSocketEndpoint {
                     config.getServerId(),
                     config.getName(),
                     config.getDescription(),
-                    config.getDocumentSelector()
+                    config.getDocumentSelector(),
+                    contributionBuilder.buildContributions(config)
                 ))
                 .toList();
 

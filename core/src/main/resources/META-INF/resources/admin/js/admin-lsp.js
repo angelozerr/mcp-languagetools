@@ -13,8 +13,10 @@ let allServersLoaded = false;
  */
 async function loadAllLspServers() {
     try {
-        // Use cached server configs from admin.js (window.serverConfigs)
-        const servers = Object.values(window.serverConfigs || {});
+        // Use cached server configs from admin.js (include both LSP and DAP for contribution detection)
+        const lspServers = Object.values(window.serverConfigs || {});
+        const dapServers = Object.values(window.dapConfigs || {}).map(s => ({...s, isDap: true}));
+        const allServers = [...lspServers, ...dapServers];
 
         const container = document.getElementById('lsp-servers-list');
         if (!container) {
@@ -22,10 +24,11 @@ async function loadAllLspServers() {
             return;
         }
 
-        // Calculate contributedBy for all servers
-        const contributedByMap = buildContributedByMap(servers);
+        // Calculate contributedBy for all servers (including DAP contributions)
+        const contributedByMap = buildContributedByMap(allServers);
 
-        container.innerHTML = servers.map(server => {
+        // Render only LSP servers in the list
+        container.innerHTML = lspServers.map(server => {
             const isActive = selectedAllServer === server.id ? 'active' : '';
             const extensionClass = server.isExtension ? 'server-extension' : '';
             const extensionBadge = server.isExtension ? ' <span style="color: #999999; font-size: 0.85em;">(Extension)</span>' : '';
@@ -45,9 +48,9 @@ async function loadAllLspServers() {
         allServersLoaded = true;
 
         // Auto-select previously selected server if it exists, otherwise first server
-        if (servers.length > 0) {
-            const previousServerExists = selectedAllServer && servers.find(s => s.id === selectedAllServer);
-            const serverToShow = previousServerExists ? selectedAllServer : servers[0].id;
+        if (lspServers.length > 0) {
+            const previousServerExists = selectedAllServer && lspServers.find(s => s.id === selectedAllServer);
+            const serverToShow = previousServerExists ? selectedAllServer : lspServers[0].id;
             showServerDetails(serverToShow);
         }
     } catch (error) {
@@ -63,11 +66,14 @@ async function showServerDetails(serverId) {
     selectedAllServer = serverId;
 
     // Re-render server list to update active state
-    const servers = Object.values(window.serverConfigs || {});
-    const contributedByMap = buildContributedByMap(servers);
+    const lspServers = Object.values(window.serverConfigs || {});
+    const dapServers = Object.values(window.dapConfigs || {}).map(s => ({...s, isDap: true}));
+    const allServers = [...lspServers, ...dapServers];
+    const contributedByMap = buildContributedByMap(allServers);
     const container = document.getElementById('lsp-servers-list');
 
-    container.innerHTML = servers.map(server => {
+    // Render only LSP servers in the list
+    container.innerHTML = lspServers.map(server => {
         const isActive = selectedAllServer === server.id ? 'active' : '';
         const extensionClass = server.isExtension ? 'server-extension' : '';
         const extensionBadge = server.isExtension ? ' <span style="color: #999999; font-size: 0.85em;">(Extension)</span>' : '';
@@ -101,11 +107,11 @@ async function showServerDetails(serverId) {
         // Build details HTML
         const serverIcon = details.isExtension ? '🧩' : '🚀';
 
-        // Overview tab content
-        const detailsHTML = buildServerDetailsHTML(details, servers);
+        // Overview tab content (pass allServers for contribution detection)
+        const detailsHTML = buildServerDetailsHTML(details, allServers);
 
-        // Contributions tab content (use same function as workspace)
-        const contributionsHTML = formatContributionsSection(details, servers);
+        // Contributions tab content (use same function as workspace, pass allServers)
+        const contributionsHTML = formatContributionsSection(details, allServers);
 
         const html = `
             <div class="console-header">
@@ -165,13 +171,13 @@ async function showServerDetails(serverId) {
         loadInstallerJson(details.id);
 
         // Render diagram (will be called when switching to diagram tab)
-        // Store servers data for diagram rendering
-        window.currentDiagramServers = servers;
+        // Store servers data for diagram rendering (include both LSP and DAP)
+        window.currentDiagramServers = allServers;
         window.currentDiagramServerId = details.id;
 
         // If contributions tab is active, render diagram immediately
         if (currentServerTab === 'contributions') {
-            setTimeout(() => renderServerDiagram(servers, details.id), 100);
+            setTimeout(() => renderServerDiagram(allServers, details.id), 100);
         }
 
     } catch (error) {

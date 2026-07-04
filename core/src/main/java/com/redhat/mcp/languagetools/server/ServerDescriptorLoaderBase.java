@@ -1,8 +1,10 @@
 package com.redhat.mcp.languagetools.server;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.redhat.mcp.languagetools.PathManager;
+import com.redhat.mcp.languagetools.lsp.Contributes;
 import com.redhat.mcp.languagetools.lsp.DocumentSelector;
 import org.jboss.logging.Logger;
 
@@ -13,7 +15,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Base class for loading server descriptors (LSP and DAP).
@@ -37,6 +41,7 @@ public abstract class ServerDescriptorLoaderBase<T extends ServerConfigBase> {
     private static final String FIELD_LANGUAGE = "language";
     private static final String FIELD_SCHEME = "scheme";
     private static final String FIELD_PATTERN = "pattern";
+    private static final String FIELD_CONTRIBUTES = "contributes";
 
     protected final Gson gson = new Gson();
 
@@ -125,7 +130,25 @@ public abstract class ServerDescriptorLoaderBase<T extends ServerConfigBase> {
             });
             config.setDocumentSelector(selectors);
         }
+
+        // Contributions
+        fillContributions(config, jsonObject);
+
         return jsonObject;
+    }
+
+    private void fillContributions(ServerConfigBase config, JsonObject jsonObject) {
+        // Contributions (LSP-specific)
+        JsonElement contributesEl = jsonObject.get(FIELD_CONTRIBUTES);
+        if (contributesEl != null) {
+            if (contributesEl.isJsonObject()) {
+                Contributes contributes = new Contributes();
+                Map<String, JsonElement> contributionsMap = new HashMap<>();
+                contributesEl.getAsJsonObject().entrySet().forEach(entry -> contributionsMap.put(entry.getKey(), entry.getValue()));
+                contributes.setContributions(contributionsMap);
+                config.setContributes(contributes);
+            }
+        }
     }
 
     protected void loadInstaller(String serverId, Path serverDir, T config) throws IOException {

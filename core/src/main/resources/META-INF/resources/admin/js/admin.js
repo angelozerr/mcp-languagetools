@@ -528,7 +528,7 @@
             }
         }
 
-        function switchTab(tab, element) {
+        function switchTab(tab, element, options = {}) {
             currentTab = tab;
             window.currentTab = tab; // Update global reference
 
@@ -536,6 +536,15 @@
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             if (element) {
                 element.classList.add('active');
+            } else {
+                // If no element provided, find it by checking onclick attribute
+                const tabs = document.querySelectorAll('.tab');
+                tabs.forEach(t => {
+                    const onclickAttr = t.getAttribute('onclick');
+                    if (onclickAttr && onclickAttr.includes(`'${tab}'`)) {
+                        t.classList.add('active');
+                    }
+                });
             }
 
             // Show/hide content and adjust layout
@@ -602,7 +611,8 @@
                 consoleColumn.style.gridColumn = '2';
 
                 // Always reload DAP servers when switching to this tab
-                loadAllDapServers();
+                // Pass serverIdToSelect if provided in options
+                loadAllDapServers(options.serverId);
             } else if (tab === 'mcp-traces') {
                 document.getElementById('workspaces-list').style.display = 'none';
                 document.getElementById('lsp-servers-list').style.display = 'none';
@@ -630,6 +640,9 @@
                 }
             }
         }
+
+        // Expose switchTab globally for diagram navigation
+        window.switchTab = switchTab;
 
         // ========== LSP Servers Tab ==========
         // (Code moved to admin-lsp.js)

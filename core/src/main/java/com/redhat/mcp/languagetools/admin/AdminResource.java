@@ -1,9 +1,6 @@
 package com.redhat.mcp.languagetools.admin;
 
-import com.redhat.mcp.languagetools.admin.dto.DapServerDTO;
-import com.redhat.mcp.languagetools.admin.dto.ServerDTOBuilder;
-import com.redhat.mcp.languagetools.admin.dto.ServerRuntimeDTO;
-import com.redhat.mcp.languagetools.admin.dto.WorkspaceDTO;
+import com.redhat.mcp.languagetools.admin.dto.*;
 import com.redhat.mcp.languagetools.dap.server.DapServerConfig;
 import com.redhat.mcp.languagetools.workspace.Workspace;
 import com.redhat.mcp.languagetools.Application;
@@ -33,6 +30,9 @@ public class AdminResource {
 
     @Inject
     com.redhat.mcp.languagetools.dap.session.DapSessionManager dapSessionManager;
+
+    @Inject
+    ContributionDTOBuilder contributionBuilder;
 
     @GET
     @Path("/workspaces")
@@ -141,7 +141,8 @@ public class AdminResource {
             config.getServerId(),
             config.getName(),
             config.getDescription(),
-            config.getDocumentSelector()
+            config.getDocumentSelector(),
+            contributionBuilder.buildContributions(config)
         );
     }
 }

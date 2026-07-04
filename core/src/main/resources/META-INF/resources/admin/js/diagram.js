@@ -40,7 +40,8 @@ function renderServerDiagram(servers, currentServerId) {
 
     // Build nodes (one per server)
     const nodes = filteredServers.map(server => {
-        const icon = server.isExtension ? '🧩' : '🚀';
+        // Icon: Extension (🧩), DAP (🐛), LSP (🚀)
+        const icon = server.isExtension ? '🧩' : (server.isDap ? '🐛' : '🚀');
         const label = `${icon} ${server.name || server.id}`;
         return {
             id: server.id,
@@ -227,7 +228,21 @@ function renderServerDiagram(servers, currentServerId) {
             }
 
             console.log('Double-clicked on server:', clickedServerId);
-            showServerDetails(clickedServerId);
+
+            // Find the server to check if it's DAP or LSP
+            const clickedServer = servers.find(s => s.id === clickedServerId);
+            if (clickedServer?.isDap) {
+                // Switch to DAP tab with the specific server to select
+                if (window.switchTab) {
+                    window.switchTab('dap-servers', null, { serverId: clickedServerId });
+                }
+            } else {
+                // Switch to Servers tab and show details
+                if (window.switchTab) {
+                    window.switchTab('servers', null);
+                }
+                showServerDetails(clickedServerId);
+            }
         }
     });
 
@@ -274,7 +289,8 @@ function renderWorkspaceDiagram(servers, currentServerId) {
 
     // Build nodes (one per server)
     const nodes = filteredServers.map(server => {
-        const icon = server.isExtension ? '🧩' : '🚀';
+        // Icon: Extension (🧩), DAP (🐛), LSP (🚀)
+        const icon = server.isExtension ? '🧩' : (server.isDap ? '🐛' : '🚀');
         const label = `${icon} ${server.name || server.id}`;
         return {
             id: server.id,

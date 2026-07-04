@@ -571,7 +571,9 @@
         async function loadConsole(server) {
             // Check if server has contributions
             const workspace = workspaces.find(w => w.rootUri === selectedWorkspace);
-            const allServers = workspace ? workspace.lspServers : [];
+            // Include both LSP and DAP servers for contribution detection (mark DAP servers)
+            const dapServersWithFlag = (workspace?.dapServers || []).map(s => ({...s, isDap: true}));
+            const allServers = workspace ? [...(workspace.lspServers || []), ...dapServersWithFlag] : [];
             const hasContributions = (server.contributions && Object.keys(server.contributions).length > 0) ||
                                     buildContributedByMap(allServers)[server.id]?.length > 0;
 
@@ -662,16 +664,16 @@
 
             currentServerId = server.id;
 
-            // Store servers data for diagram rendering
+            // Store servers data for diagram rendering (include both LSP and DAP)
             const currentWorkspace = workspaces.find(w => w.rootUri === selectedWorkspace);
             if (currentWorkspace) {
-                window.currentWorkspaceDiagramServers = currentWorkspace.lspServers;
+                window.currentWorkspaceDiagramServers = allServers;
                 window.currentWorkspaceDiagramServerId = server.id;
             }
 
             // If contributions tab is active, render diagram immediately
             if (currentConsoleTab === 'contributions' && currentWorkspace) {
-                setTimeout(() => renderWorkspaceDiagram(currentWorkspace.lspServers, server.id), 100);
+                setTimeout(() => renderWorkspaceDiagram(allServers, server.id), 100);
             }
 
             // Load and initialize trace level selector with saved value
@@ -904,9 +906,11 @@
             console.log('formatContributionsSection - server:', server.id, 'contributions:', server.contributions);
             const contributesTo = server.contributions ? Object.keys(server.contributions) : [];
 
-            // Calculate contributedBy from all servers
+            // Calculate contributedBy from all servers (include both LSP and DAP, mark DAP servers)
             if (!allServers) {
-                allServers = workspaces.find(w => w.rootUri === selectedWorkspace)?.lspServers || [];
+                const workspace = workspaces.find(w => w.rootUri === selectedWorkspace);
+                const dapServersWithFlag = (workspace?.dapServers || []).map(s => ({...s, isDap: true}));
+                allServers = workspace ? [...(workspace.lspServers || []), ...dapServersWithFlag] : [];
             }
             const contributedByMap = buildContributedByMap(allServers);
             const contributedBy = contributedByMap[server.id] || [];

@@ -3,6 +3,7 @@ package com.redhat.mcp.languagetools.admin.dto;
 import com.google.gson.Gson;
 import com.redhat.mcp.languagetools.PathManager;
 import com.redhat.mcp.languagetools.lsp.server.LspServerConfig;
+import com.redhat.mcp.languagetools.server.ServerConfigBase;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
@@ -39,7 +40,7 @@ public class ContributionDTOBuilder {
      * Returns Map<targetServerId, Map<contributionType, List<?>>>
      * Example: {"jdtls": {"bundles": ["/path/to/plugin.jar"]}}
      */
-    public Map<String, Map<String, List<?>>> buildContributions(LspServerConfig config) {
+    public Map<String, Map<String, List<?>>> buildContributions(ServerConfigBase config) {
         Map<String, Map<String, List<?>>> contributions = new HashMap<>();
 
         if (config.getContributes() != null && config.getContributes().getContributions() != null) {

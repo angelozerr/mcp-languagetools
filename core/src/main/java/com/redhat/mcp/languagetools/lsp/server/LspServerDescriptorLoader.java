@@ -28,7 +28,6 @@ public class LspServerDescriptorLoader extends ServerDescriptorLoaderBase<LspSer
     private static final String FIELD_ENV = "env";
     private static final String FIELD_WORKING_DIRECTORY = "workingDirectory";
     private static final String FIELD_INITIALIZATION_OPTIONS = "initializationOptions";
-    private static final String FIELD_CONTRIBUTES = "contributes";
 
     // Extension (ex: Quarkus, Liberty LemMinx)
     private static final String PARENT_SERVER_ID = "parentServerId" ;
@@ -79,27 +78,7 @@ public class LspServerDescriptorLoader extends ServerDescriptorLoaderBase<LspSer
             }
 
         }
-
-        // Contributions
-        fillContributions(config, jsonObject);
-
         return jsonObject;
-    }
-
-    private void fillContributions(LspServerConfig config, JsonObject jsonObject) {
-        // Contributions (LSP-specific)
-        JsonElement contributesEl = jsonObject.get(FIELD_CONTRIBUTES);
-        if (contributesEl != null) {
-            if (contributesEl.isJsonObject()) {
-                Contributes contributes = new Contributes();
-                Map<String, JsonElement> contributionsMap = new HashMap<>();
-                contributesEl.getAsJsonObject().entrySet().forEach(entry -> {
-                    contributionsMap.put(entry.getKey(), entry.getValue());
-                });
-                contributes.setContributions(contributionsMap);
-                config.setContributes(contributes);
-            }
-        }
     }
 
 }

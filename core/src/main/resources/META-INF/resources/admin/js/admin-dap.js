@@ -535,7 +535,7 @@ let dapServerConfigs = {};
 /**
  * Load all global DAP servers.
  */
-async function loadAllDapServers() {
+async function loadAllDapServers(serverIdToSelect) {
     try {
         const response = await fetch('/api/admin/dap-servers');
         const dapServers = await response.json();
@@ -570,10 +570,16 @@ async function loadAllDapServers() {
             `;
         }).join('');
 
-        // Auto-select previously selected server if it exists, otherwise first server
+        // Auto-select: 1) specified server, 2) previously selected, 3) first server
         if (dapServers.length > 0) {
-            const previousServerExists = selectedDapServer && dapServers.find(s => s.id === selectedDapServer);
-            const serverToShow = previousServerExists ? selectedDapServer : dapServers[0].id;
+            let serverToShow;
+            if (serverIdToSelect && dapServers.find(s => s.id === serverIdToSelect)) {
+                serverToShow = serverIdToSelect;
+            } else if (selectedDapServer && dapServers.find(s => s.id === selectedDapServer)) {
+                serverToShow = selectedDapServer;
+            } else {
+                serverToShow = dapServers[0].id;
+            }
             showDapServerDetails(serverToShow);
         }
     } catch (error) {
@@ -629,6 +635,22 @@ async function showDapServerDetails(serverId) {
         docSelectorHTML = `<ul style="margin: 0.5rem 0; padding-left: 1.5rem;">${docSelectorHTML}</ul>`;
     }
 
+    // Check if server has contributions
+    const lspServers = Object.values(window.serverConfigs || {});
+    const dapServersWithFlag = dapServers.map(s => ({...s, isDap: true}));
+    const allServers = [...lspServers, ...dapServersWithFlag];
+    const hasContributions = (server.contributions && Object.keys(server.contributions).length > 0) ||
+                            buildContributedByMap(allServers)[server.id]?.length > 0;
+
+    // Prepare contributions HTML and diagram data (only if has contributions)
+    const contributionsHTML = hasContributions ? formatContributionsSection(server, allServers) : '';
+
+    // Store for diagram rendering
+    if (hasContributions) {
+        window.currentDiagramServers = allServers;
+        window.currentDiagramServerId = server.id;
+    }
+
     const detailsHTML = `
         <h3 style="margin-top: 0; color: #4ec9b0;">Debug Adapter Information</h3>
 
@@ -662,6 +684,7 @@ async function showDapServerDetails(serverId) {
             </div>
             <div class="console-tabs">
                 <button class="tab-button ${currentDapServerTab === 'overview' ? 'active' : ''}" onclick="switchDapServerTab('overview')">Overview</button>
+                ${hasContributions ? `<button class="tab-button ${currentDapServerTab === 'contributions' ? 'active' : ''}" onclick="switchDapServerTab('contributions')">Contributions</button>` : ''}
                 <button class="tab-button ${currentDapServerTab === 'install' ? 'active' : ''}" onclick="switchDapServerTab('install')">Install</button>
             </div>
         </div>
@@ -671,6 +694,14 @@ async function showDapServerDetails(serverId) {
                     ${detailsHTML}
                 </div>
             </div>
+            ${hasContributions ? `
+            <div id="dap-server-contributions-tab" class="tab-panel ${currentDapServerTab === 'contributions' ? 'active' : ''}">
+                <div id="server-diagram-container" style="width: 100%; height: 400px; background: #1e1e1e; border-bottom: 1px solid #333;"></div>
+                <div class="details-panel" id="dap-contributions-content" style="padding: 2rem; color: #cccccc;">
+                    ${contributionsHTML}
+                </div>
+            </div>
+            ` : ''}
             <div id="dap-server-install-tab" class="tab-panel ${currentDapServerTab === 'install' ? 'active' : ''}">
                 <div class="install-panel">
                     <h3>Installer Configuration</h3>
@@ -710,6 +741,10 @@ function switchDapServerTab(tab) {
     currentDapServerTab = tab;
     if (selectedDapServer) {
         showDapServerDetails(selectedDapServer);
+    }
+    // Render diagram when switching to contributions tab
+    if (tab === 'contributions' && window.currentDiagramServers && window.currentDiagramServerId) {
+        setTimeout(() => renderServerDiagram(window.currentDiagramServers, window.currentDiagramServerId), 100);
     }
 }
 
