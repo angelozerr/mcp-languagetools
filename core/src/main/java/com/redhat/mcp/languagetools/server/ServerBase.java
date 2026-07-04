@@ -1,6 +1,6 @@
 package com.redhat.mcp.languagetools.server;
 
-import com.redhat.mcp.languagetools.lsp.RequestRouter;
+import com.redhat.mcp.languagetools.client.BindEndpointSupport;
 import com.redhat.mcp.languagetools.lsp.server.LspServer;
 import com.redhat.mcp.languagetools.trace.TracingMessageConsumer;
 import com.redhat.mcp.languagetools.workspace.Workspace;
@@ -16,18 +16,18 @@ import java.util.concurrent.Executors;
 
 /**
  * Base class for server implementations (LSP and DAP).
- * Provides common functionality for managing server configuration and lifecycle.
+ * Provides common functionality for managing server configuration and lifecycle,
+ * as well as bindRequest/bindNotification support via BindEndpointSupport.
  *
  * @param <T> The type of server configuration (LspServerConfig or DapServerConfig)
  */
-public abstract class ServerBase<T extends ServerConfigBase> {
+public abstract class ServerBase<T extends ServerConfigBase> extends BindEndpointSupport {
 
     private static final Logger LOG = Logger.getLogger(ServerBase.class);
 
     private final T config;
     private final Workspace workspace;
     protected ExecutorService executorService; // Not final - can be recreated after error
-    private final RequestRouter requestRouter;
     private final TracingMessageConsumer.TraceCollectorAdd traceCollector;
     private final TracingMessageConsumer tracing;
     private volatile ServerStatus status = ServerStatus.NOT_STARTED;
@@ -36,6 +36,7 @@ public abstract class ServerBase<T extends ServerConfigBase> {
 
     protected Process serverProcess;
     private volatile boolean isReady;
+    private CompletableFuture<Void> readyFuture;
 
     public ServerBase(T config, Workspace workspace) {
         this(config, workspace, config.getServerId());
@@ -46,11 +47,11 @@ public abstract class ServerBase<T extends ServerConfigBase> {
      * Used by DAP to pass sessionId instead of serverId.
      */
     protected ServerBase(T config, Workspace workspace, String traceServerId) {
+        super(config, workspace);
         this.config = config;
         this.workspace = workspace;
         this.executorService = Executors.newCachedThreadPool();
-        // Create RequestRouter for bindRequest routing
-        this.requestRouter = createRequestRouter();
+        this.readyFuture = new CompletableFuture<>();
 
         var workspaceRoot = workspace.getRootUri();
         this.traceCollector = initializeTraceCollector(workspace);
@@ -272,6 +273,18 @@ public abstract class ServerBase<T extends ServerConfigBase> {
     }
 
     /**
+     * Wait until the server is ready, without timeout.
+     * Returns a CompletableFuture that completes when the server is ready.
+     * Uses notification mechanism (no polling) for efficiency.
+     */
+    public CompletableFuture<Void> waitUntilReady() {
+        if (isReady) {
+            return CompletableFuture.completedFuture(null);
+        }
+        return readyFuture;
+    }
+
+    /**
      * Wait until the server is ready, with a timeout.
      * Returns a CompletableFuture that completes when the server is ready.
      */
@@ -280,20 +293,7 @@ public abstract class ServerBase<T extends ServerConfigBase> {
             return CompletableFuture.completedFuture(null);
         }
 
-        return CompletableFuture.runAsync(() -> {
-            long startTime = System.currentTimeMillis();
-            while (!isReady && (System.currentTimeMillis() - startTime) < timeoutMs) {
-                try {
-                    Thread.sleep(100);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    throw new RuntimeException("Interrupted while waiting for server to be ready", e);
-                }
-            }
-            if (!isReady) {
-                throw new RuntimeException("Server not ready after " + timeoutMs + "ms");
-            }
-        }, executorService);
+        return readyFuture.orTimeout(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS);
     }
 
     /**
@@ -309,9 +309,21 @@ public abstract class ServerBase<T extends ServerConfigBase> {
     /**
      * Set the ready state of the language server.
      * Called by subclasses when they detect the server is ready (e.g., JdtLsServer on language/status).
+     * Completes the readyFuture to notify all waiting threads.
      */
     public final void setReady(boolean ready) {
+        boolean wasReady = this.isReady;
         this.isReady = ready;
+
+        // Complete the future when becoming ready
+        if (ready && !wasReady && readyFuture != null && !readyFuture.isDone()) {
+            readyFuture.complete(null);
+        }
+
+        // Reset the future when becoming not ready (for restarts)
+        if (!ready && wasReady) {
+            readyFuture = new CompletableFuture<>();
+        }
     }
 
     /**
@@ -328,10 +340,6 @@ public abstract class ServerBase<T extends ServerConfigBase> {
 
     public Workspace getWorkspace() {
         return workspace;
-    }
-
-    public RequestRouter getRequestRouter() {
-        return requestRouter;
     }
 
     /**
@@ -417,39 +425,6 @@ public abstract class ServerBase<T extends ServerConfigBase> {
         });
     }
 
-    /**
-     * Create request router using the workspace to find servers.
-     */
-    private RequestRouter createRequestRouter() {
-        return (targetServerId, method, params, mode) -> {
-            // Look up the target server via workspace
-            LspServer targetServer = getWorkspace().getLspServer(targetServerId);
-
-            if (targetServer == null) {
-                LOG.warnf("Target server '%s' not found for bindRequest: %s", targetServerId, method);
-                return CompletableFuture.failedFuture(
-                        new IllegalStateException("Target server not found: " + targetServerId)
-                );
-            }
-
-            // Wait for target server to be ready before routing (important for JDT.LS)
-            LOG.debugf("Routing request %s to server %s (mode: %s), waiting for server to be ready...",
-                    method, targetServerId, mode);
-
-            return targetServer.waitUntilReady(30000) // 30 seconds timeout
-                    .thenCompose(v -> {
-                        LOG.debugf("Server %s is ready, routing request %s", targetServerId, method);
-
-                        if ("direct".equals(mode)) {
-                            // Direct JSON-RPC request
-                            return targetServer.sendRequest(method, params);
-                        } else {
-                            // Default: workspace/executeCommand (for JDT.LS delegate handlers)
-                            return targetServer.sendCommandRequest(method, params);
-                        }
-                    });
-        };
-    }
 
     public TracingMessageConsumer.TraceCollectorAdd getTraceCollector() {
         return traceCollector;

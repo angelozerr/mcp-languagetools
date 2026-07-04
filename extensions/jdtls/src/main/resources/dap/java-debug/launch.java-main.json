@@ -1,0 +1,12 @@
+{
+  "type": "java",
+  "request": "launch",
+  "name": "Launch Java Program with Arguments",
+  "mainClass": "",
+  "projectName": "",
+  "cwd": "${workspaceFolder}",
+  "console": "integratedTerminal",
+  "stopOnEntry": false,
+  "args": "",
+  "vmArgs": ""
+}

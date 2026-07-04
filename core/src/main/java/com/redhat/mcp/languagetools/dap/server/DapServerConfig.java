@@ -10,11 +10,25 @@ import java.util.Map;
 /**
  * DAP (Debug Adapter Protocol) server configuration loaded from server.json.
  * Similar to LspServerConfig but with DAP-specific fields.
+ *
+ * <p>DAP servers can be launched in two modes:</p>
+ * <ul>
+ *   <li><b>Standalone mode</b>: Uses {@code launch} to start an external process (e.g., vscode-js-debug)</li>
+ *   <li><b>Embedded mode</b>: Uses {@code launchMethod} to call an LSP method that returns a DAP port (e.g., java-debug via JDTLS)</li>
+ * </ul>
  */
 public class DapServerConfig extends ServerConfigBase {
 
-    private Map<String, String> launch;  // OS-specific launch commands
-    private Map<String, Object> attach;  // Attach configuration
+    /**
+     * OS-specific launch commands for standalone DAP servers.
+     * Example: {"default": "node debugAdapter.js ${port}"}
+     */
+    private Map<String, String> launch;
+
+    /**
+     * Attach configuration for DAP servers.
+     */
+    private Map<String, Object> attach;
     private String debugServerReadyPattern;
     private DebugServerWaitStrategy debugServerWaitStrategy = DebugServerWaitStrategy.TIMEOUT;
     private Integer connectTimeout = 500; // Default 500ms
@@ -35,6 +49,7 @@ public class DapServerConfig extends ServerConfigBase {
     public void setLaunch(Map<String, String> launch) {
         this.launch = launch;
     }
+
 
     /**
      * Get the launch command for the current OS.
