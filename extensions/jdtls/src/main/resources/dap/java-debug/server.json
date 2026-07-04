@@ -2,9 +2,7 @@
 	"id": "java-debug",
 	"name": "Java Debug Server",
 	"description": "Java Debug Server for Visual Studio Code",
-	"launch": {
-		"default": "java ???"
-	},
+	"launchMethod": "vscode.java.startDebugSession",
 	"documentSelector": [
 		{
 			"language": "java"
@@ -16,6 +14,10 @@
 				"plugins/*.jar"
 			],
 			"bindRequest": [
+				"vscode.java.validateLaunchConfig",
+				"vscode.java.buildWorkspace",
+				"vscode.java.resolveClasspath",
+				"vscode.java.resolveJavaExecutable",
 				"vscode.java.startDebugSession"
 			]
 		}

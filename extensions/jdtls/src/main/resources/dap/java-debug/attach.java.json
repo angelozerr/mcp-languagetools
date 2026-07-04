@@ -1,0 +1,8 @@
+{
+  "type": "java",
+  "request": "attach",
+  "name": "Attach to Java Process",
+  "hostName": "localhost",
+  "port": 5005,
+  "projectName": ""
+}

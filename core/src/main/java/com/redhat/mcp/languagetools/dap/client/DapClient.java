@@ -33,6 +33,7 @@ public class DapClient implements IDebugProtocolClient {
     // Parent-child session support
     private DapClient parentClient;
     private final List<DapClient> childrenClients = new ArrayList<>();
+    private Process runningProcess; // Process launched via runInTerminal
 
     // Factory for creating child debug sessions
     private Function<Map<String, Object>, CompletableFuture<DapClient>> childSessionFactory;
@@ -272,15 +273,101 @@ public class DapClient implements IDebugProtocolClient {
      */
     @Override
     public CompletableFuture<RunInTerminalResponse> runInTerminal(RunInTerminalRequestArguments args) {
-        LOG.infof("RunInTerminal request: kind=%s, title=%s", args.getKind(), args.getTitle());
+        LOG.infof("RunInTerminal request: kind=%s, title=%s, cwd=%s", args.getKind(), args.getTitle(), args.getCwd());
 
-        // For now, return a not implemented response
-        // In a full implementation, this would launch a terminal and return the process ID
-        RunInTerminalResponse response = new RunInTerminalResponse();
-        response.setProcessId(0);
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                // Build process from args
+                ProcessBuilder pb = new ProcessBuilder(java.util.Arrays.asList(args.getArgs()));
 
-        LOG.warnf("RunInTerminal not fully implemented yet");
-        return CompletableFuture.completedFuture(response);
+                // Set working directory if provided
+                if (args.getCwd() != null && !args.getCwd().isEmpty()) {
+                    pb.directory(new java.io.File(args.getCwd()));
+                }
+
+                // Set environment variables if provided
+                if (args.getEnv() != null) {
+                    pb.environment().putAll(args.getEnv());
+                }
+
+                LOG.infof("Launching process: %s", String.join(" ", args.getArgs()));
+                Process process = pb.start();
+
+                // Get process ID
+                long pid = process.pid();
+                LOG.infof("Process launched with PID: %d", pid);
+
+                // Store process for cleanup
+                runningProcess = process;
+
+                // Capture stdout and send to DAP client
+                CompletableFuture.runAsync(() -> {
+                    try (java.io.BufferedReader reader = new java.io.BufferedReader(
+                            new java.io.InputStreamReader(process.getInputStream()))) {
+                        String line;
+                        while ((line = reader.readLine()) != null) {
+                            if (eventListener != null) {
+                                OutputEventArguments output = new OutputEventArguments();
+                                output.setOutput(line + "\n");
+                                output.setCategory("stdout");
+                                eventListener.onOutput(output);
+                            }
+                        }
+                    } catch (Exception e) {
+                        LOG.errorf(e, "Error reading stdout: %s", e.getMessage());
+                    }
+                });
+
+                // Capture stderr and send to DAP client
+                CompletableFuture.runAsync(() -> {
+                    try (java.io.BufferedReader reader = new java.io.BufferedReader(
+                            new java.io.InputStreamReader(process.getErrorStream()))) {
+                        String line;
+                        while ((line = reader.readLine()) != null) {
+                            if (eventListener != null) {
+                                eventListener.onOutput(createErrorOutput(line + "\n"));
+                            }
+                        }
+                    } catch (Exception e) {
+                        LOG.errorf(e, "Error reading stderr: %s", e.getMessage());
+                    }
+                });
+
+                // Monitor process termination in background
+                CompletableFuture.runAsync(() -> {
+                    try {
+                        int exitCode = process.waitFor();
+                        LOG.infof("Process %d exited with code: %d", pid, exitCode);
+
+                        // Send exit notification
+                        if (eventListener != null) {
+                            OutputEventArguments output = new OutputEventArguments();
+                            output.setOutput(String.format("\nProcess exited with code: %d\n", exitCode));
+                            output.setCategory("console");
+                            eventListener.onOutput(output);
+                        }
+                    } catch (InterruptedException e) {
+                        LOG.warnf("Process monitoring interrupted");
+                        java.lang.Thread.currentThread().interrupt();
+                    }
+                });
+
+                RunInTerminalResponse response = new RunInTerminalResponse();
+                response.setProcessId((int) pid);
+                return response;
+
+            } catch (Exception e) {
+                LOG.errorf(e, "Failed to launch process: %s", e.getMessage());
+
+                // Send error output event
+                if (eventListener != null) {
+                    eventListener.onOutput(createErrorOutput(
+                            String.format("Failed to launch process: %s\n", e.getMessage())));
+                }
+
+                throw new RuntimeException("Failed to launch process", e);
+            }
+        });
     }
 
     /**

@@ -1,0 +1,11 @@
+{
+  "type": "java",
+  "request": "launch",
+  "name": "Launch Java Program",
+  "mainClass": "${file}",
+  "projectName": "",
+  "cwd": "${workspaceFolder}",
+  "console": "integratedTerminal",
+  "stopOnEntry": false,
+  "args": ""
+}

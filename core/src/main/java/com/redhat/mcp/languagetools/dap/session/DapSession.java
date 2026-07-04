@@ -4,6 +4,8 @@ import com.redhat.mcp.languagetools.dap.client.DapClient;
 import com.redhat.mcp.languagetools.dap.client.DapEventListener;
 import com.redhat.mcp.languagetools.dap.server.DapServer;
 import com.redhat.mcp.languagetools.dap.server.DapServerConfig;
+import com.redhat.mcp.languagetools.dap.server.DapServerFactory;
+import com.redhat.mcp.languagetools.dap.server.DapServerFactoryRegistry;
 import com.redhat.mcp.languagetools.dap.trace.DapTraceCollector;
 import com.redhat.mcp.languagetools.trace.TraceCollector;
 import com.redhat.mcp.languagetools.workspace.Workspace;
@@ -80,7 +82,8 @@ public class DapSession implements DapEventListener {
                       String sessionName,
                       DapServerConfig serverConfig,
                       Workspace workspace,
-                      DapTraceCollector traceCollector) {
+                      DapTraceCollector traceCollector,
+                      DapServerFactoryRegistry factoryRegistry) {
         this.sessionId = sessionId;
         this.language = language;
         this.sessionName = sessionName;
@@ -98,7 +101,16 @@ public class DapSession implements DapEventListener {
             ));
         }
 
-        this.dapServer = new DapServer(sessionId, serverConfig, workspace);
+        // Create DAP server using factory (allows custom implementations like JavaDebugServer)
+        DapServerFactory factory = factoryRegistry.findFactory(serverConfig.getServerId());
+        if (factory != null) {
+            LOG.infof("Using custom factory for DAP server: %s", serverConfig.getServerId());
+            this.dapServer = factory.createServer(sessionId, serverConfig, workspace);
+        } else {
+            LOG.infof("Using default DapServer for: %s", serverConfig.getServerId());
+            this.dapServer = new DapServer(sessionId, serverConfig, workspace);
+        }
+
         // Note: setEventListener() must be called AFTER start() when dapClient is created
         // Listen to server status changes to update session state
         this.dapServer.addStatusChangeListener(this::onServerStatusChanged);
@@ -293,14 +305,7 @@ public class DapSession implements DapEventListener {
             .thenAccept(v -> {
                 // Server is now RUNNING, session stays CREATED until launch
                 LOG.infof("DAP session initialized: %s", sessionId);
-
-                // Configure DapClient (must be done after start() because dapClient is created during start)
-                if (dapServer.getDapClient() != null) {
-                    // Set this session as the event listener
-                    dapServer.getDapClient().setEventListener(DapSession.this);
-                    // Set child session factory for startDebugging support
-                    dapServer.getDapClient().setChildSessionFactory(this::createChildSession);
-                }
+                // Event listener will be set in launch() before connectAndInitialize
             })
             .exceptionally(ex -> {
                 LOG.errorf(ex, "Failed to initialize DAP session: %s", sessionId);
@@ -348,8 +353,9 @@ public class DapSession implements DapEventListener {
         if (state == SessionState.CREATED
             || serverStatus == com.redhat.mcp.languagetools.server.ServerStatus.NOT_STARTED
             || serverStatus == com.redhat.mcp.languagetools.server.ServerStatus.START_FAILED
+            || serverStatus == com.redhat.mcp.languagetools.server.ServerStatus.ERROR
             || serverStatus == com.redhat.mcp.languagetools.server.ServerStatus.STOPPED) {
-            LOG.infof("Server not running, starting and initializing...");
+            LOG.infof("Server not running or in error, starting and initializing...");
             initFuture = initialize();
         } else {
             LOG.infof("Server already running, skipping init");
@@ -380,22 +386,69 @@ public class DapSession implements DapEventListener {
 
             LOG.infof("Resolved launch config (debugMode=%s): %s", debugMode, resolvedConfig);
 
-            // Use DapClient.connectAndInitialize (exactly like lsp4ij DAPClient.connectToServer)
-            return dapServer.getDapClient().connectAndInitialize(
-                    dapServer.getDebugServer(),
-                    resolvedConfig,
-                    debugMode,  // Pass debugMode to control breakpoint initialization
-                    dapServer.getConfig().getServerId()
-                )
-                .thenApply(result -> {
-                    setState(SessionState.RUNNING);
-                    LOG.infof("Debug session fully initialized and running");
-                    return Map.of(
-                        "success", true,
-                        "state", "running",
-                        "message", "Debugging started"
-                    );
-                });
+            // Enrich launch configuration (subclasses like JavaDebugServer can override)
+            return dapServer.enrichLaunchConfiguration(resolvedConfig, sessionId)
+                    .thenCompose(enrichedConfig -> {
+                        LOG.infof("Connecting and initializing with enriched config");
+
+                        // IMPORTANT: Set event listener BEFORE connectAndInitialize
+                        // because runInTerminal is called during launch (inside connectAndInitialize)
+                        if (dapServer.getDapClient() != null) {
+                            dapServer.getDapClient().setEventListener(DapSession.this);
+                            dapServer.getDapClient().setChildSessionFactory(this::createChildSession);
+                        }
+
+                        return dapServer.getDapClient().connectAndInitialize(
+                                dapServer.getDebugServer(),
+                                enrichedConfig,
+                                debugMode,  // Pass debugMode to control breakpoint initialization
+                                dapServer.getConfig().getServerId()
+                        )
+                        .thenApply(result -> {
+                            setState(SessionState.RUNNING);
+                            LOG.infof("Debug session fully initialized and running");
+                            Map<String, Object> response = new HashMap<>();
+                            response.put("success", true);
+                            response.put("state", "running");
+                            response.put("message", "Debugging started");
+                            return response;
+                        });
+                    })
+                    .handle((result, ex) -> {
+                        if (ex != null) {
+                            String error = String.format("DAP session launch failed: %s", ex.getMessage());
+                            LOG.error(error, ex);
+
+                            // Build full error message with stack trace
+                            StringBuilder errorTrace = new StringBuilder();
+                            errorTrace.append("ERROR launching DAP session:\n");
+                            errorTrace.append(ex.getClass().getName()).append(": ").append(ex.getMessage()).append("\n");
+
+                            // Add stack trace
+                            Throwable cause = ex;
+                            while (cause != null) {
+                                for (StackTraceElement element : cause.getStackTrace()) {
+                                    errorTrace.append("  at ").append(element).append("\n");
+                                }
+                                cause = cause.getCause();
+                                if (cause != null) {
+                                    errorTrace.append("Caused by: ").append(cause.getClass().getName())
+                                              .append(": ").append(cause.getMessage()).append("\n");
+                                }
+                            }
+
+                            // Add trace to console with full stack
+                            dapServer.getTraceCollector().addTrace(
+                                    workspace.getRootUri().toString(),
+                                    sessionId,
+                                    TraceCollector.MessageDirection.SERVER_TO_CLIENT,
+                                    errorTrace.toString()
+                            );
+
+                            throw new RuntimeException(error, ex);
+                        }
+                        return result;
+                    });
         });
     }
 

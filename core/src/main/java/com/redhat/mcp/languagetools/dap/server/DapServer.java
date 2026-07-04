@@ -25,6 +25,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -101,8 +102,14 @@ public class DapServer extends ServerBase<DapServerConfig> {
     }
 
     /**
-     * Start the debug adapter process and create the launcher.
+     * Start the debug adapter and create the launcher.
      * Does NOT send initialize request - that's done later in connectAndInitialize().
+     * <p>
+     * Two modes:
+     * <ul>
+     *   <li><b>Standalone</b>: Launches external process via {@code launch} command</li>
+     *   <li><b>Embedded</b>: Calls LSP method via {@code launchMethod} to get DAP port</li>
+     * </ul>
      */
     public CompletableFuture<Void> start() {
         // Common startup checks and preparation
@@ -110,6 +117,31 @@ public class DapServer extends ServerBase<DapServerConfig> {
             return CompletableFuture.completedFuture(null);
         }
 
+        // Start in standalone mode (launch external process)
+        return startStandalone();
+    }
+
+    /**
+     * Enrich launch configuration before launching.
+     * Override this method in subclasses to add custom resolution logic.
+     * For example, JavaDebugServer resolves classpath, java executable, etc.
+     *
+     * @param launchConfig The initial launch configuration
+     * @param sessionId The session ID for tracing
+     * @return CompletableFuture with enriched configuration
+     */
+    public CompletableFuture<Map<String, Object>> enrichLaunchConfiguration(
+            Map<String, Object> launchConfig,
+            String sessionId) {
+        // Default implementation: return config as-is
+        return CompletableFuture.completedFuture(launchConfig);
+    }
+
+    /**
+     * Start in standalone mode: launch external process.
+     * Used for DAP servers that run as separate processes (e.g., vscode-js-debug).
+     */
+    private CompletableFuture<Void> startStandalone() {
         // Ensure server is installed first
         return withErrorLogging(
             ensureInstalled().thenCompose(v -> startServerProcess())
@@ -314,25 +346,8 @@ public class DapServer extends ServerBase<DapServerConfig> {
                     transportStreams = new StdioTransportStreams(in, out);
                 }
 
-                dapClient = new DapClient();
-
-                // Wrapper for tracing
-                Launcher<IDebugProtocolServer> launcher = DSPLauncher.createClientLauncher(
-                        dapClient,
-                        transportStreams.getInputStream(),
-                        transportStreams.getOutputStream(),
-                        executorService,
-                        consumer -> message -> {
-                            try {
-                                getTracing().log(message, consumer);
-                            } catch (Exception e) {
-                                LOG.warnf(e, "Error tracing DAP message: %s", e.getMessage());
-                            }
-                            consumer.consume(message);
-                        });
-
-                debugServer = launcher.getRemoteProxy();
-                launcher.startListening();
+                // Create launcher from transport streams
+                createLauncherFromTransport(transportStreams);
 
                 LOG.infof("Launcher created and listening, ready for initialization");
                 setStatus(ServerStatus.RUNNING);
@@ -341,6 +356,62 @@ public class DapServer extends ServerBase<DapServerConfig> {
                 return null;
             } catch (Exception e) {
                 throw new RuntimeException(e);
+            }
+        }, executorService);
+    }
+
+    /**
+     * Create launcher from existing transport streams.
+     * Used by both startServerProcess() and connectToSocket().
+     */
+    protected void createLauncherFromTransport(TransportStreams transport) {
+        dapClient = new DapClient();
+
+        // Wrapper for tracing
+        Launcher<IDebugProtocolServer> launcher = DSPLauncher.createClientLauncher(
+                dapClient,
+                transport.getInputStream(),
+                transport.getOutputStream(),
+                executorService,
+                consumer -> message -> {
+                    try {
+                        getTracing().log(message, consumer);
+                    } catch (Exception e) {
+                        LOG.warnf(e, "Error tracing DAP message: %s", e.getMessage());
+                    }
+                    consumer.consume(message);
+                });
+
+        debugServer = launcher.getRemoteProxy();
+        launcher.startListening();
+    }
+
+    /**
+     * Connect to an existing DAP server via socket (for embedded mode).
+     * Used when the DAP server is already running and listening on a port.
+     *
+     * @param host The host (e.g., "localhost")
+     * @param port The port where DAP server is listening
+     * @return CompletableFuture that completes when connected
+     */
+    protected CompletableFuture<Void> connectToSocket(String host, int port) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                LOG.infof("Connecting to DAP server at %s:%d", host, port);
+
+                // Create socket transport
+                transportStreams = new SocketTransportStreams(host, port);
+
+                // Create launcher
+                createLauncherFromTransport(transportStreams);
+
+                LOG.infof("Connected to DAP server at %s:%d", host, port);
+                setStatus(ServerStatus.RUNNING);
+                setReady(true);
+
+                return null;
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to connect to DAP server at " + host + ":" + port, e);
             }
         }, executorService);
     }

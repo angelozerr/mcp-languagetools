@@ -71,9 +71,10 @@ public class LspRequestExecutor {
                     // Step 2: Build LSP request parameters
                     TLspParams lspParams = strategy.buildLspParams(params);
 
-                    // Execute LSP request on all servers in parallel
+                    // Execute LSP request on all servers in parallel (wait for ready first)
                     List<CompletableFuture<TResult>> futures = servers.stream()
-                            .map(server -> strategy.executeRequest(server, lspParams)
+                            .map(server -> server.waitUntilReady()
+                                    .thenCompose(v -> strategy.executeRequest(server, lspParams))
                                     .exceptionally(ex -> {
                                         LOG.warnf("Failed to execute %s on server %s: %s",
                                                 strategy.getCapability(), server.getConfig().getServerId(), ex.getMessage());

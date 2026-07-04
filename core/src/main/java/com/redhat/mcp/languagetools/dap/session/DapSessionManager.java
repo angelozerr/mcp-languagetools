@@ -1,6 +1,7 @@
 package com.redhat.mcp.languagetools.dap.session;
 
 import com.redhat.mcp.languagetools.dap.server.DapServerConfig;
+import com.redhat.mcp.languagetools.dap.server.DapServerFactoryRegistry;
 import com.redhat.mcp.languagetools.dap.trace.DapTraceCollector;
 import com.redhat.mcp.languagetools.workspace.Workspace;
 import com.redhat.mcp.languagetools.Application;
@@ -32,6 +33,9 @@ public class DapSessionManager {
 
     @Inject
     DapTraceCollector traceCollector;
+
+    @Inject
+    DapServerFactoryRegistry factoryRegistry;
 
     @Inject
     jakarta.enterprise.event.Event<DapSessionEvent> sessionEvent;
@@ -79,7 +83,8 @@ public class DapSessionManager {
             sessionName,
             serverConfig,
             workspace,
-            traceCollector
+            traceCollector,
+            factoryRegistry
         );
 
         sessions.put(sessionId, session);
@@ -166,7 +171,8 @@ public class DapSessionManager {
             sessionName,
             serverConfig,
             workspace,
-            traceCollector
+            traceCollector,
+            factoryRegistry
         );
 
         sessions.put(sessionId, session);
