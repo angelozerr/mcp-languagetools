@@ -597,8 +597,9 @@
                 appContainer.style.gridTemplateColumns = '400px 1fr';
                 consoleColumn.style.gridColumn = '2';
 
-                // Always reload servers when switching to this tab (no caching)
-                loadAllLspServers();
+                // Always reload servers when switching to this tab
+                // Pass serverIdToSelect if provided in options
+                loadAllLspServers(options.serverId);
             } else if (tab === 'dap-servers') {
                 document.getElementById('workspaces-list').style.display = 'none';
                 document.getElementById('lsp-servers-list').style.display = 'none';

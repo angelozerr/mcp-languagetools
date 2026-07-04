@@ -11,7 +11,7 @@ let allServersLoaded = false;
 /**
  * Load all global LSP servers.
  */
-async function loadAllLspServers() {
+async function loadAllLspServers(serverIdToSelect) {
     try {
         // Use cached server configs from admin.js (include both LSP and DAP for contribution detection)
         const lspServers = Object.values(window.serverConfigs || {});
@@ -47,10 +47,16 @@ async function loadAllLspServers() {
 
         allServersLoaded = true;
 
-        // Auto-select previously selected server if it exists, otherwise first server
+        // Auto-select: 1) specified server, 2) previously selected, 3) first server
         if (lspServers.length > 0) {
-            const previousServerExists = selectedAllServer && lspServers.find(s => s.id === selectedAllServer);
-            const serverToShow = previousServerExists ? selectedAllServer : lspServers[0].id;
+            let serverToShow;
+            if (serverIdToSelect && lspServers.find(s => s.id === serverIdToSelect)) {
+                serverToShow = serverIdToSelect;
+            } else if (selectedAllServer && lspServers.find(s => s.id === selectedAllServer)) {
+                serverToShow = selectedAllServer;
+            } else {
+                serverToShow = lspServers[0].id;
+            }
             showServerDetails(serverToShow);
         }
     } catch (error) {

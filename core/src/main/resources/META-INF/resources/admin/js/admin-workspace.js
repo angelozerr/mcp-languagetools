@@ -264,19 +264,15 @@
 
             container.innerHTML = headerHTML + tabsHTML + contentHTML;
 
-            // Auto-select DAP session after rendering
-            if (currentWorkspaceTab === 'debuggers' && dapSessions.length > 0) {
-                setTimeout(() => {
-                    // Try to restore last selected session from currentDapSessionId
-                    const lastSelected = window.currentDapSessionId;
-                    const sessionToSelect = lastSelected && dapSessions.find(s => s.sessionId === lastSelected)
-                        ? lastSelected
-                        : dapSessions[0].sessionId;
+            // Auto-select first DAP server after rendering (not session)
+            if (currentWorkspaceTab === 'debuggers' && workspace?.dapServers && workspace.dapServers.length > 0) {
+                const isDapServerSelected = selectedServer && workspace.dapServers.find(s => s.id === selectedServer.id);
 
-                    if (typeof window.selectDapSession === 'function') {
-                        window.selectDapSession(sessionToSelect);
-                    }
-                }, 50);
+                if (!isDapServerSelected) {
+                    // Select first DAP server
+                    const firstDapServer = workspace.dapServers[0];
+                    selectDapServer(firstDapServer);
+                }
             }
         }
 
@@ -287,6 +283,9 @@
                 renderServers(workspace.lspServers, workspace.dapSessions || [], workspace);
             }
         }
+
+        // Expose for diagram navigation
+        window.switchWorkspaceTab = switchWorkspaceTab;
 
         function renderLspServers(serversRuntime) {
             if (serversRuntime.length === 0) {
@@ -422,7 +421,7 @@
                     `;
 
                     return `
-                        <div class="server-item" data-dap-server="${server.id}" style="opacity: 0.8; cursor: default;">
+                        <div class="server-item ${selectedServer?.id === server.id ? 'active' : ''}" data-dap-server="${server.id}" onclick='selectDapServer(${JSON.stringify(server)})' style="cursor: pointer;">
                             <div class="server-name">
                                 <span class="server-source-icon">🐛</span>
                                 ${server.name}
@@ -495,6 +494,37 @@
             }
         }
 
+        function selectDapServer(dapServer) {
+            // DAP server selection in workspace - show overview/contributions
+            const wasAlreadySelected = selectedServer && selectedServer.id === dapServer.id;
+            // Mark as DAP server for proper icon display
+            selectedServer = {...dapServer, isDap: true};
+            const workspace = workspaces.find(w => w.rootUri === selectedWorkspace);
+            renderServers(workspace?.lspServers || [], workspace?.dapSessions || [], workspace);
+
+            // Load console for DAP server
+            if (!wasAlreadySelected) {
+                loadConsole({...dapServer, isDap: true});
+            }
+        }
+
+        function selectDapSessionByServerId(serverId) {
+            // Find the DAP server from workspace
+            const workspace = workspaces.find(w => w.rootUri === selectedWorkspace);
+            const dapServer = workspace?.dapServers?.find(s => s.id === serverId);
+
+            if (dapServer) {
+                // Select the DAP server
+                selectDapServer(dapServer);
+            } else {
+                // Server not found in workspace
+                console.log('DAP server not found in workspace:', serverId);
+            }
+        }
+
+        // Expose for diagram navigation
+        window.selectDapSessionByServerId = selectDapSessionByServerId;
+
         function selectServer(server) {
             const wasAlreadySelected = selectedServer && selectedServer.id === server.id;
             selectedServer = server;
@@ -506,6 +536,9 @@
                 loadConsole(server);
             }
         }
+
+        // Expose for diagram navigation
+        window.selectServer = selectServer;
 
         function showPlaceholder() {
             document.getElementById('console-area').innerHTML = `
@@ -577,20 +610,20 @@
             const hasContributions = (server.contributions && Object.keys(server.contributions).length > 0) ||
                                     buildContributedByMap(allServers)[server.id]?.length > 0;
 
-            // Extensions don't have traces - default to overview
-            if (server.isExtension && currentConsoleTab === 'traces') {
+            // Extensions and DAP servers don't have LSP traces - default to overview
+            if ((server.isExtension || server.isDap) && currentConsoleTab === 'traces') {
                 currentConsoleTab = 'overview';
             }
 
             // If current tab is contributions but there are none, switch to appropriate default
             if (!hasContributions && currentConsoleTab === 'contributions') {
-                currentConsoleTab = server.isExtension ? 'overview' : 'traces';
+                currentConsoleTab = (server.isExtension || server.isDap) ? 'overview' : 'traces';
             }
 
             // Build icon for console title
             const isExternal = server.externalInstance != null &&
                               (server.status === 'CONNECTED_TO_IDE' || server.status === 'CONNECTING_TO_IDE');
-            const titleIcon = isExternal ? '🔗' : (server.isExtension ? '🧩' : '🚀');
+            const titleIcon = isExternal ? '🔗' : (server.isExtension ? '🧩' : (server.isDap ? '🐛' : '🚀'));
 
             // Setup console UI with tabs
             document.getElementById('console-area').innerHTML = `
@@ -602,7 +635,7 @@
                             <span class="status-indicator" id="sse-status"></span>
                         </div>
                         <div class="console-tabs">
-                            ${!server.isExtension ? `<button class="tab-button ${currentConsoleTab === 'traces' ? 'active' : ''}" onclick="switchConsoleTab('traces')">Traces</button>` : ''}
+                            ${!server.isExtension && !server.isDap ? `<button class="tab-button ${currentConsoleTab === 'traces' ? 'active' : ''}" onclick="switchConsoleTab('traces')">Traces</button>` : ''}
                             <button class="tab-button ${currentConsoleTab === 'overview' ? 'active' : ''}" onclick="switchConsoleTab('overview')">Overview</button>
                             ${hasContributions ? `<button class="tab-button ${currentConsoleTab === 'contributions' ? 'active' : ''}" onclick="switchConsoleTab('contributions')">Contributions</button>` : ''}
                             <button class="tab-button ${currentConsoleTab === 'install' ? 'active' : ''}" onclick="switchConsoleTab('install')">Install</button>
@@ -800,27 +833,51 @@
                 }
                 console.log('detailsContent found, fetching details...');
 
-                const response = await fetch(`/api/admin/servers/${serverId}/details`);
-                if (!response.ok) {
-                    throw new Error('Failed to load server details');
-                }
+                const workspace = workspaces.find(w => w.rootUri === selectedWorkspace);
 
-                const details = await response.json();
+                // Check if this is a DAP server
+                const dapServer = workspace?.dapServers?.find(s => s.id === serverId);
 
-                // Get all servers for contributedBy calculation
-                const allServers = workspaces.find(w => w.rootUri === selectedWorkspace)?.lspServers || [];
+                if (dapServer) {
+                    // DAP server - display its details directly
+                    const dapServersWithFlag = (workspace?.dapServers || []).map(s => ({...s, isDap: true}));
+                    const allServers = [...(workspace.lspServers || []), ...dapServersWithFlag];
 
-                // Use shared rendering function
-                detailsContent.innerHTML = `
-                    <h3>Server Configuration</h3>
-                    ${renderServerDetailsHTML(details)}
-                `;
+                    detailsContent.innerHTML = `
+                        <h3>DAP Server Configuration</h3>
+                        ${renderServerDetailsHTML({...dapServer, isDap: true})}
+                    `;
 
-                // Update contributions tab
-                const contributionsContent = document.getElementById('contributions-content');
-                if (contributionsContent) {
-                    const contributionsHTML = formatContributionsSection(details, allServers);
-                    contributionsContent.innerHTML = contributionsHTML || '<p class="detail-value">No contributions</p>';
+                    // Update contributions tab
+                    const contributionsContent = document.getElementById('contributions-content');
+                    if (contributionsContent) {
+                        const contributionsHTML = formatContributionsSection({...dapServer, isDap: true}, allServers);
+                        contributionsContent.innerHTML = contributionsHTML || '<p class="detail-value">No contributions</p>';
+                    }
+                } else {
+                    // LSP server - fetch from API
+                    const response = await fetch(`/api/admin/servers/${serverId}/details`);
+                    if (!response.ok) {
+                        throw new Error('Failed to load server details');
+                    }
+
+                    const details = await response.json();
+
+                    // Get all servers for contributedBy calculation
+                    const allServers = workspace?.lspServers || [];
+
+                    // Use shared rendering function
+                    detailsContent.innerHTML = `
+                        <h3>Server Configuration</h3>
+                        ${renderServerDetailsHTML(details)}
+                    `;
+
+                    // Update contributions tab
+                    const contributionsContent = document.getElementById('contributions-content');
+                    if (contributionsContent) {
+                        const contributionsHTML = formatContributionsSection(details, allServers);
+                        contributionsContent.innerHTML = contributionsHTML || '<p class="detail-value">No contributions</p>';
+                    }
                 }
             } catch (error) {
                 console.error('Failed to load server details:', error);

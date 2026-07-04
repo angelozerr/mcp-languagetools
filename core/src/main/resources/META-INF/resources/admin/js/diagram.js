@@ -51,7 +51,7 @@ function renderServerDiagram(servers, currentServerId) {
                 : `${server.description || server.name || server.id}\n\n💡 Double-click to open`, // tooltip
             color: server.id === currentServerId
                 ? '#005a9e'  // Current server: blue
-                : (server.isExtension ? '#6b6b6b' : '#3a8070'),  // Extension: gray, Server: green
+                : (server.isExtension ? '#6b6b6b' : (server.isDap ? '#8e6b8a' : '#3a8070')),  // Extension: gray, DAP: purple, LSP: green
             font: {
                 color: '#ffffff',
                 size: 14
@@ -237,11 +237,10 @@ function renderServerDiagram(servers, currentServerId) {
                     window.switchTab('dap-servers', null, { serverId: clickedServerId });
                 }
             } else {
-                // Switch to Servers tab and show details
+                // Switch to Servers tab with the specific server to select
                 if (window.switchTab) {
-                    window.switchTab('servers', null);
+                    window.switchTab('lsp-servers', null, { serverId: clickedServerId });
                 }
-                showServerDetails(clickedServerId);
             }
         }
     });
@@ -300,7 +299,7 @@ function renderWorkspaceDiagram(servers, currentServerId) {
                 : `${server.description || server.name || server.id}\n\n💡 Double-click to open`, // tooltip
             color: server.id === currentServerId
                 ? '#005a9e'  // Current server: blue
-                : (server.isExtension ? '#6b6b6b' : '#3a8070'),  // Extension: gray, Server: green
+                : (server.isExtension ? '#6b6b6b' : (server.isDap ? '#8e6b8a' : '#3a8070')),  // Extension: gray, DAP: purple, LSP: green
             font: {
                 color: '#ffffff',
                 size: 14
@@ -477,8 +476,30 @@ function renderWorkspaceDiagram(servers, currentServerId) {
             }
 
             console.log('Double-clicked on workspace server:', clickedServerId);
-            switchConsoleTab('overview');
-            loadServerDetails(clickedServerId);
+
+            // Find the server to check if it's DAP or LSP
+            const clickedServer = servers.find(s => s.id === clickedServerId);
+            if (clickedServer?.isDap) {
+                // For DAP servers, switch to Debuggers tab and select the server
+                if (window.switchWorkspaceTab) {
+                    window.switchWorkspaceTab('debuggers');
+                }
+                if (window.selectDapSessionByServerId) {
+                    window.selectDapSessionByServerId(clickedServerId);
+                }
+            } else {
+                // For LSP servers, switch to Servers tab and select the server
+                if (window.switchWorkspaceTab) {
+                    window.switchWorkspaceTab('servers');
+                }
+                if (window.selectServer) {
+                    window.selectServer(clickedServer);
+                } else {
+                    // Fallback
+                    switchConsoleTab('overview');
+                    loadServerDetails(clickedServerId);
+                }
+            }
         }
     });
 
