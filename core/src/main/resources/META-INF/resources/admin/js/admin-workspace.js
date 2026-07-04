@@ -255,8 +255,8 @@
             if (currentWorkspaceTab === 'servers') {
                 contentHTML = lspServers.length > 0 ? renderLspServers(lspServers) : '<div class="servers-placeholder">No LSP servers</div>';
             } else {
-                // Use global DAP configs (like LSP serverConfigs), not per-workspace
-                const dapServers = (typeof window.dapConfigs !== 'undefined') ? window.dapConfigs : [];
+                // Use global DAP configs (like LSP lspConfigs), not per-workspace
+                const dapServers = Object.values(window.dapConfigs || {});
                 contentHTML = (dapServers.length > 0 || dapSessions.length > 0)
                     ? renderDapServers(dapServers, dapSessions)
                     : '<div class="servers-placeholder">No debug adapters</div>';
@@ -265,12 +265,12 @@
             container.innerHTML = headerHTML + tabsHTML + contentHTML;
 
             // Auto-select first DAP server after rendering (not session)
-            if (currentWorkspaceTab === 'debuggers' && workspace?.dapServers && workspace.dapServers.length > 0) {
-                const isDapServerSelected = selectedServer && workspace.dapServers.find(s => s.id === selectedServer.id);
+            if (currentWorkspaceTab === 'debuggers' && Object.values(window.dapConfigs || {}) && Object.values(window.dapConfigs || {}).length > 0) {
+                const isDapServerSelected = selectedServer && Object.values(window.dapConfigs || {}).find(s => s.id === selectedServer.id);
 
                 if (!isDapServerSelected) {
                     // Select first DAP server
-                    const firstDapServer = workspace.dapServers[0];
+                    const firstDapServer = Object.values(window.dapConfigs || {})[0];
                     selectDapServer(firstDapServer);
                 }
             }
@@ -511,7 +511,7 @@
         function selectDapSessionByServerId(serverId) {
             // Find the DAP server from workspace
             const workspace = workspaces.find(w => w.rootUri === selectedWorkspace);
-            const dapServer = workspace?.dapServers?.find(s => s.id === serverId);
+            const dapServer = Object.values(window.dapConfigs || {})?.find(s => s.id === serverId);
 
             if (dapServer) {
                 // Select the DAP server
@@ -558,7 +558,7 @@
             }
 
             try {
-                const response = await fetch(`/api/admin/config/servers/${currentServerId}/trace`, {
+                const response = await fetch(`/api/admin/lsp/configs/${currentServerId}/trace`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ trace: level })
@@ -605,7 +605,7 @@
             // Check if server has contributions
             const workspace = workspaces.find(w => w.rootUri === selectedWorkspace);
             // Include both LSP and DAP servers for contribution detection (mark DAP servers)
-            const dapServersWithFlag = (workspace?.dapServers || []).map(s => ({...s, isDap: true}));
+            const dapServersWithFlag = (Object.values(window.dapConfigs || {}) || []).map(s => ({...s, isDap: true}));
             const allServers = workspace ? [...(workspace.lspServers || []), ...dapServersWithFlag] : [];
             const hasContributions = (server.contributions && Object.keys(server.contributions).length > 0) ||
                                     buildContributedByMap(allServers)[server.id]?.length > 0;
@@ -711,7 +711,7 @@
 
             // Load and initialize trace level selector with saved value
             try {
-                const traceLevelResponse = await fetch(`/api/admin/config/servers/${server.id}/trace`);
+                const traceLevelResponse = await fetch(`/api/admin/lsp/configs/${server.id}/trace`);
                 const traceLevelData = await traceLevelResponse.json();
                 currentTraceLevel = traceLevelData.trace || 'verbose';
 
@@ -769,7 +769,13 @@
                     return;
                 }
 
-                const response = await fetch(`/api/admin/servers/${serverId}/installer`);
+                // Check if it's a DAP or LSP server
+                const isDap = window.dapConfigs && window.dapConfigs[serverId];
+                const endpoint = isDap
+                    ? `/api/admin/dap/configs/${serverId}/installer`
+                    : `/api/admin/lsp/configs/${serverId}/installer`;
+
+                const response = await fetch(endpoint);
                 if (!response.ok) {
                     editor.value = '// No installer.json found';
                     return;
@@ -797,8 +803,14 @@
                 // Validate JSON
                 JSON.parse(content);
 
-                const response = await fetch(`/api/admin/servers/${serverId}/installer`, {
-                    method: 'PUT',
+                // Check if it's a DAP or LSP server
+                const isDap = window.dapConfigs && window.dapConfigs[serverId];
+                const endpoint = isDap
+                    ? `/api/admin/dap/configs/${serverId}/installer`
+                    : `/api/admin/lsp/configs/${serverId}/installer`;
+
+                const response = await fetch(endpoint, {
+                    method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: content
                 });
@@ -836,11 +848,11 @@
                 const workspace = workspaces.find(w => w.rootUri === selectedWorkspace);
 
                 // Check if this is a DAP server
-                const dapServer = workspace?.dapServers?.find(s => s.id === serverId);
+                const dapServer = Object.values(window.dapConfigs || {})?.find(s => s.id === serverId);
 
                 if (dapServer) {
                     // DAP server - display its details directly
-                    const dapServersWithFlag = (workspace?.dapServers || []).map(s => ({...s, isDap: true}));
+                    const dapServersWithFlag = (Object.values(window.dapConfigs || {}) || []).map(s => ({...s, isDap: true}));
                     const allServers = [...(workspace.lspServers || []), ...dapServersWithFlag];
 
                     detailsContent.innerHTML = `
@@ -856,7 +868,7 @@
                     }
                 } else {
                     // LSP server - fetch from API
-                    const response = await fetch(`/api/admin/servers/${serverId}/details`);
+                    const response = await fetch(`/api/admin/lsp/configs/${serverId}`);
                     if (!response.ok) {
                         throw new Error('Failed to load server details');
                     }
@@ -966,7 +978,7 @@
             // Calculate contributedBy from all servers (include both LSP and DAP, mark DAP servers)
             if (!allServers) {
                 const workspace = workspaces.find(w => w.rootUri === selectedWorkspace);
-                const dapServersWithFlag = (workspace?.dapServers || []).map(s => ({...s, isDap: true}));
+                const dapServersWithFlag = (Object.values(window.dapConfigs || {}) || []).map(s => ({...s, isDap: true}));
                 allServers = workspace ? [...(workspace.lspServers || []), ...dapServersWithFlag] : [];
             }
             const contributedByMap = buildContributedByMap(allServers);
@@ -1510,7 +1522,7 @@
 
             try {
                 const response = await fetch(
-                    `/api/admin/servers/${encodeURIComponent(selectedWorkspace)}/${serverId}/stop`,
+                    `/api/admin/lsp/servers/${encodeURIComponent(selectedWorkspace)}/${serverId}/stop`,
                     { method: 'POST' }
                 );
 
@@ -1535,7 +1547,7 @@
 
             try {
                 const response = await fetch(
-                    `/api/admin/servers/${encodeURIComponent(selectedWorkspace)}/${serverId}/start-managed`,
+                    `/api/admin/lsp/servers/${encodeURIComponent(selectedWorkspace)}/${serverId}/start-managed`,
                     { method: 'POST' }
                 );
 
@@ -1567,7 +1579,7 @@
 
             try {
                 const response = await fetch(
-                    `/api/admin/servers/${encodeURIComponent(selectedWorkspace)}/${serverId}/restart`,
+                    `/api/admin/lsp/servers/${encodeURIComponent(selectedWorkspace)}/${serverId}/restart`,
                     { method: 'POST' }
                 );
 
@@ -1600,7 +1612,7 @@
 
             try {
                 const response = await fetch(
-                    `/api/admin/servers/${encodeURIComponent(selectedWorkspace)}/${serverId}/disconnect`,
+                    `/api/admin/lsp/servers/${encodeURIComponent(selectedWorkspace)}/${serverId}/disconnect`,
                     { method: 'POST' }
                 );
 
@@ -1624,7 +1636,7 @@
 
             try {
                 const response = await fetch(
-                    `/api/admin/servers/${encodeURIComponent(selectedWorkspace)}/${serverId}/connect-ide`,
+                    `/api/admin/lsp/servers/${encodeURIComponent(selectedWorkspace)}/${serverId}/connect-ide`,
                     { method: 'POST' }
                 );
 

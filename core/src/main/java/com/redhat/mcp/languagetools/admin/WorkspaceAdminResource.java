@@ -18,9 +18,9 @@ import java.util.stream.Collectors;
 
 @Path("/api/admin")
 @Produces(MediaType.APPLICATION_JSON)
-public class AdminResource {
+public class WorkspaceAdminResource {
 
-    private static final Logger LOG = Logger.getLogger(AdminResource.class);
+    private static final Logger LOG = Logger.getLogger(WorkspaceAdminResource.class);
 
     @Inject
     Application application;
@@ -85,15 +85,10 @@ public class AdminResource {
         var serverConfigs = application.getLspServerConfigs();
 
         // Build runtime DTOs for all LSP servers in this workspace
-        List<ServerRuntimeDTO> servers = serverConfigs
+        List<LspServerDTO> servers = serverConfigs
                 .stream()
                 .map(config -> serverDTOBuilder.buildRuntime(config, workspace))
                 .toList();
-
-        // Build DAP server DTOs for this workspace
-        List<DapServerDTO> dapServers = Collections.emptyList(); /*workspace.getDapServerConfigs().values().stream()
-                .map(this::toDapDTO)
-                .collect(Collectors.toList());*/
 
         // Build MCP client info with timestamps
         DateTimeFormatter formatter = DateTimeFormatter.ISO_INSTANT;
@@ -117,32 +112,8 @@ public class AdminResource {
                 ))
                 .collect(Collectors.toList());
 
-        LOG.infof("Workspace %s - mcpClients: %s, dapServers: %d, dapSessions: %d",
-            uri, mcpClients, dapServers.size(), dapSessions.size());
-        // Note: dapServers are DAP configs for this workspace (from workspace.getDapServerConfigs())
-        // They could be different per workspace, like LSP servers
-        return new WorkspaceDTO(uri, workspace.isInitialized(), mcpClients, servers, dapServers, dapSessions);
-    }
-
-    /**
-     * Get all available DAP (Debug Adapter Protocol) server configurations.
-     */
-    @GET
-    @Path("/dap-servers")
-    public List<DapServerDTO> listDapServers() {
-        return application.getDapServerConfigs()
-                .stream()
-                .map(this::toDapDTO)
-                .collect(Collectors.toList());
-    }
-
-    private DapServerDTO toDapDTO(DapServerConfig config) {
-        return new DapServerDTO(
-            config.getServerId(),
-            config.getName(),
-            config.getDescription(),
-            config.getDocumentSelector(),
-            contributionBuilder.buildContributions(config)
-        );
+        LOG.infof("Workspace %s - mcpClients: %s, lspServers: %d, dapSessions: %d",
+            uri, mcpClients, servers.size(), dapSessions.size());
+        return new WorkspaceDTO(uri, workspace.isInitialized(), mcpClients, servers, dapSessions);
     }
 }

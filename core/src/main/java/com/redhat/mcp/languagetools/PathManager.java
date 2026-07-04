@@ -16,7 +16,6 @@ public class PathManager {
 
     // File names (hardcoded constants)
     public static final String CONFIG_JSON = "config.json";
-    public static final String INSTALLER_JSON = "installer.json";
 
     @Inject
     PathConfig pathConfig;
@@ -44,6 +43,20 @@ public class PathManager {
         return getLspServersDir().resolve(serverId);
     }
 
+    /**
+     * Get the config directory for LSP servers (~/.mcp-languagetools/config/lsp)
+     */
+    public Path getLspConfigDir() {
+        return getConfigDir().resolve(PathConfig.getLspDirName());
+    }
+
+    /**
+     * Get the config directory for a specific LSP server (~/.mcp-languagetools/config/lsp/{serverId})
+     */
+    public Path getLspConfigDir(String serverId) {
+        return getLspConfigDir().resolve(serverId);
+    }
+
     // ----------------------- DAP configuration
 
     /**
@@ -67,27 +80,6 @@ public class PathManager {
      */
     public Path getConfigDir() {
         return getMcpLangToolsRoot().resolve(pathConfig.getConfigDirName());
-    }
-
-    /**
-     * Get the config directory for LSP servers (~/.mcp-languagetools/config/lsp)
-     */
-    public Path getLspConfigDir() {
-        return getConfigDir().resolve(PathConfig.getLspDirName());
-    }
-
-    /**
-     * Get the config directory for a specific LSP server (~/.mcp-languagetools/config/lsp/{serverId})
-     */
-    public Path getServerConfigDir(String serverId) {
-        return getLspConfigDir().resolve(serverId);
-    }
-
-    /**
-     * Get the installer.json path for a specific server (~/.mcp-languagetools/config/lsp/{serverId}/installer.json)
-     */
-    public Path getServerInstallerConfig(String serverId) {
-        return getServerConfigDir(serverId).resolve(INSTALLER_JSON);
     }
 
     /**

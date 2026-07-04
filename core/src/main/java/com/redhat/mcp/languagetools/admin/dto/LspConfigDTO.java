@@ -6,10 +6,10 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Static server configuration - immutable server descriptor.
- * This represents the server's definition independent of any workspace or runtime state.
+ * LSP server configuration - immutable server descriptor.
+ * This represents the LSP server's definition independent of any workspace or runtime state.
  */
-public record ServerConfigDTO(
+public record LspConfigDTO(
     String id,
     String name,
     String description,

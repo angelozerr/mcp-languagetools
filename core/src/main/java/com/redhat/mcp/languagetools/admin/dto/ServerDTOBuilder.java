@@ -17,10 +17,10 @@ public class ServerDTOBuilder {
     ContributionDTOBuilder contributionBuilder;
 
     /**
-     * Build ServerConfigDTO from LspServerConfig.
+     * Build LspConfigDTO from LspServerConfig.
      */
-    public ServerConfigDTO buildConfig(LspServerConfig config) {
-        return new ServerConfigDTO(
+    public LspConfigDTO buildConfig(LspServerConfig config) {
+        return new LspConfigDTO(
             config.getServerId(),
             config.getName(),
             config.getDescription(),
@@ -35,14 +35,14 @@ public class ServerDTOBuilder {
     }
 
     /**
-     * Build ServerRuntimeDTO for a server in a workspace.
+     * Build LspServerDTO for a server in a workspace.
      */
-    public ServerRuntimeDTO buildRuntime(LspServerConfig config,
+    public LspServerDTO buildRuntime(LspServerConfig config,
                                          Workspace workspace) {
         String serverId = config.getServerId();
         LspServer lspServer = workspace.getLspServer(serverId);
 
-        ServerRuntimeDTO.ExternalInstanceInfo externalInfo = null;
+        LspServerDTO.ExternalInstanceInfo externalInfo = null;
         Long pid = null;
         String command = null;
         ServerStatus status;
@@ -62,7 +62,7 @@ public class ServerDTOBuilder {
             if (parentServer != null) {
                 var currentInstance = parentServer.getCurrentInstance();
                 if (currentInstance != null) {
-                    externalInfo = new ServerRuntimeDTO.ExternalInstanceInfo(
+                    externalInfo = new LspServerDTO.ExternalInstanceInfo(
                         currentInstance.port,
                         currentInstance.pid,
                         true,
@@ -76,7 +76,7 @@ public class ServerDTOBuilder {
             if (lspServer != null) {
                 var currentInstance = lspServer.getCurrentInstance();
                 if (currentInstance != null) {
-                    externalInfo = new ServerRuntimeDTO.ExternalInstanceInfo(
+                    externalInfo = new LspServerDTO.ExternalInstanceInfo(
                         currentInstance.port,
                         currentInstance.pid,
                         true,
@@ -107,7 +107,7 @@ public class ServerDTOBuilder {
             }
         }
 
-        return new ServerRuntimeDTO(
+        return new LspServerDTO(
             serverId,
             status,
             statusMessage,

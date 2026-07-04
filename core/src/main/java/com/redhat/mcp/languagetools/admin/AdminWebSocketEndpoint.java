@@ -389,21 +389,9 @@ public class AdminWebSocketEndpoint {
         var serverConfigs = application.getLspServerConfigs();
 
         // Build runtime DTOs for all LSP servers in this workspace
-        List<ServerRuntimeDTO> servers = serverConfigs
+        List<LspServerDTO> servers = serverConfigs
                 .stream()
                 .map(config -> serverDTOBuilder.buildRuntime(config, workspace))
-                .toList();
-
-        // Build DAP server DTOs for this workspace
-        List<DapServerDTO> dapServers = workspace.getApplication().getDapServerConfigs()
-                .stream()
-                .map(config -> new DapServerDTO(
-                    config.getServerId(),
-                    config.getName(),
-                    config.getDescription(),
-                    config.getDocumentSelector(),
-                    contributionBuilder.buildContributions(config)
-                ))
                 .toList();
 
         DateTimeFormatter formatter = DateTimeFormatter.ISO_INSTANT;
@@ -429,6 +417,6 @@ public class AdminWebSocketEndpoint {
                 .toList();
 
         var uri = workspace.getRootUri();
-        return new WorkspaceDTO(uri, workspace.isInitialized(), mcpClients, servers, dapServers, dapSessions);
+        return new WorkspaceDTO(uri, workspace.isInitialized(), mcpClients, servers, dapSessions);
     }
 }
