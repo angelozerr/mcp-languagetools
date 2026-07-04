@@ -50,7 +50,7 @@ function renderServerDiagram(servers, currentServerId) {
                 ? (server.description || server.name || server.id)
                 : `${server.description || server.name || server.id}\n\n💡 Double-click to open`, // tooltip
             color: server.id === currentServerId
-                ? '#005a9e'  // Current server: blue
+                ? (server.isDap ? '#6a2c6a' : (server.isExtension ? '#4a4a4a' : '#005a9e'))  // Current DAP: dark purple, Current Extension: dark gray, Current LSP: blue
                 : (server.isExtension ? '#6b6b6b' : (server.isDap ? '#8e6b8a' : '#3a8070')),  // Extension: gray, DAP: purple, LSP: green
             font: {
                 color: '#ffffff',
@@ -208,9 +208,11 @@ function renderServerDiagram(servers, currentServerId) {
     // Create network
     serverDiagramNetwork = new vis.Network(container, data, options);
 
-    // Change cursor on hover
-    serverDiagramNetwork.on('hoverNode', function() {
-        container.style.cursor = 'pointer';
+    // Change cursor on hover (only if not the current server)
+    serverDiagramNetwork.on('hoverNode', function(params) {
+        if (params.node !== currentServerId) {
+            container.style.cursor = 'pointer';
+        }
     });
     serverDiagramNetwork.on('blurNode', function() {
         container.style.cursor = 'default';
@@ -298,7 +300,7 @@ function renderWorkspaceDiagram(servers, currentServerId) {
                 ? (server.description || server.name || server.id)
                 : `${server.description || server.name || server.id}\n\n💡 Double-click to open`, // tooltip
             color: server.id === currentServerId
-                ? '#005a9e'  // Current server: blue
+                ? (server.isDap ? '#6a2c6a' : (server.isExtension ? '#4a4a4a' : '#005a9e'))  // Current DAP: dark purple, Current Extension: dark gray, Current LSP: blue
                 : (server.isExtension ? '#6b6b6b' : (server.isDap ? '#8e6b8a' : '#3a8070')),  // Extension: gray, DAP: purple, LSP: green
             font: {
                 color: '#ffffff',
@@ -456,9 +458,11 @@ function renderWorkspaceDiagram(servers, currentServerId) {
     // Create network
     workspaceDiagramNetwork = new vis.Network(container, data, options);
 
-    // Change cursor on hover
-    workspaceDiagramNetwork.on('hoverNode', function() {
-        container.style.cursor = 'pointer';
+    // Change cursor on hover (only if not the current server)
+    workspaceDiagramNetwork.on('hoverNode', function(params) {
+        if (params.node !== currentServerId) {
+            container.style.cursor = 'pointer';
+        }
     });
     workspaceDiagramNetwork.on('blurNode', function() {
         container.style.cursor = 'default';

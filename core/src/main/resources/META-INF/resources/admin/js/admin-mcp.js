@@ -209,7 +209,7 @@ async function loadMcpConsole(clientId) {
 
 async function changeMcpTraceLevel(newLevel) {
     try {
-        await fetch('/api/admin/config/mcp/trace', {
+        await fetch('/api/admin/mcp/trace', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ trace: newLevel })

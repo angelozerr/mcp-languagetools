@@ -17,11 +17,13 @@
         // WebSocket connection (replaces SSE and polling)
         let adminWebSocket = null;
 
-        // Global server configurations (static config loaded once at startup)
-        let serverConfigs = {}; // Map<serverId, ServerConfigDTO>
+        // Global LSP configurations (static config loaded once at startup)
+        let lspConfigs = {}; // Map<serverId, LspConfigDTO>
+        let dapConfigs = {}; // Map<serverId, DapConfigDTO>
 
-        // Expose serverConfigs globally for admin-lsp.js
-        window.serverConfigs = serverConfigs;
+        // Expose configs globally for admin-lsp.js and admin-dap.js
+        window.lspConfigs = lspConfigs;
+        window.dapConfigs = dapConfigs;
 
         /**
          * Format status into CSS class name.
@@ -58,43 +60,49 @@
         }
 
         /**
-         * Load global server configurations (called once at startup).
+         * Load global LSP configurations (called once at startup).
          */
-        async function loadServerConfigs() {
+        async function loadLspConfigs() {
             try {
-                const response = await fetch('/api/admin/servers');
+                const response = await fetch('/api/admin/lsp/configs');
                 const configs = await response.json();
 
                 // Build a map for quick lookup
-                serverConfigs = {};
+                lspConfigs = {};
                 configs.forEach(config => {
-                    serverConfigs[config.id] = config;
+                    lspConfigs[config.id] = config;
                 });
 
                 // Update global reference
-                window.serverConfigs = serverConfigs;
+                window.lspConfigs = lspConfigs;
 
-                console.log('Loaded', configs.length, 'server configs');
+                console.log('Loaded', configs.length, 'LSP configs');
             } catch (error) {
-                console.error('Failed to load server configs:', error);
+                console.error('Failed to load LSP configs:', error);
             }
         }
 
         /**
-         * Load global DAP server configurations (called once at startup).
+         * Load global DAP configurations (called once at startup).
          */
         async function loadDapConfigs() {
             try {
-                const response = await fetch('/api/admin/dap-servers');
+                const response = await fetch('/api/admin/dap/configs');
                 const configs = await response.json();
 
-                // Store globally (like LSP serverConfigs)
-                window.dapConfigs = configs;
+                // Store globally as map for consistency
+                dapConfigs = {};
+                configs.forEach(config => {
+                    dapConfigs[config.id] = config;
+                });
+
+                // Update global reference
+                window.dapConfigs = dapConfigs;
 
                 console.log('Loaded', configs.length, 'DAP configs');
             } catch (error) {
                 console.error('Failed to load DAP configs:', error);
-                window.dapConfigs = [];
+                window.dapConfigs = {};
             }
         }
 
@@ -113,7 +121,7 @@
          * @returns {Object} Merged server object with both config and runtime
          */
         function mergeServerData(runtime) {
-            const config = serverConfigs[runtime.serverId] || {};
+            const config = lspConfigs[runtime.serverId] || {};
             return {
                 // Config fields
                 id: runtime.serverId,
@@ -652,9 +660,9 @@
         // ========== Debuggers Tab ==========
         // (Code moved to admin-dap.js)
 
-        // Initialize: load server configs and DAP configs first, then connect WebSocket
+        // Initialize: load LSP and DAP configs first, then connect WebSocket
         (async function init() {
-            await loadServerConfigs();
+            await loadLspConfigs();
             await loadDapConfigs();
             connectAdminWebSocket();
         })();

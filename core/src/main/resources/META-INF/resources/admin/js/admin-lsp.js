@@ -14,7 +14,7 @@ let allServersLoaded = false;
 async function loadAllLspServers(serverIdToSelect) {
     try {
         // Use cached server configs from admin.js (include both LSP and DAP for contribution detection)
-        const lspServers = Object.values(window.serverConfigs || {});
+        const lspServers = Object.values(window.lspConfigs || {});
         const dapServers = Object.values(window.dapConfigs || {}).map(s => ({...s, isDap: true}));
         const allServers = [...lspServers, ...dapServers];
 
@@ -72,7 +72,7 @@ async function showServerDetails(serverId) {
     selectedAllServer = serverId;
 
     // Re-render server list to update active state
-    const lspServers = Object.values(window.serverConfigs || {});
+    const lspServers = Object.values(window.lspConfigs || {});
     const dapServers = Object.values(window.dapConfigs || {}).map(s => ({...s, isDap: true}));
     const allServers = [...lspServers, ...dapServers];
     const contributedByMap = buildContributedByMap(allServers);
@@ -96,7 +96,7 @@ async function showServerDetails(serverId) {
         `;
     }).join('');
 
-    const details = window.serverConfigs[serverId];
+    const details = window.lspConfigs[serverId];
     if (!details) {
         console.error('Server not found:', serverId);
         return;
@@ -316,7 +316,7 @@ function switchServerTab(tabName) {
  */
 async function loadInstallerJson(serverId) {
     try {
-        const response = await fetch(`/api/admin/servers/${serverId}/installer`);
+        const response = await fetch(`/api/admin/lsp/configs/${serverId}/installer`);
         if (!response.ok) {
             throw new Error('Failed to load installer.json');
         }
@@ -345,7 +345,7 @@ async function saveInstallerJson(serverId) {
     try {
         const installerJson = JSON.parse(editor.value);
 
-        const response = await fetch(`/api/admin/servers/${serverId}/installer`, {
+        const response = await fetch(`/api/admin/lsp/configs/${serverId}/installer`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(installerJson)
@@ -383,7 +383,7 @@ async function runInstaller(serverId) {
     outputDiv.innerHTML = '<div style="color: #4ec9b0;">Running installer...</div>';
 
     try {
-        const response = await fetch(`/api/admin/servers/${serverId}/install`, {
+        const response = await fetch(`/api/admin/lsp/configs/${serverId}/install`, {
             method: 'POST'
         });
 

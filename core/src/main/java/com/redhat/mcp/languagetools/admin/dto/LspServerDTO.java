@@ -3,10 +3,10 @@ package com.redhat.mcp.languagetools.admin.dto;
 import com.redhat.mcp.languagetools.server.ServerStatus;
 
 /**
- * Runtime state of a server in a specific workspace.
+ * Runtime state of an LSP server in a specific workspace.
  * This represents the dynamic state that changes during execution.
  */
-public record ServerRuntimeDTO(
+public record LspServerDTO(
     String serverId,
     ServerStatus status,
     String statusMessage,

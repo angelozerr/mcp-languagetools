@@ -537,7 +537,7 @@ let dapServerConfigs = {};
  */
 async function loadAllDapServers(serverIdToSelect) {
     try {
-        const response = await fetch('/api/admin/dap-servers');
+        const response = await fetch('/api/admin/dap/configs');
         const dapServers = await response.json();
 
         // Store in map for easy access
@@ -636,7 +636,7 @@ async function showDapServerDetails(serverId) {
     }
 
     // Check if server has contributions
-    const lspServers = Object.values(window.serverConfigs || {});
+    const lspServers = Object.values(window.lspConfigs || {});
     const dapServersWithFlag = dapServers.map(s => ({...s, isDap: true}));
     const allServers = [...lspServers, ...dapServersWithFlag];
     const hasContributions = (server.contributions && Object.keys(server.contributions).length > 0) ||
