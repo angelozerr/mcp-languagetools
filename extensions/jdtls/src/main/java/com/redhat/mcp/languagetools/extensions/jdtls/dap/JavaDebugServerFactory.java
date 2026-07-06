@@ -1,10 +1,8 @@
-package com.redhat.mcp.languagetools.jdtls.dap;
+package com.redhat.mcp.languagetools.extensions.jdtls.dap;
 
 import com.redhat.mcp.languagetools.dap.server.DapServer;
-import com.redhat.mcp.languagetools.dap.server.DapServerConfig;
 import com.redhat.mcp.languagetools.dap.server.DapServerCreateParams;
 import com.redhat.mcp.languagetools.dap.server.DapServerFactory;
-import com.redhat.mcp.languagetools.workspace.Workspace;
 
 /**
  * Factory for creating JavaDebugServer instances.

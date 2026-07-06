@@ -1,4 +1,4 @@
-package com.redhat.mcp.languagetools.extensions.jdtls;
+package com.redhat.mcp.languagetools.extensions.jdtls.lsp;
 
 /**
  * Constants for JDT.LS contribution fields.

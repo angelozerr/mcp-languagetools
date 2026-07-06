@@ -1,7 +1,6 @@
-package com.redhat.mcp.languagetools.extensions.jdtls;
+package com.redhat.mcp.languagetools.extensions.jdtls.lsp;
 
 import com.redhat.mcp.languagetools.lsp.client.GenericLanguageClient;
-import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.services.JsonNotification;
 import org.jboss.logging.Logger;
 

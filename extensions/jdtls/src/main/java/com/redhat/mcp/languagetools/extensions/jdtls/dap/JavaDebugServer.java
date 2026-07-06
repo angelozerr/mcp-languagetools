@@ -1,4 +1,4 @@
-package com.redhat.mcp.languagetools.jdtls.dap;
+package com.redhat.mcp.languagetools.extensions.jdtls.dap;
 
 import com.redhat.mcp.languagetools.dap.server.DapServer;
 import com.redhat.mcp.languagetools.dap.server.DapServerConfig;
