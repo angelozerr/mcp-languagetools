@@ -34,8 +34,6 @@ public class DapSessionManager {
     @Inject
     DapTraceCollector traceCollector;
 
-    @Inject
-    DapServerFactoryRegistry factoryRegistry;
 
     @Inject
     jakarta.enterprise.event.Event<DapSessionEvent> sessionEvent;
@@ -83,8 +81,7 @@ public class DapSessionManager {
             sessionName,
             serverConfig,
             workspace,
-            traceCollector,
-            factoryRegistry
+            traceCollector
         );
 
         sessions.put(sessionId, session);
@@ -171,8 +168,7 @@ public class DapSessionManager {
             sessionName,
             serverConfig,
             workspace,
-            traceCollector,
-            factoryRegistry
+            traceCollector
         );
 
         sessions.put(sessionId, session);

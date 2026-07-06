@@ -20,6 +20,9 @@ public class ServerDTOBuilder {
      * Build LspConfigDTO from LspServerConfig.
      */
     public LspConfigDTO buildConfig(LspServerConfig config) {
+        // Detect if this is an extension (contribution-only, no command)
+        boolean isExtension = config.isContributionOnly();
+
         return new LspConfigDTO(
             config.getServerId(),
             config.getName(),
@@ -30,7 +33,7 @@ public class ServerDTOBuilder {
             config.getWorkingDirectory(),
             config.getInitializationOptions(),
             contributionBuilder.buildContributions(config),
-            config.isExtension()
+            isExtension
         );
     }
 
@@ -49,7 +52,9 @@ public class ServerDTOBuilder {
         String statusMessage = null;
         boolean isReady = false;
 
-        String parentServerId = config.getParentServerId() ;
+        // Get parentServerId from config (works for both instantiated servers and contribution-only)
+        String parentServerId = config.getParentServerId();
+
         if (parentServerId != null) {
             // Extension: use parent server's status
             LspServer parentServer = workspace.getLspServer(parentServerId);

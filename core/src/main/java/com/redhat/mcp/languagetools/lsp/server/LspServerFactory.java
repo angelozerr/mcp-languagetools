@@ -1,17 +1,15 @@
 package com.redhat.mcp.languagetools.lsp.server;
 
+import com.redhat.mcp.languagetools.server.ServerFactory;
 import com.redhat.mcp.languagetools.workspace.Workspace;
+
+import java.util.Objects;
 
 /**
  * SPI interface for creating custom LSP server implementations.
  * Extensions implement this interface and register via ServiceLoader.
  */
-public interface LspServerFactory {
-
-    /**
-     * Get the server ID that this factory handles (e.g., "jdtls", "microprofile").
-     */
-    String getServerId();
+public interface LspServerFactory extends ServerFactory<LspServerConfig, LspServer> {
 
     /**
      * Create a custom LSP server instance.

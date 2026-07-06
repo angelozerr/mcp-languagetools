@@ -1,6 +1,9 @@
 package com.redhat.mcp.languagetools.dap.server;
 
+import com.redhat.mcp.languagetools.server.ServerFactory;
 import com.redhat.mcp.languagetools.workspace.Workspace;
+
+import java.util.Objects;
 
 /**
  * Factory for creating DAP server instances.
@@ -11,15 +14,7 @@ import com.redhat.mcp.languagetools.workspace.Workspace;
  * <p>Example: JavaDebugServerFactory creates JavaDebugServer instances that handle
  * Java-specific resolution (classpath, java executable, etc.)</p>
  */
-public interface DapServerFactory {
-
-    /**
-     * Check if this factory can create a server for the given server ID.
-     *
-     * @param serverId The DAP server ID (e.g., "java-debug", "vscode-js-debug")
-     * @return true if this factory handles this server ID
-     */
-    boolean canHandle(String serverId);
+public interface DapServerFactory extends ServerFactory<DapServerConfig, DapServer> {
 
     /**
      * Create a DAP server instance.

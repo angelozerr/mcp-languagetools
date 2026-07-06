@@ -134,4 +134,13 @@ public class ClasspathExtensibleLspServer extends LspServer {
         return cp.toString();
     }
 
+    /**
+     * Delegate to config's parent detection.
+     * For contribution-only configs, this returns the server they contribute to.
+     * For normal servers, this returns null.
+     */
+    public String getParentServerId() {
+        return super.getConfig().getParentServerId();
+    }
+
 }

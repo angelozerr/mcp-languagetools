@@ -1,5 +1,6 @@
 package com.redhat.mcp.languagetools.lsp.server;
 
+import com.google.gson.JsonObject;
 import com.redhat.mcp.languagetools.PathManager;
 import com.redhat.mcp.languagetools.config.PathConfig;
 import com.redhat.mcp.languagetools.lsp.Contributes;
@@ -37,16 +38,6 @@ public class LspServerConfig extends ServerConfigBase {
      */
     private Map<String, Object> initializationOptions = new HashMap<>();
 
-    private String parentServerId;
-
-    public String getParentServerId() {
-        return parentServerId;
-    }
-
-    public void setParentServerId(String parentServerId) {
-        this.parentServerId = parentServerId;
-    }
-
     public LspServerConfig(String serverId, PathManager pathManager) {
         super(serverId, pathManager.getLspServerHome(serverId));
     }
@@ -56,6 +47,35 @@ public class LspServerConfig extends ServerConfigBase {
      */
     public boolean isContributionOnly() {
         return command == null && getContributes() != null;
+    }
+
+    /**
+     * Detect parent server ID from contributes configuration.
+     * For contribution-only configs (like Quarkus), the parent is the server
+     * they contribute classpath JARs to (e.g., microprofile).
+     *
+     * @return parent server ID, or null if no parent
+     */
+    public String getParentServerId() {
+        var contributes = getContributes();
+        if (contributes == null || contributes.getContributions() == null || contributes.getContributions().isEmpty()) {
+            return null;
+        }
+
+        // Find the contribution with classpath - that's the parent server
+        return contributes.getContributions().entrySet().stream()
+            .filter(entry -> {
+                var contribution = entry.getValue();
+                if (!contribution.isJsonObject()) {
+                    return false;
+                }
+                var obj = contribution.getAsJsonObject();
+                return obj.has(ClasspathExtensibleContributes.CLASSPATH)
+                    && obj.get(ClasspathExtensibleContributes.CLASSPATH).isJsonArray();
+            })
+            .map(Map.Entry::getKey)
+            .findFirst()
+            .orElse(null);
     }
 
     // Getters and setters (id, name, description, installer inherited from ServerConfigBase)
@@ -114,10 +134,6 @@ public class LspServerConfig extends ServerConfigBase {
 
     public void setInitializationOptions(Map<String, Object> initializationOptions) {
         this.initializationOptions = initializationOptions;
-    }
-
-    public boolean isExtension() {
-        return parentServerId != null;
     }
 
     @Override

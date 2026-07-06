@@ -369,7 +369,7 @@ public class Workspace {
 
     private LspServer createLspServer(LspServerConfig serverConfig) {
         // Create new server instance using factory
-        LspServer newServer = LspServerFactoryRegistry.createServer(serverConfig, this);
+        LspServer newServer = LspServerFactoryRegistry.getInstance().createServer(serverConfig, this);
         lspServers.put(newServer.getId(), newServer);
         // Register status change callback
         registerServerStatusCallback(newServer);

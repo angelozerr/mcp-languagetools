@@ -794,4 +794,5 @@ public class LspServer extends ServerBase<LspServerConfig> {
     public LspClientFeatures getClientFeatures() {
         return clientFeatures;
     }
+
 }

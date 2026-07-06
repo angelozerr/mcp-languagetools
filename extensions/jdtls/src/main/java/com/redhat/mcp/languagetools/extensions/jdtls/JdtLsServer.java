@@ -70,7 +70,7 @@ public class JdtLsServer extends LspServer {
         // Collect bundles from all servers that contribute to jdtls
         List<String> bundlePaths = collectBundles();
         if (!bundlePaths.isEmpty()) {
-            options.put("bundles", bundlePaths);
+            options.put(JdtLsContributes.BUNDLES, bundlePaths);
             LOG.infof("Passing %d bundles to JDT.LS via initializationOptions", bundlePaths.size());
         }
 
@@ -84,7 +84,7 @@ public class JdtLsServer extends LspServer {
     private List<String> collectBundles() {
         return getWorkspace()
                 .getApplication()
-                .getContributionManager().extractFilesFromContribution(getId(), "bundles");
+                .getContributionManager().extractFilesFromContribution(getId(), JdtLsContributes.BUNDLES);
     }
 
     /**

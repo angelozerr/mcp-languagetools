@@ -82,8 +82,7 @@ public class DapSession implements DapEventListener {
                       String sessionName,
                       DapServerConfig serverConfig,
                       Workspace workspace,
-                      DapTraceCollector traceCollector,
-                      DapServerFactoryRegistry factoryRegistry) {
+                      DapTraceCollector traceCollector) {
         this.sessionId = sessionId;
         this.language = language;
         this.sessionName = sessionName;
@@ -102,14 +101,7 @@ public class DapSession implements DapEventListener {
         }
 
         // Create DAP server using factory (allows custom implementations like JavaDebugServer)
-        DapServerFactory factory = factoryRegistry.findFactory(serverConfig.getServerId());
-        if (factory != null) {
-            LOG.infof("Using custom factory for DAP server: %s", serverConfig.getServerId());
-            this.dapServer = factory.createServer(sessionId, serverConfig, workspace);
-        } else {
-            LOG.infof("Using default DapServer for: %s", serverConfig.getServerId());
-            this.dapServer = new DapServer(sessionId, serverConfig, workspace);
-        }
+        this.dapServer = DapServerFactoryRegistry.getInstance().createServer(sessionId, serverConfig, workspace);
 
         // Note: setEventListener() must be called AFTER start() when dapClient is created
         // Listen to server status changes to update session state

@@ -11,11 +11,9 @@ import com.redhat.mcp.languagetools.workspace.Workspace;
  */
 public class JavaDebugServerFactory implements DapServerFactory {
 
-    private static final String JAVA_DEBUG_SERVER_ID = "java-debug";
-
     @Override
-    public boolean canHandle(String serverId) {
-        return JAVA_DEBUG_SERVER_ID.equals(serverId);
+    public String getServerId() {
+        return "java-debug";
     }
 
     @Override

@@ -29,9 +29,6 @@ public class LspServerDescriptorLoader extends ServerDescriptorLoaderBase<LspSer
     private static final String FIELD_WORKING_DIRECTORY = "workingDirectory";
     private static final String FIELD_INITIALIZATION_OPTIONS = "initializationOptions";
 
-    // Extension (ex: Quarkus, Liberty LemMinx)
-    private static final String PARENT_SERVER_ID = "parentServerId" ;
-
     @Override
     public String getRoot() {
         return PathConfig.getLspDirName();
@@ -46,11 +43,7 @@ public class LspServerDescriptorLoader extends ServerDescriptorLoaderBase<LspSer
     protected JsonObject loadServer(String serverId, Path serverDir, LspServerConfig config) throws IOException {
         // server.json
         JsonObject jsonObject = super.loadServer(serverId, serverDir, config);
-        // Command
-        if (jsonObject.has(PARENT_SERVER_ID)) {
-            // Server extension
-            config.setParentServerId(jsonObject.get(PARENT_SERVER_ID).getAsString());
-        } else
+
         if (jsonObject.has(FIELD_COMMAND)) {
             // Command
             config.setCommand(jsonObject.get(FIELD_COMMAND).getAsString());
@@ -76,7 +69,6 @@ public class LspServerDescriptorLoader extends ServerDescriptorLoaderBase<LspSer
                 );
                 config.setInitializationOptions(initOptions);
             }
-
         }
         return jsonObject;
     }
