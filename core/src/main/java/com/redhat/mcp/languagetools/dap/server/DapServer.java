@@ -361,11 +361,32 @@ public class DapServer extends ServerBase<DapServerConfig> {
     }
 
     /**
+     * Factory method to create a DapClient instance.
+     * Subclasses can override to provide specialized implementations (e.g., JavaDebugClient).
+     *
+     * @return a new DapClient instance
+     */
+    protected DapClient createDapClient() {
+        return new DapClient();
+    }
+
+    /**
+     * Factory method to create a child DapClient instance with a parent.
+     * Subclasses should override this if they override createDapClient().
+     *
+     * @param parentClient the parent DapClient
+     * @return a new child DapClient instance
+     */
+    public DapClient createDapClient(DapClient parentClient) {
+        return new DapClient(parentClient);
+    }
+
+    /**
      * Create launcher from existing transport streams.
      * Used by both startServerProcess() and connectToSocket().
      */
     protected void createLauncherFromTransport(TransportStreams transport) {
-        dapClient = new DapClient();
+        dapClient = createDapClient();
 
         // Wrapper for tracing
         Launcher<IDebugProtocolServer> launcher = DSPLauncher.createClientLauncher(

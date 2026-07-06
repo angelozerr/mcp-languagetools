@@ -1,5 +1,6 @@
 package com.redhat.mcp.languagetools.extensions.jdtls.dap;
 
+import com.redhat.mcp.languagetools.dap.client.DapClient;
 import com.redhat.mcp.languagetools.dap.server.DapServer;
 import com.redhat.mcp.languagetools.dap.server.DapServerConfig;
 import com.redhat.mcp.languagetools.server.ServerStatus;
@@ -34,6 +35,22 @@ public class JavaDebugServer extends DapServer {
 
     public JavaDebugServer(String sessionId, DapServerConfig config, Workspace workspace) {
         super(sessionId, config, workspace);
+    }
+
+    /**
+     * Override to create JavaDebugClient instead of base DapClient.
+     */
+    @Override
+    protected DapClient createDapClient() {
+        return new JavaDebugClient();
+    }
+
+    /**
+     * Override to create child JavaDebugClient.
+     */
+    @Override
+    public DapClient createDapClient(DapClient parentClient) {
+        return new JavaDebugClient((JavaDebugClient) parentClient);
     }
 
     @Override

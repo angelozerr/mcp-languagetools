@@ -133,7 +133,7 @@ public class DapSession implements DapEventListener {
 
         // Create a new DapClient for the child (like lsp4ij)
         // Each child gets its own DapClient + Launcher, sharing the same transport streams
-        DapClient childClient = new DapClient(this.dapServer.getDapClient());
+        DapClient childClient = this.dapServer.createDapClient(this.dapServer.getDapClient());
 
         // Set event listener to forward child events to parent (or handle separately)
         childClient.setEventListener(new DapEventListener() {
