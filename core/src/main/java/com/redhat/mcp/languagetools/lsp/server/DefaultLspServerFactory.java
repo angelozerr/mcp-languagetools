@@ -19,8 +19,8 @@ public class DefaultLspServerFactory implements LspServerFactory {
     }
 
     @Override
-    public LspServer createServer(LspServerConfig config, Workspace workspace) {
-        LOG.infof("Creating default LSP server for %s", config.getServerId());
-        return new LspServer(config, workspace);
+    public LspServer createServer(LspServerCreateParams params) {
+        LOG.infof("Creating default LSP server for %s", params.getConfig().getServerId());
+        return new LspServer(params.getConfig(), params.getWorkspace());
     }
 }

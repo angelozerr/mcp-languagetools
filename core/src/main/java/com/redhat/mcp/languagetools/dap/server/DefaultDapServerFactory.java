@@ -18,8 +18,8 @@ public class DefaultDapServerFactory implements DapServerFactory {
     }
 
     @Override
-    public DapServer createServer(String sessionId, DapServerConfig config, Workspace workspace) {
-        LOG.infof("Creating default DAP server for %s (session: %s)", config.getServerId(), sessionId);
-        return new DapServer(sessionId, config, workspace);
+    public DapServer createServer(DapServerCreateParams params) {
+        LOG.infof("Creating default DAP server for %s (session: %s)", params.getConfig().getServerId(), params.getSessionId());
+        return new DapServer(params.getSessionId(), params.getConfig(), params.getWorkspace());
     }
 }

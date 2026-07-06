@@ -15,28 +15,29 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * @param <C> Config type (LspServerConfig or DapServerConfig)
  * @param <S> Server type (LspServer or DapServer)
+ * @param <P> Params type (LspServerCreateParams or DapServerCreateParams)
  * @param <F> Factory type (LspServerFactory or DapServerFactory)
  */
-public abstract class ServerFactoryRegistryBase<C, S, F> {
+public abstract class ServerFactoryRegistryBase<C extends ServerConfigBase, S extends ServerBase<C>, P extends ServerCreateParams<C>, F extends ServerFactory<C, S, P>> {
 
-    protected final Logger log;
+    private static final Logger LOG = Logger.getLogger(ServerFactoryRegistryBase.class);
+
     protected final List<F> spiFactories = new ArrayList<>();
     protected final Map<String, F> factoryCache = new ConcurrentHashMap<>();
 
-    protected ServerFactoryRegistryBase(Class<F> factoryClass, Logger logger) {
-        this.log = logger;
+    protected ServerFactoryRegistryBase(Class<F> factoryClass) {
 
         // Load all factory implementations via SPI
         ServiceLoader<F> loader = ServiceLoader.load(factoryClass);
         for (F factory : loader) {
             spiFactories.add(factory);
-            log.infof("Registered factory: %s", factory.getClass().getSimpleName());
+            LOG.infof("Registered factory: %s", factory.getClass().getSimpleName());
         }
 
         // Sort factories: those with non-null getServerId() first (more specific)
         spiFactories.sort((f1, f2) -> {
-            String id1 = getFactoryServerId(f1);
-            String id2 = getFactoryServerId(f2);
+            String id1 = f1.getServerId();
+            String id2 = f2.getServerId();
             if (id1 != null && id2 == null) return -1;
             if (id1 == null && id2 != null) return 1;
             return 0;
@@ -44,50 +45,46 @@ public abstract class ServerFactoryRegistryBase<C, S, F> {
     }
 
     /**
-     * Create a server instance based on the config.
+     * Find the appropriate factory for the given config.
      * Iterates through factories calling canHandle(), uses cache, and falls back to default.
      */
-    protected S createServer(C config, Workspace workspace, String serverId) {
+    protected F findFactory(C config, Workspace workspace, String serverId) {
         // Check cache first
         F cachedFactory = factoryCache.get(serverId);
         if (cachedFactory != null) {
-            log.debugf("Using cached factory for %s: %s", serverId, cachedFactory.getClass().getSimpleName());
-            return createServerFromFactory(cachedFactory, config, workspace);
+            LOG.debugf("Using cached factory for %s: %s", serverId, cachedFactory.getClass().getSimpleName());
+            return cachedFactory;
         }
 
         // Iterate through SPI factories to find one that can handle this config
         for (F factory : spiFactories) {
-            if (canHandleConfig(factory, config, workspace)) {
-                log.infof("Factory %s can handle %s", factory.getClass().getSimpleName(), serverId);
+            if (factory.canHandle(config, workspace)) {
+                LOG.infof("Factory %s can handle %s", factory.getClass().getSimpleName(), serverId);
                 factoryCache.put(serverId, factory);
-                return createServerFromFactory(factory, config, workspace);
+                return factory;
             }
         }
 
         // Ultimate fallback - default factory
         F defaultFactory = getDefaultFactory();
-        log.debugf("No specific factory found for %s, using default factory", serverId);
+        LOG.debugf("No specific factory found for %s, using default factory", serverId);
         factoryCache.put(serverId, defaultFactory);
-        return createServerFromFactory(defaultFactory, config, workspace);
+        return defaultFactory;
     }
-
-    /**
-     * Get the serverId from a factory (factory.getServerId()).
-     */
-    protected abstract String getFactoryServerId(F factory);
-
-    /**
-     * Check if a factory can handle the config (factory.canHandle(config, workspace)).
-     */
-    protected abstract boolean canHandleConfig(F factory, C config, Workspace workspace);
-
-    /**
-     * Create a server from a factory (factory.createServer(...)).
-     */
-    protected abstract S createServerFromFactory(F factory, C config, Workspace workspace);
 
     /**
      * Get the default fallback factory.
      */
     protected abstract F getDefaultFactory();
+
+    /**
+     * Create a server instance using the appropriate factory.
+     *
+     * @param params Server creation parameters
+     * @return The created server
+     */
+    public S createServer(P params) {
+        F factory = findFactory(params.getConfig(), params.getWorkspace(), params.getConfig().getServerId());
+        return factory.createServer(params);
+    }
 }

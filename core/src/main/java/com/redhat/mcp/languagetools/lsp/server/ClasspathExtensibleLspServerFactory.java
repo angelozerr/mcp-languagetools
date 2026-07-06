@@ -42,8 +42,8 @@ public class ClasspathExtensibleLspServerFactory implements LspServerFactory {
     }
 
     @Override
-    public LspServer createServer(LspServerConfig config, Workspace workspace) {
-        LOG.infof("Creating classpath-extensible LSP server for %s", config.getServerId());
-        return new ClasspathExtensibleLspServer(config, workspace);
+    public LspServer createServer(LspServerCreateParams params) {
+        LOG.infof("Creating classpath-extensible LSP server for %s", params.getConfig().getServerId());
+        return new ClasspathExtensibleLspServer(params.getConfig(), params.getWorkspace());
     }
 }

@@ -2,6 +2,7 @@ package com.redhat.mcp.languagetools.extensions.jdtls;
 
 import com.redhat.mcp.languagetools.lsp.server.LspServer;
 import com.redhat.mcp.languagetools.lsp.server.LspServerConfig;
+import com.redhat.mcp.languagetools.lsp.server.LspServerCreateParams;
 import com.redhat.mcp.languagetools.lsp.server.LspServerFactory;
 import com.redhat.mcp.languagetools.workspace.Workspace;
 
@@ -16,7 +17,8 @@ public class JdtLsServerFactory implements LspServerFactory {
     }
 
     @Override
-    public LspServer createServer(LspServerConfig config, Workspace workspace) {
-        return new JdtLsServer(config, workspace);
+    public LspServer createServer(LspServerCreateParams params) {
+        return new JdtLsServer(params.getConfig(), params.getWorkspace());
     }
+
 }

@@ -9,7 +9,7 @@ import org.jboss.logging.Logger;
  * Uses SPI (ServiceLoader) to discover custom server factory implementations.
  * Factories are selected based on canHandle() method and results are cached.
  */
-public class LspServerFactoryRegistry extends ServerFactoryRegistryBase<LspServerConfig, LspServer, LspServerFactory> {
+public class LspServerFactoryRegistry extends ServerFactoryRegistryBase<LspServerConfig, LspServer, LspServerCreateParams, LspServerFactory> {
 
     private static final Logger LOG = Logger.getLogger(LspServerFactoryRegistry.class);
     private static final LspServerFactoryRegistry INSTANCE = new LspServerFactoryRegistry();
@@ -17,7 +17,7 @@ public class LspServerFactoryRegistry extends ServerFactoryRegistryBase<LspServe
     private final LspServerFactory defaultFactory = new DefaultLspServerFactory();
 
     private LspServerFactoryRegistry() {
-        super(LspServerFactory.class, LOG);
+        super(LspServerFactory.class);
     }
 
     public static LspServerFactoryRegistry getInstance() {
@@ -26,24 +26,10 @@ public class LspServerFactoryRegistry extends ServerFactoryRegistryBase<LspServe
 
     /**
      * Create an LSP server instance based on the config.
+     * Convenience method that wraps config and workspace in params.
      */
     public LspServer createServer(LspServerConfig config, Workspace workspace) {
-        return createServer(config, workspace, config.getServerId());
-    }
-
-    @Override
-    protected String getFactoryServerId(LspServerFactory factory) {
-        return factory.getServerId();
-    }
-
-    @Override
-    protected boolean canHandleConfig(LspServerFactory factory, LspServerConfig config, Workspace workspace) {
-        return factory.canHandle(config, workspace);
-    }
-
-    @Override
-    protected LspServer createServerFromFactory(LspServerFactory factory, LspServerConfig config, Workspace workspace) {
-        return factory.createServer(config, workspace);
+        return createServer(new LspServerCreateParams(config, workspace));
     }
 
     @Override

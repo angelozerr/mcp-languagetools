@@ -10,8 +10,9 @@ import java.util.Objects;
  *
  * @param <C> Config type (extends ServerConfigBase)
  * @param <S> Server type (extends ServerBase)
+ * @param <P> Params type (extends ServerCreateParams)
  */
-public interface ServerFactory<C extends ServerConfigBase, S extends ServerBase<C>> {
+public interface ServerFactory<C extends ServerConfigBase, S extends ServerBase<C>, P extends ServerCreateParams<C>> {
 
     /**
      * Get the server ID that this factory handles (e.g., "jdtls", "java-debug").
@@ -32,4 +33,12 @@ public interface ServerFactory<C extends ServerConfigBase, S extends ServerBase<
     default boolean canHandle(C config, Workspace workspace) {
         return config != null && Objects.equals(getServerId(), config.getServerId());
     }
+
+    /**
+     * Create a server instance.
+     *
+     * @param params Server creation parameters
+     * @return A new server instance
+     */
+    S createServer(P params);
 }

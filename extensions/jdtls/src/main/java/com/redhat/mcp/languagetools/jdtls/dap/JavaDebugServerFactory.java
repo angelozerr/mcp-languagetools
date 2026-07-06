@@ -2,6 +2,7 @@ package com.redhat.mcp.languagetools.jdtls.dap;
 
 import com.redhat.mcp.languagetools.dap.server.DapServer;
 import com.redhat.mcp.languagetools.dap.server.DapServerConfig;
+import com.redhat.mcp.languagetools.dap.server.DapServerCreateParams;
 import com.redhat.mcp.languagetools.dap.server.DapServerFactory;
 import com.redhat.mcp.languagetools.workspace.Workspace;
 
@@ -17,7 +18,8 @@ public class JavaDebugServerFactory implements DapServerFactory {
     }
 
     @Override
-    public DapServer createServer(String sessionId, DapServerConfig config, Workspace workspace) {
-        return new JavaDebugServer(sessionId, config, workspace);
+    public DapServer createServer(DapServerCreateParams params) {
+        return new JavaDebugServer(params.getSessionId(), params.getConfig(), params.getWorkspace());
     }
+
 }
