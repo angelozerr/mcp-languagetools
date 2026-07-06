@@ -98,7 +98,7 @@ function showLaunchConfigForm(session, dapServerId) {
     }
 
     // Create new session div
-    const defaultConfig = getDefaultLaunchConfig(dapServerId);
+    const defaultConfig = {};
 
     const sessionHTML = `
         <div style="padding: 1rem; height: 100%; display: flex; flex-direction: column; overflow: hidden;">
@@ -245,30 +245,6 @@ function showSessionDiv(sessionId) {
     }
 }
 
-/**
- * Get default launch configuration based on DAP server type.
- */
-function getDefaultLaunchConfig(dapServerId) {
-    const configs = {
-        'debugpy': {
-            type: 'python',
-            request: 'launch',
-            name: 'Python: Current File',
-            program: '${workspaceFolder}/main.py',
-            console: 'integratedTerminal'
-        },
-        'vscode-js-debug': {
-            // Empty - use templates from selector
-        }
-    };
-
-    return configs[dapServerId] || {
-        type: 'debug',
-        request: 'launch',
-        name: 'Launch',
-        program: '${workspaceFolder}/main'
-    };
-}
 
 /**
  * Debug a DAP session with the provided configuration (with breakpoints).
