@@ -1,10 +1,11 @@
 package com.redhat.mcp.languagetools.dap.session;
 
-import com.redhat.mcp.languagetools.dap.server.DapServerConfig;
-import com.redhat.mcp.languagetools.dap.server.DapServerFactoryRegistry;
-import com.redhat.mcp.languagetools.dap.trace.DapTraceCollector;
-import com.redhat.mcp.languagetools.workspace.Workspace;
 import com.redhat.mcp.languagetools.Application;
+import com.redhat.mcp.languagetools.dap.server.DapServerConfig;
+import com.redhat.mcp.languagetools.dap.trace.DapTraceCollector;
+import com.redhat.mcp.languagetools.language.LanguageDocument;
+import com.redhat.mcp.languagetools.language.LanguageRegistry;
+import com.redhat.mcp.languagetools.workspace.Workspace;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
@@ -16,7 +17,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Manages multiple DAP debug sessions across workspaces.
- *
+ * <p>
  * Responsibilities:
  * - Create/destroy debug sessions
  * - Track active sessions (sessionId -> DapSession)
@@ -34,6 +35,8 @@ public class DapSessionManager {
     @Inject
     DapTraceCollector traceCollector;
 
+    @Inject
+    LanguageRegistry languageRegistry;
 
     @Inject
     jakarta.enterprise.event.Event<DapSessionEvent> sessionEvent;
@@ -44,16 +47,17 @@ public class DapSessionManager {
      * Create a new debug session for a specific DAP server.
      *
      * @param workspaceUri Workspace URI for context
-     * @param dapServerId DAP server ID (e.g., "debugpy", "vscode-js-debug")
-     * @param sessionName User-friendly name for the session
+     * @param dapServerId  DAP server ID (e.g., "debugpy", "vscode-js-debug")
+     * @param sessionName  User-friendly name for the session
+     * @param createdBy    Who created the session
      * @return Created DapSession
      */
-    public DapSession createSession(URI workspaceUri, String dapServerId, String sessionName) {
-        LOG.infof("Creating debug session: workspace=%s, dapServerId=%s, name=%s",
-            workspaceUri, dapServerId, sessionName);
+    public DapSession createSession(URI workspaceUri, String dapServerId, String sessionName, DapSession.SessionActor createdBy) {
+        LOG.infof("Creating debug session: workspace=%s, dapServerId=%s, name=%s, createdBy=%s",
+                workspaceUri, dapServerId, sessionName, createdBy);
 
         // Find workspace
-        Workspace workspace = application.getWorkspace(workspaceUri);
+        Workspace workspace = application.getOrCreateWorkspace(workspaceUri);
         if (workspace == null) {
             throw new IllegalArgumentException("Workspace not found: " + workspaceUri);
         }
@@ -76,12 +80,12 @@ public class DapSessionManager {
 
         // Create session
         DapSession session = new DapSession(
-            sessionId,
-            language,
-            sessionName,
-            serverConfig,
-            workspace,
-            traceCollector
+                sessionId,
+                language,
+                sessionName,
+                createdBy,
+                serverConfig,
+                workspace
         );
 
         sessions.put(sessionId, session);
@@ -92,14 +96,12 @@ public class DapSessionManager {
             LOG.infof("DAP server status changed: session=%s, %s -> %s", sessionId, oldStatus, newStatus);
             // Fire event to notify UI with status change
             if (sessionEvent != null) {
-                sessionEvent.fire(new DapSessionEvent(
-                    DapSessionEvent.Type.STATE_CHANGED,
-                    sessionId,
-                    workspaceUri.toString(),
-                    oldStatus.name(),
-                    newStatus.name()
+                sessionEvent.fire(DapSessionEvent.stateChanged(
+                        session,
+                        oldStatus,
+                        newStatus
                 ));
-                LOG.infof("Fired STATE_CHANGED event for session %s: %s -> %s", sessionId, oldStatus, newStatus);
+                LOG.infof("Fired STATE_CHANGED event for session %s: %s -> %s (debugMode=%s)", sessionId, oldStatus, newStatus, session.isDebugMode());
             } else {
                 LOG.errorf("sessionEvent is null! Cannot fire STATE_CHANGED event");
             }
@@ -110,65 +112,64 @@ public class DapSessionManager {
             LOG.infof("DAP session state changed: session=%s, new state=%s", sessionId, session.getState());
             // Fire event to notify UI
             if (sessionEvent != null) {
-                sessionEvent.fire(new DapSessionEvent(
-                    DapSessionEvent.Type.STATE_CHANGED,
-                    sessionId,
-                    workspaceUri.toString(),
-                    null,  // No old/new state for now
-                    session.getState().name()
+                String createdAt = session.getCreatedAt() != null ? session.getCreatedAt().toString() : null;
+                String launchedAt = session.getLaunchedAt() != null ? session.getLaunchedAt().toString() : null;
+                sessionEvent.fire(DapSessionEvent.stateChanged(
+                        session,
+                        null,  // No old status
+                        null
                 ));
             }
         });
 
         // Fire CDI event for WebSocket notification
-        sessionEvent.fire(new DapSessionEvent(
-            DapSessionEvent.Type.CREATED,
-            sessionId,
-            workspaceUri.toString()
-        ));
+        sessionEvent.fire(DapSessionEvent.created(session));
 
         // Don't initialize yet - initialization (including installation) happens on first launch
         return session;
     }
 
     /**
-     * Create a new debug session for a specific language.
+     * Create a new debug session for a specific debug adapter.
      *
-     * @param language Language to debug (e.g., "javascript", "python", "go")
-     * @param sessionName User-friendly name for the session
+     * @param debuggerId   ID of the debug adapter (e.g., "java-debug", "vscode-js-debug")
+     * @param sessionName  User-friendly name for the session
      * @param workspaceUri Workspace URI for context
      * @return Session info with sessionId
      */
-    public CompletableFuture<Map<String, Object>> createSession(String language,
-                                                                  String sessionName,
-                                                                  URI workspaceUri) {
-        LOG.infof("Creating debug session for language '%s' in workspace %s", language, workspaceUri);
+    public CompletableFuture<Map<String, Object>> createSession(String debuggerId,
+                                                                String sessionName,
+                                                                URI workspaceUri) {
+        LOG.infof("Creating debug session with adapter '%s' in workspace %s", debuggerId, workspaceUri);
 
         // Find workspace
-        Workspace workspace = application.getWorkspace(workspaceUri);
+        Workspace workspace = application.getOrCreateWorkspace(workspaceUri);
         if (workspace == null) {
             return CompletableFuture.failedFuture(
-                new IllegalArgumentException("Workspace not found: " + workspaceUri)
+                    new IllegalArgumentException("Workspace not found: " + workspaceUri)
             );
         }
 
-        // Find DAP server for this language
-        DapServerConfig serverConfig = findDapServerForLanguage(workspace, language);
+        // Find DAP server by ID
+        DapServerConfig serverConfig = findDapServerById(workspace, debuggerId);
         if (serverConfig == null) {
             return CompletableFuture.failedFuture(
-                new IllegalArgumentException("No debug adapter found for language: " + language)
+                    new IllegalArgumentException("Debug adapter not found: " + debuggerId + ". Use list_debug_adapters to see available adapters.")
             );
         }
 
-        // Create session
+        // Extract language from server config for display
+        String language = extractLanguageFromConfig(serverConfig);
+
+        // Create session (created by unknown source - deprecated method)
         String sessionId = UUID.randomUUID().toString();
         DapSession session = new DapSession(
-            sessionId,
-            language,
-            sessionName,
-            serverConfig,
-            workspace,
-            traceCollector
+                sessionId,
+                language,
+                sessionName,
+                DapSession.SessionActor.UNKNOWN, // createdBy - this method is deprecated
+                serverConfig,
+                workspace
         );
 
         sessions.put(sessionId, session);
@@ -176,20 +177,20 @@ public class DapSessionManager {
 
         // Initialize the session
         return session.initialize()
-            .thenApply(v -> {
-                Map<String, Object> result = new HashMap<>();
-                result.put("success", true);
-                result.put("sessionId", sessionId);
-                result.put("language", language);
-                result.put("sessionName", sessionName);
-                result.put("message", "Created " + language + " debug session: " + sessionName);
-                return result;
-            })
-            .exceptionally(ex -> {
-                sessions.remove(sessionId);
-                LOG.errorf(ex, "Failed to initialize session %s", sessionId);
-                throw new RuntimeException("Failed to create debug session: " + ex.getMessage(), ex);
-            });
+                .thenApply(v -> {
+                    Map<String, Object> result = new HashMap<>();
+                    result.put("success", true);
+                    result.put("sessionId", sessionId);
+                    result.put("language", language);
+                    result.put("sessionName", sessionName);
+                    result.put("message", "Created " + language + " debug session: " + sessionName);
+                    return result;
+                })
+                .exceptionally(ex -> {
+                    sessions.remove(sessionId);
+                    LOG.errorf(ex, "Failed to initialize session %s", sessionId);
+                    throw new RuntimeException("Failed to create debug session: " + ex.getMessage(), ex);
+                });
     }
 
     /**
@@ -200,12 +201,31 @@ public class DapSessionManager {
 
         List<Map<String, Object>> result = new ArrayList<>();
         for (DapSession session : sessions.values()) {
-            result.add(Map.of(
-                "sessionId", session.getSessionId(),
-                "language", session.getLanguage(),
-                "sessionName", session.getSessionName(),
-                "state", session.getState().name()
-            ));
+            Map<String, Object> sessionInfo = new HashMap<>();
+            sessionInfo.put("sessionId", session.getSessionId());
+            sessionInfo.put("serverId", session.getServerConfig().getServerId()); // DAP server ID
+            sessionInfo.put("workspaceUri", session.getWorkspace().getNormalizedUri()); // Workspace URI
+            sessionInfo.put("language", session.getLanguage());
+            sessionInfo.put("sessionName", session.getSessionName());
+            sessionInfo.put("state", session.getState().name());
+            sessionInfo.put("createdBy", session.getCreatedBy());
+            sessionInfo.put("launchedBy", session.getLaunchedBy());
+            sessionInfo.put("debugMode", session.isDebugMode());
+
+            // Include timestamps
+            if (session.getCreatedAt() != null) {
+                sessionInfo.put("createdAt", session.getCreatedAt().toString());
+            }
+            if (session.getLaunchedAt() != null) {
+                sessionInfo.put("launchedAt", session.getLaunchedAt().toString());
+            }
+
+            // Include launch configuration if available
+            if (session.getLaunchConfiguration() != null) {
+                sessionInfo.put("launchConfiguration", session.getLaunchConfiguration());
+            }
+
+            result.add(sessionInfo);
         }
         return result;
     }
@@ -252,51 +272,92 @@ public class DapSessionManager {
         DapSession session = sessions.remove(sessionId);
         if (session == null) {
             return CompletableFuture.completedFuture(Map.of(
-                "success", false,
-                "message", "Session not found: " + sessionId
+                    "success", false,
+                    "message", "Session not found: " + sessionId
             ));
         }
 
         return session.terminate()
-            .thenApply(v -> {
-                LOG.infof("Session closed: %s", sessionId);
-                Map<String, Object> result = new HashMap<>();
-                result.put("success", true);
-                result.put("sessionId", sessionId);
-                result.put("message", "Debug session closed");
-                return result;
-            })
-            .exceptionally(ex -> {
-                LOG.errorf(ex, "Error closing session %s", sessionId);
-                Map<String, Object> result = new HashMap<>();
-                result.put("success", false);
-                result.put("sessionId", sessionId);
-                result.put("message", "Error closing session: " + ex.getMessage());
-                return result;
-            });
+                .thenApply(v -> {
+                    LOG.infof("Session closed: %s", sessionId);
+                    Map<String, Object> result = new HashMap<>();
+                    result.put("success", true);
+                    result.put("sessionId", sessionId);
+                    result.put("message", "Debug session closed");
+                    return result;
+                })
+                .exceptionally(ex -> {
+                    LOG.errorf(ex, "Error closing session %s", sessionId);
+                    Map<String, Object> result = new HashMap<>();
+                    result.put("success", false);
+                    result.put("sessionId", sessionId);
+                    result.put("message", "Error closing session: " + ex.getMessage());
+                    return result;
+                });
     }
 
     /**
-     * List supported languages based on available DAP servers.
+     * List all available debug adapters with their details.
      */
-    public List<String> listSupportedLanguages() {
-        Set<String> languages = new HashSet<>();
+    public List<Map<String, Object>> listDebugAdapters() {
+        List<Map<String, Object>> adapters = new ArrayList<>();
 
         for (DapServerConfig config : application.getDapServerConfigs()) {
-            if (config.getDocumentSelector() != null) {
-                config.getDocumentSelector().forEach(selector -> {
-                    if (selector.getLanguage() != null) {
-                        languages.add(selector.getLanguage());
-                    }
-                });
+            adapters.add(buildAdapterInfo(config));
+        }
+
+        LOG.debugf("Available debug adapters: %d", adapters.size());
+        return adapters;
+    }
+
+    /**
+     * List debug adapters suitable for a specific file.
+     * Uses LanguageRegistry to detect the language automatically.
+     */
+    public List<Map<String, Object>> listDebugAdaptersForFile(URI fileUri) {
+        List<Map<String, Object>> adapters = new ArrayList<>();
+
+        // Create language document (detects language using LanguageRegistry)
+        LanguageDocument document = languageRegistry.createDocument(fileUri);
+        String language = document.getLanguageId();
+
+        if (language == null) {
+            LOG.warnf("Could not detect language for file: %s", fileUri);
+            // Return all adapters if language detection fails
+            return listDebugAdapters();
+        }
+
+        for (DapServerConfig config : application.getDapServerConfigs()) {
+            // Check if this adapter supports the file's language
+            if (config.canHandle(null, language)) {
+                adapters.add(buildAdapterInfo(config));
             }
         }
 
-        List<String> result = new ArrayList<>(languages);
-        Collections.sort(result);
-        LOG.debugf("Supported languages: %s", result);
-        return result;
+        LOG.debugf("Debug adapters for file %s (language: %s): %d", fileUri, language, adapters.size());
+        return adapters;
     }
+
+    private Map<String, Object> buildAdapterInfo(DapServerConfig config) {
+        Map<String, Object> adapter = new HashMap<>();
+        adapter.put("id", config.getServerId());
+        adapter.put("name", config.getName());
+        adapter.put("enabled", true);  // All configs from getDapServerConfigs are enabled
+
+        // Extract supported languages
+        List<String> languages = new ArrayList<>();
+        if (config.getDocumentSelector() != null) {
+            config.getDocumentSelector().forEach(selector -> {
+                if (selector.getLanguage() != null && !languages.contains(selector.getLanguage())) {
+                    languages.add(selector.getLanguage());
+                }
+            });
+        }
+        adapter.put("languages", languages);
+
+        return adapter;
+    }
+
 
     /**
      * Get statistics about active sessions.
@@ -309,9 +370,9 @@ public class DapSessionManager {
         }
 
         return Map.of(
-            "totalSessions", sessions.size(),
-            "sessionsByState", stateCount,
-            "supportedLanguages", listSupportedLanguages().size()
+                "totalSessions", sessions.size(),
+                "sessionsByState", stateCount,
+                "availableAdapters", application.getDapServerConfigs().size()
         );
     }
 
@@ -328,7 +389,7 @@ public class DapSessionManager {
         }
 
         // Then check workspace-specific DAP servers
-       // Map<String, DapServerConfig> workspaceDapServers = workspace.getDapServerConfigs();
+        // Map<String, DapServerConfig> workspaceDapServers = workspace.getDapServerConfigs();
         //return workspaceDapServers.get(dapServerId);
         return null;
     }
@@ -350,11 +411,15 @@ public class DapSessionManager {
     /**
      * Find the appropriate DAP server for a language.
      */
+    /**
+     * @deprecated Use findDapServerById instead
+     */
+    @Deprecated
     private DapServerConfig findDapServerForLanguage(Workspace workspace, String language) {
         // First check workspace-specific DAP servers
         var workspaceDapServers = workspace.getApplication().getDapServerConfigs();
         for (DapServerConfig config : workspaceDapServers) {
-            if (supportsLanguage(config, language)) {
+            if (config.canHandle(null, language)) {
                 return config;
             }
         }
@@ -362,7 +427,7 @@ public class DapSessionManager {
         // Fallback to global DAP servers
         /*Map<String, DapServerConfig> globalDapServers = application.getDapServerConfigs();
         for (DapServerConfig config : globalDapServers.values()) {
-            if (supportsLanguage(config, language)) {
+            if (config.canHandle(null, language)) {
                 return config;
             }
         }*/
@@ -370,17 +435,6 @@ public class DapSessionManager {
         return null;
     }
 
-    /**
-     * Check if a DAP server config supports a specific language.
-     */
-    private boolean supportsLanguage(DapServerConfig config, String language) {
-        if (config.getDocumentSelector() == null) {
-            return false;
-        }
-
-        return config.getDocumentSelector().stream()
-            .anyMatch(selector -> language.equalsIgnoreCase(selector.getLanguage()));
-    }
 
     // ========== Cleanup ==========
 
@@ -396,9 +450,9 @@ public class DapSessionManager {
         }
 
         return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
-            .thenAccept(v -> {
-                sessions.clear();
-                LOG.info("All debug sessions shut down");
-            });
+                .thenAccept(v -> {
+                    sessions.clear();
+                    LOG.info("All debug sessions shut down");
+                });
     }
 }

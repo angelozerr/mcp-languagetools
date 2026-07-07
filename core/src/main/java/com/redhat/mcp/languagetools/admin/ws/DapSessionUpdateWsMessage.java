@@ -6,5 +6,10 @@ public record DapSessionUpdateWsMessage(
     String sessionId,
     String workspaceUri,
     String oldStatus,  // Server status (INSTALLING, STARTING, RUNNING, etc.)
-    String newStatus   // Server status (INSTALLING, STARTING, RUNNING, etc.)
+    String newStatus,  // Server status (INSTALLING, STARTING, RUNNING, etc.)
+    Boolean debugMode,  // true if debugging, false if running without debug
+    String createdBy,
+    String createdAt,  // ISO-8601 timestamp when session was created
+    String launchBy,
+    String launchedAt  // ISO-8601 timestamp when session was last launched
 ) {}

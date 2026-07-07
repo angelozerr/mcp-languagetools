@@ -3,6 +3,7 @@ package com.redhat.mcp.languagetools.admin;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.redhat.mcp.languagetools.PathManager;
 import com.redhat.mcp.languagetools.admin.dto.ErrorResponse;
 import com.redhat.mcp.languagetools.admin.dto.LspConfigDTO;
@@ -35,9 +36,6 @@ public class LspAdminResource {
 
     @Inject
     Application application;
-
-    @Inject
-    PathManager pathManager;
 
     @Inject
     ServerDTOBuilder serverDTOBuilder;
@@ -296,7 +294,7 @@ public class LspAdminResource {
     @Consumes(MediaType.APPLICATION_JSON)
     public Response setTraceLevel(@PathParam("serverId") String serverId, String body) {
         try {
-            String trace = com.google.gson.JsonParser.parseString(body)
+            String trace = JsonParser.parseString(body)
                     .getAsJsonObject()
                     .get("trace")
                     .getAsString();

@@ -2,8 +2,9 @@
         let selectedWorkspace = null;
         let selectedServer = null;
 
-        // Expose selectedWorkspace globally for admin-dap.js and admin-lsp.js
+        // Expose globally for admin-dap.js and admin-lsp.js
         window.selectedWorkspace = null;
+        window.workspaces = workspaces;
 
         let tracesByServer = {}; // Store traces per server: {serverId: [...traces]}
         let currentTab = 'workspaces';
@@ -21,9 +22,10 @@
         let lspConfigs = {}; // Map<serverId, LspConfigDTO>
         let dapConfigs = {}; // Map<serverId, DapConfigDTO>
 
-        // Expose configs globally for admin-lsp.js and admin-dap.js
+        // Expose configs and merge function globally for admin-lsp.js and admin-dap.js
         window.lspConfigs = lspConfigs;
         window.dapConfigs = dapConfigs;
+        window.mergeServerData = mergeServerData;
 
         /**
          * Format status into CSS class name.
@@ -121,27 +123,30 @@
          * @returns {Object} Merged server object with both config and runtime
          */
         function mergeServerData(runtime) {
-            const config = lspConfigs[runtime.serverId] || {};
+            const serverId = runtime.serverId || runtime.id;
+            const config = lspConfigs[serverId] || {};
             return {
                 // Config fields
-                id: runtime.serverId,
-                name: config.name || runtime.serverId,
+                id: serverId,
+                name: config.name || serverId,
                 description: config.description,
                 documentSelector: config.documentSelector,
-                command: config.command,
+                command: runtime.command || config.command,
                 args: config.args,
                 env: config.env,
                 workingDirectory: config.workingDirectory,
                 initializationOptions: config.initializationOptions,
                 contributions: config.contributions,
                 isExtension: config.isExtension,
+                parentServerId: runtime.parentServerId,
 
                 // Runtime fields
                 status: runtime.status,
                 statusMessage: runtime.statusMessage,
                 isReady: runtime.isReady,
                 pid: runtime.pid,
-                externalInstance: runtime.externalInstance
+                externalInstance: runtime.externalInstance,
+                installProgress: runtime.installProgress
             };
         }
 
@@ -394,52 +399,31 @@
         function handleWorkspacesUpdate(newWorkspaces) {
             console.log('WebSocket workspaces update:', newWorkspaces);
 
-            // Merge runtime server data with static configs for each workspace
-            const mergedWorkspaces = newWorkspaces.map(workspace => {
-                const servers = workspace.lspServers.map(mergeServerData);
-
-                // Synchronize extensions with their parent servers
-                servers.forEach(server => {
-                    console.log('Checking server:', server.id, 'parentServerId:', server.parentServerId);
-                    if (server.parentServerId) {
-                        const parent = servers.find(s => s.id === server.parentServerId);
-                        console.log('Found parent:', parent ? parent.id : 'NOT FOUND', 'status:', parent?.status);
-                        if (parent) {
-                            server.status = parent.status;
-                            server.isReady = parent.isReady;
-                            server.statusMessage = parent.statusMessage;
-                            server.pid = parent.pid;
-                            server.command = parent.command;
-                            console.log('Synced', server.id, 'status to', server.status);
-                        }
-                    }
-                });
-
-                return {
-                    ...workspace,
-                    lspServers: servers
-                };
-            });
+            // WorkspaceDTO now only contains mcpClients (LSP servers loaded lazily)
+            const mergedWorkspaces = newWorkspaces;
 
             // Update if data changed OR if this is the first render
             if (!workspacesRendered || JSON.stringify(mergedWorkspaces) !== JSON.stringify(workspaces)) {
                 workspaces = mergedWorkspaces;
+                window.workspaces = workspaces; // Update global
                 workspacesRendered = true;
                 console.log('Workspaces updated, rendering...');
                 renderWorkspaces();
 
-                // If a workspace was selected, update its details
+                // If a workspace was selected, re-render its current tab (servers or debuggers)
                 if (selectedWorkspace) {
                     console.log('Selected workspace:', selectedWorkspace);
                     const workspace = workspaces.find(w => w.rootUri === selectedWorkspace);
                     console.log('Found workspace:', workspace);
                     if (workspace) {
-                        console.log('Rendering servers:', workspace.lspServers);
-                        renderServers(workspace.lspServers, workspace.dapSessions || [], workspace);
+                        // Re-render current tab (will lazy load if needed)
+                        if (typeof window.switchWorkspaceTab === 'function') {
+                            window.switchWorkspaceTab(window.currentWorkspaceTab || 'servers');
+                        }
                     } else {
                         // Selected workspace no longer exists
                         selectedWorkspace = null;
-                window.selectedWorkspace = null;
+                        window.selectedWorkspace = null;
                         document.getElementById('servers-list').innerHTML = '<div class="servers-placeholder">No workspaces selected</div>';
                     }
                 } else if (workspaces.length > 0 && currentTab === 'workspaces') {
@@ -469,7 +453,7 @@
 
             // Find the workspace
             const workspace = workspaces.find(w => w.rootUri === event.workspaceUri);
-            if (!workspace) {
+            if (!workspace || !workspace.lspServers) {
                 return;
             }
 
@@ -661,6 +645,7 @@
         // (Code moved to admin-dap.js)
 
         // Initialize: load LSP and DAP configs first, then connect WebSocket
+        // DAP sessions are loaded lazily when clicking "Debuggers" tab
         (async function init() {
             await loadLspConfigs();
             await loadDapConfigs();

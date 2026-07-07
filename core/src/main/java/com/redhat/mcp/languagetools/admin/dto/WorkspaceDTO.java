@@ -1,26 +1,14 @@
 package com.redhat.mcp.languagetools.admin.dto;
 
-import java.net.URI;
 import java.util.List;
 
 public record WorkspaceDTO(
-    URI rootUri,
+    String rootUri,
     boolean initialized,
-    List<McpClientInfo> mcpClients,
-    List<LspServerDTO> lspServers,
-    List<DapSessionDTO> dapSessions
+    List<McpClientInfo> mcpClients
 ) {
     public record McpClientInfo(
         String name,
         String connectedAt
-    ) {}
-
-    public record DapSessionDTO(
-        String sessionId,
-        String sessionName,
-        String dapServerId,
-        String state,
-        String language,
-        String serverStatus  // INSTALLING, STARTING, RUNNING, etc.
     ) {}
 }

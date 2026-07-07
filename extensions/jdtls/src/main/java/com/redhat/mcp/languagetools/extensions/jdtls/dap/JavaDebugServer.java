@@ -90,7 +90,7 @@ public class JavaDebugServer extends DapServer {
                     // Start debug session (loads java-debug bundle in JDTLS and returns port)
                     return startDebugSession(sessionId)
                             .thenCompose(port -> {
-                                String workspaceRootUri = getWorkspace().getRootUri().toString();
+                                String workspaceRootUri = getWorkspace().getNormalizedUri();
 
                                 getTraceCollector().addTrace(
                                         workspaceRootUri,
@@ -128,9 +128,15 @@ public class JavaDebugServer extends DapServer {
 
         String mainClass = (String) launchConfig.get("mainClass");
         String projectName = (String) launchConfig.get("projectName");
-        String workspaceRootUri = getWorkspace().getRootUri().toString();
+        String workspaceRootUri = getWorkspace().getNormalizedUri();
 
         LOG.infof("Resolving launch configuration for mainClass=%s, projectName=%s", mainClass, projectName);
+
+        // If mainClass is missing, return config as-is (for test configurations)
+        if (mainClass == null || mainClass.isEmpty()) {
+            LOG.infof("No mainClass provided, skipping JDTLS resolution");
+            return CompletableFuture.completedFuture(launchConfig);
+        }
 
         // Step 1: Validate launch config
         return validateLaunchConfig(workspaceRootUri, mainClass, projectName, sessionId)
@@ -178,7 +184,7 @@ public class JavaDebugServer extends DapServer {
      * @return The port where the debug adapter is listening
      */
     public CompletableFuture<Integer> startDebugSession(String sessionId) {
-        String workspaceRootUri = getWorkspace().getRootUri().toString();
+        String workspaceRootUri = getWorkspace().getNormalizedUri();
 
         getTraceCollector().addTrace(
                 workspaceRootUri,
@@ -218,7 +224,11 @@ public class JavaDebugServer extends DapServer {
             String projectName,
             String sessionId) {
 
-        List<Object> args = List.of(workspaceRootUri, mainClass, projectName, false);
+        List<Object> args = new java.util.ArrayList<>();
+        args.add(workspaceRootUri);
+        args.add(mainClass);
+        args.add(projectName);
+        args.add(false);
 
         getTraceCollector().addTrace(
                 workspaceRootUri,
@@ -254,7 +264,7 @@ public class JavaDebugServer extends DapServer {
     private CompletableFuture<Object> buildWorkspace(String mainClass, String sessionId) {
         // Build workspace expects a JSON string (not a structured object)
         String buildArg = String.format("{\"mainClass\":\"%s\",\"isFullBuild\":false}", mainClass);
-        String workspaceRootUri = getWorkspace().getRootUri().toString();
+        String workspaceRootUri = getWorkspace().getNormalizedUri();
 
         getTraceCollector().addTrace(
                 workspaceRootUri,
@@ -294,7 +304,7 @@ public class JavaDebugServer extends DapServer {
 
         // Use Arrays.asList instead of List.of because List.of doesn't allow null values
         List<Object> args = java.util.Arrays.asList(mainClass, projectName, null);
-        String workspaceRootUri = getWorkspace().getRootUri().toString();
+        String workspaceRootUri = getWorkspace().getNormalizedUri();
 
         getTraceCollector().addTrace(
                 workspaceRootUri,
@@ -337,7 +347,7 @@ public class JavaDebugServer extends DapServer {
             String sessionId) {
 
         List<Object> args = List.of(mainClass, projectName);
-        String workspaceRootUri = getWorkspace().getRootUri().toString();
+        String workspaceRootUri = getWorkspace().getNormalizedUri();
 
         getTraceCollector().addTrace(
                 workspaceRootUri,

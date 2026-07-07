@@ -1,7 +1,6 @@
 package com.redhat.mcp.languagetools.admin;
 
 import com.redhat.mcp.languagetools.admin.dto.*;
-import com.redhat.mcp.languagetools.dap.server.DapServerConfig;
 import com.redhat.mcp.languagetools.workspace.Workspace;
 import com.redhat.mcp.languagetools.Application;
 import jakarta.inject.Inject;
@@ -12,9 +11,7 @@ import org.jboss.logging.Logger;
 
 import java.net.URI;
 import java.time.format.DateTimeFormatter;
-import java.util.Collections;
-import java.util.List;
-import java.util.stream.Collectors;
+import java.util.*;
 
 @Path("/api/admin")
 @Produces(MediaType.APPLICATION_JSON)
@@ -49,7 +46,7 @@ public class WorkspaceAdminResource {
     private List<WorkspaceDTO> getCurrentWorkspaces() {
         return application.getWorkspaces()
                 .stream()
-                .map(workspace -> toDTO(workspace))
+                .map(this::toDTO)
                 .toList();
     }
 
@@ -62,6 +59,62 @@ public class WorkspaceAdminResource {
             throw new NotFoundException("Workspace not found: " + uri);
         }
         return toDTO(workspace);
+    }
+
+    /**
+     * Get LSP servers for a workspace (loaded on demand when clicking "Servers" tab).
+     */
+    @GET
+    @Path("/workspaces/{uri}/lsp-servers")
+    public List<LspServerDTO> getLspServers(@PathParam("uri") String uriParam) {
+        URI uri = URI.create(uriParam);
+        Workspace workspace = application.getWorkspace(uri);
+        if (workspace == null) {
+            throw new NotFoundException("Workspace not found: " + uri);
+        }
+
+        var serverConfigs = application.getLspServerConfigs();
+        return serverConfigs.stream()
+                .map(config -> serverDTOBuilder.buildRuntime(config, workspace))
+                .toList();
+    }
+
+    /**
+     * Get DAP sessions for a workspace (loaded on demand when clicking "Debuggers" tab).
+     */
+    @GET
+    @Path("/workspaces/{uri}/dap-sessions")
+    public List<Map<String, Object>> getDapSessions(@PathParam("uri") String uriParam) {
+        URI uri = URI.create(uriParam);
+        Workspace workspace = application.getWorkspace(uri);
+        if (workspace == null) {
+            throw new NotFoundException("Workspace not found: " + uri);
+        }
+
+        return dapSessionManager.getSessionsForWorkspace(uri).stream()
+                .map(session -> {
+                    Map<String, Object> sessionInfo = new java.util.HashMap<>();
+                    sessionInfo.put("sessionId", session.getSessionId());
+                    sessionInfo.put("serverId", session.getServerConfig().getServerId());
+                    sessionInfo.put("workspaceUri", session.getWorkspace().getNormalizedUri());
+                    sessionInfo.put("language", session.getLanguage());
+                    sessionInfo.put("sessionName", session.getSessionName());
+                    sessionInfo.put("state", session.getState().name());
+                    sessionInfo.put("createdBy", session.getCreatedBy());
+                    sessionInfo.put("launchedBy", session.getLaunchedBy());
+                    sessionInfo.put("debugMode", session.isDebugMode());
+                    if (session.getCreatedAt() != null) {
+                        sessionInfo.put("createdAt", session.getCreatedAt().toString());
+                    }
+                    if (session.getLaunchedAt() != null) {
+                        sessionInfo.put("launchedAt", session.getLaunchedAt().toString());
+                    }
+                    if (session.getLaunchConfiguration() != null) {
+                        sessionInfo.put("launchConfiguration", session.getLaunchConfiguration());
+                    }
+                    return sessionInfo;
+                })
+                .toList();
     }
 
     /**
@@ -80,15 +133,7 @@ public class WorkspaceAdminResource {
     }
 
     private WorkspaceDTO toDTO(Workspace workspace) {
-        var uri = workspace.getRootUri();
-        // Get all available server descriptors
-        var serverConfigs = application.getLspServerConfigs();
-
-        // Build runtime DTOs for all LSP servers in this workspace
-        List<LspServerDTO> servers = serverConfigs
-                .stream()
-                .map(config -> serverDTOBuilder.buildRuntime(config, workspace))
-                .toList();
+        var uri = workspace.getNormalizedUri();
 
         // Build MCP client info with timestamps
         DateTimeFormatter formatter = DateTimeFormatter.ISO_INSTANT;
@@ -99,21 +144,7 @@ public class WorkspaceAdminResource {
                 ))
                 .toList();
 
-        // Build DAP session DTOs for this workspace
-        List<WorkspaceDTO.DapSessionDTO> dapSessions = dapSessionManager.getAllSessions().stream()
-                .filter(session -> session.getWorkspace().getRootUri().equals(uri))
-                .map(session -> new WorkspaceDTO.DapSessionDTO(
-                    session.getSessionId(),
-                    session.getSessionName(),
-                    session.getServerConfig().getServerId(),
-                    session.getState().name(),
-                    session.getLanguage(),
-                    session.getDapServer().getStatus().name()  // Add server status
-                ))
-                .collect(Collectors.toList());
-
-        LOG.infof("Workspace %s - mcpClients: %s, lspServers: %d, dapSessions: %d",
-            uri, mcpClients, servers.size(), dapSessions.size());
-        return new WorkspaceDTO(uri, workspace.isInitialized(), mcpClients, servers, dapSessions);
+        LOG.infof("Workspace %s - mcpClients: %s", uri, mcpClients);
+        return new WorkspaceDTO(uri, workspace.isInitialized(), mcpClients);
     }
 }

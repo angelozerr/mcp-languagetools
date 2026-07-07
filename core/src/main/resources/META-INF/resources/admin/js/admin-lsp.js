@@ -312,11 +312,17 @@ function switchServerTab(tabName) {
 }
 
 /**
- * Load installer.json for an LSP server.
+ * Load installer.json for an LSP or DAP server.
  */
 async function loadInstallerJson(serverId) {
     try {
-        const response = await fetch(`/api/admin/lsp/configs/${serverId}/installer`);
+        // Check if it's a DAP or LSP server
+        const isDap = window.dapConfigs && window.dapConfigs[serverId];
+        const endpoint = isDap
+            ? `/api/admin/dap/configs/${serverId}/installer`
+            : `/api/admin/lsp/configs/${serverId}/installer`;
+
+        const response = await fetch(endpoint);
         if (!response.ok) {
             throw new Error('Failed to load installer.json');
         }
@@ -336,7 +342,7 @@ async function loadInstallerJson(serverId) {
 }
 
 /**
- * Save installer.json for an LSP server.
+ * Save installer.json for an LSP or DAP server.
  */
 async function saveInstallerJson(serverId) {
     const editor = document.getElementById('installer-json-editor');
@@ -345,7 +351,13 @@ async function saveInstallerJson(serverId) {
     try {
         const installerJson = JSON.parse(editor.value);
 
-        const response = await fetch(`/api/admin/lsp/configs/${serverId}/installer`, {
+        // Check if it's a DAP or LSP server
+        const isDap = window.dapConfigs && window.dapConfigs[serverId];
+        const endpoint = isDap
+            ? `/api/admin/dap/configs/${serverId}/installer`
+            : `/api/admin/lsp/configs/${serverId}/installer`;
+
+        const response = await fetch(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(installerJson)

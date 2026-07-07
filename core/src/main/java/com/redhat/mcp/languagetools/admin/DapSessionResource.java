@@ -30,6 +30,25 @@ public class DapSessionResource {
     Application application;
 
     /**
+     * List all active DAP sessions.
+     */
+    @GET
+    public Response listSessions() {
+        LOG.debugf("Listing all DAP sessions");
+
+        try {
+            List<Map<String, Object>> sessions = sessionManager.listSessions();
+            return Response.ok(sessions).build();
+
+        } catch (Exception e) {
+            LOG.errorf(e, "Failed to list DAP sessions");
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(ErrorResponse.fromException(e))
+                    .build();
+        }
+    }
+
+    /**
      * Create a new DAP session for testing.
      */
     @POST
@@ -43,7 +62,8 @@ public class DapSessionResource {
             DapSession session = sessionManager.createSession(
                     workspaceUri,
                     request.dapServerId(),
-                    request.sessionName()
+                    request.sessionName(),
+                    DapSession.SessionActor.MANUAL // Created manually via REST API
             );
 
             // Return session info
@@ -72,7 +92,7 @@ public class DapSessionResource {
     @Path("/{sessionId}/launch")
     public Response launchSession(
             @PathParam("sessionId") String sessionId,
-            @QueryParam("debugMode") @DefaultValue("true") boolean debugMode,
+            @QueryParam("debugMode") boolean debugMode,
             Map<String, Object> launchConfig) {
 
         LOG.infof("Launching DAP session: sessionId=%s, debugMode=%s, config=%s", sessionId, debugMode, launchConfig);
@@ -86,7 +106,7 @@ public class DapSessionResource {
             }
 
             // Launch the session asynchronously (don't block HTTP thread!)
-            session.launch(launchConfig, debugMode).whenComplete((result, error) -> {
+            session.launch(launchConfig, debugMode, DapSession.SessionActor.MANUAL).whenComplete((result, error) -> {
                 if (error != null) {
                     LOG.errorf(error, "DAP session launch failed: %s", sessionId);
                 } else {

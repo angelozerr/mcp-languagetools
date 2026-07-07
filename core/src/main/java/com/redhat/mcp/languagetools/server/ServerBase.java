@@ -53,9 +53,9 @@ public abstract class ServerBase<T extends ServerConfigBase> extends BindEndpoin
         this.executorService = Executors.newCachedThreadPool();
         this.readyFuture = new CompletableFuture<>();
 
-        var workspaceRoot = workspace.getRootUri();
+        var workspaceRoot = workspace.getNormalizedUri();
         this.traceCollector = initializeTraceCollector(workspace);
-        this.tracing = new TracingMessageConsumer(traceCollector, workspaceRoot.toString(), traceServerId);
+        this.tracing = new TracingMessageConsumer(traceCollector, workspaceRoot, traceServerId);
     }
 
     /**
@@ -398,7 +398,7 @@ public abstract class ServerBase<T extends ServerConfigBase> extends BindEndpoin
         // Send to trace collector
         try {
             traceCollector.addTrace(
-                workspace.getRootUri().toString(),
+                workspace.getNormalizedUri(),
                 contextId,
                 com.redhat.mcp.languagetools.trace.TraceCollector.MessageDirection.SERVER_TO_CLIENT,
                 stackTrace.toString()

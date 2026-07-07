@@ -181,7 +181,7 @@ public class Application {
                 // Check if server already exists in workspace
                 if (!workspace.hasLspServer(config.getServerId())) {
                     LOG.infof("Need %s for language '%s' in workspace: %s",
-                            config.getName(), language, workspace.getRootUri());
+                            config.getName(), language, workspace.getNormalizedUri());
 
                     // Check if there's an external instance (launched by IDE) first
                     var externalInstance = workspace.getExternalInstance(config.getServerId());
@@ -264,7 +264,7 @@ public class Application {
                 if (canHandle && workspace.getApplication().getDapServerConfig(config.getServerId()) == null) {
                     workspace.addDapServer(config);
                     LOG.infof("Added DAP server %s for language '%s' in workspace: %s",
-                        config.getName(), language, workspace.getRootUri());
+                        config.getName(), language, workspace.getNormalizedUri());
                 }
             }
         }

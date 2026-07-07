@@ -1,3 +1,19 @@
+        // Global variable to store DAP sessions
+        let dapSessions = [];
+
+        // Load DAP sessions from API
+        async function loadDapSessions() {
+            try {
+                const response = await fetch('/api/admin/dap/sessions');
+                if (response.ok) {
+                    dapSessions = await response.json();
+                    console.log('Loaded DAP sessions:', dapSessions);
+                }
+            } catch (error) {
+                console.error('Failed to load DAP sessions:', error);
+            }
+        }
+
         function renderWorkspaces() {
             const container = document.getElementById('workspaces-list');
 
@@ -89,10 +105,8 @@
             const workspace = workspaces.find(w => w.rootUri === uri);
             console.log('Found workspace in selectWorkspace:', workspace);
             if (workspace) {
-                console.log('Rendering servers:', workspace.lspServers);
-                renderServers(workspace.lspServers, workspace.dapSessions || [], workspace);
-                // renderServers will auto-select a server and call selectServer
-                // which will load the console, so don't show placeholder here
+                // Render the current tab (will lazy load servers/sessions as needed)
+                switchWorkspaceTab(currentWorkspaceTab || 'servers');
             } else {
                 console.log('Workspace not found, showing placeholder');
                 document.getElementById('servers-list').innerHTML = '<div class="servers-placeholder">No LSP servers</div>';
@@ -167,15 +181,21 @@
 
         let lastServersData = null;
 
-        function loadServers(uri) {
+        async function loadServers(uri) {
             // Find workspace in local data (already received via WebSocket)
             const workspace = workspaces.find(w => w.rootUri === uri);
             if (workspace) {
+                // Load LSP servers if not already loaded (lazy loading)
+                if (!workspace.lspServers) {
+                    await loadLspServersForWorkspace(workspace);
+                }
+
                 // Only re-render if servers data actually changed
                 const newServersData = JSON.stringify(workspace.lspServers);
                 if (newServersData !== lastServersData) {
                     lastServersData = newServersData;
-                    renderServers(workspace.lspServers, workspace.dapSessions || [], workspace);
+                    // Don't pass dapSessions here - they're loaded separately when clicking "Debuggers"
+                    renderServers(workspace.lspServers || [], [], workspace);
                 }
             } else {
                 console.warn('Workspace not found:', uri);
@@ -227,7 +247,8 @@
 
         function renderServers(lspServers, dapSessions = [], workspace = null) {
             const container = document.getElementById('servers-list');
-            console.log('renderServers - lspServers:', lspServers, 'dapSessions:', dapSessions);
+            console.log('renderServers called - lspServers:', lspServers?.length, 'dapSessions:', dapSessions?.length, 'workspace:', workspace?.rootUri);
+            console.trace('renderServers call stack');
 
             if (!container) {
                 console.error('servers-list element not found!');
@@ -253,7 +274,7 @@
             // Render content based on active tab
             let contentHTML = '';
             if (currentWorkspaceTab === 'servers') {
-                contentHTML = lspServers.length > 0 ? renderLspServers(lspServers) : '<div class="servers-placeholder">No LSP servers</div>';
+                contentHTML = (lspServers && lspServers.length > 0) ? renderLspServers(lspServers) : '<div class="servers-placeholder">No LSP servers</div>';
             } else {
                 // Use global DAP configs (like LSP lspConfigs), not per-workspace
                 const dapServers = Object.values(window.dapConfigs || {});
@@ -276,11 +297,57 @@
             }
         }
 
-        function switchWorkspaceTab(tab) {
+        async function switchWorkspaceTab(tab) {
             currentWorkspaceTab = tab;
+            window.currentWorkspaceTab = tab; // Update global
             const workspace = workspaces.find(w => w.rootUri === selectedWorkspace);
-            if (workspace) {
-                renderServers(workspace.lspServers, workspace.dapSessions || [], workspace);
+            if (!workspace) return;
+
+            if (tab === 'servers') {
+                // Load LSP servers lazy
+                if (!workspace.lspServers) {
+                    await loadLspServersForWorkspace(workspace);
+                }
+                renderServers(workspace.lspServers || [], [], workspace);
+            } else if (tab === 'debuggers') {
+                // Load DAP sessions lazy
+                await loadDapSessionsForWorkspace();
+                renderServers([], dapSessions, workspace);
+            }
+        }
+
+        async function loadLspServersForWorkspace(workspace) {
+            try {
+                const response = await fetch(`/api/admin/workspaces/${encodeURIComponent(workspace.rootUri)}/lsp-servers`);
+                if (response.ok) {
+                    const servers = await response.json();
+                    // Merge runtime data with configs (for name, description, etc.)
+                    workspace.lspServers = servers.map(s => window.mergeServerData(s));
+                }
+            } catch (error) {
+                console.error('Failed to load LSP servers:', error);
+                workspace.lspServers = [];
+            }
+        }
+
+        async function loadDapSessionsForWorkspace() {
+            if (!selectedWorkspace) {
+                dapSessions = [];
+                window.dapSessions = [];
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/admin/workspaces/${encodeURIComponent(selectedWorkspace)}/dap-sessions`);
+                if (response.ok) {
+                    dapSessions = await response.json();
+                    window.dapSessions = dapSessions; // Sync with global variable for admin-dap.js
+                    console.log('Loaded DAP sessions for workspace:', selectedWorkspace, 'count:', dapSessions.length);
+                }
+            } catch (error) {
+                console.error('Failed to load DAP sessions:', error);
+                dapSessions = [];
+                window.dapSessions = [];
             }
         }
 
@@ -396,23 +463,25 @@
             `;
         }
 
-        function renderDapServers(dapServers, dapSessions) {
-            if (dapServers.length === 0 && dapSessions.length === 0) {
+        function renderDapServers(dapConfigs, dapSessions) {
+            // Merge global DAP configs with workspace sessions
+            const sessionsByServerId = {};
+            dapSessions.forEach(session => {
+                if (!sessionsByServerId[session.serverId]) {
+                    sessionsByServerId[session.serverId] = [];
+                }
+                sessionsByServerId[session.serverId].push(session);
+            });
+
+            // Use global dapConfigs
+            const configs = Object.values(dapConfigs || {});
+            if (configs.length === 0 && dapSessions.length === 0) {
                 return '';
             }
 
-            // Group sessions by server ID
-            const sessionsByServer = {};
-            dapSessions.forEach(session => {
-                if (!sessionsByServer[session.dapServerId]) {
-                    sessionsByServer[session.dapServerId] = [];
-                }
-                sessionsByServer[session.dapServerId].push(session);
-            });
-
             return `
-                ${dapServers.map(server => {
-                    const sessions = sessionsByServer[server.id] || [];
+                ${configs.map(server => {
+                    const sessions = sessionsByServerId[server.id] || [];
                     const isInstalled = server.installed;
 
                     // Actions for debugger (like LSP servers)
@@ -432,55 +501,12 @@
                             </div>
                         </div>
                         ${sessions.map(session => {
-                            // Determine icon based on serverStatus first, then session state
-                            let stateIcon = '<span>⏹️</span>';
-                            let statusText = session.state ? session.state.charAt(0) + session.state.slice(1).toLowerCase() : '';
-                            let finalStatusClass = 'status-stopped';
-
-                            if (session.serverStatus === 'INSTALLING') {
-                                stateIcon = '<span>⏳</span>';
-                                statusText = 'Installing';
-                                finalStatusClass = 'status-installing';
-                            } else if (session.serverStatus === 'STARTING') {
-                                stateIcon = '<span>⏳</span>';
-                                statusText = 'Starting';
-                                finalStatusClass = 'status-starting';
-                            } else if (session.state === 'RUNNING') {
-                                stateIcon = '<span>▶️</span>';
-                                statusText = 'Running';
-                                finalStatusClass = 'status-running';
-                            } else if (session.state === 'PAUSED') {
-                                stateIcon = '<span>⏸️</span>';
-                                statusText = 'Paused';
-                                finalStatusClass = 'status-running-not-ready';
-                            } else if (session.state === 'ERROR' || session.serverStatus === 'START_FAILED' || session.serverStatus === 'ERROR') {
-                                stateIcon = '<span>❌</span>';
-                                statusText = 'Error';
-                                finalStatusClass = 'status-error';
+                            // Use createSessionHTML from admin-dap.js if available, otherwise fallback
+                            if (typeof window.createSessionHTML === 'function') {
+                                return window.createSessionHTML(session);
                             }
-
-                            // Determine action buttons
-                            const isStopped = session.state === 'CREATED' || session.serverStatus === 'STOPPED' || session.serverStatus === 'START_FAILED' || session.serverStatus === 'ERROR';
-                            const isRunningOrStarting = session.state === 'RUNNING' || session.serverStatus === 'STARTING' || session.serverStatus === 'INSTALLING';
-
-                            let actions = '';
-                            if (isStopped) {
-                                actions = `
-                                    <button class="server-action-btn" onclick='event.stopPropagation(); selectDapSession("${session.sessionId}"); setTimeout(() => { const btn = document.getElementById("dap-launch-btn-${session.sessionId}"); if(btn) btn.click(); }, 100);' title="Launch" style="font-size: 0.7rem; padding: 0.15rem 0.3rem;">▶</button>
-                                    <button class="server-action-btn" onclick='event.stopPropagation(); deleteDapSession("${session.sessionId}")' title="Delete" style="font-size: 0.7rem; padding: 0.15rem 0.3rem;">🗑️</button>
-                                `;
-                            } else if (isRunningOrStarting) {
-                                actions = `<button class="server-action-btn" onclick='event.stopPropagation(); stopDapSession("${session.sessionId}")' title="Stop" style="font-size: 0.7rem; padding: 0.15rem 0.3rem;">⏹</button>`;
-                            }
-
-                            return `
-                                <div data-session-id="${session.sessionId}" class="dap-session-item" style="margin-left: 2rem; padding: 0.25rem 0.5rem; display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.85rem; opacity: 0.9; border-radius: 4px; transition: background-color 0.2s;" onclick="selectDapSession('${session.sessionId}')">
-                                    ${stateIcon}
-                                    <span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${session.sessionName}</span>
-                                    <span class="status-badge ${finalStatusClass}" style="font-size: 0.7rem; padding: 0.1rem 0.4rem;">${statusText}</span>
-                                    ${actions}
-                                </div>
-                            `;
+                            // Fallback (should not happen if admin-dap.js is loaded)
+                            return `<div data-session-id="${session.sessionId}" class="dap-session-item">${session.sessionName}</div>`;
                         }).join('')}
                     `;
                 }).join('')}
@@ -500,7 +526,8 @@
             // Mark as DAP server for proper icon display
             selectedServer = {...dapServer, isDap: true};
             const workspace = workspaces.find(w => w.rootUri === selectedWorkspace);
-            renderServers(workspace?.lspServers || [], workspace?.dapSessions || [], workspace);
+            // Use global dapSessions, not workspace.dapSessions (doesn't exist anymore)
+            renderServers([], dapSessions || [], workspace);
 
             // Load console for DAP server
             if (!wasAlreadySelected) {
@@ -529,7 +556,12 @@
             const wasAlreadySelected = selectedServer && selectedServer.id === server.id;
             selectedServer = server;
             const workspace = workspaces.find(w => w.rootUri === selectedWorkspace);
-            renderServers(workspace?.lspServers || [], workspace?.dapSessions || [], workspace);
+            // Use the correct data based on current tab
+            if (currentWorkspaceTab === 'debuggers') {
+                renderServers([], dapSessions || [], workspace);
+            } else {
+                renderServers(workspace?.lspServers || [], [], workspace);
+            }
 
             // Only reload console if switching to a different server
             if (!wasAlreadySelected) {
@@ -2048,3 +2080,10 @@
             });
         }
 
+        // Expose globally for DAP session updates
+        window.loadDapSessionsForWorkspace = loadDapSessionsForWorkspace;
+        window.renderServers = renderServers;
+
+
+// Expose globally
+window.loadDapSessions = loadDapSessions;
