@@ -401,18 +401,22 @@ public class DapClient implements IDebugProtocolClient {
      * 1. initialize request → response (capabilities)
      * 2. launch/attach request → response
      * 3. Wait for initialized event
-     * 4. configurationDone request
+     * 4. setBreakpoints (if isDebug) ← IMPORTANT: before configurationDone
+     * 5. configurationDone request
      *
      * @param debugServer the debug protocol server proxy
      * @param dapParameters the DAP parameters (launch/attach configuration)
      * @param isDebug true if debugging (will set breakpoints), false for run without debugging
+     * @param serverId the DAP server ID
+     * @param breakpointSender optional callback to send breakpoints (if isDebug=true)
      * @return CompletableFuture that completes when initialization is done
      */
     public CompletableFuture<Void> connectAndInitialize(
             IDebugProtocolServer debugServer,
             Map<String, Object> dapParameters,
             boolean isDebug,
-            String serverId) {
+            String serverId,
+            java.util.function.Supplier<CompletableFuture<Void>> breakpointSender) {
 
         LOG.infof("Starting DAP connectAndInitialize sequence");
 
@@ -463,11 +467,28 @@ public class DapClient implements IDebugProtocolClient {
                 return q;
             });
 
-        // Step 2: Wait for initialized event, then configurationDone (like lsp4ij - runs in parallel with launch)
+        // Step 2: Wait for initialized event, then send breakpoints (if debug mode), then configurationDone
+        // This follows lsp4ij pattern: initialized → setBreakpoints → configurationDone
         CompletableFuture<Void> configurationDoneFuture = CompletableFuture
-            .allOf(initializedEventFuture, capabilitiesFuture)
+            .allOf(initializedEventFuture, capabilitiesFuture);
+
+        // If debug mode, send breakpoints BEFORE configurationDone (like lsp4ij)
+        if (isDebug && breakpointSender != null) {
+            configurationDoneFuture = configurationDoneFuture
+                .thenCompose(v -> {
+                    LOG.infof("Received initialized event, sending breakpoints");
+                    return breakpointSender.get();
+                })
+                .exceptionally(t -> {
+                    LOG.errorf(t, "Failed to send breakpoints (non-fatal, continuing)");
+                    return null;
+                });
+        }
+
+        // Then send configurationDone (like lsp4ij - after breakpoints if debug mode)
+        configurationDoneFuture = configurationDoneFuture
             .thenCompose(v -> {
-                LOG.infof("Received initialized event and capabilities, sending configurationDone");
+                LOG.infof("Sending configurationDone");
                 org.eclipse.lsp4j.debug.Capabilities caps = getCapabilities();
 
                 // Only send configurationDone if supported

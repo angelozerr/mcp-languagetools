@@ -82,6 +82,10 @@ public class DapSession implements DapEventListener {
     // Parent-child session support
     private final List<DapSession> childSessions = new ArrayList<>();
 
+    // Track which server has the active thread (for routing stackTrace/scopes/variables requests)
+    // In VS Code JS Debug, child sessions handle the actual debugging, so we need to route to the right server
+    private IDebugProtocolServer activeServer; // The server that has the currentThreadId
+
     public enum SessionState {
         CREATED,
         RUNNING,
@@ -168,133 +172,108 @@ public class DapSession implements DapEventListener {
         // Each child gets its own DapClient + Launcher, sharing the same transport streams
         DapClient childClient = this.dapServer.createDapClient(this.dapServer.getDapClient());
 
-        // Set event listener to forward child events to parent (or handle separately)
-        childClient.setEventListener(new DapEventListener() {
-            @Override
-            public void onInitialized() {
-                LOG.infof("Child session %s initialized", childSessionId);
-            }
-
-            @Override
-            public void onStopped(StoppedEventArguments event) {
-                LOG.infof("Child session %s stopped", childSessionId);
-            }
-
-            @Override
-            public void onContinued(ContinuedEventArguments event) {
-                LOG.infof("Child session %s continued", childSessionId);
-            }
-
-            @Override
-            public void onTerminated(TerminatedEventArguments event) {
-                LOG.infof("Child session %s terminated", childSessionId);
-                // Remove child from parent's list
-                DapSession.this.dapServer.getDapClient().getChildrenClients().remove(childClient);
-            }
-
-            @Override
-            public void onThread(ThreadEventArguments event) {}
-
-            @Override
-            public void onOutput(OutputEventArguments event) {
-                // Forward output to parent's trace collector
-                String output = event.getOutput();
-                LOG.infof("Child session %s onOutput called: category=%s, output=%s",
-                    childSessionId, event.getCategory(), output);
-                if (output != null && !output.isBlank()) {
-                    String category = event.getCategory();
-
-                    // Skip telemetry outputs
-                    if ("telemetry".equals(category)) {
-                        return;
-                    }
-
-                    com.redhat.mcp.languagetools.trace.TraceCollector.MessageDirection direction =
-                        "stderr".equals(category)
-                            ? com.redhat.mcp.languagetools.trace.TraceCollector.MessageDirection.SERVER_TO_CLIENT
-                            : com.redhat.mcp.languagetools.trace.TraceCollector.MessageDirection.SERVER_TO_CLIENT;
-
-                    // Use same color coding as parent: [Console], [Stdout], [Error]
-                    // IMPORTANT: Use messageType to ensure outputs always show (not filtered by trace level)
-                    String displayText;
-                    TraceCollector.MessageType messageType;
-
-                    if ("console".equals(category)) {
-                        displayText = output.trim();  // Console output
-                        messageType = TraceCollector.MessageType.INFO;
-                    } else if ("stdout".equals(category)) {
-                        displayText = output.trim();  // Standard output
-                        messageType = TraceCollector.MessageType.INFO;
-                    } else if ("stderr".equals(category)) {
-                        displayText = output.trim();  // Error output
-                        messageType = TraceCollector.MessageType.ERROR;
-                    } else {
-                        displayText = String.format("[Child DAP Output - %s] %s", category, output.trim());
-                        messageType = TraceCollector.MessageType.TRACE;
-                    }
-
-                    // Use DapTraceCollector's addTrace with messageType
-                    // IMPORTANT: Use parent sessionId so outputs appear in the same console
-                    if (traceCollector instanceof DapTraceCollector) {
-                        ((DapTraceCollector) traceCollector).addTrace(
-                            workspace.getNormalizedUri(),
-                            DapSession.this.sessionId,  // Use parent sessionId, not childSessionId
-                            direction,
-                            displayText,
-                            messageType
-                        );
-                    } else {
-                        traceCollector.addTrace(
-                            workspace.getNormalizedUri(),
-                            DapSession.this.sessionId,  // Use parent sessionId, not childSessionId
-                            direction,
-                            displayText
-                        );
-                    }
-                }
-            }
-
-            @Override
-            public void onBreakpoint(BreakpointEventArguments event) {}
-
-            @Override
-            public void onModule(ModuleEventArguments event) {}
-
-            @Override
-            public void onLoadedSource(LoadedSourceEventArguments event) {}
-
-            @Override
-            public void onProcess(ProcessEventArguments event) {}
-
-            @Override
-            public void onCapabilities(CapabilitiesEventArguments event) {}
-
-            @Override
-            public void onProgressStart(ProgressStartEventArguments event) {}
-
-            @Override
-            public void onProgressUpdate(ProgressUpdateEventArguments event) {}
-
-            @Override
-            public void onProgressEnd(ProgressEndEventArguments event) {}
-
-            @Override
-            public void onInvalidated(InvalidatedEventArguments event) {}
-
-            @Override
-            public void onMemory(MemoryEventArguments event) {}
-        });
-
         // Create a NEW launcher for this child (like lsp4ij)
         // The launcher will share the same transport streams but route messages correctly
         IDebugProtocolServer childDebugServer = this.dapServer.createChildLauncher(childClient);
 
+        // IMPORTANT: Like lsp4ij DAPDebugProcess, child clients forward events to the parent session
+        // But we need to know WHICH server to use for stackTrace/scopes/variables
+        // So we wrap the events to capture the child's debug server
+        final IDebugProtocolServer childServer = childDebugServer;
+        childClient.setEventListener(new DapEventListener() {
+            @Override
+            public void onInitialized() {
+                DapSession.this.onInitialized();
+            }
+
+            @Override
+            public void onStopped(StoppedEventArguments event) {
+                // Like lsp4ij: when stopped arrives, store THIS client's server as the active one
+                LOG.infof("Child session %s stopped - setting as active server", childSessionId);
+                activeServer = childServer;
+                DapSession.this.onStopped(event);
+            }
+
+            @Override
+            public void onContinued(ContinuedEventArguments event) {
+                DapSession.this.onContinued(event);
+            }
+
+            @Override
+            public void onTerminated(TerminatedEventArguments event) {
+                DapSession.this.onTerminated(event);
+            }
+
+            @Override
+            public void onThread(ThreadEventArguments event) {
+                DapSession.this.onThread(event);
+            }
+
+            @Override
+            public void onOutput(OutputEventArguments event) {
+                DapSession.this.onOutput(event);
+            }
+
+            @Override
+            public void onBreakpoint(BreakpointEventArguments event) {
+                DapSession.this.onBreakpoint(event);
+            }
+
+            @Override
+            public void onModule(ModuleEventArguments event) {
+                DapSession.this.onModule(event);
+            }
+
+            @Override
+            public void onLoadedSource(LoadedSourceEventArguments event) {
+                DapSession.this.onLoadedSource(event);
+            }
+
+            @Override
+            public void onProcess(ProcessEventArguments event) {
+                DapSession.this.onProcess(event);
+            }
+
+            @Override
+            public void onCapabilities(CapabilitiesEventArguments event) {
+                DapSession.this.onCapabilities(event);
+            }
+
+            @Override
+            public void onProgressStart(ProgressStartEventArguments event) {
+                DapSession.this.onProgressStart(event);
+            }
+
+            @Override
+            public void onProgressUpdate(ProgressUpdateEventArguments event) {
+                DapSession.this.onProgressUpdate(event);
+            }
+
+            @Override
+            public void onProgressEnd(ProgressEndEventArguments event) {
+                DapSession.this.onProgressEnd(event);
+            }
+
+            @Override
+            public void onInvalidated(InvalidatedEventArguments event) {
+                DapSession.this.onInvalidated(event);
+            }
+
+            @Override
+            public void onMemory(MemoryEventArguments event) {
+                DapSession.this.onMemory(event);
+            }
+        });
+
         // Initialize the child client with its own debug server proxy
+        // IMPORTANT: Like lsp4ij, child sessions receive parent's breakpoints
+        // by calling sendAllBreakpointsToServer with the child server
         return childClient.connectAndInitialize(
                 childDebugServer,  // Use the child's own debug server proxy
                 configuration,
                 debugMode,
-                this.serverConfig.getServerId()
+                this.serverConfig.getServerId(),
+                debugMode ? () -> sendAllBreakpointsToServer(childDebugServer) : null  // Send parent's breakpoints to child server
             )
             .thenApply(v -> childClient)
             .exceptionally(ex -> {
@@ -438,7 +417,8 @@ public class DapSession implements DapEventListener {
                                 dapServer.getDebugServer(),
                                 enrichedConfig,
                                 debugMode,  // Pass debugMode to control breakpoint initialization
-                                dapServer.getConfig().getServerId()
+                                dapServer.getConfig().getServerId(),
+                                debugMode ? this::sendAllBreakpoints : null  // Send breakpoints if debug mode
                         )
                         .thenApply(result -> {
                             setState(SessionState.RUNNING);
@@ -593,47 +573,173 @@ public class DapSession implements DapEventListener {
     // ========== Breakpoints ==========
 
     /**
+     * Send breakpoints for a specific file to the DAP server.
+     * This replaces ALL breakpoints for the file (DAP setBreakpoints semantics).
+     *
+     * @param file the source file path
+     * @return CompletableFuture that completes when breakpoints are sent
+     */
+    private CompletableFuture<Void> sendBreakpoints(String file) {
+        IDebugProtocolServer server = dapServer.getDebugServer();
+        if (server == null) {
+            LOG.warnf("Cannot send breakpoints for %s: server not initialized", file);
+            return CompletableFuture.completedFuture(null);
+        }
+
+        // Get ALL breakpoints for this file
+        List<BreakpointInfo> fileBreakpoints = breakpoints.values().stream()
+                .filter(bp -> bp.file.equals(file))
+                .toList();
+
+        LOG.infof("Sending %d breakpoint(s) for file: %s", fileBreakpoints.size(), file);
+
+        // Convert to SourceBreakpoint[]
+        SourceBreakpoint[] sourceBps = fileBreakpoints.stream()
+                .map(info -> {
+                    SourceBreakpoint bp = new SourceBreakpoint();
+                    bp.setLine(info.line);
+                    if (info.condition != null && !info.condition.isEmpty()) {
+                        bp.setCondition(info.condition);
+                    }
+                    return bp;
+                })
+                .toArray(SourceBreakpoint[]::new);
+
+        // Build setBreakpoints request
+        SetBreakpointsArguments args = new SetBreakpointsArguments();
+        Source source = new Source();
+        source.setPath(file);
+        args.setSource(source);
+        args.setBreakpoints(sourceBps);
+
+        // Send and update verified status
+        return server.setBreakpoints(args)
+                .thenAccept(response -> {
+                    if (response.getBreakpoints() != null) {
+                        Breakpoint[] dapBps = response.getBreakpoints();
+                        for (int i = 0; i < Math.min(dapBps.length, fileBreakpoints.size()); i++) {
+                            BreakpointInfo info = fileBreakpoints.get(i);
+                            Breakpoint dapBp = dapBps[i];
+                            info.verified = dapBp.isVerified();
+                            info.dapBreakpoint = dapBp;
+                            LOG.infof("Breakpoint %s at %s:%d verified=%s",
+                                    info.breakpointId, info.file, info.line, info.verified);
+                        }
+                    }
+                })
+                .exceptionally(t -> {
+                    LOG.errorf(t, "Failed to send breakpoints for file: %s", file);
+                    return null;
+                });
+    }
+
+    /**
+     * Send ALL parent's breakpoints to a specific debug server (like lsp4ij pattern).
+     * This is used when a child session is created - it receives all breakpoints from the parent.
+     *
+     * @param server the debug server to send breakpoints to (typically a child server)
+     * @return CompletableFuture that completes when all breakpoints are sent
+     */
+    private CompletableFuture<Void> sendAllBreakpointsToServer(IDebugProtocolServer server) {
+        LOG.infof("Sending %d parent breakpoints to specific server", breakpoints.size());
+
+        if (breakpoints.isEmpty()) {
+            return CompletableFuture.completedFuture(null);
+        }
+
+        // Group breakpoints by file (like lsp4ij does)
+        Map<String, List<BreakpointInfo>> byFile = breakpoints.values().stream()
+                .collect(java.util.stream.Collectors.groupingBy(bp -> bp.file));
+
+        // Send each file's breakpoints to the given server (like lsp4ij pattern)
+        List<CompletableFuture<Void>> futures = new ArrayList<>();
+        for (Map.Entry<String, List<BreakpointInfo>> entry : byFile.entrySet()) {
+            String file = entry.getKey();
+            List<BreakpointInfo> fileBps = entry.getValue();
+
+            // Convert to SourceBreakpoint[]
+            SourceBreakpoint[] sourceBps = fileBps.stream()
+                    .map(info -> {
+                        SourceBreakpoint bp = new SourceBreakpoint();
+                        bp.setLine(info.line);
+                        if (info.condition != null && !info.condition.isEmpty()) {
+                            bp.setCondition(info.condition);
+                        }
+                        return bp;
+                    })
+                    .toArray(SourceBreakpoint[]::new);
+
+            // Build setBreakpoints request
+            SetBreakpointsArguments args = new SetBreakpointsArguments();
+            Source source = new Source();
+            source.setPath(file);
+            args.setSource(source);
+            args.setBreakpoints(sourceBps);
+
+            // Send to the specific server (like lsp4ij: setBreakpoints(server, arguments))
+            CompletableFuture<Void> future = server.setBreakpoints(args)
+                    .thenAccept(response -> {
+                        LOG.infof("Server received %d breakpoints for file: %s",
+                                response.getBreakpoints() != null ? response.getBreakpoints().length : 0, file);
+                    })
+                    .exceptionally(t -> {
+                        LOG.errorf(t, "Failed to send breakpoints for file: %s", file);
+                        return null;
+                    });
+
+            futures.add(future);
+        }
+
+        return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]));
+    }
+
+    /**
+     * Send ALL breakpoints to the DAP server, grouped by file.
+     * Used during initialization (after 'initialized' event, before 'configurationDone').
+     *
+     * @return CompletableFuture that completes when all breakpoints are sent
+     */
+    public CompletableFuture<Void> sendAllBreakpoints() {
+        if (breakpoints.isEmpty()) {
+            LOG.infof("No breakpoints to send");
+            return CompletableFuture.completedFuture(null);
+        }
+
+        // Group breakpoints by file
+        Set<String> files = breakpoints.values().stream()
+                .map(bp -> bp.file)
+                .collect(java.util.stream.Collectors.toSet());
+
+        LOG.infof("Sending breakpoints for %d file(s)", files.size());
+
+        // Send one setBreakpoints per file
+        List<CompletableFuture<Void>> futures = files.stream()
+                .map(this::sendBreakpoints)
+                .toList();
+
+        return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]));
+    }
+
+    /**
      * Set a breakpoint at a specific file and line.
+     * This adds the breakpoint to the session and immediately sends ALL breakpoints
+     * for the file to the DAP server (since setBreakpoints replaces all breakpoints).
      */
     public CompletableFuture<BreakpointInfo> setBreakpoint(String file, int line, String condition) {
         String breakpointId = UUID.randomUUID().toString();
         BreakpointInfo info = new BreakpointInfo(breakpointId, file, line, condition);
         breakpoints.put(breakpointId, info);
 
-        LOG.infof("Setting breakpoint: %s at %s:%d", breakpointId, file, line);
+        LOG.infof("Added breakpoint: %s at %s:%d", breakpointId, file, line);
 
-        // Send to DAP server
-        IDebugProtocolServer server = dapServer.getDebugServer();
-        if (server == null) {
-            return CompletableFuture.completedFuture(info);
-        }
-
-        SetBreakpointsArguments args = new SetBreakpointsArguments();
-        Source source = new Source();
-        source.setPath(file);
-        args.setSource(source);
-
-        SourceBreakpoint bp = new SourceBreakpoint();
-        bp.setLine(line);
-        if (condition != null && !condition.isEmpty()) {
-            bp.setCondition(condition);
-        }
-        args.setBreakpoints(new SourceBreakpoint[]{bp});
-
-        return server.setBreakpoints(args)
-            .thenApply(response -> {
-                if (response.getBreakpoints() != null && response.getBreakpoints().length > 0) {
-                    Breakpoint dapBp = response.getBreakpoints()[0];
-                    info.verified = dapBp.isVerified();
-                    info.dapBreakpoint = dapBp;
-                    LOG.infof("Breakpoint set and verified: %s", breakpointId);
-                }
-                return info;
-            });
+        // Send ALL breakpoints for this file (DAP setBreakpoints replaces all)
+        return sendBreakpoints(file).thenApply(v -> info);
     }
 
     /**
      * Remove a breakpoint.
+     * This removes the breakpoint from the session and sends the updated list
+     * for the file to the DAP server.
      */
     public CompletableFuture<Boolean> removeBreakpoint(String breakpointId) {
         BreakpointInfo info = breakpoints.remove(breakpointId);
@@ -641,22 +747,10 @@ public class DapSession implements DapEventListener {
             return CompletableFuture.completedFuture(false);
         }
 
-        LOG.infof("Removing breakpoint: %s", breakpointId);
+        LOG.infof("Removed breakpoint: %s at %s:%d", breakpointId, info.file, info.line);
 
-        // Send updated breakpoint list to DAP server (without this breakpoint)
-        IDebugProtocolServer server = dapServer.getDebugServer();
-        if (server == null) {
-            return CompletableFuture.completedFuture(true);
-        }
-
-        SetBreakpointsArguments args = new SetBreakpointsArguments();
-        Source source = new Source();
-        source.setPath(info.file);
-        args.setSource(source);
-        args.setBreakpoints(new SourceBreakpoint[0]); // Empty = remove all from this file
-
-        return server.setBreakpoints(args)
-            .thenApply(response -> true);
+        // Send ALL remaining breakpoints for this file (empty list if none left)
+        return sendBreakpoints(info.file).thenApply(v -> true);
     }
 
     /**
@@ -674,7 +768,7 @@ public class DapSession implements DapEventListener {
     public CompletableFuture<Map<String, Object>> continueExecution() {
         LOG.infof("Continue execution: %s", sessionId);
 
-        IDebugProtocolServer server = dapServer.getDebugServer();
+        IDebugProtocolServer server = getActiveServer();
         if (server == null || currentThreadId == null) {
             return CompletableFuture.failedFuture(new IllegalStateException("No thread to continue"));
         }
@@ -698,7 +792,7 @@ public class DapSession implements DapEventListener {
     public CompletableFuture<Void> stepOver() {
         LOG.infof("Step over: %s", sessionId);
 
-        IDebugProtocolServer server = dapServer.getDebugServer();
+        IDebugProtocolServer server = getActiveServer();
         if (server == null || currentThreadId == null) {
             return CompletableFuture.failedFuture(new IllegalStateException("No thread to step"));
         }
@@ -715,7 +809,7 @@ public class DapSession implements DapEventListener {
     public CompletableFuture<Void> stepIn() {
         LOG.infof("Step in: %s", sessionId);
 
-        IDebugProtocolServer server = dapServer.getDebugServer();
+        IDebugProtocolServer server = getActiveServer();
         if (server == null || currentThreadId == null) {
             return CompletableFuture.failedFuture(new IllegalStateException("No thread to step"));
         }
@@ -732,7 +826,7 @@ public class DapSession implements DapEventListener {
     public CompletableFuture<Void> stepOut() {
         LOG.infof("Step out: %s", sessionId);
 
-        IDebugProtocolServer server = dapServer.getDebugServer();
+        IDebugProtocolServer server = getActiveServer();
         if (server == null || currentThreadId == null) {
             return CompletableFuture.failedFuture(new IllegalStateException("No thread to step"));
         }
@@ -749,7 +843,7 @@ public class DapSession implements DapEventListener {
     public CompletableFuture<Void> pause() {
         LOG.infof("Pause execution: %s", sessionId);
 
-        IDebugProtocolServer server = dapServer.getDebugServer();
+        IDebugProtocolServer server = getActiveServer();
         if (server == null || currentThreadId == null) {
             return CompletableFuture.failedFuture(new IllegalStateException("No thread to pause"));
         }
@@ -764,13 +858,26 @@ public class DapSession implements DapEventListener {
     // ========== Inspection ==========
 
     /**
+     * Get the active debug server.
+     * Like lsp4ij: when a child session sends 'stopped', that child's server becomes the active one.
+     * All subsequent requests (stackTrace, continue, step, etc.) use the active server.
+     */
+    private IDebugProtocolServer getActiveServer() {
+        return activeServer != null ? activeServer : dapServer.getDebugServer();
+    }
+
+    /**
      * Get stack trace for current thread.
      */
     public CompletableFuture<StackFrame[]> getStackTrace() {
-        LOG.infof("Get stack trace: %s", sessionId);
+        LOG.infof("Get stack trace: %s (activeServer=%s, currentThreadId=%d)",
+                sessionId, activeServer != null ? "child" : "parent", currentThreadId);
 
-        IDebugProtocolServer server = dapServer.getDebugServer();
+        // Like lsp4ij: use the active server (the one that sent the last 'stopped' event)
+        // For VS Code JS Debug, child sessions have the threads, not the parent
+        IDebugProtocolServer server = activeServer != null ? activeServer : dapServer.getDebugServer();
         if (server == null || currentThreadId == null) {
+            LOG.warnf("Cannot get stack trace: server=%s, currentThreadId=%s", server, currentThreadId);
             return CompletableFuture.completedFuture(new StackFrame[0]);
         }
 
@@ -790,7 +897,7 @@ public class DapSession implements DapEventListener {
     public CompletableFuture<Thread[]> getThreads() {
         LOG.infof("Get threads: %s", sessionId);
 
-        IDebugProtocolServer server = dapServer.getDebugServer();
+        IDebugProtocolServer server = getActiveServer();
         if (server == null) {
             return CompletableFuture.completedFuture(new Thread[0]);
         }
@@ -811,7 +918,7 @@ public class DapSession implements DapEventListener {
     public CompletableFuture<Scope[]> getScopes(int frameId) {
         LOG.infof("Get scopes for frame %d: %s", frameId, sessionId);
 
-        IDebugProtocolServer server = dapServer.getDebugServer();
+        IDebugProtocolServer server = getActiveServer();
         if (server == null) {
             return CompletableFuture.completedFuture(new Scope[0]);
         }
@@ -829,7 +936,7 @@ public class DapSession implements DapEventListener {
     public CompletableFuture<Variable[]> getVariables(int variablesReference) {
         LOG.infof("Get variables for reference %d: %s", variablesReference, sessionId);
 
-        IDebugProtocolServer server = dapServer.getDebugServer();
+        IDebugProtocolServer server = getActiveServer();
         if (server == null) {
             return CompletableFuture.completedFuture(new Variable[0]);
         }
@@ -847,7 +954,7 @@ public class DapSession implements DapEventListener {
     public CompletableFuture<EvaluateResponse> evaluate(String expression, Integer frameId) {
         LOG.infof("Evaluate expression '%s': %s", expression, sessionId);
 
-        IDebugProtocolServer server = dapServer.getDebugServer();
+        IDebugProtocolServer server = getActiveServer();
         if (server == null) {
             return CompletableFuture.failedFuture(new IllegalStateException("DAP server not initialized"));
         }
