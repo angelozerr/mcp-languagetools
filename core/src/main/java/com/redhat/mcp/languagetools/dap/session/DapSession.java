@@ -14,6 +14,7 @@ import org.eclipse.lsp4j.debug.Thread;
 import org.eclipse.lsp4j.debug.services.IDebugProtocolServer;
 import org.jboss.logging.Logger;
 
+import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -33,21 +34,50 @@ public class DapSession implements DapEventListener {
 
     private static final Logger LOG = Logger.getLogger(DapSession.class);
 
+    /**
+     * Enum for tracking who created/launched a debug session.
+     */
+    public enum SessionActor {
+        AI_AGENT("AI Agent"),    // Created/launched by an AI agent (Claude, etc.)
+        MANUAL("Manual"),        // Created/launched manually via UI/API
+        UNKNOWN("Unknown");      // Unknown source
+
+        private final String displayName;
+
+        SessionActor(String displayName) {
+            this.displayName = displayName;
+        }
+
+        public String getDisplayName() {
+            return displayName;
+        }
+
+        @Override
+        public String toString() {
+            return displayName;
+        }
+    }
+
     private final String sessionId;
     private final String language;
     private final String sessionName;
+    private final SessionActor createdBy; // Who created the session
     private final DapServerConfig serverConfig;
     private final DapServer dapServer; // Not final - can be recreated after error
     private final Workspace workspace;
     private final DapTraceCollector traceCollector;
+    private final Instant createdAt; // When the session was created
 
     private SessionState state = SessionState.CREATED;
     private boolean debugMode = false; // Default to run mode (without debugging)
+    private SessionActor launchedBy; // Who last launched the session
+    private Instant launchedAt; // When the session was last launched
     private Runnable stateChangeCallback; // Callback when session state changes
     private final Map<String, BreakpointInfo> breakpoints = new ConcurrentHashMap<>();
     private Thread[] threads = new Thread[0];
     private StackFrame[] currentStackFrames = new StackFrame[0];
     private Integer currentThreadId;
+    private Map<String, Object> launchConfiguration; // Store the launch configuration used
 
     // Parent-child session support
     private final List<DapSession> childSessions = new ArrayList<>();
@@ -80,12 +110,15 @@ public class DapSession implements DapEventListener {
     public DapSession(String sessionId,
                       String language,
                       String sessionName,
+                      SessionActor createdBy,
                       DapServerConfig serverConfig,
-                      Workspace workspace,
-                      DapTraceCollector traceCollector) {
+                      Workspace workspace) {
         this.sessionId = sessionId;
         this.language = language;
         this.sessionName = sessionName;
+        this.createdBy = createdBy != null ? createdBy : SessionActor.UNKNOWN;
+        this.createdAt = Instant.now(); // Record creation timestamp
+        this.launchedBy = createdBy; // Initially, createdBy is also launchedBy
         this.serverConfig = serverConfig;
         this.workspace = workspace;
         this.traceCollector = workspace.getApplication().getDapTraceCollector();
@@ -95,7 +128,7 @@ public class DapSession implements DapEventListener {
             // Replace with a new wrapper that uses the session's sessionId
             serverConfig.setTraceCollector(new DapTraceCollectorWrapper(
                 workspace.getApplication().getDapTraceCollector(),
-                workspace.getRootUri().toString(),
+                workspace.getNormalizedUri(),
                 sessionId
             ));
         }
@@ -204,7 +237,7 @@ public class DapSession implements DapEventListener {
                     // IMPORTANT: Use parent sessionId so outputs appear in the same console
                     if (traceCollector instanceof DapTraceCollector) {
                         ((DapTraceCollector) traceCollector).addTrace(
-                            workspace.getRootUri().toString(),
+                            workspace.getNormalizedUri(),
                             DapSession.this.sessionId,  // Use parent sessionId, not childSessionId
                             direction,
                             displayText,
@@ -212,7 +245,7 @@ public class DapSession implements DapEventListener {
                         );
                     } else {
                         traceCollector.addTrace(
-                            workspace.getRootUri().toString(),
+                            workspace.getNormalizedUri(),
                             DapSession.this.sessionId,  // Use parent sessionId, not childSessionId
                             direction,
                             displayText
@@ -305,7 +338,7 @@ public class DapSession implements DapEventListener {
 
                 // Send error to traces
                 traceCollector.addTrace(
-                    workspace.getRootUri().toString(),
+                    workspace.getNormalizedUri(),
                     sessionId,
                     TraceCollector.MessageDirection.SERVER_TO_CLIENT,
                     "❌ Failed to initialize: " + ex.getMessage()
@@ -331,11 +364,22 @@ public class DapSession implements DapEventListener {
      * @param launchConfig the launch configuration
      * @param debugMode true to launch in debug mode (with breakpoints), false to run without debugging
      */
-    public CompletableFuture<Map<String, Object>> launch(Map<String, Object> launchConfig, boolean debugMode) {
-        LOG.infof("Launching debug session: %s (debugMode=%s) with config: %s", sessionId, debugMode, launchConfig);
+    public CompletableFuture<Map<String, Object>> launch(Map<String, Object> launchConfig, boolean debugMode, SessionActor launchedBy) {
+        LOG.infof("Launching debug session: %s (debugMode=%s, launchedBy=%s) with config: %s", sessionId, debugMode, launchedBy, launchConfig);
+
+        // Store launch configuration for later retrieval
+        this.launchConfiguration = new HashMap<>(launchConfig);
+
+        // Store who launched this session
+        if (launchedBy != null) {
+            this.launchedBy = launchedBy;
+        }
 
         // Store debugMode for child sessions to inherit
         this.debugMode = debugMode;
+
+        // Record launch timestamp
+        this.launchedAt = Instant.now();
 
         // Restart server if not running (first launch or after crash)
         CompletableFuture<Void> initFuture;
@@ -431,7 +475,7 @@ public class DapSession implements DapEventListener {
 
                             // Add trace to console with full stack
                             dapServer.getTraceCollector().addTrace(
-                                    workspace.getRootUri().toString(),
+                                    workspace.getNormalizedUri(),
                                     sessionId,
                                     TraceCollector.MessageDirection.SERVER_TO_CLIENT,
                                     errorTrace.toString()
@@ -502,7 +546,7 @@ public class DapSession implements DapEventListener {
                                     error.getMessage());
                                 // Show in UI
                                 traceCollector.addTrace(
-                                    workspace.getRootUri().toString(),
+                                    workspace.getNormalizedUri(),
                                     sessionId,
                                     com.redhat.mcp.languagetools.trace.TraceCollector.MessageDirection.CLIENT_TO_SERVER,
                                     "Disconnect completed (server may have already terminated)"
@@ -529,7 +573,7 @@ public class DapSession implements DapEventListener {
                 // Catch any remaining errors and show in UI
                 LOG.errorf(t, "Error during session termination: %s", sessionId);
                 traceCollector.addTrace(
-                    workspace.getRootUri().toString(),
+                    workspace.getNormalizedUri(),
                     sessionId,
                     com.redhat.mcp.languagetools.trace.TraceCollector.MessageDirection.CLIENT_TO_SERVER,
                     "⚠️ Termination error: " + t.getMessage()
@@ -900,7 +944,7 @@ public class DapSession implements DapEventListener {
             // Use the DapTraceCollector's addTrace with messageType
             if (traceCollector instanceof DapTraceCollector) {
                 ((DapTraceCollector) traceCollector).addTrace(
-                    workspace.getRootUri().toString(),
+                    workspace.getNormalizedUri(),
                     sessionId,
                     direction,
                     displayText,
@@ -908,7 +952,7 @@ public class DapSession implements DapEventListener {
                 );
             } else {
                 traceCollector.addTrace(
-                    workspace.getRootUri().toString(),
+                    workspace.getNormalizedUri(),
                     sessionId,
                     direction,
                     displayText
@@ -1024,15 +1068,18 @@ public class DapSession implements DapEventListener {
 
     /**
      * Get workspace folder path as a proper file system path (not URI).
-     * On Windows: "C:/path/to/workspace" (not "/C:/path/to/workspace")
+     * On Windows: "C:\path\to\workspace" (not "file:/C:/path/to/workspace")
      */
     private String getWorkspaceFolderPath() {
-        String path = workspace.getRootUri().getPath();
-        // On Windows, URI.getPath() returns "/C:/..." - remove leading slash
-        if (path.length() > 2 && path.charAt(0) == '/' && path.charAt(2) == ':') {
-            path = path.substring(1);
+        try {
+            // Convert URI to Path to get proper file system path
+            java.nio.file.Path path = java.nio.file.Paths.get(workspace.getRootUri());
+            return path.toString();
+        } catch (Exception e) {
+            LOG.errorf(e, "Failed to convert workspace URI to path: %s", workspace.getRootUri());
+            // Fallback to normalized URI
+            return workspace.getNormalizedUri();
         }
-        return path;
     }
 
     // ========== Getters ==========
@@ -1049,8 +1096,36 @@ public class DapSession implements DapEventListener {
         return sessionName;
     }
 
+    public SessionActor getCreatedBy() {
+        return createdBy;
+    }
+
+    public java.time.Instant getCreatedAt() {
+        return createdAt;
+    }
+
+    public SessionActor getLaunchedBy() {
+        return launchedBy;
+    }
+
+    public Instant getLaunchedAt() {
+        return launchedAt;
+    }
+
+    public void setLaunchedBy(SessionActor launchedBy) {
+        this.launchedBy = launchedBy;
+    }
+
     public SessionState getState() {
         return state;
+    }
+
+    public Map<String, Object> getLaunchConfiguration() {
+        return launchConfiguration;
+    }
+
+    public boolean isDebugMode() {
+        return debugMode;
     }
 
     /**

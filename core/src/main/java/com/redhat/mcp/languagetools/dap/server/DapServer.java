@@ -51,10 +51,7 @@ public class DapServer extends ServerBase<DapServerConfig> {
 
     @Override
     protected TracingMessageConsumer.TraceCollectorAdd initializeTraceCollector(Workspace workspace) {
-        DapTraceCollector collector = workspace.getApplication().getDapTraceCollector();
-        // Pass the server reference so collector can check trace level
-        collector.setServer(this);
-        return collector;
+        return workspace.getApplication().getDapTraceCollector();
     }
 
     /**
@@ -168,7 +165,7 @@ public class DapServer extends ServerBase<DapServerConfig> {
                 LOG.debugf("DAP command: %s", commandStr);
 
                 // Send startup traces
-                String workspaceRootUri = getWorkspace().getRootUri().toString();
+                String workspaceRootUri = getWorkspace().getNormalizedUri();
                 getTraceCollector().addTrace(
                     workspaceRootUri,
                     sessionId,
@@ -290,7 +287,7 @@ public class DapServer extends ServerBase<DapServerConfig> {
             .thenApply(v -> {
                 LOG.infof("DAP server ready, creating launcher...");
 
-                String workspaceRootUri = getWorkspace().getRootUri().toString();
+                String workspaceRootUri = getWorkspace().getNormalizedUri();
                 getTraceCollector().addTrace(
                     workspaceRootUri,
                     sessionId,

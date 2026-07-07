@@ -3,7 +3,9 @@ package com.redhat.mcp.languagetools.admin;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.redhat.mcp.languagetools.admin.dto.*;
 import com.redhat.mcp.languagetools.admin.ws.*;
+import com.redhat.mcp.languagetools.dap.session.DapSessionEvent;
 import com.redhat.mcp.languagetools.dap.session.DapSessionManager;
+import com.redhat.mcp.languagetools.dap.trace.DapTraceMessage;
 import com.redhat.mcp.languagetools.lsp.server.LspServerStatusChangeEvent;
 import com.redhat.mcp.languagetools.lsp.trace.LspTraceCollector;
 import com.redhat.mcp.languagetools.lsp.trace.LspTraceMessage;
@@ -126,7 +128,7 @@ public class AdminWebSocketEndpoint {
                 for (var server : workspace.getLspServers()) {
                     // Get last 200 traces for this server
                     var traces = lspTraceCollector.getTracesForWorkspaceAndServer(
-                        workspace.getRootUri().toString(),
+                        workspace.getNormalizedUri(),
                         server.getId(),
                         200
                     );
@@ -210,8 +212,8 @@ public class AdminWebSocketEndpoint {
     /**
      * CDI observer for DAP trace events.
      */
-    void onDapTrace(@Observes com.redhat.mcp.languagetools.dap.trace.DapTraceMessage trace) {
-        com.redhat.mcp.languagetools.admin.ws.DapTraceWsMessage msg = new com.redhat.mcp.languagetools.admin.ws.DapTraceWsMessage(
+    void onDapTrace(@Observes DapTraceMessage trace) {
+        var msg = new DapTraceWsMessage(
                 "dap-trace",
                 trace.workspaceUri(),
                 trace.sessionId(),
@@ -226,19 +228,23 @@ public class AdminWebSocketEndpoint {
     /**
      * CDI observer for DAP session events (created/changed/deleted).
      */
-    void onDapSessionEvent(@Observes com.redhat.mcp.languagetools.dap.session.DapSessionEvent event) {
+    void onDapSessionEvent(@Observes DapSessionEvent event) {
         LOG.infof("DAP session event: %s - session=%s, workspace=%s, status=%s->%s",
             event.getType(), event.getSessionId(), event.getWorkspaceUri(),
             event.getOldStatus(), event.getNewStatus());
 
-        com.redhat.mcp.languagetools.admin.ws.DapSessionUpdateWsMessage msg =
-            new com.redhat.mcp.languagetools.admin.ws.DapSessionUpdateWsMessage(
+        var msg = new DapSessionUpdateWsMessage(
                 "dap-session-update",
                 event.getType().name(),
                 event.getSessionId(),
                 event.getWorkspaceUri(),
                 event.getOldStatus(),
-                event.getNewStatus()
+                event.getNewStatus(),
+                event.getDebugMode(),
+                event.getCreatedBy(),
+                event.getCreatedAt(),
+                event.getLaunchedBy(),
+                event.getLaunchedAt()
             );
         broadcast(msg);
     }
@@ -386,14 +392,6 @@ public class AdminWebSocketEndpoint {
      * Convert workspace to DTO (copied from AdminResource).
      */
     private WorkspaceDTO toWorkspaceDTO(Workspace workspace) {
-        var serverConfigs = application.getLspServerConfigs();
-
-        // Build runtime DTOs for all LSP servers in this workspace
-        List<LspServerDTO> servers = serverConfigs
-                .stream()
-                .map(config -> serverDTOBuilder.buildRuntime(config, workspace))
-                .toList();
-
         DateTimeFormatter formatter = DateTimeFormatter.ISO_INSTANT;
         List<WorkspaceDTO.McpClientInfo> mcpClients = workspace.getMcpClientConnections().values()
                 .stream()
@@ -403,20 +401,7 @@ public class AdminWebSocketEndpoint {
                 ))
                 .toList();
 
-        // Build DAP session DTOs for this workspace
-        List<WorkspaceDTO.DapSessionDTO> dapSessions = dapSessionManager.getSessionsForWorkspace(workspace.getRootUri())
-                .stream()
-                .map(session -> new WorkspaceDTO.DapSessionDTO(
-                    session.getSessionId(),
-                    session.getSessionName(),
-                    session.getServerConfig().getServerId(),
-                    session.getState().name(),
-                    session.getLanguage(),
-                    session.getDapServer().getStatus().name()
-                ))
-                .toList();
-
-        var uri = workspace.getRootUri();
-        return new WorkspaceDTO(uri, workspace.isInitialized(), mcpClients, servers, dapSessions);
+        var uri = workspace.getNormalizedUri();
+        return new WorkspaceDTO(uri, workspace.isInitialized(), mcpClients);
     }
 }

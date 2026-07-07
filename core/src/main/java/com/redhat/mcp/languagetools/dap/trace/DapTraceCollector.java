@@ -28,13 +28,6 @@ public class DapTraceCollector implements TracingMessageConsumer.TraceCollectorA
     @Inject
     Event<DapTraceMessage> traceEvent;
 
-    // Reference to the DAP server for checking trace level
-    private com.redhat.mcp.languagetools.dap.server.DapServer server;
-
-    public void setServer(com.redhat.mcp.languagetools.dap.server.DapServer server) {
-        this.server = server;
-    }
-
     @Override
     public void trace(String message, TraceCollector.MessageType type) {
         // Default implementation - subclasses can override if needed
@@ -85,13 +78,6 @@ public class DapTraceCollector implements TracingMessageConsumer.TraceCollectorA
     public List<DapTraceMessage> getTracesForSession(String sessionId, int limit) {
         return traces.stream()
             .filter(t -> t.sessionId().equals(sessionId))
-            .skip(Math.max(0, traces.size() - limit))
-            .toList();
-    }
-
-    public List<DapTraceMessage> getTracesForWorkspaceAndSession(String workspaceUri, String sessionId, int limit) {
-        return traces.stream()
-            .filter(t -> t.workspaceUri().equals(workspaceUri) && t.sessionId().equals(sessionId))
             .skip(Math.max(0, traces.size() - limit))
             .toList();
     }
