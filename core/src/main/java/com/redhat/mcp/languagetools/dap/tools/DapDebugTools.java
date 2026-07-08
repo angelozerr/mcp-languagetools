@@ -4,6 +4,7 @@ import com.redhat.mcp.languagetools.Application;
 import com.redhat.mcp.languagetools.dap.session.DapSession;
 import com.redhat.mcp.languagetools.dap.session.DapSessionManager;
 import com.redhat.mcp.languagetools.tools.ToolArgDescriptions;
+import io.quarkiverse.mcp.server.Cancellation;
 import io.quarkiverse.mcp.server.Tool;
 import io.quarkiverse.mcp.server.ToolArg;
 import jakarta.inject.Inject;
@@ -13,7 +14,10 @@ import org.eclipse.lsp4j.debug.Thread;
 
 import java.net.URI;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
+
+import static com.redhat.mcp.languagetools.tools.CancellationSupport.executeWithCancellation;
 
 /**
  * MCP Tools for Debug Adapter Protocol (DAP) operations.
@@ -254,7 +258,7 @@ public class DapDebugTools {
 
     // ========== Inspection ==========
 
-    @Tool(description = "Get the current call stack (stack trace) showing function calls and line numbers.")
+    @Tool(description = "Get the current call stack (stack trace) showing function calls and line numbers.", structuredContent = true)
     public Map<String, Object> get_stack_trace(String sessionId) {
         DapSession session = sessionManager.getSession(sessionId);
         StackFrame[] frames = session.getStackTrace().join();
@@ -279,7 +283,7 @@ public class DapDebugTools {
         );
     }
 
-    @Tool(description = "List all threads in the debugged program.")
+    @Tool(description = "List all threads in the debugged program.", structuredContent = true)
     public Map<String, Object> list_threads(String sessionId) {
         DapSession session = sessionManager.getSession(sessionId);
         Thread[] threads = session.getThreads().join();
@@ -299,7 +303,7 @@ public class DapDebugTools {
         );
     }
 
-    @Tool(description = "Get variable scopes (Locals, Globals, etc.) for a specific stack frame.")
+    @Tool(description = "Get variable scopes (Locals, Globals, etc.) for a specific stack frame.", structuredContent = true)
     public Map<String, Object> get_scopes(
             String sessionId,
             int frameId) {
@@ -324,7 +328,8 @@ public class DapDebugTools {
     }
 
     @Tool(description = "Get variables from a scope or expandable variable. " +
-            "Use variablesReference from get_scopes or a variable's variablesReference.")
+            "Use variablesReference from get_scopes or a variable's variablesReference.",
+            structuredContent = true)
     public Map<String, Object> get_variables(
             String sessionId,
             int variablesReference) {
@@ -351,7 +356,7 @@ public class DapDebugTools {
         );
     }
 
-    @Tool(description = "Shortcut to get local variables in the current stack frame (top of stack).")
+    @Tool(description = "Shortcut to get local variables in the current stack frame (top of stack).", structuredContent = true)
     public Map<String, Object> get_local_variables(String sessionId) {
         DapSession session = sessionManager.getSession(sessionId);
 
@@ -386,31 +391,40 @@ public class DapDebugTools {
         return get_variables(sessionId, localsScope.getVariablesReference());
     }
 
-    @Tool(description = "Evaluate an expression in the current debug context (e.g., 'x + y', 'myFunction()').")
-    public Map<String, Object> evaluate_expression(
+    @Tool(
+            name = "evaluate_expression",
+            description = "Evaluate an expression in the current debug context (e.g., 'x + y', 'myFunction()').",
+            structuredContent = true)
+    public EvaluateResponse evaluateExpressionSync(
             String sessionId,
             String expression,
-            Integer frameId) {
+            Integer frameId,
+            Cancellation cancellation) {
+        return evaluateExpression(sessionId, expression, frameId, cancellation)
+                .join();
+    }
+
+    public CompletableFuture<EvaluateResponse> evaluateExpression(
+            String sessionId,
+            String expression,
+            Integer frameId,
+            Cancellation cancellation) {
 
         DapSession session = sessionManager.getSession(sessionId);
 
         // If no frameId provided, use top frame
-        Integer targetFrameId = frameId;
-        if (targetFrameId == null) {
-            StackFrame[] frames = session.getStackTrace().join();
-            if (frames.length > 0) {
-                targetFrameId = frames[0].getId();
-            }
+        if (frameId == null) {
+            return executeWithCancellation(
+                session.getStackTrace()
+                    .thenCompose(frames -> {
+                        int targetFrameId = frames.length > 0 ? frames[0].getId() : 0;
+                        return session.evaluate(expression, targetFrameId);
+                    }),
+                cancellation
+            );
         }
 
-        EvaluateResponse response = session.evaluate(expression, targetFrameId).join();
-
-        return Map.of(
-                "success", true,
-                "result", response.getResult(),
-                "type", response.getType() != null ? response.getType() : "",
-                "variablesReference", response.getVariablesReference()
-        );
+        return executeWithCancellation(session.evaluate(expression, frameId), cancellation);
     }
 
     // ========== Statistics ==========

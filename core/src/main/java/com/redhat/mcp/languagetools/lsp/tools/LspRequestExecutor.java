@@ -23,6 +23,8 @@ import org.jboss.logging.Logger;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
+import static com.redhat.mcp.languagetools.tools.CancellationSupport.executeWithCancellation;
+
 /**
  * Generic executor for LSP requests.
  * Handles the common pattern:
@@ -70,7 +72,9 @@ public class LspRequestExecutor {
                     // Execute LSP request on all servers in parallel (wait for ready first)
                     List<CompletableFuture<TResult>> futures = servers.stream()
                             .map(server -> server.waitUntilReady()
-                                    .thenCompose(v -> strategy.executeRequest(server, lspParams))
+                                    .thenCompose(v ->
+                                            // Register futures for automatic cancellation
+                                            executeWithCancellation(strategy.executeRequest(server, lspParams), cancellation))
                                     .exceptionally(ex -> {
                                         LOG.warnf("Failed to execute %s on server %s: %s",
                                                 strategy.getCapability(), server.getConfig().getServerId(), ex.getMessage());
@@ -78,10 +82,7 @@ public class LspRequestExecutor {
                                     }))
                             .toList();
 
-                    // Register futures for automatic cancellation
-                    if (cancellation != null) {
-                        cancellation.onCancelled(reason -> futures.forEach(future -> future.cancel(true)));
-                    }
+
 
                     // Step 3: Wait for all to complete and merge results
                     return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
