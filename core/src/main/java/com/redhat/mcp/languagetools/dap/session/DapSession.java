@@ -410,7 +410,11 @@ public class DapSession implements DapEventListener {
         var serverStatus = dapServer.getStatus();
         LOG.infof("Launch requested: sessionState=%s, serverStatus=%s", state, serverStatus);
 
-        if (state == SessionState.CREATED
+        // If session was TERMINATED, stop server first to clear vscode-js-debug DI state
+        if (state == SessionState.TERMINATED && serverStatus == com.redhat.mcp.languagetools.server.ServerStatus.RUNNING) {
+            LOG.infof("Session TERMINATED but server RUNNING - stopping server to clear state");
+            initFuture = dapServer.stop2().thenCompose(v -> initialize());
+        } else if (state == SessionState.CREATED
             || serverStatus == com.redhat.mcp.languagetools.server.ServerStatus.NOT_STARTED
             || serverStatus == com.redhat.mcp.languagetools.server.ServerStatus.START_FAILED
             || serverStatus == com.redhat.mcp.languagetools.server.ServerStatus.ERROR
