@@ -81,6 +81,7 @@ public class DapSession implements DapEventListener {
 
     // Parent-child session support
     private final List<DapSession> childSessions = new ArrayList<>();
+    private boolean isChildSession = false; // True if this is a child session created via startDebugging
 
     // Track which server has the active thread (for routing stackTrace/scopes/variables requests)
     // In VS Code JS Debug, child sessions handle the actual debugging, so we need to route to the right server
@@ -992,17 +993,19 @@ public class DapSession implements DapEventListener {
 
     @Override
     public void onTerminated(TerminatedEventArguments event) {
-        LOG.infof("Session %s terminated", sessionId);
+        LOG.infof("Session %s terminated (isChild=%s)", sessionId, isChildSession);
         setState(SessionState.TERMINATED);
 
-        // Stop the DAP server when session terminates
-        // This ensures a clean restart on next launch
-        LOG.infof("Stopping DAP server after session termination: %s", sessionId);
-        dapServer.stop2()
-            .exceptionally(ex -> {
-                LOG.warnf(ex, "Error stopping DAP server after termination: %s", ex.getMessage());
-                return null;
-            });
+        // Only stop the DAP server from the parent session
+        // Child sessions share the same server, so only the parent should stop it
+        if (!isChildSession) {
+            LOG.infof("Stopping DAP server after session termination: %s", sessionId);
+            dapServer.stop2()
+                .exceptionally(ex -> {
+                    LOG.warnf(ex, "Error stopping DAP server after termination: %s", ex.getMessage());
+                    return null;
+                });
+        }
     }
 
     @Override

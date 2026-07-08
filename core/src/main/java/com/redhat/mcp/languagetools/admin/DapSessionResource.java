@@ -225,7 +225,7 @@ public class DapSessionResource {
             }
 
             // Get templates from the server config
-            List<Map<String, Object>> templates = serverConfig.getConfigurationTemplates();
+            var templates = serverConfig.getConfigurationTemplates();
 
             return Response.ok(Map.of(
                     "serverId", serverId,

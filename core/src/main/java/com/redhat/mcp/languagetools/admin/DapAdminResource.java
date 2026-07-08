@@ -146,7 +146,7 @@ public class DapAdminResource {
             throw new NotFoundException("DAP server not found: " + serverId);
         }
 
-        List<Map<String, Object>> templates = serverConfig.getConfigurationTemplates();
+        var templates = serverConfig.getConfigurationTemplates();
         return Response.ok(Map.of("serverId", serverId, "templates", templates)).build();
     }
 

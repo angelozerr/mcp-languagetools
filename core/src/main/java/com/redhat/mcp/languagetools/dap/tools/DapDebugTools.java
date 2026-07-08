@@ -129,19 +129,35 @@ public class DapDebugTools {
 
     // ========== Debugging Lifecycle ==========
 
-    @Tool(description = "Start debugging (launch or attach) based on configuration.request. " +
-            "Creates a debug session automatically and starts the program. " +
-            "Returns sessionId to use in other debug operations. " +
-            "Use get_debug_templates() to see available configuration parameters. " +
-            "Set debugMode=false to run without debugging (no breakpoints). " +
-            "Optionally specify breakpoints to set before launching (avoids race conditions).")
-    public Map<String, Object> start_debugging(
+    @Tool(
+            name = "start_debugging",
+            description = "Start debugging (launch or attach) based on configuration.request. " +
+                    "Creates a debug session automatically and starts the program. " +
+                    "Returns sessionId to use in other debug operations. " +
+                    "Use get_debug_templates() to see available configuration parameters. " +
+                    "Set debugMode=false to run without debugging (no breakpoints). " +
+                    "Optionally specify breakpoints to set before launching (avoids race conditions).",
+            structuredContent = true
+    )
+    public Map<String, Object> startDebuggingSync(
             @ToolArg(description = "ID of the debug adapter (e.g., 'java-debug', 'vscode-js-debug', 'debugpy')") String debuggerId,
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = "Debug configuration with 'request' field ('launch' or 'attach')") Map<String, Object> configuration,
             @ToolArg(description = "Optional breakpoints to set before starting [{file, line, condition?}]") List<Map<String, Object>> breakpoints,
             @ToolArg(description = "Optional session name (auto-generated if not provided)") String sessionName,
-            @ToolArg(description = "Debug mode: true=debug with breakpoints, false=run without debugging (default)") Boolean debugMode) {
+            @ToolArg(description = "Debug mode: true=debug with breakpoints, false=run without debugging (default)") Boolean debugMode,
+            Cancellation cancellation) {
+        return startDebugging(debuggerId, cwd, configuration, breakpoints, sessionName, debugMode, cancellation).join();
+    }
+
+    public CompletableFuture<Map<String, Object>> startDebugging(
+            String debuggerId,
+            String cwd,
+            Map<String, Object> configuration,
+            List<Map<String, Object>> breakpoints,
+            String sessionName,
+            Boolean debugMode,
+            Cancellation cancellation) {
 
         // Convert cwd to URI (handle both file:// URIs and Windows/Unix paths)
         URI uri;
@@ -164,41 +180,46 @@ public class DapDebugTools {
         String sessionId = session.getSessionId();
 
         // Set breakpoints before launching (if provided and in debug mode)
+        CompletableFuture<Void> breakpointsFuture = CompletableFuture.completedFuture(null);
         if (actualDebugMode && breakpoints != null && !breakpoints.isEmpty()) {
-            for (Map<String, Object> bp : breakpoints) {
-                String file = (String) bp.get("file");
-                Integer line = (Integer) bp.get("line");
-                String condition = (String) bp.get("condition");
-
-                if (file != null && line != null) {
-                    session.setBreakpoint(file, line, condition).join();
-                }
-            }
+            CompletableFuture<?>[] bpFutures = breakpoints.stream()
+                    .filter(bp -> bp.get("file") != null && bp.get("line") != null)
+                    .map(bp -> {
+                        String file = (String) bp.get("file");
+                        Integer line = (Integer) bp.get("line");
+                        String condition = (String) bp.get("condition");
+                        return session.setBreakpoint(file, line, condition);
+                    })
+                    .toArray(CompletableFuture[]::new);
+            breakpointsFuture = CompletableFuture.allOf(bpFutures);
         }
 
-        // Launch or attach based on configuration.request
-        String request = (String) configuration.get("request");
-        Map<String, Object> result;
+        // Chain: breakpoints → launch/attach → add metadata
+        return executeWithCancellation(
+                breakpointsFuture.thenCompose(v -> {
+                    String request = (String) configuration.get("request");
 
-        if ("attach".equals(request)) {
-            // Attach mode
-            Integer processId = (Integer) configuration.get("processId");
-            if (processId != null) {
-                result = session.attach(processId).join();
-            } else {
-                // Attach via port/host
-                result = session.launch(configuration, actualDebugMode, DapSession.SessionActor.AI_AGENT).join();
-            }
-        } else {
-            // Launch mode (default)
-            result = session.launch(configuration, actualDebugMode, DapSession.SessionActor.AI_AGENT).join();
-        }
-
-        // Add sessionId to result
-        result.put("sessionId", sessionId);
-        result.put("language", session.getLanguage());
-
-        return result;
+                    if ("attach".equals(request)) {
+                        // Attach mode
+                        Integer processId = (Integer) configuration.get("processId");
+                        if (processId != null) {
+                            return session.attach(processId);
+                        } else {
+                            // Attach via port/host
+                            return session.launch(configuration, actualDebugMode, DapSession.SessionActor.AI_AGENT);
+                        }
+                    } else {
+                        // Launch mode (default)
+                        return session.launch(configuration, actualDebugMode, DapSession.SessionActor.AI_AGENT);
+                    }
+                }).thenApply(result -> {
+                    // Add sessionId to result
+                    result.put("sessionId", sessionId);
+                    result.put("language", session.getLanguage());
+                    return result;
+                }),
+                cancellation
+        );
     }
 
     @Tool(description = "Detach from the debugged process without terminating it.")
@@ -436,184 +457,60 @@ public class DapDebugTools {
 
     // ========== Configuration Helpers ==========
 
-    @Tool(description = "Get debug configuration templates (launch and attach) for a specific debug adapter. " +
-            "Returns both 'launch' and 'attach' templates with all available parameters. " +
-            "Use the adapter ID from list_debug_adapters.")
-    public Map<String, Object> get_debug_templates(
+    @Tool(
+            name = "get_debug_templates",
+            description = "Get debug configuration templates for a specific debug adapter. " +
+                    "Returns templates grouped by type (launch, attach) from the debug adapter's configuration. " +
+                    "Use the adapter ID from list_debug_adapters.",
+            structuredContent = true
+    )
+    public DebugTemplatesResult getDebugTemplates(
             @ToolArg(description = "ID of the debug adapter (e.g., 'java-debug', 'vscode-js-debug')") String debuggerId) {
 
-        Map<String, Object> result = new HashMap<>();
-
-        // Determine language from debugger ID (simple heuristic)
-        String language = extractLanguageFromDebuggerId(debuggerId);
-
-        // Build launch and attach templates based on language
-        Map<String, Object> launchTemplate = buildLaunchTemplate(language);
-        Map<String, Object> attachTemplate = buildAttachTemplate(language);
-
-        result.put("debuggerId", debuggerId);
-        result.put("launch", launchTemplate);
-        result.put("attach", attachTemplate);
-
-        return result;
-    }
-
-    private String extractLanguageFromDebuggerId(String debuggerId) {
-        if (debuggerId.contains("java")) return "java";
-        if (debuggerId.contains("js") || debuggerId.contains("node")) return "javascript";
-        if (debuggerId.contains("python") || debuggerId.contains("debugpy")) return "python";
-        if (debuggerId.contains("go") || debuggerId.contains("delve")) return "go";
-        return "unknown";
-    }
-
-    private Map<String, Object> buildLaunchTemplate(String language) {
-        Map<String, Object> template = new HashMap<>();
-
-        switch (language.toLowerCase()) {
-            case "javascript":
-            case "typescript":
-            case "node":
-                template.put("type", "node");
-                template.put("request", "launch");
-                template.put("name", "Launch Program");
-                template.put("program", "${workspaceFolder}/index.js");
-                template.put("skipFiles", List.of("<node_internals>/**"));
-                template.put("console", "integratedTerminal");
-
-                Map<String, Object> optional = new HashMap<>();
-                optional.put("args", List.of("--optional-arg"));
-                optional.put("env", Map.of("NODE_ENV", "development"));
-                optional.put("cwd", "${workspaceFolder}");
-                optional.put("runtimeArgs", List.of("--nolazy"));
-                optional.put("port", 9229);
-                template.put("_optional", optional);
-                template.put("_description", "Node.js/JavaScript debugging configuration");
-                break;
-
-            case "java":
-                template.put("type", "java");
-                template.put("request", "launch");
-                template.put("name", "Launch Java Program");
-                template.put("mainClass", "com.example.Main");
-                template.put("projectName", "my-project");
-
-                Map<String, Object> javaOptional = new HashMap<>();
-                javaOptional.put("args", List.of("arg1", "arg2"));
-                javaOptional.put("vmArgs", "-Xmx512m");
-                javaOptional.put("cwd", "${workspaceFolder}");
-                javaOptional.put("classPaths", List.of("${workspaceFolder}/target/classes"));
-                javaOptional.put("modulePaths", List.of());
-                javaOptional.put("env", Map.of("JAVA_HOME", "/path/to/jdk"));
-                template.put("_optional", javaOptional);
-                template.put("_description", "Java debugging configuration");
-                break;
-
-            case "python":
-                template.put("type", "python");
-                template.put("request", "launch");
-                template.put("name", "Launch Python Program");
-                template.put("program", "${workspaceFolder}/main.py");
-                template.put("console", "integratedTerminal");
-
-                Map<String, Object> pythonOptional = new HashMap<>();
-                pythonOptional.put("args", List.of("--verbose"));
-                pythonOptional.put("env", Map.of("PYTHONPATH", "${workspaceFolder}"));
-                pythonOptional.put("cwd", "${workspaceFolder}");
-                pythonOptional.put("stopOnEntry", false);
-                pythonOptional.put("justMyCode", true);
-                template.put("_optional", pythonOptional);
-                template.put("_description", "Python debugging configuration");
-                break;
-
-            case "go":
-                template.put("type", "go");
-                template.put("request", "launch");
-                template.put("name", "Launch Go Program");
-                template.put("mode", "auto");
-                template.put("program", "${workspaceFolder}");
-
-                Map<String, Object> goOptional = new HashMap<>();
-                goOptional.put("args", List.of("--port=8080"));
-                goOptional.put("env", Map.of("GO_ENV", "development"));
-                goOptional.put("cwd", "${workspaceFolder}");
-                goOptional.put("buildFlags", "-tags=debug");
-                template.put("_optional", goOptional);
-                template.put("_description", "Go debugging configuration (using Delve)");
-                break;
-
-            default:
-                template.put("error", "Unsupported language: " + language);
-                template.put("supportedLanguages", List.of("javascript", "java", "python", "go"));
+        // Get the real configuration templates from the debug adapter config
+        var serverConfig = application.getDapServerConfig(debuggerId);
+        if (serverConfig == null) {
+            return new DebugTemplatesResult(
+                    debuggerId,
+                    List.of(),
+                    List.of(),
+                    "Unknown debug adapter: " + debuggerId + ". Use list_debug_adapters to see available adapters."
+            );
         }
 
-        return template;
+        var allTemplates = serverConfig.getConfigurationTemplates();
+
+        // Group templates by type (launch vs attach)
+        var launchTemplates = allTemplates.stream()
+                .filter(t -> t.name.startsWith("launch."))
+                .toList();
+
+        var attachTemplates = allTemplates.stream()
+                .filter(t -> t.name.startsWith("attach."))
+                .toList();
+
+        return new DebugTemplatesResult(debuggerId, launchTemplates, attachTemplates, null);
     }
 
-    private Map<String, Object> buildAttachTemplate(String language) {
-        Map<String, Object> template = new HashMap<>();
+    /**
+     * Result class for debug templates, grouped by type.
+     */
+    public static class DebugTemplatesResult {
+        public String debuggerId;
+        public List<com.redhat.mcp.languagetools.dap.server.DapConfigurationTemplate> launch;
+        public List<com.redhat.mcp.languagetools.dap.server.DapConfigurationTemplate> attach;
+        public String error;
 
-        switch (language.toLowerCase()) {
-            case "javascript":
-            case "typescript":
-            case "node":
-                template.put("type", "node");
-                template.put("request", "attach");
-                template.put("name", "Attach to Process");
-                template.put("port", 9229);
-
-                Map<String, Object> optional = new HashMap<>();
-                optional.put("address", "localhost");
-                optional.put("restart", true);
-                optional.put("skipFiles", List.of("<node_internals>/**"));
-                template.put("_optional", optional);
-                template.put("_description", "Attach to a running Node.js process");
-                break;
-
-            case "java":
-                template.put("type", "java");
-                template.put("request", "attach");
-                template.put("name", "Attach to JVM");
-                template.put("hostName", "localhost");
-                template.put("port", 5005);
-
-                Map<String, Object> javaOptional = new HashMap<>();
-                javaOptional.put("projectName", "my-project");
-                javaOptional.put("timeout", 30000);
-                template.put("_optional", javaOptional);
-                template.put("_description", "Attach to a running JVM with debug port enabled");
-                break;
-
-            case "python":
-                template.put("type", "python");
-                template.put("request", "attach");
-                template.put("name", "Attach to Python");
-                template.put("connect", Map.of("host", "localhost", "port", 5678));
-
-                Map<String, Object> pythonOptional = new HashMap<>();
-                pythonOptional.put("pathMappings", List.of(Map.of("localRoot", "${workspaceFolder}", "remoteRoot", ".")));
-                pythonOptional.put("justMyCode", true);
-                template.put("_optional", pythonOptional);
-                template.put("_description", "Attach to a Python process with debugpy");
-                break;
-
-            case "go":
-                template.put("type", "go");
-                template.put("request", "attach");
-                template.put("name", "Attach to Process");
-                template.put("mode", "local");
-                template.put("processId", 0);
-
-                Map<String, Object> goOptional = new HashMap<>();
-                goOptional.put("backend", "default");
-                template.put("_optional", goOptional);
-                template.put("_description", "Attach to a running Go process");
-                break;
-
-            default:
-                template.put("error", "Unsupported language: " + language);
+        public DebugTemplatesResult(
+                String debuggerId,
+                List<com.redhat.mcp.languagetools.dap.server.DapConfigurationTemplate> launch,
+                List<com.redhat.mcp.languagetools.dap.server.DapConfigurationTemplate> attach,
+                String error) {
+            this.debuggerId = debuggerId;
+            this.launch = launch;
+            this.attach = attach;
+            this.error = error;
         }
-
-        return template;
     }
 
     @Tool(description = "Validate a debug configuration before using it with start_debugging. " +

@@ -1,11 +1,21 @@
 package com.redhat.mcp.languagetools.dap.server;
 
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.redhat.mcp.languagetools.dap.transport.TransportType;
 import com.redhat.mcp.languagetools.server.ServerConfigBase;
+import org.jboss.logging.Logger;
 
+import java.net.URI;
+import java.net.URL;
+import java.nio.file.FileSystem;
+import java.nio.file.FileSystems;
+import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.HashMap;
-import java.util.Map;
+import java.nio.file.Paths;
+import java.util.*;
+import java.util.stream.Stream;
 
 /**
  * DAP (Debug Adapter Protocol) server configuration loaded from server.json.
@@ -18,6 +28,8 @@ import java.util.Map;
  * </ul>
  */
 public class DapServerConfig extends ServerConfigBase {
+
+    private static final Logger LOG = Logger.getLogger(DapServerConfig.class);
 
     /**
      * OS-specific launch commands for standalone DAP servers.
@@ -139,67 +151,80 @@ public class DapServerConfig extends ServerConfigBase {
 
     /**
      * Get configuration templates (launch/attach snippets) for this DAP server.
-     * Templates are loaded from /dap/{serverId}/*.json in the classpath.
-     * Returns a list of template objects with "name", "label", and "body" fields.
+     * Templates are loaded from /dap/{serverId}/*.json files in the classpath.
+     *
+     * @return list of templates, or empty list if none found
      */
-    public java.util.List<Map<String, Object>> getConfigurationTemplates() {
-        java.util.List<Map<String, Object>> templates = new java.util.ArrayList<>();
+    public List<DapConfigurationTemplate> getConfigurationTemplates() {
+        List<DapConfigurationTemplate> templates = new ArrayList<>();
+        String resourcePath = "/dap/" + getServerId();
+
+        URL resourceUrl = getClass().getResource(resourcePath);
+        if (resourceUrl == null) {
+            LOG.debugf("No templates directory found for DAP server: %s", getServerId());
+            return templates;
+        }
 
         try {
-            // List all JSON files in /dap/{serverId}/ directory
-            String resourcePath = "/dap/" + getServerId();
-            java.net.URL resourceUrl = getClass().getResource(resourcePath);
-
-            if (resourceUrl == null) {
-                return templates; // No templates directory for this server
-            }
-
-            // Read files from JAR or filesystem
-            java.nio.file.Path dirPath;
-            if (resourceUrl.toURI().getScheme().equals("jar")) {
-                // Running from JAR
-                java.nio.file.FileSystem fs = java.nio.file.FileSystems.newFileSystem(
-                    resourceUrl.toURI(),
-                    java.util.Collections.emptyMap()
-                );
-                dirPath = fs.getPath(resourcePath);
-            } else {
-                // Running from filesystem (development)
-                dirPath = java.nio.file.Paths.get(resourceUrl.toURI());
-            }
-
-            // List all .json files that start with "attach." or "launch."
-            try (java.util.stream.Stream<java.nio.file.Path> paths = java.nio.file.Files.list(dirPath)) {
-                paths.filter(path -> {
-                         String fileName = path.getFileName().toString();
-                         return fileName.endsWith(".json") &&
-                                (fileName.startsWith("attach.") || fileName.startsWith("launch."));
-                     })
-                     .forEach(path -> {
-                         try {
-                             String content = java.nio.file.Files.readString(path);
-                             com.google.gson.JsonObject json = com.google.gson.JsonParser.parseString(content).getAsJsonObject();
-
-                             // Extract template info
-                             String fileName = path.getFileName().toString();
-                             String name = fileName.replace(".json", "");
-                             String label = json.has("name") ? json.get("name").getAsString() : name;
-
-                             Map<String, Object> template = new java.util.HashMap<>();
-                             template.put("name", name);
-                             template.put("label", label);
-                             template.put("body", content);
-
-                             templates.add(template);
-                         } catch (Exception e) {
-                             // Skip invalid template files
-                         }
-                     });
-            }
+            Path dirPath = resolveResourcePath(resourceUrl);
+            loadTemplatesFromDirectory(dirPath, templates);
         } catch (Exception e) {
-            // No templates available or error reading them
+            LOG.warnf(e, "Failed to list templates directory for DAP server %s: %s", getServerId(), e.getMessage());
+            // Return partial results - individual template failures are already logged
         }
 
         return templates;
+    }
+
+    private Path resolveResourcePath(URL resourceUrl) throws Exception {
+        try {
+            URI uri = resourceUrl.toURI();
+            if ("jar".equals(uri.getScheme())) {
+                // Running from JAR - need FileSystem
+                FileSystem fs = FileSystems.newFileSystem(uri, Collections.emptyMap());
+                return fs.getPath(resourceUrl.getPath());
+            } else {
+                // Running from filesystem (development)
+                return Paths.get(uri);
+            }
+        } catch (Exception e) {
+            throw new Exception("Failed to resolve resource path: " + resourceUrl, e);
+        }
+    }
+
+    private void loadTemplatesFromDirectory(Path dirPath, List<DapConfigurationTemplate> templates) {
+        try (Stream<Path> paths = Files.list(dirPath)) {
+            paths.filter(this::isTemplateFile)
+                 .forEach(path -> loadTemplate(path, templates));
+        } catch (Exception e) {
+            LOG.warnf(e, "Failed to list templates in directory %s: %s", dirPath, e.getMessage());
+            // Individual template load failures are already logged in loadTemplate()
+        }
+    }
+
+    private boolean isTemplateFile(Path path) {
+        String fileName = path.getFileName().toString();
+        return fileName.endsWith(".json") &&
+               (fileName.startsWith("attach.") || fileName.startsWith("launch."));
+    }
+
+    private void loadTemplate(Path path, List<DapConfigurationTemplate> templates) {
+        try {
+            String content = Files.readString(path);
+            JsonObject json = JsonParser.parseString(content).getAsJsonObject();
+
+            String fileName = path.getFileName().toString();
+            String name = fileName.replace(".json", "");
+            String label = json.has("name") ? json.get("name").getAsString() : name;
+
+            // Parse body as JSON object, not raw string
+            @SuppressWarnings("unchecked")
+            Map<String, Object> body = new Gson().fromJson(json, Map.class);
+
+            templates.add(new DapConfigurationTemplate(name, label, body));
+
+        } catch (Exception e) {
+            LOG.warnf(e, "Failed to load template from %s: %s", path, e.getMessage());
+        }
     }
 }
