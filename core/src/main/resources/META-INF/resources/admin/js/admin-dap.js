@@ -1492,7 +1492,6 @@ async function loadLaunchConfigurationTemplates(sessionId, serverId) {
             const option = document.createElement('option');
             option.value = index;
             option.textContent = template.label;
-            option.dataset.body = template.body;
             selector.appendChild(option);
         });
 
@@ -1517,11 +1516,10 @@ function applyLaunchTemplate(sessionId, templateIndex) {
     const template = templates[templateIndex];
     if (!template) return;
 
-    // Parse and pretty-print the template JSON
+    // template.body is already an object (not a JSON string)
     try {
-        const json = JSON.parse(template.body);
         const editor = document.getElementById('launch-config-editor');
-        editor.value = JSON.stringify(json, null, 2);
+        editor.value = JSON.stringify(template.body, null, 2);
 
         // Reset selector to "Select template..."
         selector.value = '';
