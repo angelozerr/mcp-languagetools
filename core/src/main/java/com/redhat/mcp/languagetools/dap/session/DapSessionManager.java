@@ -7,6 +7,7 @@ import com.redhat.mcp.languagetools.language.LanguageDocument;
 import com.redhat.mcp.languagetools.language.LanguageRegistry;
 import com.redhat.mcp.languagetools.workspace.Workspace;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.event.Event;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
 
@@ -39,7 +40,7 @@ public class DapSessionManager {
     LanguageRegistry languageRegistry;
 
     @Inject
-    jakarta.enterprise.event.Event<DapSessionEvent> sessionEvent;
+    Event<DapSessionEvent> sessionEvent;
 
     private final Map<String, DapSession> sessions = new ConcurrentHashMap<>();
 

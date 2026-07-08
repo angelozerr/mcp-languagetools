@@ -519,7 +519,9 @@ public class DapServer extends ServerBase<DapServerConfig> {
                     if (!serverProcess.waitFor(5, TimeUnit.SECONDS)) {
                         LOG.warnf("Server process did not terminate gracefully, forcing kill");
                         serverProcess.destroyForcibly();
-                        serverProcess.waitFor(2, TimeUnit.SECONDS);
+                        if (!serverProcess.waitFor(2, TimeUnit.SECONDS)) {
+                            LOG.errorf("Server process did not terminate after forceful kill (PID: %d) - may be zombie", serverProcess.pid());
+                        }
                     }
                     LOG.infof("DAP server process terminated");
                 } else {

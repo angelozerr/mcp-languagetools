@@ -18,6 +18,8 @@ import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
  * Represents a single debug session.
@@ -78,6 +80,7 @@ public class DapSession implements DapEventListener {
     private StackFrame[] currentStackFrames = new StackFrame[0];
     private Integer currentThreadId;
     private Map<String, Object> launchConfiguration; // Store the launch configuration used
+    private boolean sentTerminateRequest = false; // Track if terminate request was sent
 
     // Parent-child session support
     private final List<DapSession> childSessions = new ArrayList<>();
@@ -86,6 +89,9 @@ public class DapSession implements DapEventListener {
     // Track which server has the active thread (for routing stackTrace/scopes/variables requests)
     // In VS Code JS Debug, child sessions handle the actual debugging, so we need to route to the right server
     private IDebugProtocolServer activeServer; // The server that has the currentThreadId
+
+    // Track pending CompletableFutures to cancel them if session is terminated
+    private final Set<CompletableFuture<?>> pendingRequests = ConcurrentHashMap.newKeySet();
 
     public enum SessionState {
         CREATED,
@@ -306,7 +312,7 @@ public class DapSession implements DapEventListener {
      */
     public CompletableFuture<Void> initialize() {
         LOG.infof("Initializing DAP session: %s (%s)", sessionName, sessionId);
-        return dapServer.start()
+        return trackFuture(dapServer.start()
             .thenAccept(v -> {
                 // Server is now RUNNING, session stays CREATED until launch
                 LOG.infof("DAP session initialized: %s", sessionId);
@@ -329,7 +335,45 @@ public class DapSession implements DapEventListener {
                     throw (RuntimeException) ex;
                 }
                 throw new RuntimeException("Failed to initialize DAP session", ex);
-            });
+            }));
+    }
+
+    /**
+     * Track a CompletableFuture so it can be cancelled if the session terminates.
+     * Automatically removes the future from tracking when it completes.
+     *
+     * @param future the future to track
+     * @return the same future for chaining
+     */
+    private <T> CompletableFuture<T> trackFuture(CompletableFuture<T> future) {
+        pendingRequests.add(future);
+        future.whenComplete((result, error) -> pendingRequests.remove(future));
+        return future;
+    }
+
+    /**
+     * Cancel all pending CompletableFutures.
+     * Called when the session is terminated to unblock any waiting .join() calls.
+     */
+    private void cancelAllPendingRequests() {
+        if (pendingRequests.isEmpty()) {
+            return;
+        }
+
+        LOG.infof("Cancelling %d pending requests for session %s", pendingRequests.size(), sessionId);
+
+        // Complete all pending futures exceptionally
+        RuntimeException sessionTerminated = new RuntimeException(
+            "Session " + sessionId + " terminated - cancelling pending request"
+        );
+
+        pendingRequests.forEach(future -> {
+            if (!future.isDone()) {
+                future.completeExceptionally(sessionTerminated);
+            }
+        });
+
+        pendingRequests.clear();
     }
 
     /**
@@ -378,7 +422,7 @@ public class DapSession implements DapEventListener {
             initFuture = CompletableFuture.completedFuture(null);
         }
 
-        return initFuture.thenCompose(v -> {
+        return trackFuture(initFuture.thenCompose(v -> {
             // Verify server is actually running
             if (dapServer.getStatus() != com.redhat.mcp.languagetools.server.ServerStatus.RUNNING) {
                 return CompletableFuture.failedFuture(new IllegalStateException(
@@ -466,7 +510,7 @@ public class DapSession implements DapEventListener {
                         }
                         return result;
                     });
-        });
+        }));
     }
 
     /**
@@ -485,7 +529,7 @@ public class DapSession implements DapEventListener {
             return CompletableFuture.failedFuture(new IllegalStateException("DAP server not initialized"));
         }
 
-        return server.attach(attachArgs)
+        return trackFuture(server.attach(attachArgs)
             .thenApply(v -> {
                 setState(SessionState.RUNNING);
                 return Map.of(
@@ -493,7 +537,7 @@ public class DapSession implements DapEventListener {
                     "state", "attached",
                     "message", "Attached to process " + processId
                 );
-            });
+            }));
     }
 
     /**
@@ -503,69 +547,67 @@ public class DapSession implements DapEventListener {
     public CompletableFuture<Void> terminate() {
         LOG.infof("Terminating DAP session: %s (with %d child sessions)", sessionId, childSessions.size());
 
+        // Cancel all pending requests FIRST to unblock any waiting .join() calls
+        cancelAllPendingRequests();
+
         // First, terminate all child sessions
         List<CompletableFuture<Void>> childTerminations = new ArrayList<>();
         for (DapSession child : childSessions) {
             childTerminations.add(child.terminate());
         }
 
+        // DO NOT track terminate() itself - it should never be cancelled
         return CompletableFuture.allOf(childTerminations.toArray(new CompletableFuture[0]))
             .thenCompose(v -> {
                 // Then terminate this session
                 IDebugProtocolServer server = dapServer.getDebugServer();
                 if (server != null) {
-                    DisconnectArguments args = new DisconnectArguments();
-                    args.setTerminateDebuggee(true);
+                    // Like lsp4ij: prefer terminate() over disconnect() for LAUNCH mode
+                    Capabilities capabilities = dapServer.getDapClient().getCapabilities();
+                    boolean supportsTerminateRequest = capabilities != null
+                        && Boolean.TRUE.equals(capabilities.getSupportsTerminateRequest());
+                    boolean isLaunchMode = launchConfiguration != null
+                        && "launch".equals(launchConfiguration.get("request"));
 
-                    // Send disconnect, but handle errors gracefully (like lsp4ij)
-                    // The server may have already closed the connection after 'terminated' event
-                    return server.disconnect(args)
-                        .handle((result, error) -> {
-                            if (error != null) {
-                                // Log but don't fail - socket might already be closed
-                                LOG.debugf("Disconnect error (expected if server already terminated): %s",
-                                    error.getMessage());
-                                // Show in UI
-                                traceCollector.addTrace(
-                                    workspace.getNormalizedUri(),
-                                    sessionId,
-                                    com.redhat.mcp.languagetools.trace.TraceCollector.MessageDirection.CLIENT_TO_SERVER,
-                                    "Disconnect completed (server may have already terminated)"
-                                );
+                    boolean shouldSendTerminateRequest = !sentTerminateRequest
+                        && supportsTerminateRequest
+                        && isLaunchMode;
+
+                    if (shouldSendTerminateRequest) {
+                        sentTerminateRequest = true;
+                        server.terminate(new TerminateArguments()).whenComplete((r, e) -> {
+                            if (e != null) {
+                                LOG.debugf("Terminate error: %s", e.getMessage());
                             }
-                            return null;
-                        })
-                        .thenCompose(v2 -> dapServer.stop2())
-                        .thenAccept(v2 -> {
-                            setState(SessionState.TERMINATED);
-                            childSessions.clear();
-                            LOG.infof("DAP session terminated: %s", sessionId);
                         });
+                    } else {
+                        DisconnectArguments args = new DisconnectArguments();
+                        server.disconnect(args).whenComplete((r, e) -> {
+                            if (e != null) {
+                                LOG.debugf("Disconnect error (expected if server terminated): %s", e.getMessage());
+                            }
+                        });
+                    }
                 }
 
-                // No server, just stop
-                return dapServer.stop2()
-                    .thenAccept(v2 -> {
-                        setState(SessionState.TERMINATED);
-                        childSessions.clear();
-                    });
+                return dapServer.stop2();
             })
-            .exceptionally(t -> {
-                // Catch any remaining errors and show in UI
-                LOG.errorf(t, "Error during session termination: %s", sessionId);
-                traceCollector.addTrace(
-                    workspace.getNormalizedUri(),
-                    sessionId,
-                    com.redhat.mcp.languagetools.trace.TraceCollector.MessageDirection.CLIENT_TO_SERVER,
-                    "⚠️ Termination error: " + t.getMessage()
-                );
-
-                // Still mark as terminated and clean up
+            .handle((result, error) -> {
+                // Always mark as terminated and clean up
                 setState(SessionState.TERMINATED);
                 childSessions.clear();
 
-                // Force stop the server
-                dapServer.stop2();
+                if (error != null) {
+                    LOG.errorf(error, "Error during session termination: %s", sessionId);
+                    traceCollector.addTrace(
+                        workspace.getNormalizedUri(),
+                        sessionId,
+                        com.redhat.mcp.languagetools.trace.TraceCollector.MessageDirection.CLIENT_TO_SERVER,
+                        "⚠️ Termination error: " + error.getMessage()
+                    );
+                } else {
+                    LOG.infof("DAP session terminated: %s", sessionId);
+                }
 
                 return null;
             });
@@ -718,7 +760,7 @@ public class DapSession implements DapEventListener {
                 .map(this::sendBreakpoints)
                 .toList();
 
-        return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]));
+        return trackFuture(CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])));
     }
 
     /**
@@ -734,7 +776,7 @@ public class DapSession implements DapEventListener {
         LOG.infof("Added breakpoint: %s at %s:%d", breakpointId, file, line);
 
         // Send ALL breakpoints for this file (DAP setBreakpoints replaces all)
-        return sendBreakpoints(file).thenApply(v -> info);
+        return trackFuture(sendBreakpoints(file).thenApply(v -> info));
     }
 
     /**
@@ -751,7 +793,7 @@ public class DapSession implements DapEventListener {
         LOG.infof("Removed breakpoint: %s at %s:%d", breakpointId, info.file, info.line);
 
         // Send ALL remaining breakpoints for this file (empty list if none left)
-        return sendBreakpoints(info.file).thenApply(v -> true);
+        return trackFuture(sendBreakpoints(info.file).thenApply(v -> true));
     }
 
     /**
@@ -777,14 +819,14 @@ public class DapSession implements DapEventListener {
         ContinueArguments args = new ContinueArguments();
         args.setThreadId(currentThreadId);
 
-        return server.continue_(args)
+        return trackFuture(server.continue_(args)
             .thenApply(response -> {
                 setState(SessionState.RUNNING);
                 return Map.of(
                     "success", true,
                     "allThreadsContinued", response.getAllThreadsContinued() != null ? response.getAllThreadsContinued() : false
                 );
-            });
+            }));
     }
 
     /**
@@ -801,7 +843,7 @@ public class DapSession implements DapEventListener {
         NextArguments args = new NextArguments();
         args.setThreadId(currentThreadId);
 
-        return server.next(args);
+        return trackFuture(server.next(args));
     }
 
     /**
@@ -818,7 +860,7 @@ public class DapSession implements DapEventListener {
         StepInArguments args = new StepInArguments();
         args.setThreadId(currentThreadId);
 
-        return server.stepIn(args);
+        return trackFuture(server.stepIn(args));
     }
 
     /**
@@ -835,7 +877,7 @@ public class DapSession implements DapEventListener {
         StepOutArguments args = new StepOutArguments();
         args.setThreadId(currentThreadId);
 
-        return server.stepOut(args);
+        return trackFuture(server.stepOut(args));
     }
 
     /**
@@ -852,8 +894,8 @@ public class DapSession implements DapEventListener {
         PauseArguments args = new PauseArguments();
         args.setThreadId(currentThreadId);
 
-        return server.pause(args)
-            .thenAccept(v -> setState(SessionState.PAUSED));
+        return trackFuture(server.pause(args)
+            .thenAccept(v -> setState(SessionState.PAUSED)));
     }
 
     // ========== Inspection ==========
@@ -885,11 +927,11 @@ public class DapSession implements DapEventListener {
         StackTraceArguments args = new StackTraceArguments();
         args.setThreadId(currentThreadId);
 
-        return server.stackTrace(args)
+        return trackFuture(server.stackTrace(args)
             .thenApply(response -> {
                 currentStackFrames = response.getStackFrames();
                 return currentStackFrames;
-            });
+            }));
     }
 
     /**
@@ -903,14 +945,14 @@ public class DapSession implements DapEventListener {
             return CompletableFuture.completedFuture(new Thread[0]);
         }
 
-        return server.threads()
+        return trackFuture(server.threads()
             .thenApply(response -> {
                 threads = response.getThreads();
                 if (threads.length > 0 && currentThreadId == null) {
                     currentThreadId = threads[0].getId();
                 }
                 return threads;
-            });
+            }));
     }
 
     /**
@@ -927,8 +969,8 @@ public class DapSession implements DapEventListener {
         ScopesArguments args = new ScopesArguments();
         args.setFrameId(frameId);
 
-        return server.scopes(args)
-            .thenApply(ScopesResponse::getScopes);
+        return trackFuture(server.scopes(args)
+            .thenApply(ScopesResponse::getScopes));
     }
 
     /**
@@ -945,8 +987,8 @@ public class DapSession implements DapEventListener {
         VariablesArguments args = new VariablesArguments();
         args.setVariablesReference(variablesReference);
 
-        return server.variables(args)
-            .thenApply(VariablesResponse::getVariables);
+        return trackFuture(server.variables(args)
+            .thenApply(VariablesResponse::getVariables));
     }
 
     /**
@@ -967,7 +1009,7 @@ public class DapSession implements DapEventListener {
         }
         args.setContext("watch");
 
-        return server.evaluate(args);
+        return trackFuture(server.evaluate(args));
     }
 
     // ========== Event Handlers (DapEventListener implementation) ==========
@@ -996,16 +1038,9 @@ public class DapSession implements DapEventListener {
         LOG.infof("Session %s terminated (isChild=%s)", sessionId, isChildSession);
         setState(SessionState.TERMINATED);
 
-        // Only stop the DAP server from the parent session
-        // Child sessions share the same server, so only the parent should stop it
-        if (!isChildSession) {
-            LOG.infof("Stopping DAP server after session termination: %s", sessionId);
-            dapServer.stop2()
-                .exceptionally(ex -> {
-                    LOG.warnf(ex, "Error stopping DAP server after termination: %s", ex.getMessage());
-                    return null;
-                });
-        }
+        // DON'T stop the server here (like lsp4ij)!
+        // If terminate() is in progress, it will call stop2() after disconnect() completes
+        // Closing the socket here would prevent disconnect() from receiving its response
     }
 
     @Override
