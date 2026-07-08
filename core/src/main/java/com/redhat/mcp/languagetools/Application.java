@@ -128,11 +128,6 @@ public class Application {
             return ws;
         });
 
-        // Fire event if workspace was just created
-        if (isNewWorkspace) {
-            sendWorkspaceChangeEvent(WorkspaceChangeEvent.Type.CREATED, workspaceUri);
-        }
-
         // Add current MCP client to this workspace
         String clientName = mcpClientTracker.getCurrentClientName();
         String connectionId = mcpClientTracker.getCurrentConnectionId();
@@ -148,6 +143,11 @@ public class Application {
             mcpClientChangeEvent.fire(new McpClientChangeEvent());
         } else {
             LOG.infof("MCP client already exists in workspace, no event fired");
+        }
+
+        // Fire event if workspace was just created
+        if (isNewWorkspace) {
+            sendWorkspaceChangeEvent(WorkspaceChangeEvent.Type.CREATED, workspaceUri);
         }
 
         return workspace;

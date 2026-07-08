@@ -15,7 +15,6 @@ import com.redhat.mcp.languagetools.lsp.client.LspCapability;
 import com.redhat.mcp.languagetools.lsp.server.LspServer;
 import com.redhat.mcp.languagetools.lsp.server.LspServerResolver;
 import com.redhat.mcp.languagetools.lsp.tools.params.LspRequestParams;
-import com.redhat.mcp.languagetools.mcp.McpCancellationSupport;
 import io.quarkiverse.mcp.server.Cancellation;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -42,9 +41,6 @@ public class LspRequestExecutor {
 
     @Inject
     LspServerResolver serverResolver;
-
-    @Inject
-    McpCancellationSupport cancellationSupport;
 
     /**
      * Execute an LSP request across all capable servers.
@@ -84,7 +80,7 @@ public class LspRequestExecutor {
 
                     // Register futures for automatic cancellation
                     if (cancellation != null) {
-                        cancellationSupport.registerAll(cancellation, futures);
+                        cancellation.onCancelled(reason -> futures.forEach(future -> future.cancel(true)));
                     }
 
                     // Step 3: Wait for all to complete and merge results

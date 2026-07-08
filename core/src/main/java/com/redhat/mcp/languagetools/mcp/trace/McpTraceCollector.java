@@ -1,8 +1,9 @@
 package com.redhat.mcp.languagetools.mcp.trace;
 
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
+import com.google.gson.GsonBuilder;
 import com.google.gson.JsonParser;
+import io.quarkiverse.mcp.server.McpConnection;
+import io.quarkiverse.mcp.server.RawMessage;
 import io.quarkus.logging.Log;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Event;
@@ -21,6 +22,9 @@ import java.util.concurrent.CopyOnWriteArrayList;
 @ApplicationScoped
 public class McpTraceCollector {
 
+    public static final com.google.gson.Gson PRETTY_PRINT_GSON = new GsonBuilder()
+            .setPrettyPrinting()
+            .create();
     private final List<McpTrace> traces = new CopyOnWriteArrayList<>();
     private static final int MAX_TRACES = 500;
 
@@ -30,35 +34,23 @@ public class McpTraceCollector {
     @Inject
     Event<McpTrace> traceEvent;
 
-    private static class PendingRequest {
-        final String method;
-        final Instant timestamp;
-        final String connectionId;
-
-        PendingRequest(String method, Instant timestamp, String connectionId) {
-            this.method = method;
-            this.timestamp = timestamp;
-            this.connectionId = connectionId;
-        }
+    private record PendingRequest(String method, Instant timestamp, String connectionId) {
     }
 
     /**
      * Add a new MCP trace with LSP-style formatting.
      */
-    public void addTrace(String direction, String connectionId, String message) {
-        addTrace(direction, connectionId, message, null);
-    }
-
-    public void addTrace(String direction, String connectionId, String message, com.redhat.mcp.languagetools.trace.TraceCollector.MessageType messageType) {
+    public void addTrace(McpTraceDirection direction, RawMessage message, McpConnection connection) {
         Instant now = Instant.now();
-        String formattedMessage = formatMessage(direction, connectionId, message, now);
+        String connectionId = connection.id();
+        String formattedMessage = formatMessage(direction, message, connectionId, now);
 
         McpTrace trace = new McpTrace(
-                direction,
+                direction.name().toLowerCase(),
                 connectionId,
                 formattedMessage,
                 now,
-                messageType
+                null
         );
 
         traces.add(trace);
@@ -69,38 +61,20 @@ public class McpTraceCollector {
         }
 
         // Fire CDI event for SSE broadcasting
-        Log.infof("Firing MCP trace event: %s [%s] - message length: %d", direction, connectionId, message.length());
         traceEvent.fire(trace);
-
-        Log.infof("MCP trace added to collection (total: %d): %s [%s]", traces.size(), direction, connectionId);
     }
 
     /**
      * Format MCP message in LSP-style with method name, ID, and timing.
      */
-    private String formatMessage(String direction, String connectionId, String message, Instant now) {
+    private String formatMessage(McpTraceDirection direction, RawMessage message, String connectionId, Instant now) {
         try {
-            Log.infof("Formatting MCP message: direction=%s, connectionId=%s, messageLength=%d",
-                     direction, connectionId, message.length());
-            Log.infof("Message content: %s", message.substring(0, Math.min(100, message.length())));
-
-            JsonObject json = JsonParser.parseString(message).getAsJsonObject();
-            Log.infof("Parsed JSON successfully");
-
-            String method = json.has("method") ? json.get("method").getAsString() : null;
-            JsonElement idElement = json.get("id");
-            String id = null;
-            if (idElement != null && !idElement.isJsonNull()) {
-                // ID can be number or string in JSON-RPC
-                id = idElement.isJsonPrimitive() ? idElement.getAsString() : idElement.toString();
-            }
+            String method = message.method();
+            String id = message.id() != null ? message.id().asString() : null;
 
             boolean isNotification = id == null && method != null;
             boolean isRequest = id != null && method != null;
             boolean isResponse = id != null && method == null;
-
-            Log.infof("Parsed: method=%s, id=%s, isRequest=%s, isResponse=%s, isNotification=%s",
-                     method, id, isRequest, isResponse, isNotification);
 
             String header;
             String key = connectionId + ":" + (id != null ? id : "");
@@ -121,10 +95,10 @@ public class McpTraceCollector {
                     header = String.format("[Trace - %s] Received response '(%s)'",
                             formatTime(now), id);
                 }
-            } else if (isNotification && "sent".equals(direction)) {
+            } else if (isNotification && direction == McpTraceDirection.SENT) {
                 header = String.format("[Trace - %s] Sending notification '%s'",
                         formatTime(now), method);
-            } else if (isNotification && "received".equals(direction)) {
+            } else if (isNotification && direction == McpTraceDirection.RECEIVED) {
                 header = String.format("[Trace - %s] Received notification '%s'",
                         formatTime(now), method);
             } else {
@@ -134,19 +108,31 @@ public class McpTraceCollector {
             }
 
             // Pretty-print JSON body
-            String body = new com.google.gson.GsonBuilder()
-                    .setPrettyPrinting()
-                    .create()
-                    .toJson(json);
-
+            String body = getBody(message);
             return header + "\n" + body;
 
         } catch (Exception e) {
-            // If JSON parsing fails, return original message
+            // If JSON parsing fails, return original messagebody
+            String body = message.asString();
             Log.errorf(e, "Failed to parse MCP message for formatting, direction=%s, connectionId=%s, messageStart=%s",
-                      direction, connectionId, message.substring(0, Math.min(50, message.length())));
+                    direction, connectionId, body.substring(0, Math.min(50, body.length())));
             return String.format("[Trace - %s] MCP %s (PARSE ERROR) [%s]\n%s",
-                    formatTime(now), direction, connectionId, message);
+                    formatTime(now), direction, connectionId, body);
+        }
+    }
+
+    private static String getBody(RawMessage message) {
+        try {
+            return message.asJsonObject()
+                    .encodePrettily();
+        } catch (Exception e) {
+            String jsonText = message.asString();
+            try {
+                var json = JsonParser.parseString(jsonText);
+                return PRETTY_PRINT_GSON.toJson(json);
+            } catch (Exception ex) {
+                return jsonText;
+            }
         }
     }
 
@@ -157,13 +143,6 @@ public class McpTraceCollector {
         java.time.ZonedDateTime zdt = instant.atZone(java.time.ZoneId.systemDefault());
         return String.format("%02d:%02d:%02d",
                 zdt.getHour(), zdt.getMinute(), zdt.getSecond());
-    }
-
-    /**
-     * Get all traces.
-     */
-    public List<McpTrace> getAllTraces() {
-        return List.copyOf(traces);
     }
 
     /**

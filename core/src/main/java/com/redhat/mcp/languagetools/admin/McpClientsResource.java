@@ -55,7 +55,7 @@ public class McpClientsResource {
                     name = initialRequest.implementation().name();
                     version = initialRequest.implementation().version();
                 }
-                protocolVersion = initialRequest.protocolVersion();
+                protocolVersion = initialRequest.protocolVersion().toString();
             }
 
             // Use connection.id() as ID so it matches MCP trace connectionId

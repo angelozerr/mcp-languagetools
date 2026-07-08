@@ -373,7 +373,7 @@ public class AdminWebSocketEndpoint {
                     name = initialRequest.implementation().name();
                     version = initialRequest.implementation().version();
                 }
-                protocolVersion = initialRequest.protocolVersion();
+                protocolVersion = initialRequest.protocolVersion().toString();
             }
 
             clients.add(new McpClientDTO(
