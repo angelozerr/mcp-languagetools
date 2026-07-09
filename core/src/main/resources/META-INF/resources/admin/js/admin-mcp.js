@@ -17,7 +17,7 @@ let mcpTracesLoaded = false; // Track if MCP traces have been loaded
  */
 async function loadMcpClients() {
     try {
-        const response = await fetch('/api/admin/mcp-clients');
+        const response = await fetch('/api/admin/mcp/clients');
         const newClients = await response.json();
 
         // Check if data actually changed to avoid unnecessary re-renders
@@ -129,7 +129,7 @@ async function loadInitialMcpTraces() {
     mcpTracesLoaded = true;
 
     try {
-        const allTraces = await fetch('/api/admin/mcp-traces?limit=500').then(r => r.json());
+        const allTraces = await fetch('/api/admin/mcp/traces?limit=500').then(r => r.json());
 
         // Organize traces by connectionId (client)
         mcpTracesByClient = {};
@@ -209,7 +209,7 @@ async function loadMcpConsole(clientId) {
 
 async function changeMcpTraceLevel(newLevel) {
     try {
-        await fetch('/api/admin/mcp/trace', {
+        await fetch('/api/admin/mcp/config', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ trace: newLevel })
@@ -353,7 +353,7 @@ function toggleAllMcpTraces() {
 
 async function clearMcpConsole() {
     try {
-        await fetch('/api/admin/mcp-traces', { method: 'DELETE' });
+        await fetch('/api/admin/mcp/traces', { method: 'DELETE' });
 
         // Clear traces for current client only
         if (selectedMcpClient) {

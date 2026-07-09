@@ -14,7 +14,7 @@ import java.util.List;
  * REST API for MCP traffic traces.
  * Real-time updates via WebSocket.
  */
-@Path("/api/admin/mcp-traces")
+@Path("/api/admin/mcp/traces")
 @Produces(MediaType.APPLICATION_JSON)
 public class McpTracesResource {
 

@@ -16,7 +16,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 /**
  * REST API for MCP clients (AI connections).
  */
-@Path("/api/admin/mcp-clients")
+@Path("/api/admin/mcp/clients")
 @Produces(MediaType.APPLICATION_JSON)
 public class McpClientsResource {
 

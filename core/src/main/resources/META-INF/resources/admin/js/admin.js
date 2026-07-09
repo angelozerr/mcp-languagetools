@@ -747,13 +747,9 @@
                     }
                 },
                 onCloseSearch: () => {
-                    // Close search box and clear highlights
-                    const searchBox = document.getElementById('search-box');
-                    if (searchBox) {
-                        searchBox.classList.remove('visible');
-                        if (typeof clearHighlights === 'function') {
-                            clearHighlights();
-                        }
+                    // Delegate to TraceRenderer.closeSearch which handles re-rendering
+                    if (window.closeSearch) {
+                        window.closeSearch();
                     }
                 }
             });

@@ -8,6 +8,7 @@ const TraceRenderer = (function() {
     let searchMatches = [];
     let currentMatchIndex = -1;
     let currentSearchQuery = '';
+    let renderCallback = null; // Callback to re-render traces
 
     /**
      * Render a single trace with folding support.
@@ -235,12 +236,20 @@ const TraceRenderer = (function() {
 
     /**
      * Close the search box and clear highlights.
+     * The render callback will be called to re-render without highlights.
      */
     function closeSearch() {
         const searchBox = document.getElementById('search-box');
-        if (searchBox) {
+        const searchInput = document.getElementById('search-input');
+        if (searchBox && searchInput) {
             searchBox.classList.remove('visible');
+            searchInput.value = '';
             clearHighlights();
+
+            // Trigger re-render to remove highlights
+            if (renderCallback) {
+                renderCallback('');
+            }
         }
     }
 
@@ -349,7 +358,10 @@ const TraceRenderer = (function() {
      * Initialize search box event listeners.
      * Should be called once on page load.
      */
-    function initSearchListeners(renderCallback) {
+    function initSearchListeners(callback) {
+        // Store the callback for use in closeSearch
+        renderCallback = callback;
+
         const searchInput = document.getElementById('search-input');
         if (searchInput) {
             // Input event for live search

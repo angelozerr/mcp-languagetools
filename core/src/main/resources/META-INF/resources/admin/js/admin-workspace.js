@@ -774,7 +774,7 @@
                 // Only load from API if we don't have traces for this server yet
                 if (!tracesByServer[server.id] || tracesByServer[server.id].length === 0) {
                     console.log('Loading traces from API for server:', server.id);
-                    const response = await fetch(`/api/admin/traces/workspace/${encodedWorkspace}/server/${server.id}?limit=50`);
+                    const response = await fetch(`/api/admin/lsp/traces/workspace/${encodedWorkspace}/server/${server.id}?limit=50`);
                     const loadedTraces = await response.json();
                     tracesByServer[server.id] = loadedTraces || [];
                     console.log('Loaded', loadedTraces.length, 'traces for', server.id);
@@ -1459,7 +1459,7 @@
 
         async function clearConsole() {
             try {
-                await fetch('/api/admin/traces', { method: 'DELETE' });
+                await fetch('/api/admin/lsp/traces', { method: 'DELETE' });
 
                 // Clear traces for current server only
                 if (currentServerId) {

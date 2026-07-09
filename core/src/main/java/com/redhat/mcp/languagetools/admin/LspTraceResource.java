@@ -16,7 +16,7 @@ import java.util.List;
  * Provides historical trace retrieval (real-time updates via WebSocket).
  */
 @ApplicationScoped
-@Path("/api/admin/traces")
+@Path("/api/admin/lsp/traces")
 public class LspTraceResource {
 
     @Inject

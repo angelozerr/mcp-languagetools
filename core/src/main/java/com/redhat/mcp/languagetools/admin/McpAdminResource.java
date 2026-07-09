@@ -21,7 +21,7 @@ public class McpAdminResource {
      * Get MCP trace level.
      */
     @GET
-    @Path("/mcp/trace")
+    @Path("/config")
     public Response getMcpTraceLevel() {
         String level = globalConfig.getMcpTraceLevel();
         return Response.ok()
@@ -33,7 +33,7 @@ public class McpAdminResource {
      * Set MCP trace level.
      */
     @PUT
-    @Path("/mcp/trace")
+    @Path("/config")
     @Consumes(MediaType.APPLICATION_JSON)
     public Response setMcpTraceLevel(String body) {
         try {

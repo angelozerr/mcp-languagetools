@@ -16,7 +16,7 @@ import java.util.List;
  * Provides historical trace retrieval (real-time updates via WebSocket).
  */
 @ApplicationScoped
-@Path("/api/admin/dap-traces")
+@Path("/api/admin/dap/traces")
 public class DapTraceResource {
 
     @Inject
