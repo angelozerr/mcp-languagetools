@@ -144,7 +144,8 @@ public class DapDebugTools {
                     "Returns sessionId to use in other debug operations. " +
                     "Use get_debug_templates() to see available configuration parameters. " +
                     "Set debugMode=false to run without debugging (no breakpoints). " +
-                    "Optionally specify breakpoints to set before launching (avoids race conditions).",
+                    "Optionally specify breakpoints to set before launching (avoids race conditions). " +
+                    "After starting, use get_console_output(sessionId) to see program output (stdout/stderr/console.log).",
             structuredContent = true
     )
     public Map<String, Object> startDebuggingSync(
@@ -260,7 +261,7 @@ public class DapDebugTools {
 
     // ========== Execution Control ==========
 
-    @Tool(description = "Continue program execution after hitting a breakpoint or pause.")
+    @Tool(description = "Continue program execution after hitting a breakpoint or pause. Returns console output (stdout/stderr) accumulated during execution.")
     public Map<String, Object> continue_execution(String sessionId) {
         DapSession session = sessionManager.getSession(sessionId);
         return session.continueExecution().join();
@@ -276,34 +277,22 @@ public class DapDebugTools {
         );
     }
 
-    @Tool(description = "Step over the current line (execute without entering function calls).")
+    @Tool(description = "Step over the current line (execute without entering function calls). Returns console output if any was printed during execution.")
     public Map<String, Object> step_over(String sessionId) {
         DapSession session = sessionManager.getSession(sessionId);
-        session.stepOver().join();
-        return Map.of(
-                "success", true,
-                "message", "Stepped over"
-        );
+        return session.stepOver().join();
     }
 
     @Tool(description = "Step into a function call on the current line.")
     public Map<String, Object> step_in(String sessionId) {
         DapSession session = sessionManager.getSession(sessionId);
-        session.stepIn().join();
-        return Map.of(
-                "success", true,
-                "message", "Stepped in"
-        );
+        return session.stepIn().join();
     }
 
     @Tool(description = "Step out of the current function, returning to the caller.")
     public Map<String, Object> step_out(String sessionId) {
         DapSession session = sessionManager.getSession(sessionId);
-        session.stepOut().join();
-        return Map.of(
-                "success", true,
-                "message", "Stepped out"
-        );
+        return session.stepOut().join();
     }
 
     // ========== Inspection ==========
@@ -331,6 +320,28 @@ public class DapDebugTools {
                 "success", true,
                 "frames", framesList
         );
+    }
+
+    @Tool(description = "Get the console output (stdout/stderr/console.log) from the debugged program. Use this to see what the program has printed or logged. Very useful to understand program behavior without re-running. Returns up to 200 recent lines.")
+    public Map<String, Object> get_console_output(String sessionId) {
+        DapSession session = sessionManager.getSession(sessionId);
+
+        String output = session.getProgramOutput().getAllWithCategories();
+        int lineCount = session.getProgramOutput().getLineCount();
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("success", true);
+
+        if (lineCount > 0) {
+            result.put("output", output);
+            result.put("lines", lineCount);
+        } else {
+            result.put("output", "");
+            result.put("lines", 0);
+            result.put("message", "No console output yet");
+        }
+
+        return result;
     }
 
     @Tool(description = "List all threads in the debugged program.", structuredContent = true)

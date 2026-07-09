@@ -69,6 +69,7 @@ public class DapSession implements DapEventListener {
     private final DapServer dapServer; // Not final - can be recreated after error
     private final Workspace workspace;
     private final DapTraceCollector traceCollector;
+    private final DapProgramOutput programOutput; // Captures stdout/stderr from debugged program
     private final Instant createdAt; // When the session was created
 
     private SessionState state = SessionState.CREATED;
@@ -134,6 +135,7 @@ public class DapSession implements DapEventListener {
         this.serverConfig = serverConfig;
         this.workspace = workspace;
         this.traceCollector = workspace.getApplication().getDapTraceCollector();
+        this.programOutput = new DapProgramOutput(); // Initialize program output buffer
 
         // Update the trace collector wrapper with the correct sessionId for installation traces
         if (serverConfig.getTraceCollector() instanceof DapTraceCollectorWrapper) {
@@ -827,17 +829,17 @@ public class DapSession implements DapEventListener {
         return trackFuture(server.continue_(args)
             .thenApply(response -> {
                 setState(SessionState.RUNNING);
-                return Map.of(
+                return createResultWithOutput(Map.of(
                     "success", true,
                     "allThreadsContinued", response.getAllThreadsContinued() != null ? response.getAllThreadsContinued() : false
-                );
+                ));
             }));
     }
 
     /**
      * Step over (next line).
      */
-    public CompletableFuture<Void> stepOver() {
+    public CompletableFuture<Map<String, Object>> stepOver() {
         LOG.infof("Step over: %s", sessionId);
 
         IDebugProtocolServer server = getActiveServer();
@@ -848,13 +850,14 @@ public class DapSession implements DapEventListener {
         NextArguments args = new NextArguments();
         args.setThreadId(currentThreadId);
 
-        return trackFuture(server.next(args));
+        return trackFuture(server.next(args)
+            .thenApply(v -> createResultWithOutput(Map.of("success", true))));
     }
 
     /**
      * Step into function.
      */
-    public CompletableFuture<Void> stepIn() {
+    public CompletableFuture<Map<String, Object>> stepIn() {
         LOG.infof("Step in: %s", sessionId);
 
         IDebugProtocolServer server = getActiveServer();
@@ -865,13 +868,14 @@ public class DapSession implements DapEventListener {
         StepInArguments args = new StepInArguments();
         args.setThreadId(currentThreadId);
 
-        return trackFuture(server.stepIn(args));
+        return trackFuture(server.stepIn(args)
+            .thenApply(v -> createResultWithOutput(Map.of("success", true))));
     }
 
     /**
      * Step out of current function.
      */
-    public CompletableFuture<Void> stepOut() {
+    public CompletableFuture<Map<String, Object>> stepOut() {
         LOG.infof("Step out: %s", sessionId);
 
         IDebugProtocolServer server = getActiveServer();
@@ -882,7 +886,23 @@ public class DapSession implements DapEventListener {
         StepOutArguments args = new StepOutArguments();
         args.setThreadId(currentThreadId);
 
-        return trackFuture(server.stepOut(args));
+        return trackFuture(server.stepOut(args)
+            .thenApply(v -> createResultWithOutput(Map.of("success", true))));
+    }
+
+    /**
+     * Helper to create a result Map with console output included.
+     */
+    private Map<String, Object> createResultWithOutput(Map<String, Object> baseResult) {
+        Map<String, Object> result = new HashMap<>(baseResult);
+
+        // Include console output if any
+        if (programOutput.hasOutput()) {
+            result.put("consoleOutput", programOutput.getAllWithCategories());
+            result.put("outputLines", programOutput.getLineCount());
+        }
+
+        return result;
     }
 
     /**
@@ -1059,6 +1079,12 @@ public class DapSession implements DapEventListener {
         String output = event.getOutput();
 
         LOG.debugf("Session %s output [%s]: %s", sessionId, category, output);
+
+        // Capture program output for AI agent
+        // Skip telemetry - it's just internal DAP metrics
+        if (!"telemetry".equals(category)) {
+            programOutput.addOutput(event);
+        }
 
         // Send to trace collector for UI visibility
         if (output != null && !output.isBlank()) {
@@ -1310,5 +1336,13 @@ public class DapSession implements DapEventListener {
 
     public Workspace getWorkspace() {
         return workspace;
+    }
+
+    /**
+     * Get the program output buffer for this session.
+     * Contains stdout/stderr from the debugged program.
+     */
+    public DapProgramOutput getProgramOutput() {
+        return programOutput;
     }
 }
