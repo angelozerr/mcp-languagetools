@@ -53,14 +53,15 @@ public class DapDebugTools {
         return sessionManager.listDebugAdapters();
     }
 
-
-    @Tool(description = "List all active debug sessions with their state (CREATED, RUNNING, PAUSED, etc).")
-    public List<Map<String, Object>> list_debug_sessions() {
+    @Tool(
+            name = "list_debug_sessions",
+            description = "List all active debug sessions with their state (CREATED, RUNNING, PAUSED, etc).")
+    public List<Map<String, Object>> getListDebugSessions() {
         return sessionManager.listSessions();
     }
 
     @Tool(
-            name="close_debug_session",
+            name = "close_debug_session",
             description = "Close and terminate a debug session, stopping the debugged program.")
     public Map<String, Object> closeDebugSessionSynch(String sessionId) {
         return closeDebugSession(sessionId)
@@ -154,7 +155,20 @@ public class DapDebugTools {
             @ToolArg(description = "Optional session name (auto-generated if not provided)") String sessionName,
             @ToolArg(description = "Debug mode: true=debug with breakpoints, false=run without debugging (default)") Boolean debugMode,
             Cancellation cancellation) {
+        // CRITICAL: Use .handle() instead of .exceptionally().join() to avoid re-throwing
         return startDebugging(debuggerId, cwd, configuration, breakpoints, sessionName, debugMode, cancellation)
+                .handle((result, ex) -> {
+                    if (ex != null) {
+                        // Error case - return error result
+                        Map<String, Object> errorResult = new HashMap<>();
+                        errorResult.put("success", false);
+                        errorResult.put("error", ex.getCause() != null ? ex.getCause().getMessage() : ex.getMessage());
+                        return errorResult;
+                    } else {
+                        // Success case - return result as-is
+                        return result;
+                    }
+                })
                 .join();
     }
 
@@ -225,6 +239,13 @@ public class DapDebugTools {
                     result.put("sessionId", sessionId);
                     result.put("language", session.getLanguage());
                     return result;
+                }).exceptionally(ex -> {
+                    // Ensure the future always completes (never hangs)
+                    Map<String, Object> errorResult = new HashMap<>();
+                    errorResult.put("success", false);
+                    errorResult.put("sessionId", sessionId);
+                    errorResult.put("error", ex.getCause() != null ? ex.getCause().getMessage() : ex.getMessage());
+                    return errorResult;
                 }),
                 cancellation
         );
@@ -444,12 +465,12 @@ public class DapDebugTools {
         // If no frameId provided, use top frame
         if (frameId == null) {
             return executeWithCancellation(
-                session.getStackTrace()
-                    .thenCompose(frames -> {
-                        int targetFrameId = frames.length > 0 ? frames[0].getId() : 0;
-                        return session.evaluate(expression, targetFrameId);
-                    }),
-                cancellation
+                    session.getStackTrace()
+                            .thenCompose(frames -> {
+                                int targetFrameId = frames.length > 0 ? frames[0].getId() : 0;
+                                return session.evaluate(expression, targetFrameId);
+                            }),
+                    cancellation
             );
         }
 

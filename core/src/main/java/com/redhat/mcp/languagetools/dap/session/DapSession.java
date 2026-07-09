@@ -7,6 +7,7 @@ import com.redhat.mcp.languagetools.dap.server.DapServerConfig;
 import com.redhat.mcp.languagetools.dap.server.DapServerFactory;
 import com.redhat.mcp.languagetools.dap.server.DapServerFactoryRegistry;
 import com.redhat.mcp.languagetools.dap.trace.DapTraceCollector;
+import com.redhat.mcp.languagetools.server.ServerStatus;
 import com.redhat.mcp.languagetools.trace.TraceCollector;
 import com.redhat.mcp.languagetools.workspace.Workspace;
 import org.eclipse.lsp4j.debug.*;
@@ -411,14 +412,14 @@ public class DapSession implements DapEventListener {
         LOG.infof("Launch requested: sessionState=%s, serverStatus=%s", state, serverStatus);
 
         // If session was TERMINATED, stop server first to clear vscode-js-debug DI state
-        if (state == SessionState.TERMINATED && serverStatus == com.redhat.mcp.languagetools.server.ServerStatus.RUNNING) {
+        if (state == SessionState.TERMINATED && serverStatus == ServerStatus.RUNNING) {
             LOG.infof("Session TERMINATED but server RUNNING - stopping server to clear state");
             initFuture = dapServer.stop2().thenCompose(v -> initialize());
         } else if (state == SessionState.CREATED
-            || serverStatus == com.redhat.mcp.languagetools.server.ServerStatus.NOT_STARTED
-            || serverStatus == com.redhat.mcp.languagetools.server.ServerStatus.START_FAILED
-            || serverStatus == com.redhat.mcp.languagetools.server.ServerStatus.ERROR
-            || serverStatus == com.redhat.mcp.languagetools.server.ServerStatus.STOPPED) {
+            || serverStatus == ServerStatus.NOT_STARTED
+            || serverStatus == ServerStatus.START_FAILED
+            || serverStatus == ServerStatus.ERROR
+            || serverStatus == ServerStatus.STOPPED) {
             LOG.infof("Server not running or in error, starting and initializing...");
             initFuture = initialize();
         } else {
@@ -428,7 +429,7 @@ public class DapSession implements DapEventListener {
 
         return trackFuture(initFuture.thenCompose(v -> {
             // Verify server is actually running
-            if (dapServer.getStatus() != com.redhat.mcp.languagetools.server.ServerStatus.RUNNING) {
+            if (dapServer.getStatus() != ServerStatus.RUNNING) {
                 return CompletableFuture.failedFuture(new IllegalStateException(
                     "DAP server not running (status: " + dapServer.getStatus() + ")"));
             }
