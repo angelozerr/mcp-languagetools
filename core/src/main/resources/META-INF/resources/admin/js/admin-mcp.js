@@ -238,9 +238,17 @@ function switchMcpConsoleTab(tab) {
     if (tab === 'traces') {
         document.getElementById('mcp-traces-tab').classList.add('active');
         document.getElementById('mcp-traces-controls').style.display = 'flex';
+        // Show search box for traces
+        if (window.updateSearchBoxVisibility) {
+            window.updateSearchBoxVisibility(true);
+        }
     } else if (tab === 'tools') {
         document.getElementById('mcp-tools-tab').classList.add('active');
         document.getElementById('mcp-traces-controls').style.display = 'none';
+        // Hide search box for tools
+        if (window.updateSearchBoxVisibility) {
+            window.updateSearchBoxVisibility(false);
+        }
     }
 }
 
@@ -267,7 +275,7 @@ function renderMcpConsole() {
         expandedTraces.add(el.id);
     });
 
-    const html = clientTraces.map(trace => formatMcpTrace(trace, '')).join('');
+    const html = clientTraces.map((trace, index) => formatMcpTrace(trace, index, '')).join('');
     output.innerHTML = html;
 
     // Restore expanded state
@@ -308,7 +316,7 @@ function renderMcpConsoleWithHighlights() {
         expandedTraces.add(el.id);
     });
 
-    const html = clientTraces.map(trace => formatMcpTrace(trace, window.currentSearchQuery || '')).join('');
+    const html = clientTraces.map((trace, index) => formatMcpTrace(trace, index, TraceRenderer.getCurrentSearchQuery())).join('');
     output.innerHTML = html;
 
     // Restore expanded state
@@ -323,109 +331,23 @@ function renderMcpConsoleWithHighlights() {
     });
 }
 
-function formatMcpTrace(trace, searchQuery = '') {
-    const content = trace.jsonContent;
-
-    // Split by first newline to separate header from body
-    const firstNewline = content.indexOf('\n');
-    if (firstNewline === -1) {
-        // No body, just header
-        return `
-            <div class="trace-line">
-                <div style="padding: 0.25rem; font-family: 'Consolas', 'Monaco', monospace; font-size: 0.85rem; color: #cccccc;">${window.highlightText ? window.highlightText(content, searchQuery) : content}</div>
-            </div>
-        `;
-    }
-
-    const headerLine = content.substring(0, firstNewline);
-    let body = content.substring(firstNewline + 1).trim();
-
-    // Check if trace has search match
-    const hasMatch = searchQuery && trace.jsonContent.toLowerCase().includes(searchQuery.toLowerCase());
-
-    // Messages mode: show only header line, no folding
-    if (mcpTraceLevel === 'messages') {
-        return `
-            <div class="trace-line">
-                <div style="padding: 0.25rem; font-family: 'Consolas', 'Monaco', monospace; font-size: 0.85rem; color: #cccccc;">${window.highlightText ? window.highlightText(headerLine, searchQuery) : headerLine}</div>
-            </div>
-        `;
-    }
-
-    // Verbose mode: header + body folded by default
-    const hasBody = body.length > 0;
-    if (!hasBody) {
-        return `<div class="trace-line">
-            <div style="padding: 0.25rem; font-family: 'Consolas', 'Monaco', monospace; font-size: 0.85rem; color: #cccccc;">${window.highlightText ? window.highlightText(headerLine, searchQuery) : headerLine}</div>
-        </div>`;
-    }
-
-    // With body: show toggle arrow and collapsible content
-    // Auto-expand if has search match
-    const traceId = 'mcp-trace-' + Math.random().toString(36).substr(2, 9);
-    const foldState = hasMatch ? 'expanded' : 'collapsed';
-    const toggleIcon = hasMatch ? '▼' : '▶';
-    const fullContent = headerLine + '\n' + body;
-
-    return `
-        <div class="trace-line" onmouseenter="showMcpTooltip(event, '${traceId}', ${!hasMatch})" onmouseleave="hideMcpTooltip('${traceId}')">
-            <div style="display: flex; align-items: flex-start; padding: 0.25rem; cursor: pointer;"
-                 onclick="toggleMcpTrace('${traceId}')">
-                <span id="${traceId}-arrow" class="mcp-trace-toggle" style="margin-right: 0.5rem; user-select: none; font-size: 0.7rem; color: #888;">${toggleIcon}</span>
-                <div style="flex: 1; font-family: 'Consolas', 'Monaco', monospace; font-size: 0.85rem; color: #cccccc;">${window.highlightText ? window.highlightText(headerLine, searchQuery) : headerLine}</div>
-            </div>
-            <div id="${traceId}" class="mcp-trace-body ${foldState}" style="font-family: 'Consolas', 'Monaco', monospace; font-size: 0.8rem; color: #d4d4d4; white-space: pre-wrap; word-wrap: break-word; padding-left: 1.5rem;">${window.highlightText ? window.highlightText(body, searchQuery) : body}</div>
-            <div class="trace-tooltip" id="${traceId}-tooltip">${window.escapeHtml ? window.escapeHtml(fullContent) : fullContent}</div>
-        </div>
-    `;
+function formatMcpTrace(trace, index, searchQuery = '') {
+    // Delegate to TraceRenderer for consistent rendering
+    return TraceRenderer.renderTrace(trace, index, mcpTraceLevel, searchQuery);
 }
 
-function showMcpTooltip(event, traceId, isFolded) {
-    if (!isFolded) return;
-
-    const body = document.getElementById(traceId);
-    if (!body || !body.classList.contains('collapsed')) return;
-
-    const tooltip = document.getElementById(traceId + '-tooltip');
-    if (!tooltip) return;
-
-    // Position tooltip near mouse
-    const x = event.clientX + 15;
-    const y = event.clientY + 15;
-
-    tooltip.style.left = x + 'px';
-    tooltip.style.top = y + 'px';
-    tooltip.style.display = 'block';
-}
-
-function hideMcpTooltip(traceId) {
-    const tooltip = document.getElementById(traceId + '-tooltip');
-    if (tooltip) {
-        tooltip.style.display = 'none';
-    }
-}
-
-function toggleMcpTrace(id) {
-    const body = document.getElementById(id);
-    const arrow = document.getElementById(id + '-arrow');
-
-    if (body.classList.contains('collapsed')) {
-        body.classList.remove('collapsed');
-        body.classList.add('expanded');
-        arrow.textContent = '▼';
-    } else {
-        body.classList.remove('expanded');
-        body.classList.add('collapsed');
-        arrow.textContent = '▶';
-    }
-}
+// Tooltip, toggle, and toggleAll functions now provided by TraceRenderer (via window.*)
 
 function toggleAllMcpTraces() {
-    if (window.toggleAllTracesGeneric) {
-        window.toggleAllTracesGeneric('mcp-console-output', 'mcp-trace-body', 'mcp-trace-toggle', 'mcp-fold-button', {
-            get value() { return mcpAllFolded; },
-            set value(v) { mcpAllFolded = v; }
-        });
+    // Use TraceRenderer's toggleAllTraces with MCP console container
+    const expand = mcpAllFolded;
+    TraceRenderer.toggleAllTraces('mcp-console-output', expand);
+    mcpAllFolded = !mcpAllFolded;
+
+    // Update button text
+    const foldButton = document.getElementById('mcp-fold-button');
+    if (foldButton) {
+        foldButton.textContent = mcpAllFolded ? 'Unfold All' : 'Fold All';
     }
 }
 
@@ -511,11 +433,9 @@ window.selectMcpClient = selectMcpClient;
 window.loadMcpTracesConsole = loadMcpTracesConsole;
 window.changeMcpTraceLevel = changeMcpTraceLevel;
 window.switchMcpConsoleTab = switchMcpConsoleTab;
-window.toggleMcpTrace = toggleMcpTrace;
+// toggleMcpTrace, showMcpTooltip, hideMcpTooltip now provided by TraceRenderer
 window.toggleAllMcpTraces = toggleAllMcpTraces;
 window.clearMcpConsole = clearMcpConsole;
-window.showMcpTooltip = showMcpTooltip;
-window.hideMcpTooltip = hideMcpTooltip;
 window.handleMcpTrace = handleMcpTrace;
 window.handleMcpClientsUpdate = handleMcpClientsUpdate;
 window.renderMcpConsoleWithHighlights = renderMcpConsoleWithHighlights;

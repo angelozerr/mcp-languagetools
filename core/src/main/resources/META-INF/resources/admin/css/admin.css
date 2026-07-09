@@ -418,11 +418,17 @@ body {
     border: 1px solid #3e3e42;
     border-radius: 4px;
     padding: 0.5rem;
-    display: none;
+    display: none; /* Hidden by default */
     z-index: 100;
     box-shadow: 0 4px 8px rgba(0,0,0,0.3);
 }
 
+/* Available context (LSP traces, MCP, DAP) */
+.search-box.search-box-available {
+    display: none; /* Still hidden until Ctrl+F */
+}
+
+/* Opened via Ctrl+F - works with or without search-box-available */
 .search-box.visible {
     display: flex;
     gap: 0.5rem;
@@ -1001,6 +1007,7 @@ body {
     white-space: pre-wrap;
     word-wrap: break-word;
     font-size: 11px;
+    color: #ffffff;
     box-shadow: 0 6px 16px rgba(0,0,0,0.6);
     pointer-events: none;
 }

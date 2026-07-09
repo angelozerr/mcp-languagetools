@@ -464,6 +464,22 @@ async function selectDapSession(sessionId) {
         selectedElement.classList.add('active');
     }
 
+    // Clear search when switching sessions
+    const searchBox = document.getElementById('search-box');
+    const searchInput = document.getElementById('search-input');
+    if (searchBox && searchInput) {
+        searchBox.classList.remove('visible');
+        searchInput.value = '';
+        if (window.clearHighlights) {
+            window.clearHighlights();
+        }
+    }
+
+    // Show search box for DAP traces
+    if (typeof updateSearchBoxVisibility === 'function') {
+        updateSearchBoxVisibility(true);
+    }
+
     // Check if session div already exists
     const sessionDiv = document.getElementById(`dap-session-${sessionId}`);
     if (sessionDiv) {
@@ -500,54 +516,33 @@ async function selectDapSession(sessionId) {
 function renderDapTraces(traces, sessionId) {
     const level = currentDapTraceLevel[sessionId] || 'verbose';
 
-    return traces.map((trace, index) => {
+    const html = traces.map((trace, index) => {
         // Filter based on trace level
         if (!shouldShowDapTrace(trace, sessionId)) {
             return ''; // Don't show if level is 'off'
         }
 
-        const content = trace.jsonContent;
+        // Use TraceRenderer for consistent rendering
+        let rendered = TraceRenderer.renderTrace(trace, index, level, TraceRenderer.getCurrentSearchQuery());
 
-        // Parse the trace: first line is header, rest is body (same as LSP)
-        const lines = content.split('\n');
-        const headerLine = lines[0]; // [Trace - HH:mm:ss] ... or [Starting ...]
-
-        // Assign colors based on messageType (not text content)
-        let headerColor = '#cccccc';  // Default gray
-        if (trace.messageType === 'ERROR') {
-            headerColor = '#ff6b6b';  // Red for errors/stderr
-        } else if (trace.messageType === 'INFO') {
-            headerColor = '#569cd6';  // Blue for console/stdout output
-        } else if (trace.messageType === 'UPDATE') {
-            headerColor = '#4ec9b0';  // Cyan for progress updates
-        }
-        // TRACE type stays gray (default)
-
-        // Body is everything after the first line
-        const bodyLines = lines.slice(1);
-        const body = bodyLines.join('\n').trim();
-        const hasBody = body.length > 0;
-
-        // If no body OR level is 'messages', display header only (no folding)
-        if (!hasBody || level === 'messages') {
-            return `
-                <div class="trace-line">
-                    <div style="padding: 0.25rem; font-family: 'Consolas', 'Monaco', monospace; font-size: 0.85rem; color: ${headerColor};">${escapeHtml(headerLine)}</div>
-                </div>
-            `;
+        // Apply DAP-specific colors based on messageType
+        if (trace.messageType) {
+            let color = '#cccccc'; // Default gray
+            if (trace.messageType === 'ERROR') {
+                color = '#ff6b6b'; // Red for errors/stderr
+            } else if (trace.messageType === 'INFO') {
+                color = '#569cd6'; // Blue for console/stdout output
+            } else if (trace.messageType === 'UPDATE') {
+                color = '#4ec9b0'; // Cyan for progress updates
+            }
+            // Replace the default color with the specific one
+            rendered = rendered.replace(/color: #cccccc;/g, `color: ${color};`);
         }
 
-        // With body AND level is 'verbose': header + foldable body (like LSP)
-        return `
-            <div class="trace-line">
-                <div class="trace-header folded" onclick="toggleDapTrace(${index})" style="padding: 0.25rem; font-family: 'Consolas', 'Monaco', monospace; font-size: 0.85rem; cursor: pointer;">
-                    <span class="trace-toggle" id="dap-toggle-${index}">▶</span>
-                    <span class="trace-header-text" style="color: ${headerColor};">${escapeHtml(headerLine)}</span>
-                </div>
-                <div class="trace-body collapsed" id="dap-body-${index}" style="font-family: 'Consolas', 'Monaco', monospace; font-size: 0.85rem; color: #cccccc; white-space: pre-wrap;">${escapeHtml(body)}</div>
-            </div>
-        `;
+        return rendered;
     }).join('');
+
+    return html;
 }
 
 /**
@@ -640,6 +635,14 @@ async function loadAllDapServers(serverIdToSelect) {
  */
 async function showDapServerDetails(serverId) {
     selectedDapServer = serverId;
+
+    // Clear current DAP session ID (we're viewing server config, not a session)
+    window.currentDapSessionId = null;
+
+    // Hide search box when showing server details (not traces)
+    if (window.updateSearchBoxVisibility) {
+        window.updateSearchBoxVisibility(false);
+    }
 
     // Re-render server list to update active state
     const dapServers = Object.values(dapServerConfigs);
@@ -884,23 +887,7 @@ async function runDapInstaller(serverId) {
 /**
  * Toggle individual DAP trace item.
  */
-function toggleDapTrace(index) {
-    const header = document.getElementById(`dap-toggle-${index}`).parentElement;
-    const body = document.getElementById(`dap-body-${index}`);
-    const toggle = document.getElementById(`dap-toggle-${index}`);
-
-    if (body.classList.contains('collapsed')) {
-        body.classList.remove('collapsed');
-        body.classList.add('expanded');
-        header.classList.remove('folded');
-        toggle.textContent = '▼';
-    } else {
-        body.classList.remove('expanded');
-        body.classList.add('collapsed');
-        header.classList.add('folded');
-        toggle.textContent = '▶';
-    }
-}
+// toggleDapTrace now provided by TraceRenderer (via window.toggleTrace)
 
 /**
  * Toggle folding state for DAP traces.
@@ -912,30 +899,14 @@ function toggleAllDapTraces(sessionId) {
     const foldButton = document.getElementById('dap-fold-button');
     const isFolded = dapFoldedState[sessionId] || false;
 
+    // Use TraceRenderer's toggleAllTraces
+    TraceRenderer.toggleAllTraces(`dap-traces-container-${sessionId}`, isFolded);
+
+    // Update button text and state
     if (isFolded) {
-        // Unfold all
-        container.querySelectorAll('.trace-header').forEach(header => {
-            header.classList.remove('folded');
-        });
-        container.querySelectorAll('.trace-body').forEach((body, index) => {
-            body.classList.remove('collapsed');
-            body.classList.add('expanded');
-            const toggle = document.getElementById(`dap-toggle-${index}`);
-            if (toggle) toggle.textContent = '▼';
-        });
         foldButton.textContent = 'Fold All';
         dapFoldedState[sessionId] = false;
     } else {
-        // Fold all
-        container.querySelectorAll('.trace-header').forEach(header => {
-            header.classList.add('folded');
-        });
-        container.querySelectorAll('.trace-body').forEach((body, index) => {
-            body.classList.remove('expanded');
-            body.classList.add('collapsed');
-            const toggle = document.getElementById(`dap-toggle-${index}`);
-            if (toggle) toggle.textContent = '▶';
-        });
         foldButton.textContent = 'Unfold All';
         dapFoldedState[sessionId] = true;
     }
@@ -1486,83 +1457,8 @@ function createSessionHTML(session) {
 
 // ============================================
 // Keyboard shortcuts for DAP console (Ctrl+A, Ctrl+F)
+// Handled by keyboard-shortcuts.js (see admin.js for registration)
 // ============================================
-
-let dapFullTextSelected = false;
-
-document.addEventListener('keydown', (e) => {
-    const dapTracesContainer = document.getElementById(`dap-traces-container-${window.currentDapSessionId}`);
-
-    // Ctrl+A to select all DAP console content
-    if (e.ctrlKey && e.key === 'a' && dapTracesContainer && window.currentDapSessionId) {
-        const activeElement = document.activeElement;
-        if (activeElement.tagName !== 'INPUT' && activeElement.tagName !== 'TEXTAREA') {
-            e.preventDefault();
-            selectAllDapConsoleContent();
-        }
-    }
-
-    // Ctrl+C after Ctrl+A to copy full content (including folded)
-    if (e.ctrlKey && e.key === 'c' && dapFullTextSelected && window.currentDapSessionId) {
-        e.preventDefault();
-        copyFullDapConsoleContent();
-    }
-
-    // Ctrl+F to open search in DAP console
-    if (e.ctrlKey && e.key === 'f' && dapTracesContainer && window.currentDapSessionId) {
-        e.preventDefault();
-        openDapSearch();
-    }
-
-    // Escape to close search
-    if (e.key === 'Escape') {
-        closeDapSearch();
-    }
-});
-
-// Reset flag when clicking
-document.addEventListener('mousedown', () => {
-    dapFullTextSelected = false;
-});
-
-function selectAllDapConsoleContent() {
-    const container = document.getElementById(`dap-traces-container-${window.currentDapSessionId}`);
-    if (!container) return;
-
-    const range = document.createRange();
-    range.selectNodeContents(container);
-    const selection = window.getSelection();
-    selection.removeAllRanges();
-    selection.addRange(range);
-
-    dapFullTextSelected = true;
-    container.focus();
-}
-
-function copyFullDapConsoleContent() {
-    const traces = window.dapTracesBySession?.[window.currentDapSessionId] || [];
-
-    let fullText = '';
-    traces.forEach(trace => {
-        fullText += trace.jsonContent + '\n\n';
-    });
-
-    navigator.clipboard.writeText(fullText).then(() => {
-        dapFullTextSelected = false;
-    }).catch(err => {
-        console.error('Failed to copy DAP console:', err);
-        dapFullTextSelected = false;
-    });
-}
-
-function openDapSearch() {
-    // TODO: Implement search box for DAP (similar to LSP)
-    console.log('DAP search not yet implemented');
-}
-
-function closeDapSearch() {
-    // TODO: Implement close search for DAP
-}
 
 /**
  * Load launch configuration templates for a DAP server.
@@ -1637,7 +1533,7 @@ window.renderDapTracesForSession = renderDapTracesForSession;
 window.loadAllDapServers = loadAllDapServers;
 window.showDapServerDetails = showDapServerDetails;
 window.switchDapServerTab = switchDapServerTab;
-window.toggleDapTrace = toggleDapTrace;
+// toggleDapTrace now provided by TraceRenderer (via window.toggleTrace)
 window.toggleAllDapTraces = toggleAllDapTraces;
 window.clearDapConsole = clearDapConsole;
 window.changeDapTraceLevel = changeDapTraceLevel;

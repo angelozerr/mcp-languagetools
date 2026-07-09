@@ -28,6 +28,25 @@
         window.mergeServerData = mergeServerData;
 
         /**
+         * Show or hide the search box based on whether we're viewing trace console.
+         */
+        function updateSearchBoxVisibility(showSearchBox) {
+            const searchBox = document.getElementById('search-box');
+            if (searchBox) {
+                // Always close the popup when changing visibility
+                searchBox.classList.remove('visible');
+
+                if (showSearchBox) {
+                    // Make search box available (but closed) - use CSS class instead of inline style
+                    searchBox.classList.add('search-box-available');
+                } else {
+                    // Hide search box completely
+                    searchBox.classList.remove('search-box-available');
+                }
+            }
+        }
+
+        /**
          * Format status into CSS class name.
          */
         function formatStatusClass(status, isReady) {
@@ -320,7 +339,6 @@
          * Handle DAP trace message from WebSocket.
          */
         function handleDapTrace(trace) {
-            console.log('handleDapTrace called for session:', trace.sessionId);
 
             // Store trace by session
             if (!window.dapTracesBySession) {
@@ -524,6 +542,20 @@
             currentTab = tab;
             window.currentTab = tab; // Update global reference
 
+            // Clear DAP session ID when leaving DAP tab
+            if (tab !== 'dap-servers') {
+                window.currentDapSessionId = null;
+            }
+
+            // Close search box when switching tabs
+            const searchBox = document.getElementById('search-box');
+            if (searchBox) {
+                searchBox.classList.remove('visible');
+                if (typeof clearHighlights === 'function') {
+                    clearHighlights();
+                }
+            }
+
             // Update tab UI
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             if (element) {
@@ -568,6 +600,7 @@
                                 ← Select a workspace and LSP server to view console
                             </div>
                         `;
+                        updateSearchBoxVisibility(false);
                     }
                 } else {
                     // No workspace selected, show placeholder
@@ -577,6 +610,7 @@
                             ← Select a workspace and LSP server to view console
                         </div>
                     `;
+                    updateSearchBoxVisibility(false);
                 }
             } else if (tab === 'lsp-servers') {
                 document.getElementById('workspaces-list').style.display = 'none';
@@ -592,6 +626,7 @@
                 // Always reload servers when switching to this tab
                 // Pass serverIdToSelect if provided in options
                 loadAllLspServers(options.serverId);
+                // Search box will be shown/hidden by loadAllLspServers -> selectServer -> loadConsole
             } else if (tab === 'dap-servers') {
                 document.getElementById('workspaces-list').style.display = 'none';
                 document.getElementById('lsp-servers-list').style.display = 'none';
@@ -606,6 +641,8 @@
                 // Always reload DAP servers when switching to this tab
                 // Pass serverIdToSelect if provided in options
                 loadAllDapServers(options.serverId);
+                // DAP now supports search via TraceRenderer
+                // Search box visibility will be updated when session detail is shown
             } else if (tab === 'mcp-traces') {
                 document.getElementById('workspaces-list').style.display = 'none';
                 document.getElementById('lsp-servers-list').style.display = 'none';
@@ -623,13 +660,16 @@
                     if (selectedMcpClient && mcpClients.find(c => c.id === selectedMcpClient)) {
                         // Re-select and refresh
                         loadMcpConsole(selectedMcpClient);
+                        updateSearchBoxVisibility(true); // MCP traces support search
                     } else {
                         // Select first client
                         selectMcpClient(mcpClients[0].id);
+                        updateSearchBoxVisibility(true); // MCP traces support search
                     }
                 } else {
                     // No clients, show placeholder
                     loadMcpTracesConsole();
+                    updateSearchBoxVisibility(false);
                 }
             }
         }
@@ -650,4 +690,71 @@
             await loadLspConfigs();
             await loadDapConfigs();
             connectAdminWebSocket();
+
+            // Register keyboard shortcuts for all consoles (LSP, MCP, DAP)
+            KeyboardShortcuts.register({
+                getActiveConsole: () => {
+                    // DAP console (highest priority - active when detail view open)
+                    const dapTracesContainer = document.getElementById(`dap-traces-container-${window.currentDapSessionId}`);
+                    if (dapTracesContainer && window.currentDapSessionId) {
+                        return {
+                            type: 'dap',
+                            containerId: `dap-traces-container-${window.currentDapSessionId}`,
+                            data: window.dapTracesBySession?.[window.currentDapSessionId] || []
+                        };
+                    }
+
+                    // LSP console (workspace tab with selected server)
+                    const consoleOutput = document.getElementById('console-output');
+                    if (consoleOutput && selectedServer) {
+                        return {
+                            type: 'lsp',
+                            containerId: 'console-output',
+                            data: tracesByServer[currentServerId] || []
+                        };
+                    }
+
+                    // MCP console (mcp-traces tab)
+                    const mcpConsoleOutput = document.getElementById('mcp-console-output');
+                    if (mcpConsoleOutput && currentTab === 'mcp-traces' && typeof selectedMcpClient !== 'undefined') {
+                        return {
+                            type: 'mcp',
+                            containerId: 'mcp-console-output',
+                            data: (typeof mcpTracesByClient !== 'undefined' && mcpTracesByClient[selectedMcpClient]) || []
+                        };
+                    }
+
+                    return null;
+                },
+                onSearch: () => {
+                    // Only allow search in trace consoles (LSP/MCP with server/client selected)
+                    const consoleOutput = document.getElementById('console-output');
+                    const mcpConsoleOutput = document.getElementById('mcp-console-output');
+                    const dapTracesContainer = document.getElementById(`dap-traces-container-${window.currentDapSessionId}`);
+
+                    const hasLspConsole = consoleOutput && selectedServer;
+                    const hasMcpConsole = mcpConsoleOutput && currentTab === 'mcp-traces' && typeof selectedMcpClient !== 'undefined';
+                    const hasDapConsole = dapTracesContainer && window.currentDapSessionId;
+
+                    if (hasLspConsole || hasMcpConsole || hasDapConsole) {
+                        const searchBox = document.getElementById('search-box');
+                        const searchInput = document.getElementById('search-input');
+                        if (searchBox && searchInput) {
+                            searchBox.classList.add('visible');
+                            searchInput.focus();
+                            searchInput.select();
+                        }
+                    }
+                },
+                onCloseSearch: () => {
+                    // Close search box and clear highlights
+                    const searchBox = document.getElementById('search-box');
+                    if (searchBox) {
+                        searchBox.classList.remove('visible');
+                        if (typeof clearHighlights === 'function') {
+                            clearHighlights();
+                        }
+                    }
+                }
+            });
         })();
