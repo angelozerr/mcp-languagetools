@@ -53,7 +53,10 @@ public class DapSessionManager {
      * @param createdBy    Who created the session
      * @return Created DapSession
      */
-    public DapSession createSession(URI workspaceUri, String dapServerId, String sessionName, DapSession.SessionActor createdBy) {
+    public DapSession createSession(URI workspaceUri,
+                                    String dapServerId,
+                                    String sessionName,
+                                    DapSession.SessionActor createdBy) {
         LOG.infof("Creating debug session: workspace=%s, dapServerId=%s, name=%s, createdBy=%s",
                 workspaceUri, dapServerId, sessionName, createdBy);
 
@@ -95,103 +98,19 @@ public class DapSessionManager {
         // Register status change listener on the DAP server
         session.getDapServer().addStatusChangeListener((oldStatus, newStatus) -> {
             LOG.infof("DAP server status changed: session=%s, %s -> %s", sessionId, oldStatus, newStatus);
-            // Fire event to notify UI with status change
-            if (sessionEvent != null) {
-                sessionEvent.fire(DapSessionEvent.stateChanged(
-                        session,
-                        oldStatus,
-                        newStatus
-                ));
-                LOG.infof("Fired STATE_CHANGED event for session %s: %s -> %s (debugMode=%s)", sessionId, oldStatus, newStatus, session.isDebugMode());
-            } else {
-                LOG.errorf("sessionEvent is null! Cannot fire STATE_CHANGED event");
-            }
+            fireStateChangedEvent(session, oldStatus, newStatus);
         });
 
         // Register session state change listener
         session.setStateChangeCallback(() -> {
             LOG.infof("DAP session state changed: session=%s, new state=%s", sessionId, session.getState());
-            // Fire event to notify UI
-            if (sessionEvent != null) {
-                String createdAt = session.getCreatedAt() != null ? session.getCreatedAt().toString() : null;
-                String launchedAt = session.getLaunchedAt() != null ? session.getLaunchedAt().toString() : null;
-                sessionEvent.fire(DapSessionEvent.stateChanged(
-                        session,
-                        null,  // No old status
-                        null
-                ));
-            }
+            fireStateChangedEvent(session, null, null);
         });
 
         // Fire CDI event for WebSocket notification
-        sessionEvent.fire(DapSessionEvent.created(session));
-
+        fireCreatedEvent(session);
         // Don't initialize yet - initialization (including installation) happens on first launch
         return session;
-    }
-
-    /**
-     * Create a new debug session for a specific debug adapter.
-     *
-     * @param debuggerId   ID of the debug adapter (e.g., "java-debug", "vscode-js-debug")
-     * @param sessionName  User-friendly name for the session
-     * @param workspaceUri Workspace URI for context
-     * @return Session info with sessionId
-     */
-    public CompletableFuture<Map<String, Object>> createSession(String debuggerId,
-                                                                String sessionName,
-                                                                URI workspaceUri) {
-        LOG.infof("Creating debug session with adapter '%s' in workspace %s", debuggerId, workspaceUri);
-
-        // Find workspace
-        Workspace workspace = application.getOrCreateWorkspace(workspaceUri);
-        if (workspace == null) {
-            return CompletableFuture.failedFuture(
-                    new IllegalArgumentException("Workspace not found: " + workspaceUri)
-            );
-        }
-
-        // Find DAP server by ID
-        DapServerConfig serverConfig = findDapServerById(workspace, debuggerId);
-        if (serverConfig == null) {
-            return CompletableFuture.failedFuture(
-                    new IllegalArgumentException("Debug adapter not found: " + debuggerId + ". Use list_debug_adapters to see available adapters.")
-            );
-        }
-
-        // Extract language from server config for display
-        String language = extractLanguageFromConfig(serverConfig);
-
-        // Create session (created by unknown source - deprecated method)
-        String sessionId = UUID.randomUUID().toString();
-        DapSession session = new DapSession(
-                sessionId,
-                language,
-                sessionName,
-                DapSession.SessionActor.UNKNOWN, // createdBy - this method is deprecated
-                serverConfig,
-                workspace
-        );
-
-        sessions.put(sessionId, session);
-        LOG.infof("Created session %s for %s (%s)", sessionId, language, sessionName);
-
-        // Initialize the session
-        return session.initialize()
-                .thenApply(v -> {
-                    Map<String, Object> result = new HashMap<>();
-                    result.put("success", true);
-                    result.put("sessionId", sessionId);
-                    result.put("language", language);
-                    result.put("sessionName", sessionName);
-                    result.put("message", "Created " + language + " debug session: " + sessionName);
-                    return result;
-                })
-                .exceptionally(ex -> {
-                    sessions.remove(sessionId);
-                    LOG.errorf(ex, "Failed to initialize session %s", sessionId);
-                    throw new RuntimeException("Failed to create debug session: " + ex.getMessage(), ex);
-                });
     }
 
     /**
@@ -255,12 +174,13 @@ public class DapSessionManager {
     }
 
     /**
-     * Remove a session from the manager.
+     * Remove a session from the manager and fire DELETED event.
      */
     public void removeSession(String sessionId) {
         DapSession session = sessions.remove(sessionId);
         if (session != null) {
             LOG.infof("Removed session: %s", sessionId);
+            fireDeletedEvent(session);
         }
     }
 
@@ -436,6 +356,44 @@ public class DapSessionManager {
         return null;
     }
 
+    // ========== Helper Methods ==========
+
+    /**
+     * Fire STATE_CHANGED event (with null check).
+     */
+    private void fireStateChangedEvent(DapSession session, com.redhat.mcp.languagetools.server.ServerStatus oldStatus, com.redhat.mcp.languagetools.server.ServerStatus newStatus) {
+        if (sessionEvent != null) {
+            sessionEvent.fire(DapSessionEvent.stateChanged(session, oldStatus, newStatus));
+            LOG.infof("Fired STATE_CHANGED event for session %s: %s -> %s (debugMode=%s)",
+                session.getSessionId(), oldStatus, newStatus, session.isDebugMode());
+        } else {
+            LOG.errorf("sessionEvent is null! Cannot fire STATE_CHANGED event");
+        }
+    }
+
+    /**
+     * Fire CREATED event (with null check).
+     */
+    private void fireCreatedEvent(DapSession session) {
+        if (sessionEvent != null) {
+            sessionEvent.fire(DapSessionEvent.created(session));
+            LOG.infof("Fired CREATED event for session %s", session.getSessionId());
+        } else {
+            LOG.errorf("sessionEvent is null! Cannot fire CREATED event");
+        }
+    }
+
+    /**
+     * Fire DELETED event (with null check).
+     */
+    private void fireDeletedEvent(DapSession session) {
+        if (sessionEvent != null) {
+            sessionEvent.fire(DapSessionEvent.deleted(session));
+            LOG.infof("Fired DELETED event for session %s", session.getSessionId());
+        } else {
+            LOG.errorf("sessionEvent is null! Cannot fire DELETED event");
+        }
+    }
 
     // ========== Cleanup ==========
 

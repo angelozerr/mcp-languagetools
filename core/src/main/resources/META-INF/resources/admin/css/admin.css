@@ -370,6 +370,15 @@ body {
     text-align: center;
 }
 
+/* Compact variant for DAP session badges in list/detail */
+.status-badge.status-badge-compact {
+    padding: 0.1rem 0.4rem;
+    width: 5rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .status-starting { background: #ffa500; color: white; }
 .status-running { background: #28a745; color: white; }
 .status-running-not-ready { background: #cddc39; color: black; } /* Yellow-green transition between STARTING and RUNNING */

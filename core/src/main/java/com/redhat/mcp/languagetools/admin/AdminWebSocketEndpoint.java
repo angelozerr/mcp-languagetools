@@ -54,6 +54,9 @@ public class AdminWebSocketEndpoint {
     McpTraceCollector mcpTraceCollector;
 
     @Inject
+    com.redhat.mcp.languagetools.dap.trace.DapTraceCollector dapTraceCollector;
+
+    @Inject
     ServerDTOBuilder serverDTOBuilder;
 
     @Inject
@@ -111,6 +114,9 @@ public class AdminWebSocketEndpoint {
 
             // Send MCP trace history
             sendMcpTraceHistory(session);
+
+            // Send DAP trace history
+            sendDapTraceHistory(session);
 
             LOG.debugf("Initial state sent to session: %s", session.getId());
         } catch (Exception e) {
@@ -176,6 +182,40 @@ public class AdminWebSocketEndpoint {
             LOG.debugf("MCP trace history sent to session: %s", session.getId());
         } catch (Exception e) {
             LOG.errorf(e, "Failed to send MCP trace history to session: %s", session.getId());
+        }
+    }
+
+    /**
+     * Send DAP trace history for all sessions.
+     */
+    private void sendDapTraceHistory(Session session) {
+        try {
+            // Get all active DAP sessions
+            var dapSessions = dapSessionManager.getAllSessions();
+            LOG.infof("Sending DAP trace history: %d sessions", dapSessions.size());
+
+            // Send traces for each session (last 200 traces per session)
+            for (var dapSession : dapSessions) {
+                var traces = dapTraceCollector.getTracesForSession(dapSession.getSessionId(), 200);
+                LOG.infof("Session %s: sending %d traces", dapSession.getSessionId(), traces.size());
+
+                // Send each trace
+                for (var trace : traces) {
+                    DapTraceWsMessage msg = new DapTraceWsMessage(
+                        "dap-trace",
+                        trace.workspaceUri(),
+                        trace.sessionId(),
+                        trace.timestamp().toString(),
+                        trace.direction().name(),
+                        trace.jsonContent(),
+                        trace.messageType() != null ? trace.messageType().name() : null
+                    );
+                    sendToSession(session, msg);
+                }
+            }
+            LOG.infof("DAP trace history sent to session: %s", session.getId());
+        } catch (Exception e) {
+            LOG.errorf(e, "Failed to send DAP trace history to session: %s", session.getId());
         }
     }
 

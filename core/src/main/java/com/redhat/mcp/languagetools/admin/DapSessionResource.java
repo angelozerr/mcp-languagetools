@@ -188,6 +188,7 @@ public class DapSessionResource {
                         .build();
             }
 
+            // Remove session (fires DELETED event automatically)
             sessionManager.removeSession(sessionId);
 
             return Response.ok(Map.of(

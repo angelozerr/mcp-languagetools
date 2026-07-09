@@ -59,9 +59,16 @@ public class DapDebugTools {
         return sessionManager.listSessions();
     }
 
-    @Tool(description = "Close and terminate a debug session, stopping the debugged program.")
-    public Map<String, Object> close_debug_session(String sessionId) {
-        return sessionManager.closeSession(sessionId).join();
+    @Tool(
+            name="close_debug_session",
+            description = "Close and terminate a debug session, stopping the debugged program.")
+    public Map<String, Object> closeDebugSessionSynch(String sessionId) {
+        return closeDebugSession(sessionId)
+                .join();
+    }
+
+    public CompletableFuture<Map<String, Object>> closeDebugSession(String sessionId) {
+        return sessionManager.closeSession(sessionId);
     }
 
     // ========== Breakpoints ==========
@@ -147,7 +154,8 @@ public class DapDebugTools {
             @ToolArg(description = "Optional session name (auto-generated if not provided)") String sessionName,
             @ToolArg(description = "Debug mode: true=debug with breakpoints, false=run without debugging (default)") Boolean debugMode,
             Cancellation cancellation) {
-        return startDebugging(debuggerId, cwd, configuration, breakpoints, sessionName, debugMode, cancellation).join();
+        return startDebugging(debuggerId, cwd, configuration, breakpoints, sessionName, debugMode, cancellation)
+                .join();
     }
 
     public CompletableFuture<Map<String, Object>> startDebugging(
@@ -226,7 +234,7 @@ public class DapDebugTools {
     public Map<String, Object> detach_from_process(String sessionId) {
         // For now, just close the session
         // TODO: implement proper detach that leaves process running
-        return close_debug_session(sessionId);
+        return closeDebugSessionSynch(sessionId);
     }
 
     // ========== Execution Control ==========

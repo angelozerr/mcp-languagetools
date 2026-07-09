@@ -130,12 +130,15 @@ function showLaunchConfigForm(session, dapServerId) {
     // Use launchConfiguration from session if available, otherwise empty
     const defaultConfig = session.launchConfiguration || {};
 
+    // Get session state info (same logic as session list)
+    const { statusText, statusClass } = getSessionStateInfo(session);
+
     const sessionHTML = `
         <div style="padding: 1rem; height: 100%; display: flex; flex-direction: column; overflow: hidden;">
             <div style="margin-bottom: 1rem;">
                 <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
                     <h3 style="margin: 0; color: #cccccc;">${session.sessionName || 'New Debug Session'}</h3>
-                    <span id="dap-session-status-${sessionId}" class="session-server-status status-badge status-stopped">${session.state || 'CREATED'}</span>
+                    <span id="dap-session-status-${sessionId}" class="session-server-status status-badge status-badge-compact ${statusClass}">${statusText}</span>
                 </div>
                 <p style="margin: 0; color: #858585; font-size: 0.85rem;">Server: ${session.serverId || session.dapServerId || dapServerId}</p>
                 <p style="margin: 0; color: #666; font-size: 0.75rem; font-family: monospace;">Session ID: ${sessionId}</p>
@@ -148,15 +151,6 @@ function showLaunchConfigForm(session, dapServerId) {
                     <label style="font-weight: 500; color: #cccccc;">Launch Configuration</label>
                     <div style="display: flex; gap: 0;">
                         <button
-                            id="dap-debug-btn-${sessionId}"
-                            onclick="debugDapSession('${session.sessionId}')"
-                            style="padding: 0.1rem 0.2rem; background: transparent; color: #569cd6; border: none; cursor: pointer; font-size: 1rem; display: flex; align-items: center; border-radius: 3px; transition: background 0.2s;"
-                            onmouseover="this.style.background='rgba(86, 156, 214, 0.2)'"
-                            onmouseout="this.style.background='transparent'"
-                            title="Debug (with breakpoints)">
-                            🐛
-                        </button>
-                        <button
                             id="dap-launch-btn-${sessionId}"
                             onclick="launchDapSession('${session.sessionId}')"
                             style="padding: 0.1rem 0.2rem; background: transparent; color: #4ec9b0; border: none; cursor: pointer; font-size: 1rem; display: flex; align-items: center; border-radius: 3px; transition: background 0.2s;"
@@ -164,6 +158,15 @@ function showLaunchConfigForm(session, dapServerId) {
                             onmouseout="this.style.background='transparent'"
                             title="Run (without debugging)">
                             ▶
+                        </button>
+                        <button
+                            id="dap-debug-btn-${sessionId}"
+                            onclick="debugDapSession('${session.sessionId}')"
+                            style="padding: 0.1rem 0.2rem; background: transparent; color: #569cd6; border: none; cursor: pointer; font-size: 1rem; display: flex; align-items: center; border-radius: 3px; transition: background 0.2s;"
+                            onmouseover="this.style.background='rgba(86, 156, 214, 0.2)'"
+                            onmouseout="this.style.background='transparent'"
+                            title="Debug (with breakpoints)">
+                            🐛
                         </button>
                         <button
                             id="dap-stop-btn-${sessionId}"
@@ -235,6 +238,30 @@ function showLaunchConfigForm(session, dapServerId) {
         loadLaunchConfigurationTemplates(sessionId, dapServerId);
     }
 
+    // Load existing traces for this session (renderDapTracesForSession will be called by WebSocket when traces arrive)
+    renderDapTracesForSession(sessionId);
+
+    // Initialize button states based on session state
+    const debugBtn = document.getElementById(`dap-debug-btn-${sessionId}`);
+    const launchBtn = document.getElementById(`dap-launch-btn-${sessionId}`);
+    const stopBtn = document.getElementById(`dap-stop-btn-${sessionId}`);
+
+    if (debugBtn && launchBtn && stopBtn && session.state) {
+        const { canLaunch, canStop } = getSessionButtonStates(session.state);
+
+        debugBtn.disabled = !canLaunch;
+        debugBtn.style.opacity = canLaunch ? '1' : '0.3';
+        debugBtn.style.cursor = canLaunch ? 'pointer' : 'not-allowed';
+
+        launchBtn.disabled = !canLaunch;
+        launchBtn.style.opacity = canLaunch ? '1' : '0.3';
+        launchBtn.style.cursor = canLaunch ? 'pointer' : 'not-allowed';
+
+        stopBtn.disabled = !canStop;
+        stopBtn.style.opacity = canStop ? '1' : '0.3';
+        stopBtn.style.cursor = canStop ? 'pointer' : 'not-allowed';
+    }
+
     // Clear DAP server selection
     selectedDapServer = null;
 
@@ -270,12 +297,8 @@ function showSessionDiv(sessionId) {
     // Show the selected session
     sessionDiv.style.display = 'block';
 
-    // Update traces container with current traces
-    const traces = window.dapTracesBySession?.[sessionId] || [];
-    const tracesContainer = document.getElementById(`dap-traces-container-${sessionId}`);
-    if (tracesContainer && traces.length > 0) {
-        tracesContainer.innerHTML = renderDapTraces(traces, sessionId);
-    }
+    // Render traces for this session
+    renderDapTracesForSession(sessionId);
 }
 
 
@@ -297,9 +320,26 @@ async function launchDapSession(sessionId) {
  * Internal function to launch/debug a DAP session.
  */
 async function launchDapSessionInternal(sessionId, debugMode) {
+    // Disable buttons immediately to prevent double-click
+    disableSessionButtons(sessionId);
+
     try {
-        const configText = document.getElementById('launch-config-editor').value;
-        const launchConfig = JSON.parse(configText);
+        // Try to get config from editor (if in detail view), otherwise use stored config
+        const editor = document.getElementById('launch-config-editor');
+        let launchConfig;
+
+        if (editor) {
+            // Config from editor (detail view)
+            const configText = editor.value;
+            launchConfig = JSON.parse(configText);
+        } else {
+            // Config from session cache (list view button click)
+            const session = window.dapSessions?.find(s => s.sessionId === sessionId);
+            if (!session || !session.launchConfiguration) {
+                throw new Error('No launch configuration found. Please open the session detail first.');
+            }
+            launchConfig = session.launchConfiguration;
+        }
 
         // Pass debugMode as query parameter (not in config)
         const response = await fetch(`/api/admin/dap/sessions/${sessionId}/launch?debugMode=${debugMode}`, {
@@ -347,6 +387,9 @@ async function launchDapSessionInternal(sessionId, debugMode) {
  * Stop a running DAP session.
  */
 async function stopDapSession(sessionId) {
+    // Disable buttons immediately to prevent double-click
+    disableSessionButtons(sessionId);
+
     try {
         const response = await fetch(`/api/admin/dap/sessions/${sessionId}/stop`, {
             method: 'POST'
@@ -1044,78 +1087,80 @@ function updateSessionDetailInDOM(sessionId, message) {
 function updateSessionStateInDOM(sessionId, newStatus, debugMode) {
     console.log('[DAP] Updating session in DOM:', sessionId, 'new status:', newStatus, 'debugMode:', debugMode);
 
-    // Get session to check debug mode (fallback to cache if not provided)
-    let isDebugging = debugMode;
-    if (isDebugging === null || isDebugging === undefined) {
-        const session = window.dapSessions?.find(s => s.sessionId === sessionId);
-        isDebugging = session?.debugMode === true;
-    }
-
-    // Calculate display values
-    let statusText = newStatus.charAt(0) + newStatus.slice(1).toLowerCase();
-    let statusClass = 'status-stopped';
-
-    if (newStatus === 'RUNNING') {
-        statusText = isDebugging ? 'Debugging' : 'Running';
-        statusClass = 'status-running';
-    } else if (newStatus === 'STARTING' || newStatus === 'INSTALLING') {
-        statusClass = 'status-starting';
-        statusText = newStatus === 'INSTALLING' ? 'Installing' : 'Starting';
-    } else if (newStatus === 'ERROR' || newStatus === 'START_FAILED') {
-        statusClass = 'status-error';
-        statusText = 'Error';
-    } else if (newStatus === 'TERMINATED') {
-        statusClass = 'status-stopped';
-        statusText = 'Terminated';
-    }
-
     // Update in the dapSessions array
     if (window.dapSessions) {
         const session = window.dapSessions.find(s => s.sessionId === sessionId);
         if (session) {
             session.state = newStatus;
+            if (debugMode !== null && debugMode !== undefined) {
+                session.debugMode = debugMode;
+            }
         }
     }
+
+    // Get session info to calculate display values (use same logic as everywhere)
+    let session = window.dapSessions?.find(s => s.sessionId === sessionId);
+    if (!session) {
+        session = { state: newStatus, debugMode: debugMode };
+    }
+    const { stateIcon, statusText, statusClass } = getSessionStateInfo(session);
 
     // Update the session element in the list (left side)
     const sessionElement = document.querySelector(`[data-session-id="${sessionId}"]`);
     if (sessionElement) {
-        // Update icon
-        let stateIcon = '⏹️';
-        if (newStatus === 'INSTALLING' || newStatus === 'STARTING') {
-            stateIcon = '⏳';
-        } else if (newStatus === 'RUNNING') {
-            stateIcon = isDebugging ? '🐛' : '▶️';
-        } else if (newStatus === 'PAUSED') {
-            stateIcon = '⏸️';
-        } else if (newStatus === 'ERROR' || newStatus === 'START_FAILED') {
-            stateIcon = '❌';
-        }
-
+        // Update icon (use stateIcon from getSessionStateInfo)
         const iconElement = sessionElement.querySelector('span:first-child');
         if (iconElement) {
-            iconElement.textContent = stateIcon;
+            // Extract emoji from HTML string (e.g., "<span>⏹️</span>" -> "⏹️")
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = stateIcon;
+            iconElement.textContent = tempDiv.textContent;
         }
 
         // Update status badge
         const statusBadge = sessionElement.querySelector('.status-badge');
         if (statusBadge) {
-            statusBadge.className = `status-badge ${statusClass}`;
+            statusBadge.className = `status-badge status-badge-compact ${statusClass}`;
             statusBadge.textContent = statusText;
+        }
+
+        // Update action buttons in the list
+        const runBtn = sessionElement.querySelector('.session-run-btn');
+        const debugBtn = sessionElement.querySelector('.session-debug-btn');
+        const stopBtn = sessionElement.querySelector('.session-stop-btn');
+
+        const { canLaunch, canStop } = getSessionButtonStates(newStatus);
+
+        if (runBtn) {
+            runBtn.disabled = !canLaunch;
+            runBtn.style.opacity = canLaunch ? '1' : '0.3';
+            runBtn.style.cursor = canLaunch ? 'pointer' : 'not-allowed';
+        }
+        if (debugBtn) {
+            debugBtn.disabled = !canLaunch;
+            debugBtn.style.opacity = canLaunch ? '1' : '0.3';
+            debugBtn.style.cursor = canLaunch ? 'pointer' : 'not-allowed';
+        }
+        if (stopBtn) {
+            stopBtn.disabled = !canStop;
+            stopBtn.style.opacity = canStop ? '1' : '0.3';
+            stopBtn.style.cursor = canStop ? 'pointer' : 'not-allowed';
         }
     }
 
     // Update detail panel (right side) if this session is selected
     const sessionDetailDiv = document.getElementById(`dap-session-${sessionId}`);
+    console.log('[DAP] Detail div found:', !!sessionDetailDiv, 'display:', sessionDetailDiv?.style.display);
     if (sessionDetailDiv && sessionDetailDiv.style.display !== 'none') {
-        // Update server status in detail panel
-        const serverStatusEl = sessionDetailDiv.querySelector('.session-server-status');
+        // Update server status in detail panel (use ID selector for more precision)
+        const serverStatusEl = document.getElementById(`dap-session-status-${sessionId}`);
+        console.log('[DAP] Badge element found:', !!serverStatusEl, 'statusText:', statusText, 'statusClass:', statusClass);
         if (serverStatusEl) {
             serverStatusEl.textContent = statusText;
-            serverStatusEl.className = `session-server-status status-badge ${statusClass}`;
+            serverStatusEl.className = `session-server-status status-badge status-badge-compact ${statusClass}`;
             console.log('[DAP] Updated detail panel status to:', statusText);
         } else {
-            console.warn('[DAP] Could not find .session-server-status element');
+            console.warn('[DAP] Could not find badge element with ID dap-session-status-' + sessionId);
         }
 
         // Update button states
@@ -1124,12 +1169,7 @@ function updateSessionStateInDOM(sessionId, newStatus, debugMode) {
         const stopBtn = document.getElementById(`dap-stop-btn-${sessionId}`);
 
         if (debugBtn && launchBtn && stopBtn) {
-            const isRunning = newStatus === 'RUNNING';
-            const isStarting = newStatus === 'STARTING' || newStatus === 'INSTALLING';
-            const isStopped = newStatus === 'STOPPED' || newStatus === 'START_FAILED' || newStatus === 'ERROR' || newStatus === 'CREATED' || newStatus === 'TERMINATED';
-
-            const canLaunch = isStopped;
-            const canStop = isRunning || isStarting;
+            const { canLaunch, canStop } = getSessionButtonStates(newStatus);
 
             debugBtn.disabled = !canLaunch;
             debugBtn.style.opacity = canLaunch ? '1' : '0.3';
@@ -1232,7 +1272,7 @@ async function updateSessionInDOM(message) {
         if (sessionElement) {
             const statusBadge = sessionElement.querySelector('.status-badge');
             if (statusBadge && message.newStatus) {
-                statusBadge.className = `status-badge ${statusClass}`;
+                statusBadge.className = `status-badge status-badge-compact ${statusClass}`;
                 statusBadge.textContent = statusText;
             }
             // Update icon (first child element in the session div)
@@ -1251,7 +1291,7 @@ async function updateSessionInDOM(message) {
         // Update status badge in session console (right panel)
         const sessionStatusBadge = document.getElementById(`dap-session-status-${message.sessionId}`);
         if (sessionStatusBadge && message.newStatus) {
-            sessionStatusBadge.className = `status-badge ${statusClass}`;
+            sessionStatusBadge.className = `status-badge status-badge-compact ${statusClass}`;
             sessionStatusBadge.textContent = statusText;
         }
 
@@ -1263,11 +1303,12 @@ async function updateSessionInDOM(message) {
         if (debugBtn && launchBtn && stopBtn) {
             // Determine button states based on status
             const isRunning = message.newStatus === 'RUNNING';
+            const isPaused = message.newStatus === 'PAUSED';
             const isStarting = message.newStatus === 'STARTING' || message.newStatus === 'INSTALLING';
-            const isStopped = message.newStatus === 'STOPPED' || message.newStatus === 'START_FAILED' || message.newStatus === 'ERROR' || message.newStatus === 'CREATED';
+            const isStopped = message.newStatus === 'STOPPED' || message.newStatus === 'START_FAILED' || message.newStatus === 'ERROR' || message.newStatus === 'CREATED' || message.newStatus === 'TERMINATED';
 
-            const canLaunch = isStopped || (!isRunning && !isStarting);
-            const canStop = isRunning || isStarting;
+            const canLaunch = isStopped;
+            const canStop = isRunning || isStarting || isPaused;
 
             // Update Debug button (same state as Launch)
             debugBtn.disabled = !canLaunch;
@@ -1318,8 +1359,62 @@ function removeSessionFromDOM(sessionId) {
 /**
  * Create HTML for a DAP session item.
  */
-function createSessionHTML(session) {
-    // Determine icon based on session state
+/**
+ * Disable all action buttons for a session (prevent double-click during launch).
+ */
+function disableSessionButtons(sessionId) {
+    // Disable buttons in list
+    const sessionElement = document.querySelector(`[data-session-id="${sessionId}"]`);
+    if (sessionElement) {
+        const buttons = sessionElement.querySelectorAll('.session-run-btn, .session-debug-btn, .session-stop-btn');
+        buttons.forEach(btn => {
+            btn.disabled = true;
+            btn.style.opacity = '0.3';
+            btn.style.cursor = 'not-allowed';
+        });
+    }
+
+    // Disable buttons in detail
+    const runBtn = document.getElementById(`dap-launch-btn-${sessionId}`);
+    const debugBtn = document.getElementById(`dap-debug-btn-${sessionId}`);
+    const stopBtn = document.getElementById(`dap-stop-btn-${sessionId}`);
+
+    if (runBtn) {
+        runBtn.disabled = true;
+        runBtn.style.opacity = '0.3';
+        runBtn.style.cursor = 'not-allowed';
+    }
+    if (debugBtn) {
+        debugBtn.disabled = true;
+        debugBtn.style.opacity = '0.3';
+        debugBtn.style.cursor = 'not-allowed';
+    }
+    if (stopBtn) {
+        stopBtn.disabled = true;
+        stopBtn.style.opacity = '0.3';
+        stopBtn.style.cursor = 'not-allowed';
+    }
+}
+
+/**
+ * Get button states based on session state.
+ */
+function getSessionButtonStates(sessionState) {
+    const isPaused = sessionState === 'PAUSED';
+    const isRunning = sessionState === 'RUNNING';
+    const isStarting = sessionState === 'STARTING' || sessionState === 'INSTALLING';
+    const isStopped = sessionState === 'STOPPED' || sessionState === 'START_FAILED' || sessionState === 'ERROR' || sessionState === 'CREATED' || sessionState === 'TERMINATED';
+
+    const canLaunch = isStopped;
+    const canStop = isRunning || isStarting || isPaused;
+
+    return { canLaunch, canStop };
+}
+
+/**
+ * Get session state display info (icon, text, CSS class).
+ */
+function getSessionStateInfo(session) {
     let stateIcon = '<span>⏹️</span>';
     let statusText = session.state ? session.state.charAt(0) + session.state.slice(1).toLowerCase() : 'Created';
     let statusClass = 'status-stopped';
@@ -1352,19 +1447,23 @@ function createSessionHTML(session) {
         statusClass = 'status-error';
     }
 
-    // Determine action buttons
-    const isStopped = session.state === 'CREATED' || session.state === 'STOPPED' || session.state === 'TERMINATED' || session.state === 'START_FAILED' || session.state === 'ERROR';
-    const isRunningOrStarting = session.state === 'RUNNING' || session.state === 'STARTING' || session.state === 'INSTALLING';
+    return { stateIcon, statusText, statusClass };
+}
 
-    let actions = '';
-    if (isStopped) {
-        actions = `
-            <button class="server-action-btn" onclick='event.stopPropagation(); selectDapSession("${session.sessionId}"); setTimeout(() => { const btn = document.getElementById("dap-launch-btn-${session.sessionId}"); if(btn) btn.click(); }, 100);' title="Run (without debugging)" style="font-size: 0.7rem; padding: 0.15rem 0.3rem;">▶</button>
-            <button class="server-action-btn" onclick='event.stopPropagation(); selectDapSession("${session.sessionId}"); setTimeout(() => { const btn = document.getElementById("dap-debug-btn-${session.sessionId}"); if(btn) btn.click(); }, 100);' title="Debug (with breakpoints)" style="font-size: 0.7rem; padding: 0.15rem 0.3rem;">🐛</button>
-        `;
-    } else if (isRunningOrStarting) {
-        actions = `<button class="server-action-btn" onclick='event.stopPropagation(); stopDapSession("${session.sessionId}")' title="Stop" style="font-size: 0.7rem; padding: 0.15rem 0.3rem;">⏹</button>`;
-    }
+function createSessionHTML(session) {
+    const { stateIcon, statusText, statusClass } = getSessionStateInfo(session);
+    const { canLaunch, canStop } = getSessionButtonStates(session.state);
+
+    // Always show all 3 buttons, grayed/enabled based on state
+    const runStyle = canLaunch ? 'opacity: 1; cursor: pointer;' : 'opacity: 0.3; cursor: not-allowed;';
+    const debugStyle = canLaunch ? 'opacity: 1; cursor: pointer;' : 'opacity: 0.3; cursor: not-allowed;';
+    const stopStyle = canStop ? 'opacity: 1; cursor: pointer;' : 'opacity: 0.3; cursor: not-allowed;';
+
+    const actions = `
+        <button class="server-action-btn session-run-btn" data-session-id="${session.sessionId}" ${canLaunch ? '' : 'disabled'} onclick='event.stopPropagation(); if(!this.disabled) { selectDapSession("${session.sessionId}"); launchDapSession("${session.sessionId}"); }' title="Run (without debugging)" style="font-size: 0.7rem; padding: 0.15rem 0.3rem; ${runStyle}">▶</button>
+        <button class="server-action-btn session-debug-btn" data-session-id="${session.sessionId}" ${canLaunch ? '' : 'disabled'} onclick='event.stopPropagation(); if(!this.disabled) { selectDapSession("${session.sessionId}"); debugDapSession("${session.sessionId}"); }' title="Debug (with breakpoints)" style="font-size: 0.7rem; padding: 0.15rem 0.3rem; ${debugStyle}">🐛</button>
+        <button class="server-action-btn session-stop-btn" data-session-id="${session.sessionId}" ${canStop ? '' : 'disabled'} onclick='event.stopPropagation(); if(!this.disabled) { selectDapSession("${session.sessionId}"); stopDapSession("${session.sessionId}"); }' title="Stop" style="font-size: 0.7rem; padding: 0.15rem 0.3rem; ${stopStyle}">⏹</button>
+    `;
 
     // Add creator icon
     console.log('[DAP] Session createdBy:', session.sessionId, session.createdBy);
@@ -1379,7 +1478,7 @@ function createSessionHTML(session) {
             ${stateIcon}
             ${creatorIcon}
             <span style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${session.sessionName}</span>
-            <span class="status-badge ${statusClass}" style="font-size: 0.7rem; padding: 0.1rem 0.4rem;">${statusText}</span>
+            <span class="status-badge status-badge-compact ${statusClass}">${statusText}</span>
             ${actions}
         </div>
     `;
