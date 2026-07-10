@@ -195,6 +195,73 @@ public class Workspace {
     }
 
     /**
+     * Ensure an LSP server is started in this workspace.
+     * Handles:
+     * - Checking for external instances (launched by IDE)
+     * - Installing if needed
+     * - Starting and initializing the server
+     *
+     * @param serverId The server ID to ensure is started
+     * @return CompletableFuture<LspServer> that completes with the ready server instance
+     */
+    public CompletableFuture<LspServer> ensureLspServerStarted(String serverId) {
+        // Already running?
+        if (hasLspServer(serverId)) {
+            LspServer server = getLspServer(serverId);
+            if (server != null && server.getStatus() != ServerStatus.STOPPED) {
+                LOG.debugf("Server '%s' already running in workspace: %s", serverId, rootUri);
+                return server.waitUntilReady().thenApply(v -> server);
+            }
+        }
+
+        LOG.infof("Ensuring server '%s' is started in workspace: %s", serverId, rootUri);
+
+        LspServerConfig config = application.getLspServerConfig(serverId);
+        if (config == null) {
+            return CompletableFuture.failedFuture(
+                new IllegalArgumentException("Server config not found: " + serverId)
+            );
+        }
+
+        // Check if there's an external instance (launched by IDE) first
+        var externalInstance = getExternalInstance(serverId);
+        if (externalInstance != null) {
+            LOG.infof("Found external %s instance (port %d, PID %d), connecting...",
+                config.getName(), externalInstance.port, externalInstance.pid);
+
+            // Add server to workspace if not already present
+            if (!hasLspServer(serverId)) {
+                addLspServer(config);
+            }
+
+            // Start and initialize (will connect to socket)
+            var server = getLspServer(serverId);
+            if (server != null) {
+                return server.start()
+                    .thenCompose(v -> server.initialize())
+                    .thenCompose(v -> server.waitUntilReady())
+                    .thenApply(v -> server)
+                    .exceptionally(ex -> {
+                        LOG.errorf(ex, "Failed to connect to external %s", config.getName());
+                        return null;
+                    });
+            }
+        }
+
+        // No external instance - start our own managed server (handles installation automatically)
+        return startManagedLspServer(serverId)
+            .thenCompose(v -> {
+                LspServer server = getLspServer(serverId);
+                if (server == null) {
+                    return CompletableFuture.failedFuture(
+                        new IllegalStateException("Server failed to start: " + serverId)
+                    );
+                }
+                return server.waitUntilReady().thenApply(v2 -> server);
+            });
+    }
+
+    /**
      * Initialize the workspace (start all LSP servers).
      */
     public CompletableFuture<Void> initialize() {

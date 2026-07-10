@@ -183,38 +183,11 @@ public class Application {
                     LOG.infof("Need %s for language '%s' in workspace: %s",
                             config.getName(), language, workspace.getNormalizedUri());
 
-                    // Check if there's an external instance (launched by IDE) first
-                    var externalInstance = workspace.getExternalInstance(config.getServerId());
-                    if (externalInstance != null) {
-                        LOG.infof("Found external %s instance (port %d, PID %d), skipping installation",
-                                 config.getName(), externalInstance.port, externalInstance.pid);
-
-                        // No need to install (external instance), add server to workspace
-                        workspace.addLspServer(config);
-
-                        // Start and initialize (will connect to socket)
-                        var server = workspace.getLspServer(config.getServerId());
-                        if (server != null) {
-                            CompletableFuture<Void> future = server.start()
-                                    .thenCompose(v -> server.initialize())
-                                    .exceptionally(ex -> {
-                                        LOG.errorf(ex, "Failed to connect to external %s", config.getName());
-                                        // Status is already set by server via listener callback
-                                        return null;
-                                    });
-                            serverFutures.add(future);
-                        }
-                        continue;
-                    }
-
-                    // No external instance - need to start our own (installation is handled by server)
-                    // Add server to workspace if not already present
-                    if (!workspace.hasLspServer(config.getServerId())) {
-                        workspace.addLspServer(config);
-                    }
-
-                    // Start managed server (handles installation automatically)
-                    CompletableFuture<Void> future = workspace.startManagedLspServer(config.getServerId())
+                    // Ensure server is started (handles external instances, installation, etc.)
+                    CompletableFuture<Void> future = workspace.ensureLspServerStarted(config.getServerId())
+                            .thenAccept(server -> {
+                                // Server is ready, nothing else to do
+                            })
                             .exceptionally(ex -> {
                                 LOG.errorf(ex, "Failed to start %s", config.getName());
                                 return null;
