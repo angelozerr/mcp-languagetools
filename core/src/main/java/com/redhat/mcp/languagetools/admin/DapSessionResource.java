@@ -6,6 +6,8 @@ import com.redhat.mcp.languagetools.admin.dto.ErrorResponse;
 import com.redhat.mcp.languagetools.dap.server.DapServerConfig;
 import com.redhat.mcp.languagetools.dap.session.DapSession;
 import com.redhat.mcp.languagetools.dap.session.DapSessionManager;
+import com.redhat.mcp.languagetools.installer.TraceProgressMonitor;
+import com.redhat.mcp.languagetools.progress.ProgressMonitor;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
@@ -105,8 +107,11 @@ public class DapSessionResource {
                         .build();
             }
 
+            // Launch from Admin UI - create ProgressMonitor for user feedback
+            ProgressMonitor progressMonitor = AdminProgressMonitorHelper.forDapSession(session);
+
             // Launch the session asynchronously (don't block HTTP thread!)
-            session.launch(launchConfig, debugMode, DapSession.SessionActor.MANUAL)
+            session.launch(launchConfig, debugMode, DapSession.SessionActor.MANUAL, progressMonitor)
                     .whenComplete((result, error) -> {
                         if (error != null) {
                             LOG.errorf(error, "DAP session launch failed: %s", sessionId);

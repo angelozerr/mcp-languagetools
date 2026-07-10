@@ -90,6 +90,9 @@
             }).join('');
         }
 
+        // Expose renderWorkspaces globally for use in admin.js
+        window.renderWorkspaces = renderWorkspaces;
+
         function selectWorkspace(uri) {
             // Only reset server selection if we're changing workspace
             if (selectedWorkspace !== uri) {
@@ -235,17 +238,7 @@
             const statusClass = server.status === 'RUNNING' && !server.isReady ? 'status-running-not-ready' : 'status-' + server.status.toLowerCase();
             const label = formatStatusLabel(server.status, server.externalInstance);
 
-            // If installing and we have progress, show a progress bar
-            if (server.status === 'INSTALLING' && server.installProgress != null) {
-                const progressPercent = Math.round(server.installProgress * 100);
-                return `
-                    <span class="status-badge ${statusClass}" style="position: relative; overflow: hidden;">
-                        <span style="position: absolute; left: 0; top: 0; bottom: 0; width: ${progressPercent}%; background: rgba(76, 175, 80, 0.3); z-index: 0;"></span>
-                        <span style="position: relative; z-index: 1;">${label} (${progressPercent}%)</span>
-                    </span>
-                `;
-            }
-
+            // In server list, show simple badge (progress bar is shown in detail panel only)
             return `<span class="status-badge ${statusClass}">${label}</span>`;
         }
 
@@ -612,16 +605,16 @@
         }
 
         let currentTraceLevel = 'verbose';
-        let currentServerId = null;
+        // window.currentServerId is declared in admin.js and used globally
 
         async function changeTraceLevel(level) {
-            if (!currentServerId) {
+            if (!window.currentServerId) {
                 console.error('No server selected');
                 return;
             }
 
             try {
-                const response = await fetch(`/api/admin/lsp/configs/${currentServerId}/trace`, {
+                const response = await fetch(`/api/admin/lsp/configs/${window.currentServerId}/trace`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ trace: level })
@@ -632,7 +625,7 @@
                 }
 
                 currentTraceLevel = level;
-                console.log('Trace level changed to:', level, 'for server:', currentServerId);
+                console.log('Trace level changed to:', level, 'for server:', window.currentServerId);
 
                 // Show/hide fold button based on level
                 const foldButton = document.getElementById('fold-button');
@@ -687,6 +680,7 @@
             const isExternal = server.externalInstance != null &&
                               (server.status === 'CONNECTED_TO_IDE' || server.status === 'CONNECTING_TO_IDE');
             const titleIcon = isExternal ? '🔗' : (server.isExtension ? '🧩' : (server.isDap ? '🐛' : '🚀'));
+
 
             // Setup console UI with tabs
             document.getElementById('console-area').innerHTML = `
@@ -758,7 +752,7 @@
                 </div>
             `;
 
-            currentServerId = server.id;
+            window.currentServerId = server.id;
 
             // Store servers data for diagram rendering (include both LSP and DAP)
             const currentWorkspace = workspaces.find(w => w.rootUri === selectedWorkspace);
@@ -1273,13 +1267,13 @@
             const container = document.getElementById('console-output');
             if (!container) return;
 
-            console.log('renderConsole - currentServerId:', currentServerId);
+            console.log('renderConsole - window.currentServerId:', window.currentServerId);
             console.log('tracesByServer keys:', Object.keys(tracesByServer));
             console.log('mcpTracesByClient keys:', Object.keys(mcpTracesByClient));
 
             // Get traces for current server
-            const traces = tracesByServer[currentServerId] || [];
-            console.log('Traces for', currentServerId, ':', traces.length);
+            const traces = tracesByServer[window.currentServerId] || [];
+            console.log('Traces for', window.currentServerId, ':', traces.length);
             if (traces.length > 0) {
                 console.log('First trace:', traces[0]);
             }
@@ -1489,8 +1483,8 @@
                 await fetch('/api/admin/lsp/traces', { method: 'DELETE' });
 
                 // Clear traces for current server only
-                if (currentServerId) {
-                    tracesByServer[currentServerId] = [];
+                if (window.currentServerId) {
+                    tracesByServer[window.currentServerId] = [];
                 }
 
                 renderConsole();
@@ -1680,7 +1674,7 @@
             const container = document.getElementById('console-output');
             if (!container) return;
 
-            const traces = tracesByServer[currentServerId] || [];
+            const traces = tracesByServer[window.currentServerId] || [];
             const filteredTraces = traces.filter(trace => shouldShowTrace(trace, currentTraceLevel));
 
             if (filteredTraces.length === 0) {
@@ -1704,7 +1698,7 @@
             if (!container) return;
 
             // Get traces for current server
-            const traces = tracesByServer[currentServerId] || [];
+            const traces = tracesByServer[window.currentServerId] || [];
 
             // Filter traces based on current level
             const filteredTraces = traces.filter(trace => shouldShowTrace(trace, currentTraceLevel));
@@ -1830,3 +1824,8 @@
 
 // Expose globally
 window.loadDapSessions = loadDapSessions;
+
+// Expose renderWorkspaces at global scope (needed by admin.js)
+if (typeof renderWorkspaces !== 'undefined') {
+    window.renderWorkspaces = renderWorkspaces;
+}

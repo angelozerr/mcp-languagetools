@@ -10,7 +10,10 @@ import com.redhat.mcp.languagetools.admin.dto.LspConfigDTO;
 import com.redhat.mcp.languagetools.admin.dto.ServerDTOBuilder;
 import com.redhat.mcp.languagetools.admin.dto.StatusResponse;
 import com.redhat.mcp.languagetools.config.GlobalConfiguration;
+import com.redhat.mcp.languagetools.installer.TraceProgressMonitor;
+import com.redhat.mcp.languagetools.lsp.server.LspServer;
 import com.redhat.mcp.languagetools.lsp.server.LspServerConfig;
+import com.redhat.mcp.languagetools.progress.ProgressMonitor;
 import com.redhat.mcp.languagetools.workspace.Workspace;
 import com.redhat.mcp.languagetools.Application;
 import jakarta.inject.Inject;
@@ -42,6 +45,9 @@ public class LspAdminResource {
 
     @Inject
     GlobalConfiguration globalConfig;
+
+    @Inject
+    ProgressBroadcaster progressBroadcaster;
 
     private final Gson gson = new GsonBuilder().setPrettyPrinting().create();
 
@@ -181,7 +187,14 @@ public class LspAdminResource {
                 return Response.status(404).entity(new ErrorResponse("Workspace not found")).build();
             }
 
-            workspace.restartLspServer(serverId);
+            // Restart from Admin UI - create ProgressMonitor for user feedback
+            LspServer server = workspace.getLspServer(serverId);
+            String taskId = "restart-" + serverId;
+            String title = "Restart " + serverId;
+            ProgressMonitor progressMonitor = new TraceProgressMonitor(
+                    server.getTraceCollector(), 100.0, progressBroadcaster, taskId, serverId, title);
+
+            workspace.restartLspServer(serverId, progressMonitor);
 
             return Response.ok().entity(new StatusResponse("restarted")).build();
         } catch (Exception e) {
@@ -206,7 +219,12 @@ public class LspAdminResource {
 
             var existingServer = workspace.getLspServer(serverId);
             if (existingServer != null) {
-                workspace.startManagedLspServer(serverId);
+                // Start from Admin UI - create ProgressMonitor for user feedback
+                String taskId = "start-" + serverId;
+                String title = "Start " + serverId;
+                ProgressMonitor progressMonitor = new TraceProgressMonitor(
+                        existingServer.getTraceCollector(), 100.0, progressBroadcaster, taskId, serverId, title);
+                workspace.startManagedLspServer(serverId, progressMonitor);
             } else {
                 application.ensureServerStarted(serverId, workspaceUri);
             }
@@ -264,7 +282,14 @@ public class LspAdminResource {
                 return Response.status(404).entity(new ErrorResponse("No IDE instance available for this server")).build();
             }
 
-            workspace.restartLspServer(serverId).join();
+            // Connect to IDE from Admin UI - create ProgressMonitor for user feedback
+            LspServer server = workspace.getLspServer(serverId);
+            String taskId = "connect-" + serverId;
+            String title = "Connect " + serverId;
+            ProgressMonitor progressMonitor = new TraceProgressMonitor(
+                    server.getTraceCollector(), 100.0, progressBroadcaster, taskId, serverId, title);
+
+            workspace.restartLspServer(serverId, progressMonitor).join();
 
             return Response.ok().entity(new StatusResponse("connected")).build();
         } catch (Exception e) {

@@ -1,24 +1,26 @@
 package com.redhat.mcp.languagetools;
 
+import com.redhat.mcp.languagetools.admin.McpClientChangeEvent;
 import com.redhat.mcp.languagetools.dap.server.DapServerConfig;
 import com.redhat.mcp.languagetools.dap.trace.DapTraceCollector;
+import com.redhat.mcp.languagetools.installer.TraceProgressMonitor;
 import com.redhat.mcp.languagetools.language.LanguageRegistry;
+import com.redhat.mcp.languagetools.lsp.server.LspServer;
 import com.redhat.mcp.languagetools.lsp.server.LspServerConfig;
 import com.redhat.mcp.languagetools.lsp.server.LspServerStatusChangeEvent;
-import com.redhat.mcp.languagetools.mcp.McpClientTracker;
-import com.redhat.mcp.languagetools.server.ServerConfigBase;
-import com.redhat.mcp.languagetools.server.ServerDescriptorRegistry;
 import com.redhat.mcp.languagetools.lsp.trace.LspTraceCollector;
-
+import com.redhat.mcp.languagetools.mcp.McpClientTracker;
+import com.redhat.mcp.languagetools.progress.ProgressMonitor;
+import com.redhat.mcp.languagetools.server.ServerDescriptorRegistry;
 import com.redhat.mcp.languagetools.workspace.Workspace;
 import com.redhat.mcp.languagetools.workspace.WorkspaceChangeEvent;
+import io.quarkiverse.mcp.server.Progress;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Event;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
-import com.redhat.mcp.languagetools.admin.McpClientChangeEvent;
 import org.jboss.logging.Logger;
 
 import java.net.URI;
@@ -73,6 +75,9 @@ public class Application {
     @Inject
     Event<McpClientChangeEvent> mcpClientChangeEvent;
 
+    @Inject
+    com.redhat.mcp.languagetools.admin.ProgressBroadcaster progressBroadcaster;
+
     private final Map<URI, Workspace> workspaces = new ConcurrentHashMap<>();
     private final Map<String, LspServerConfig> lspServerConfigs = new ConcurrentHashMap<>();
     private final Map<String, DapServerConfig> dapServerConfigs = new ConcurrentHashMap<>();
@@ -91,7 +96,6 @@ public class Application {
 
         // Load all bundled DAP server descriptors
         dapServerConfigs.putAll(serverDescriptorRegistry.loadAllDapServers());
-
 
 
         LOG.infof("Loaded %d LSP server descriptors", lspServerConfigs.size());
@@ -133,7 +137,7 @@ public class Application {
         String connectionId = mcpClientTracker.getCurrentConnectionId();
 
         LOG.infof("Adding MCP client to workspace %s: name=%s, connectionId=%s",
-                 workspaceUri, clientName, connectionId);
+                workspaceUri, clientName, connectionId);
 
         boolean isNewClient = workspace.addMcpClient(connectionId, clientName);
 
@@ -157,7 +161,9 @@ public class Application {
      * Ensure LSP server is running for the given file in the workspace.
      * Detects language, finds matching servers, installs if needed, and starts them.
      */
-    private CompletableFuture<Void> ensureServerForFile(Workspace workspace, URI fileUri) {
+    private CompletableFuture<Void> ensureServerForFile(URI fileUri,
+                                                        Workspace workspace,
+                                                        ProgressMonitor progressMonitor) {
         // Detect language from file
         Optional<String> languageId = languageRegistry.detectLanguage(fileUri);
         if (languageId.isEmpty()) {
@@ -184,7 +190,9 @@ public class Application {
                             config.getName(), language, workspace.getNormalizedUri());
 
                     // Ensure server is started (handles external instances, installation, etc.)
-                    CompletableFuture<Void> future = workspace.ensureLspServerStarted(config.getServerId())
+                    CompletableFuture<Void> future = workspace.ensureLspServerStarted(
+                                    config.getServerId(),
+                                    progressMonitor)
                             .thenAccept(server -> {
                                 // Server is ready, nothing else to do
                             })
@@ -217,27 +225,27 @@ public class Application {
             // Check if this DAP server can handle the file's language
             if (config.getDocumentSelector() != null) {
                 boolean canHandle = config.getDocumentSelector().stream()
-                    .anyMatch(selector -> {
-                        if (selector.getLanguage() != null && selector.getLanguage().equals(language)) {
-                            return true;
-                        }
-                        if (selector.getPattern() != null) {
-                            // Simple pattern matching (could be improved with glob matching)
-                            String path = fileUri.getPath();
-                            String pattern = selector.getPattern();
-                            // Convert glob to simple contains check for now
-                            if (pattern.contains("*")) {
-                                String ext = pattern.substring(pattern.lastIndexOf('.'));
-                                return path.endsWith(ext.replace("*", "").replace("}", ""));
+                        .anyMatch(selector -> {
+                            if (selector.getLanguage() != null && selector.getLanguage().equals(language)) {
+                                return true;
                             }
-                        }
-                        return false;
-                    });
+                            if (selector.getPattern() != null) {
+                                // Simple pattern matching (could be improved with glob matching)
+                                String path = fileUri.getPath();
+                                String pattern = selector.getPattern();
+                                // Convert glob to simple contains check for now
+                                if (pattern.contains("*")) {
+                                    String ext = pattern.substring(pattern.lastIndexOf('.'));
+                                    return path.endsWith(ext.replace("*", "").replace("}", ""));
+                                }
+                            }
+                            return false;
+                        });
 
                 if (canHandle && workspace.getApplication().getDapServerConfig(config.getServerId()) == null) {
                     workspace.addDapServer(config);
                     LOG.infof("Added DAP server %s for language '%s' in workspace: %s",
-                        config.getName(), language, workspace.getNormalizedUri());
+                            config.getName(), language, workspace.getNormalizedUri());
                 }
             }
         }
@@ -249,7 +257,8 @@ public class Application {
      * Walks up the directory tree to find pom.xml or build.gradle.
      * Ensures the appropriate LSP server is started for the file.
      */
-    public CompletableFuture<Workspace> getWorkspaceForFile(URI fileUri) {
+    public CompletableFuture<Workspace> getWorkspaceForFile(URI fileUri,
+                                                            ProgressMonitor progressMonitor) {
         URI rootUri = detectWorkspaceRoot(fileUri);
         if (rootUri == null) {
             return CompletableFuture.failedFuture(
@@ -258,7 +267,7 @@ public class Application {
         }
 
         Workspace workspace = getOrCreateWorkspace(rootUri);
-        return ensureServerForFile(workspace, fileUri)
+        return ensureServerForFile(fileUri, workspace, progressMonitor)
                 .thenApply(v -> workspace);
     }
 
@@ -355,6 +364,7 @@ public class Application {
     public Workspace getWorkspace(URI uri) {
         return workspaces.get(uri);
     }
+
     /**
      * Get all active workspaces.
      */
@@ -378,13 +388,13 @@ public class Application {
         return workspace
                 .shutdown()
                 .thenRun(() -> {
-            // Remove from active workspaces
-            workspaces.remove(workspaceUri);
-            LOG.infof("Workspace closed and removed from memory: %s", workspaceUri);
+                    // Remove from active workspaces
+                    workspaces.remove(workspaceUri);
+                    LOG.infof("Workspace closed and removed from memory: %s", workspaceUri);
 
-            // Fire workspace closed event
-            sendWorkspaceChangeEvent(WorkspaceChangeEvent.Type.CLOSED, workspaceUri);
-        });
+                    // Fire workspace closed event
+                    sendWorkspaceChangeEvent(WorkspaceChangeEvent.Type.CLOSED, workspaceUri);
+                });
     }
 
     /**
@@ -402,12 +412,19 @@ public class Application {
         }
 
         // Add server to workspace if not already present
+        LspServer lspServer;
         if (!workspace.hasLspServer(serverId)) {
-            workspace.addLspServer(config);
+            lspServer = workspace.addLspServer(config);
+        } else {
+            lspServer = workspace.getLspServer(serverId);
         }
 
         // Start managed server (handles installation automatically)
-        return workspace.startManagedLspServer(serverId)
+        String taskId = "start-" + serverId;
+        String title = "Start " + serverId;
+        ProgressMonitor progressMonitor = new TraceProgressMonitor(
+                lspServer.getTraceCollector(), 100.0, progressBroadcaster, taskId, serverId, title);
+        return workspace.startManagedLspServer(serverId, progressMonitor)
                 .exceptionally(ex -> {
                     LOG.errorf(ex, "Failed to start %s", config.getName());
                     return null;

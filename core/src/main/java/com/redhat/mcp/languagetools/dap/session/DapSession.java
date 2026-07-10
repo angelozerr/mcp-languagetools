@@ -358,9 +358,19 @@ public class DapSession implements DapEventListener {
      * @return the same future for chaining
      */
     private <T> CompletableFuture<T> trackFuture(CompletableFuture<T> future, ProgressMonitor progressMonitor) {
-        pendingRequests.add(future);
-        future.whenComplete((result, error) -> pendingRequests.remove(future));
-        return progressMonitor != null ? progressMonitor.executeWithCancellation(future) : future;
+        // TEMPORARY: Disable executeWithCancellation to isolate the blocking issue
+        // TODO: Re-enable once we fix the root cause
+        /*
+        CompletableFuture<T> trackedFuture = progressMonitor != null
+            ? progressMonitor.executeWithCancellation(future)
+            : future;
+        */
+        CompletableFuture<T> trackedFuture = future;
+
+        pendingRequests.add(trackedFuture);
+        trackedFuture.whenComplete((result, error) -> pendingRequests.remove(trackedFuture));
+
+        return trackedFuture;
     }
 
     /**
@@ -397,23 +407,6 @@ public class DapSession implements DapEventListener {
     /**
      * Launch with full launch configuration (from launch.json).
      *
-     * @param launchConfig the launch configuration
-     * @param debugMode    true to launch in debug mode (with breakpoints), false to run without debugging
-     */
-    public CompletableFuture<Map<String, Object>> launch(Map<String, Object> launchConfig,
-                                                         boolean debugMode,
-                                                         SessionActor launchedBy) {
-        return launch(launchConfig, debugMode, launchedBy, ProgressMonitor.none());
-    }
-    /**
-     * Launch a program for debugging.
-     *
-     * @param scriptPath Path to the script/program to debug
-     * @param args Additional launch arguments
-     */
-    /**
-     * Launch with full launch configuration (from launch.json).
-     *
      * @param launchConfig    the launch configuration
      * @param debugMode       true to launch in debug mode (with breakpoints), false to run without debugging
      * @param progressMonitor the MCP progress + cancellation
@@ -437,6 +430,11 @@ public class DapSession implements DapEventListener {
 
         // Record launch timestamp
         this.launchedAt = Instant.now();
+
+        // Report progress: Starting debug adapter
+        if (progressMonitor != null) {
+            progressMonitor.reportProgress(10.0, "Starting debug adapter");
+        }
 
         // Restart server if not running (first launch or after crash)
         CompletableFuture<Void> initFuture;
@@ -485,6 +483,11 @@ public class DapSession implements DapEventListener {
 
             LOG.infof("Resolved launch config (debugMode=%s): %s", debugMode, resolvedConfig);
 
+            // Report progress: Preparing launch configuration
+            if (progressMonitor != null) {
+                progressMonitor.reportProgress(30.0, "Preparing launch configuration");
+            }
+
             // Enrich launch configuration (subclasses like JavaDebugServer can override)
             return dapServer.enrichLaunchConfiguration(resolvedConfig, sessionId)
                     .thenCompose(enrichedConfig -> {
@@ -514,7 +517,7 @@ public class DapSession implements DapEventListener {
                                     return response;
                                 });
                     })
-                    .handle((result, ex) -> {
+                    .whenComplete((result, ex) -> {
                         if (ex != null) {
                             String error = String.format("DAP session launch failed: %s", ex.getMessage());
                             LOG.error(error, ex);
@@ -544,10 +547,7 @@ public class DapSession implements DapEventListener {
                                     TraceCollector.MessageDirection.SERVER_TO_CLIENT,
                                     errorTrace.toString()
                             );
-
-                            throw new RuntimeException(error, ex);
                         }
-                        return result;
                     });
         }), progressMonitor);
     }
@@ -689,10 +689,13 @@ public class DapSession implements DapEventListener {
                 })
                 .toArray(SourceBreakpoint[]::new);
 
+        // Resolve file path to absolute if needed
+        String absolutePath = resolveFilePath(file);
+
         // Build setBreakpoints request
         SetBreakpointsArguments args = new SetBreakpointsArguments();
         Source source = new Source();
-        source.setPath(file);
+        source.setPath(absolutePath);  // Use absolute path
         args.setSource(source);
         args.setBreakpoints(sourceBps);
 
@@ -715,6 +718,31 @@ public class DapSession implements DapEventListener {
                     LOG.errorf(t, "Failed to send breakpoints for file: %s", file);
                     return null;
                 });
+    }
+
+    /**
+     * Resolve file path to absolute path.
+     * If the path is already absolute, returns it as-is.
+     * If relative, resolves it against the workspace root.
+     */
+    private String resolveFilePath(String file) {
+        // Check if already absolute
+        java.nio.file.Path path = java.nio.file.Paths.get(file);
+        if (path.isAbsolute()) {
+            return file;
+        }
+
+        // Resolve against workspace root
+        try {
+            String workspaceFolder = getWorkspaceFolderPath();
+            java.nio.file.Path absolutePath = java.nio.file.Paths.get(workspaceFolder, file);
+            String resolved = absolutePath.toString();
+            LOG.infof("Resolved relative path '%s' to absolute: '%s'", file, resolved);
+            return resolved;
+        } catch (Exception e) {
+            LOG.warnf(e, "Failed to resolve file path: %s, using as-is", file);
+            return file;
+        }
     }
 
     /**

@@ -15,6 +15,7 @@ import com.redhat.mcp.languagetools.lsp.tools.params.WorkspaceSymbolRequestParam
 import com.redhat.mcp.languagetools.lsp.tools.strategies.WorkspaceSymbolStrategy;
 import com.redhat.mcp.languagetools.tools.ToolArgDescriptions;
 import io.quarkiverse.mcp.server.Cancellation;
+import io.quarkiverse.mcp.server.Progress;
 import io.quarkiverse.mcp.server.Tool;
 import io.quarkiverse.mcp.server.ToolArg;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -37,13 +38,14 @@ public class WorkspaceSymbolTools {
     public CompletableFuture<String> searchWorkspaceSymbols(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = "The search query string to match against symbol names") String query,
-            @ToolArg(description = ToolArgDescriptions.CANCELLATION) Cancellation cancellation) {
+            @ToolArg(description = ToolArgDescriptions.CANCELLATION) Cancellation cancellation,
+            Progress progress) {
 
         WorkspaceSymbolRequestParams params = new WorkspaceSymbolRequestParams(cwd, query);
         return requestExecutor.execute(
                 params,
                 new WorkspaceSymbolStrategy(),
-                cancellation
-        );
+                cancellation,
+                progress);
     }
 }

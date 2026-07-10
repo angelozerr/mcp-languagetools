@@ -15,15 +15,17 @@ import com.redhat.mcp.languagetools.lsp.client.LspCapability;
 import com.redhat.mcp.languagetools.lsp.server.LspServer;
 import com.redhat.mcp.languagetools.lsp.server.LspServerResolver;
 import com.redhat.mcp.languagetools.lsp.tools.params.LspRequestParams;
+import com.redhat.mcp.languagetools.progress.*;
 import io.quarkiverse.mcp.server.Cancellation;
+import io.quarkiverse.mcp.server.Progress;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-
-import static com.redhat.mcp.languagetools.tools.CancellationSupport.executeWithCancellation;
 
 /**
  * Generic executor for LSP requests.
@@ -44,27 +46,59 @@ public class LspRequestExecutor {
     @Inject
     LspServerResolver serverResolver;
 
+    @Inject
+    Instance<ProgressMonitorContributor> progressContributors;
+
     /**
      * Execute an LSP request across all capable servers.
      *
      * @param params       Request parameters
      * @param strategy     Strategy for resolving servers, building params, executing request, and formatting results
      * @param cancellation Cancellation token
+     * @param progress
      * @return Formatted result as String
      */
     public <TRequestParams extends LspRequestParams, TLspParams, TResult> CompletableFuture<String> execute(
             TRequestParams params,
             LspRequestStrategy<TRequestParams, TLspParams, TResult> strategy,
-            Cancellation cancellation) {
+            Cancellation cancellation,
+            Progress progress) {
+        // Create MCP progress monitor
+        McpProgressMonitor mcpMonitor = new McpProgressMonitor(progress, cancellation);
+
+        // Collect additional monitors from contributors (e.g., Admin module)
+        List<ProgressMonitor> monitors = new ArrayList<>();
+        monitors.add(mcpMonitor);
+
+        ProgressContext context = ProgressContext.forOperation(null, strategy.getCapability().name());
+        for (ProgressMonitorContributor contributor : progressContributors) {
+            ProgressMonitor contributed = contributor.createMonitor(context);
+            if (contributed != null && contributed != ProgressMonitor.none()) {
+                monitors.add(contributed);
+            }
+        }
+
+        // Use MultiProgressMonitor if we have multiple monitors
+        ProgressMonitor progressMonitor = monitors.size() > 1
+                ? new MultiProgressMonitor(monitors.toArray(new ProgressMonitor[0]))
+                : mcpMonitor;
+
+        // Report progress: Resolving language servers
+        progressMonitor.reportProgress(10.0, "Resolving language servers");
 
         // Step 1: Resolve LSP servers (strategy decides how)
-        return strategy.resolveServers(serverResolver, params)
+        return strategy.resolveServers(serverResolver, params, progressMonitor)
                 .thenCompose(servers -> {
                     if (servers.isEmpty()) {
+                        progressMonitor.reportProgress(100.0, "No language server found");
                         return CompletableFuture.completedFuture(
                                 strategy.formatNoServerFound(params)
                         );
                     }
+
+                    // Report progress: Executing request
+                    progressMonitor.reportProgress(30.0, String.format("Executing %s on %d server(s)",
+                        strategy.getCapability().name(), servers.size()));
 
                     // Step 2: Build LSP request parameters
                     TLspParams lspParams = strategy.buildLspParams(params);
@@ -74,7 +108,7 @@ public class LspRequestExecutor {
                             .map(server -> server.waitUntilReady()
                                     .thenCompose(v ->
                                             // Register futures for automatic cancellation
-                                            executeWithCancellation(strategy.executeRequest(server, lspParams), cancellation))
+                                            progressMonitor.executeWithCancellation(strategy.executeRequest(server, lspParams)))
                                     .exceptionally(ex -> {
                                         LOG.warnf("Failed to execute %s on server %s: %s",
                                                 strategy.getCapability(), server.getConfig().getServerId(), ex.getMessage());
@@ -87,17 +121,29 @@ public class LspRequestExecutor {
                     // Step 3: Wait for all to complete and merge results
                     return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
                             .thenApply(v -> {
+                                // Report progress: Processing results
+                                progressMonitor.reportProgress(80.0, "Processing results");
+
                                 List<TResult> results = futures.stream()
                                         .map(CompletableFuture::join)
                                         .filter(strategy::isValidResult)
                                         .toList();
 
                                 if (results.isEmpty()) {
+                                    progressMonitor.reportProgress(100.0, "No results found");
                                     return strategy.formatNoResultFound(params);
                                 }
 
+                                // Report progress: Formatting results
+                                progressMonitor.reportProgress(90.0, String.format("Formatting %d result(s)", results.size()));
+
                                 // Format and return results
-                                return strategy.formatResults(params, results);
+                                String formatted = strategy.formatResults(params, results);
+
+                                // Report complete
+                                progressMonitor.reportProgress(100.0, "Done");
+
+                                return formatted;
                             });
                 }).exceptionally(ex -> {
                     LOG.error("Failed to execute LSP request", ex);
@@ -125,7 +171,7 @@ public class LspRequestExecutor {
          */
         CompletableFuture<List<LspServer>> resolveServers(
                 LspServerResolver resolver,
-                TRequestParams params);
+                TRequestParams params, ProgressMonitor progressMonitor);
 
         /**
          * Build LSP request parameters from request params.

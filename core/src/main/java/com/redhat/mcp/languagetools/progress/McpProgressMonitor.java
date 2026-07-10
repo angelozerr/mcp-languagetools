@@ -80,6 +80,7 @@ public class McpProgressMonitor extends AbstractProgressMonitor {
         if (progress != null && progress.token().isPresent()) {
             progress.notificationBuilder()
                     .setMessage(message)
+                    .setProgress(0)
                     .build()
                     .sendAndForget();
         }
@@ -98,14 +99,31 @@ public class McpProgressMonitor extends AbstractProgressMonitor {
     }
 
     @Override
+    public void cancel(String taskId) {
+        // MCP client (AI) CANNOT cancel installation tasks
+        // These run in the background and will be reused by other operations
+        if (taskId != null && taskId.startsWith("install-")) {
+            // Silently ignore - installation continues
+            return;
+        }
+
+        // MCP client CAN cancel other operations (execute, start, etc.)
+        super.cancel(taskId);
+    }
+
+    @Override
     public boolean isCancelled() {
-        return cancellation != null && !cancellation.check().isRequested();
+        // Check both parent's task-based cancellation and MCP cancellation
+        return super.isCancelled() || (cancellation != null && !cancellation.check().isRequested());
     }
 
     @Override
     public void checkCancelled() {
         if (cancellation != null) {
             cancellation.skipProcessingIfCancelled();
+        }
+        if (super.isCancelled()) {
+            throw new RuntimeException("Task cancelled");
         }
     }
 
@@ -128,7 +146,6 @@ public class McpProgressMonitor extends AbstractProgressMonitor {
                 result.complete(value);
             }
         });
-
         return result;
     }
 

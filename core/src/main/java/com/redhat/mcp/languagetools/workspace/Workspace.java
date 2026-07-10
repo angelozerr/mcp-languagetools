@@ -7,6 +7,7 @@ import com.redhat.mcp.languagetools.installer.*;
 import com.redhat.mcp.languagetools.lsp.LspInstanceRegistry;
 import com.redhat.mcp.languagetools.lsp.server.*;
 import com.redhat.mcp.languagetools.lsp.trace.LspTraceCollector;
+import com.redhat.mcp.languagetools.progress.ProgressMonitor;
 import com.redhat.mcp.languagetools.server.ServerBase;
 import com.redhat.mcp.languagetools.server.ServerStatus;
 import org.jboss.logging.Logger;
@@ -92,20 +93,25 @@ public class Workspace {
     /**
      * Add an LSP server to this workspace (serverHome calculated from PathManager).
      *
-     * @param config           Server configuration
+     * @param config Server configuration
+     * @return
      */
-    public void addLspServer(LspServerConfig config) {
+    public LspServer addLspServer(LspServerConfig config) {
         // TraceCollector is now configured in createLspServer()
-        createLspServer(config);
+        var lspServer = createLspServer(config);
         LOG.infof("Added LSP server '%s' to workspace: %s", config.getServerId(), rootUri);
+        return lspServer;
     }
 
 
     /**
      * Restart a specific LSP server (shutdown old, create new, start).
      * Will try to connect to IDE instance if available.
+     *
+     * @param serverId Server ID
+     * @param progressMonitor Progress monitor (never null)
      */
-    public CompletableFuture<Void> restartLspServer(String serverId) {
+    public CompletableFuture<Void> restartLspServer(String serverId, ProgressMonitor progressMonitor) {
         LspServerConfig serverConfig = application.getLspServerConfig(serverId);
         if (serverConfig == null) {
             return CompletableFuture.failedFuture(new IllegalArgumentException("Server not found: " + serverId));
@@ -127,7 +133,7 @@ public class Workspace {
             lspServers.put(serverId, newServer);
 
             // Start and initialize (will detect IDE instance)
-            return newServer.start()
+            return newServer.start(progressMonitor)
                     .thenCompose(initV -> newServer.initialize())
                     .thenRun(() -> LOG.infof("Restarted LSP server '%s' for workspace: %s", serverId, rootUri))
                     .exceptionally(ex -> {
@@ -140,12 +146,17 @@ public class Workspace {
     /**
      * Start an MCP-managed LSP server only (do not connect to IDE instance).
      * Handles installation if needed before starting.
+     *
+     * @param serverId Server ID
+     * @param progressMonitor Progress monitor (never null)
      */
-    public CompletableFuture<Void> startManagedLspServer(String serverId) {
+    public CompletableFuture<Void> startManagedLspServer(String serverId, ProgressMonitor progressMonitor) {
         LspServerConfig serverConfig = application.getLspServerConfig(serverId);
         if (serverConfig == null) {
             return CompletableFuture.failedFuture(new IllegalArgumentException("Server not found: " + serverId));
         }
+
+        progressMonitor.reportProgress("Starting " + serverConfig.getName() + "...");
 
         LspServer oldServer = getLspServer(serverId);
 
@@ -169,7 +180,7 @@ public class Workspace {
 
 
             // Step 1: Start and initialize (installation happens inside start())
-            return newServer.startManagedOnly()
+            return newServer.startManagedOnly(progressMonitor)
                     .thenCompose(initV -> newServer.initialize())
                     .thenRun(() -> LOG.infof("Started MCP-managed LSP server '%s' for workspace: %s", serverId, rootUri))
                     .exceptionally(ex -> {
@@ -196,10 +207,12 @@ public class Workspace {
      * - Installing if needed
      * - Starting and initializing the server
      *
-     * @param serverId The server ID to ensure is started
+     * @param serverId        The server ID to ensure is started
+     * @param progressMonitor
      * @return CompletableFuture<LspServer> that completes when server is started (not necessarily ready)
      */
-    public CompletableFuture<LspServer> ensureLspServerStarted(String serverId) {
+    public CompletableFuture<LspServer> ensureLspServerStarted(String serverId,
+                                                               ProgressMonitor progressMonitor) {
         // Already running?
         if (hasLspServer(serverId)) {
             LspServer server = getLspServer(serverId);
@@ -232,7 +245,7 @@ public class Workspace {
             // Start and initialize (will connect to socket)
             var server = getLspServer(serverId);
             if (server != null) {
-                return server.start()
+                return server.start(progressMonitor)
                     .thenCompose(v -> server.initialize())
                     .thenApply(v -> server)
                     .exceptionally(ex -> {
@@ -243,7 +256,7 @@ public class Workspace {
         }
 
         // No external instance - start our own managed server (handles installation automatically)
-        return startManagedLspServer(serverId)
+        return startManagedLspServer(serverId, progressMonitor)
             .thenApply(v -> {
                 LspServer server = getLspServer(serverId);
                 if (server == null) {
@@ -264,39 +277,10 @@ public class Workspace {
      * @param serverId The server ID to ensure is ready
      * @return CompletableFuture<LspServer> that completes when server is ready
      */
-    public CompletableFuture<LspServer> ensureLspServerReady(String serverId) {
-        return ensureLspServerStarted(serverId)
+    public CompletableFuture<LspServer> ensureLspServerReady(String serverId,
+                                                             ProgressMonitor progressMonitor) {
+        return ensureLspServerStarted(serverId, progressMonitor)
             .thenCompose(server -> server.waitUntilReady().thenApply(v -> server));
-    }
-
-    /**
-     * Initialize the workspace (start all LSP servers).
-     */
-    public CompletableFuture<Void> initialize() {
-        if (initialized) {
-            return CompletableFuture.completedFuture(null);
-        }
-
-        LOG.infof("Initializing workspace: %s", rootUri);
-
-        // Start all servers in parallel
-        List<CompletableFuture<Void>> futures = new ArrayList<>();
-        for (LspServer server : lspServers.values()) {
-            CompletableFuture<Void> future = server.start()
-                    .thenCompose(v -> server.initialize());
-            futures.add(future);
-        }
-
-        return CompletableFuture
-                .allOf(futures.toArray(new CompletableFuture[0]))
-                .thenRun(() -> {
-                    initialized = true;
-                    LOG.infof("Workspace initialized: %s", rootUri);
-                })
-                .exceptionally(ex -> {
-                    LOG.errorf(ex, "Failed to initialize workspace: %s", rootUri);
-                    throw new RuntimeException("Failed to initialize workspace: " + rootUri, ex);
-                });
     }
 
     /**

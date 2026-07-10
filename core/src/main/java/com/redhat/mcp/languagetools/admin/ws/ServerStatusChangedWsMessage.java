@@ -11,6 +11,9 @@ public record ServerStatusChangedWsMessage(
     String workspaceUri,
     String serverId,
     String oldStatus,
-    String newStatus
+    String newStatus,
+    String statusMessage,      // Status message (e.g., "Downloading dependencies...")
+    Double installProgress,    // Installation progress (0.0 to 1.0), null if not installing
+    Boolean isReady           // Whether server is ready to handle requests
 ) {
 }

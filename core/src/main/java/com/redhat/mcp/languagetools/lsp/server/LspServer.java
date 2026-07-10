@@ -4,6 +4,7 @@ import com.redhat.mcp.languagetools.PathManager;
 import com.redhat.mcp.languagetools.language.LanguageDocument;
 import com.redhat.mcp.languagetools.lsp.*;
 import com.redhat.mcp.languagetools.lsp.client.GenericLanguageClient;
+import com.redhat.mcp.languagetools.progress.ProgressMonitor;
 import com.redhat.mcp.languagetools.server.ServerBase;
 import com.redhat.mcp.languagetools.server.ServerStatus;
 import com.redhat.mcp.languagetools.trace.TraceCollector;
@@ -72,8 +73,13 @@ public class LspServer extends ServerBase<LspServerConfig> {
     /**
      * Start the language server process and establish LSP communication.
      * First tries to connect to an existing instance via socket, falls back to launching a new process.
+     *
+     * @param progressMonitor Progress monitor (never null, use ProgressMonitor.none() if not available)
      */
-    public CompletableFuture<Void> start() {
+    public CompletableFuture<Void> start(ProgressMonitor progressMonitor) {
+        // progressMonitor must never be null - use ProgressMonitor.none() instead
+        // If null, let it fail with NullPointerException to catch bugs early
+
         // Common startup checks and preparation
         if (!checkAndPrepareStart()) {
             return CompletableFuture.completedFuture(null);
@@ -83,7 +89,8 @@ public class LspServer extends ServerBase<LspServerConfig> {
 
         // Ensure server is installed first
         return withErrorLogging(
-            ensureInstalled().thenCompose(v -> CompletableFuture.runAsync(() -> {
+            config.ensureInstalled(getWorkspace().getApplication().getPathManager(), this::setStatus, progressMonitor)
+                .thenCompose(v -> CompletableFuture.runAsync(() -> {
                 // Try to find existing instance first
                 String workspacePath = Paths.get(workspaceRoot).toString();
                 LspInstanceRegistry.InstanceInfo existingInstance = LspInstanceRegistry.findInstance(workspacePath, config.getServerId());
@@ -121,15 +128,18 @@ public class LspServer extends ServerBase<LspServerConfig> {
 
     /**
      * Start MCP-managed language server process only (do not connect to IDE instance).
+     *
+     * @param progressMonitor Progress monitor (never null, use ProgressMonitor.none() if not available)
      */
-    public CompletableFuture<Void> startManagedOnly() {
+    public CompletableFuture<Void> startManagedOnly(ProgressMonitor progressMonitor) {
         var config = super.getConfig();
         LOG.infof("=== startManagedOnly() called for %s ===", config.getServerId());
         setStatus(ServerStatus.STARTING);
 
         // Ensure server is installed first
         return withErrorLogging(
-            ensureInstalled().thenCompose(v -> CompletableFuture.runAsync(() -> {
+            config.ensureInstalled(getWorkspace().getApplication().getPathManager(), this::setStatus, progressMonitor)
+                .thenCompose(v -> CompletableFuture.runAsync(() -> {
                 LOG.infof("=== Inside CompletableFuture.runAsync for %s ===", config.getServerId());
                 String workspacePath = Paths.get(workspaceRoot).toString();
                 LOG.infof("Workspace path: %s", workspacePath);
