@@ -116,6 +116,15 @@ public class DapClient implements IDebugProtocolClient {
     @Override
     public void terminated(TerminatedEventArguments args) {
         LOG.info("Terminated event");
+
+        // CRITICAL FIX: If program terminates before 'initialized' event arrives,
+        // complete initializedEventFuture to unblock connectAndInitialize()
+        // This happens when the debugged program crashes immediately after launch
+        if (!initializedEventFuture.isDone()) {
+            LOG.warnf("Program terminated before 'initialized' event - completing future to prevent hang");
+            initializedEventFuture.complete(null);
+        }
+
         if (eventListener != null) {
             eventListener.onTerminated(args);
         }
@@ -441,7 +450,11 @@ public class DapClient implements IDebugProtocolClient {
         initArgs.setSupportsVariableType(true);
         initArgs.setSupportsVariablePaging(false);
 
-        // Step 1: Send initialize, THEN launch (like lsp4ij - both run in parallel with configurationDone)
+        // Detect request type (launch vs attach)
+        String requestType = (String) dapParameters.get("request");
+        boolean isAttach = "attach".equals(requestType);
+
+        // Step 1: Send initialize, THEN launch or attach (like lsp4ij - both run in parallel with configurationDone)
         CompletableFuture<?> launchAttachFuture = debugServer.initialize(initArgs)
             .thenAccept(capabilities -> {
                 LOG.infof("Received capabilities from initialize");
@@ -452,15 +465,21 @@ public class DapClient implements IDebugProtocolClient {
                 capabilitiesFuture.complete(capabilities);
             })
             .thenCompose(unused -> {
-                LOG.infof("Sending launch request");
-                return debugServer.launch(dapParameters);
+                if (isAttach) {
+                    LOG.infof("Sending attach request");
+                    return debugServer.attach(dapParameters);
+                } else {
+                    LOG.infof("Sending launch request");
+                    return debugServer.launch(dapParameters);
+                }
             })
             .handle((q, t) -> {
                 if (t != null) {
-                    LOG.errorf(t, "Error during initialize/launch");
+                    LOG.errorf(t, "Error during initialize/%s", isAttach ? "attach" : "launch");
                     if (eventListener != null) {
                         eventListener.onOutput(createErrorOutput(
-                            "Error during initialize/launch: " + t.getMessage()));
+                            String.format("Error during initialize/%s: %s",
+                                isAttach ? "attach" : "launch", t.getMessage())));
                     }
                     initializedEventFuture.completeExceptionally(t);
                 }
@@ -494,7 +513,12 @@ public class DapClient implements IDebugProtocolClient {
                 // Only send configurationDone if supported
                 if (caps != null && Boolean.TRUE.equals(caps.getSupportsConfigurationDoneRequest())) {
                     return debugServer.configurationDone(
-                        new org.eclipse.lsp4j.debug.ConfigurationDoneArguments());
+                        new org.eclipse.lsp4j.debug.ConfigurationDoneArguments())
+                        .exceptionally(t -> {
+                            // Non-fatal: server may have already terminated
+                            LOG.warnf(t, "configurationDone failed (non-fatal, server may be terminated)");
+                            return null;
+                        });
                 }
                 LOG.infof("Server doesn't support configurationDone, skipping");
                 return CompletableFuture.completedFuture(null);
@@ -518,14 +542,15 @@ public class DapClient implements IDebugProtocolClient {
             .thenRun(() -> {
                 LOG.infof("DAP session fully initialized and ready");
             })
-            .exceptionally(t -> {
-                LOG.errorf(t, "Error during DAP initialization sequence");
-                // Send error to UI
-                if (eventListener != null) {
-                    eventListener.onOutput(createErrorOutput(
-                        "DAP initialization failed: " + t.getMessage()));
+            .whenComplete((result, t) -> {
+                if (t != null) {
+                    LOG.errorf(t, "Error during DAP initialization sequence");
+                    // Send error to UI
+                    if (eventListener != null) {
+                        eventListener.onOutput(createErrorOutput(
+                            "DAP initialization failed: " + t.getMessage()));
+                    }
                 }
-                throw new RuntimeException("DAP initialization failed", t);
             });
     }
 

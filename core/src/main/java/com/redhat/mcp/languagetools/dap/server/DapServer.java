@@ -5,6 +5,7 @@ import com.redhat.mcp.languagetools.dap.trace.DapTraceCollector;
 import com.redhat.mcp.languagetools.dap.transport.SocketTransportStreams;
 import com.redhat.mcp.languagetools.dap.transport.StdioTransportStreams;
 import com.redhat.mcp.languagetools.dap.transport.TransportStreams;
+import com.redhat.mcp.languagetools.progress.ProgressMonitor;
 import com.redhat.mcp.languagetools.trace.TraceCollector;
 import com.redhat.mcp.languagetools.trace.TracingMessageConsumer;
 import com.redhat.mcp.languagetools.server.ServerBase;
@@ -139,9 +140,13 @@ public class DapServer extends ServerBase<DapServerConfig> {
      * Used for DAP servers that run as separate processes (e.g., vscode-js-debug).
      */
     private CompletableFuture<Void> startStandalone() {
-        // Ensure server is installed first
+        // Ensure server is installed first (DAP servers don't support progress monitoring during start)
         return withErrorLogging(
-            ensureInstalled().thenCompose(v -> startServerProcess())
+            getConfig().ensureInstalled(
+                    getWorkspace().getApplication().getPathManager(),
+                    this::setStatus,
+                    ProgressMonitor.none())
+                .thenCompose(v -> startServerProcess())
                 .thenCompose(this::waitForServerReady)
                 .thenCompose(this::createLauncher),
             getTraceCollector(),

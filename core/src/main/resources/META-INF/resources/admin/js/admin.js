@@ -12,8 +12,9 @@
         let currentConsoleTab = 'traces'; // Track current tab in Workspaces view
         let currentWorkspaceTab = 'servers'; // Track current tab in workspace view: 'servers' or 'debuggers'
 
-        // Expose currentTab globally for admin-mcp.js
+        // Expose globals for other scripts
         window.currentTab = currentTab;
+        window.currentServerId = null; // Track currently selected LSP server (used by admin-workspace.js)
 
         // WebSocket connection (replaces SSE and polling)
         let adminWebSocket = null;
@@ -267,6 +268,11 @@
                 case 'dap-session-update':
                     handleDapSessionUpdate(message);
                     break;
+                case 'progress-update':
+                    if (typeof handleProgressUpdate === 'function') {
+                        handleProgressUpdate(message);
+                    }
+                    break;
                 case 'mcp-trace':
                     handleMcpTrace(message);
                     break;
@@ -288,7 +294,7 @@
          * Handle LSP trace message from WebSocket.
          */
         function handleLspTrace(trace) {
-            console.log('handleLspTrace called for server:', trace.serverId, 'current:', currentServerId);
+            console.log('handleLspTrace called for server:', trace.serverId, 'current:', window.currentServerId);
 
             // Store trace by server
             if (!tracesByServer[trace.serverId]) {
@@ -319,7 +325,7 @@
             // If this is an installation trace (INFO, UPDATE, ERROR) and no server is currently selected,
             // auto-select this server to show installation progress
             if ((trace.messageType === 'INFO' || trace.messageType === 'UPDATE' || trace.messageType === 'ERROR') &&
-                !currentServerId) {
+                !window.currentServerId) {
                 console.log('Auto-selecting server for installation:', trace.serverId);
 
                 // Find the workspace and server
@@ -336,8 +342,8 @@
                             window.selectServer(server);
                         } else {
                             console.log('window.selectServer not found, using fallback');
-                            // Fallback: just set currentServerId and render
-                            currentServerId = trace.serverId;
+                            // Fallback: just set window.currentServerId and render
+                            window.currentServerId = trace.serverId;
                             if (typeof renderConsole === 'function') {
                                 renderConsole();
                             }
@@ -351,7 +357,7 @@
             }
 
             // Refresh console if this trace is for the currently selected server
-            if (trace.workspaceUri === selectedWorkspace && trace.serverId === currentServerId) {
+            if (trace.workspaceUri === selectedWorkspace && trace.serverId === window.currentServerId) {
                 console.log('Refreshing console for current server');
                 renderConsole();
             }
@@ -478,7 +484,7 @@
                 window.workspaces = workspaces; // Update global
                 workspacesRendered = true;
                 console.log('Workspaces updated, rendering...');
-                renderWorkspaces();
+                window.renderWorkspaces();
 
                 // If a workspace was selected, re-render its current tab (servers or debuggers)
                 if (selectedWorkspace) {
@@ -533,15 +539,19 @@
                 return;
             }
 
-            // Update the server's status
+            // Update the server's status and progress info
             changedServer.status = event.newStatus;
+            changedServer.statusMessage = event.statusMessage;
+            changedServer.installProgress = event.installProgress;
+            changedServer.isReady = event.isReady;
 
             // If this server is a parent, update all its extensions
             const extensions = workspace.lspServers.filter(s => s.parentServerId === event.serverId);
             for (const ext of extensions) {
                 ext.status = event.newStatus;
-                ext.isReady = changedServer.isReady;
-                ext.statusMessage = changedServer.statusMessage;
+                ext.isReady = event.isReady;
+                ext.statusMessage = event.statusMessage;
+                ext.installProgress = event.installProgress;
                 ext.pid = changedServer.pid;
                 ext.command = changedServer.command;
             }
@@ -554,6 +564,11 @@
                 // Update status badges for all extensions of this server
                 for (const ext of extensions) {
                     updateServerStatusBadge(ext.id, ext);
+                }
+
+                // Update the detail panel status badge if this server is selected
+                if (selectedServer && selectedServer.id === event.serverId) {
+                    updateDetailPanelStatusBadge(changedServer);
                 }
             }
         }
@@ -572,21 +587,38 @@
                 return;
             }
 
-            // Regenerate the status badge HTML
+            // Just update the status badge (progress is shown in footer now)
             const statusClass = formatStatusClass(server.status, server.isReady);
             const label = formatStatusLabel(server.status, server.externalInstance);
+            statusBadgeContainer.innerHTML = `<span class="status-badge ${statusClass}">${label}</span>`;
+        }
 
-            // If installing and we have progress, show a progress bar
-            if (server.status === 'INSTALLING' && server.installProgress != null) {
-                const progressPercent = Math.round(server.installProgress * 100);
-                statusBadgeContainer.innerHTML = `
-                    <span class="status-badge ${statusClass}" style="position: relative; overflow: hidden;">
-                        <span style="position: absolute; left: 0; top: 0; bottom: 0; width: ${progressPercent}%; background: rgba(76, 175, 80, 0.3); z-index: 0;"></span>
-                        <span style="position: relative; z-index: 1;">${label} (${progressPercent}%)</span>
-                    </span>
-                `;
+        /**
+         * Update the progress section in the detail panel when a server status changes.
+         */
+        function updateDetailPanelStatusBadge(server) {
+            const progressElement = document.getElementById('server-detail-progress');
+
+            if (!progressElement) {
+                return; // Detail panel not showing
+            }
+
+            const statusClass = server.status === 'RUNNING' && !server.isReady ? 'status-running-not-ready' : 'status-' + server.status.toLowerCase();
+            const label = formatStatusLabel(server.status, server.externalInstance);
+
+            // Show progress if installing/starting with progress
+            if ((server.status === 'INSTALLING' || server.status === 'STARTING') && server.installProgress != null) {
+                const progressPercent = server.installProgress * 100;
+                const message = server.statusMessage || null;
+                progressElement.innerHTML = renderProgressBadge(label, statusClass, progressPercent, message);
+                progressElement.style.display = 'block';
+                progressElement.style.padding = '0.5rem 1rem';
+                progressElement.style.background = '#1e1e1e';
+                progressElement.style.borderBottom = '1px solid #3e3e42';
             } else {
-                statusBadgeContainer.innerHTML = `<span class="status-badge ${statusClass}">${label}</span>`;
+                // Hide progress section
+                progressElement.innerHTML = '';
+                progressElement.style.display = 'none';
             }
         }
 
@@ -762,7 +794,7 @@
                         return {
                             type: 'lsp',
                             containerId: 'console-output',
-                            data: tracesByServer[currentServerId] || []
+                            data: tracesByServer[window.currentServerId] || []
                         };
                     }
 

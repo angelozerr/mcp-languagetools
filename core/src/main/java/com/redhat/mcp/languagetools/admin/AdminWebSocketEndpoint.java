@@ -305,6 +305,13 @@ public class AdminWebSocketEndpoint {
     }
 
     /**
+     * CDI observer for progress updates.
+     */
+    void onProgressUpdate(@Observes com.redhat.mcp.languagetools.admin.ws.ProgressUpdateWsMessage msg) {
+        broadcast(msg);
+    }
+
+    /**
      * CDI observer for workspace changes (created/closed).
      */
     void onWorkspaceChange(@Observes WorkspaceChangeEvent event) {
@@ -332,13 +339,39 @@ public class AdminWebSocketEndpoint {
         LOG.infof("WebSocket: Server status changed: %s/%s - %s -> %s (broadcasting to %d clients)",
                 event.workspaceUri(), event.serverId(), event.oldStatus(), event.newStatus(), sessions.size());
 
-        // Send status change event
+        // Get server details for progress info
+        var workspace = application.getWorkspace(event.workspaceUri());
+        String statusMessage = null;
+        Double installProgress = null;
+        Boolean isReady = false;
+
+        if (workspace != null) {
+            var server = workspace.getLspServer(event.serverId());
+            if (server != null) {
+                statusMessage = server.getStatusMessage();
+                isReady = server.isReady();
+
+                // Get install progress if installing
+                if (event.newStatus() == com.redhat.mcp.languagetools.server.ServerStatus.INSTALLING) {
+                    var config = server.getConfig();
+                    var progressIndicator = config.getInstallProgress();
+                    if (progressIndicator != null) {
+                        installProgress = progressIndicator.getFraction();
+                    }
+                }
+            }
+        }
+
+        // Send status change event with progress info
         ServerStatusChangedWsMessage msg = new ServerStatusChangedWsMessage(
                 "server-status-changed",
                 event.workspaceUri().toString(),
                 event.serverId(),
                 event.oldStatus().name(),
-                event.newStatus().name()
+                event.newStatus().name(),
+                statusMessage,
+                installProgress,
+                isReady
         );
         broadcast(msg);
 

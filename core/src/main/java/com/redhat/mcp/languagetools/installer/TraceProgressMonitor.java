@@ -1,5 +1,6 @@
 package com.redhat.mcp.languagetools.installer;
 
+import com.redhat.mcp.languagetools.admin.ProgressBroadcaster;
 import com.redhat.mcp.languagetools.progress.AbstractProgressMonitor;
 import com.redhat.mcp.languagetools.trace.TraceCollector;
 
@@ -9,33 +10,56 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Progress monitor that sends traces via TraceCollector.
+ * Optionally broadcasts progress to Admin UI via ProgressBroadcaster.
  */
 public class TraceProgressMonitor extends AbstractProgressMonitor {
     private final TraceCollector traceCollector;
     private final AtomicBoolean canceled = new AtomicBoolean(false);
     private volatile String currentText = "";
 
+    // Optional broadcasting to Admin UI
+    private final ProgressBroadcaster broadcaster;
+    private final String taskId;
+    private final String serverId;
+    private final String title;
+
     /**
      * Create trace progress monitor with default total of 100.
      */
     public TraceProgressMonitor(TraceCollector traceCollector) {
-        this(traceCollector, 100.0);
+        this(traceCollector, 100.0, null, null, null, null);
     }
 
     /**
      * Create trace progress monitor with specific total.
      */
     public TraceProgressMonitor(TraceCollector traceCollector, double total) {
+        this(traceCollector, total, null, null, null, null);
+    }
+
+    /**
+     * Create trace progress monitor with broadcasting support.
+     */
+    public TraceProgressMonitor(TraceCollector traceCollector, double total,
+                               ProgressBroadcaster broadcaster, String taskId, String serverId, String title) {
         super(total);
         this.traceCollector = traceCollector;
+        this.broadcaster = broadcaster;
+        this.taskId = taskId;
+        this.serverId = serverId;
+        this.title = title;
     }
 
     @Override
     public void reportProgress(double progress, String message) {
         setCurrent(progress);
         this.currentText = message;
-        // Note: trace updates are handled by wrappers (e.g., ProgressMonitorWrapper in DownloadTask)
-        // This just updates the internal state for getFraction() which is used by the badge
+
+        // Broadcast to Admin UI if configured
+        if (broadcaster != null && taskId != null) {
+            double fraction = total > 0 ? current / total : 0.0;
+            broadcaster.taskRunning(taskId, serverId, title, fraction, message);
+        }
     }
 
     @Override
@@ -44,11 +68,22 @@ public class TraceProgressMonitor extends AbstractProgressMonitor {
         if (traceCollector != null) {
             traceCollector.info(message);
         }
+
+        // Broadcast to Admin UI if configured
+        if (broadcaster != null && taskId != null) {
+            double fraction = total > 0 ? current / total : 0.0;
+            broadcaster.taskRunning(taskId, serverId, title, fraction, message);
+        }
     }
 
     @Override
     public void setComplete() {
         setCurrent(total);
+
+        // Broadcast completion
+        if (broadcaster != null && taskId != null) {
+            broadcaster.taskCompleted(taskId, serverId, title);
+        }
     }
 
     /**
@@ -61,14 +96,22 @@ public class TraceProgressMonitor extends AbstractProgressMonitor {
 
 
     @Override
+    public void cancel(String taskId) {
+        // Admin can cancel ANY task (including installations)
+        super.cancel(taskId);
+        canceled.set(true);
+    }
+
+    @Override
     public boolean isCancelled() {
-        return canceled.get();
+        // Check both parent's task-based cancellation and the legacy canceled flag
+        return super.isCancelled() || canceled.get();
     }
 
     @Override
     public void checkCancelled() {
         if (isCancelled()) {
-            throw new CancellationException("Installation cancelled");
+            throw new CancellationException("Operation cancelled");
         }
     }
 
@@ -85,7 +128,7 @@ public class TraceProgressMonitor extends AbstractProgressMonitor {
     }
 
     /**
-     * Cancels the operation.
+     * Cancels the operation (legacy method for backward compatibility).
      */
     public void cancel() {
         canceled.set(true);

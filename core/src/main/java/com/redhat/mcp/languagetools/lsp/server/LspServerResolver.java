@@ -12,6 +12,7 @@ package com.redhat.mcp.languagetools.lsp.server;
 
 import com.redhat.mcp.languagetools.language.LanguageDocument;
 import com.redhat.mcp.languagetools.Application;
+import com.redhat.mcp.languagetools.progress.ProgressMonitor;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
@@ -33,17 +34,19 @@ public class LspServerResolver {
     /**
      * Get all LSP servers that can handle the given file and match the filter.
      *
-     * @param document the language document
-     * @param cwd      the current working directory (used for workspace detection)
-     * @param filter   predicate to filter servers (e.g., by capability, enabled status)
+     * @param document        the language document
+     * @param cwd             the current working directory (used for workspace detection)
+     * @param filter          predicate to filter servers (e.g., by capability, enabled status)
+     * @param progressMonitor
      * @return completable future with list of matching servers
      */
     public CompletableFuture<List<LspServer>> getLspServersForFile(
             LanguageDocument document,
             String cwd,
-            Predicate<LspServer> filter) {
+            Predicate<LspServer> filter,
+            ProgressMonitor progressMonitor) {
 
-        return application.getWorkspaceForFile(document.getUri())
+        return application.getWorkspaceForFile(document.getUri(), progressMonitor)
                 .thenApply(workspace -> {
                     // Get all LSP servers from workspace
                     var allServers = workspace.getLspServers();

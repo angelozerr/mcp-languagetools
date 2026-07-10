@@ -76,10 +76,34 @@
         </div>
     </div>
 
+    <!-- Global Progress Footer -->
+    <div id="progress-footer" class="progress-footer">
+        <div class="progress-footer-content">
+            <div id="progress-status" class="progress-status">No tasks running</div>
+            <button id="progress-toggle" class="progress-toggle" onclick="toggleProgressPanel()" title="Show progress tasks">
+                <span id="progress-icon">⏸</span>
+                <span id="progress-count" class="progress-count">0</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Progress Panel (slide up from footer) -->
+    <div id="progress-panel" class="progress-panel">
+        <div class="progress-panel-header">
+            <h3>Active Tasks</h3>
+            <button onclick="toggleProgressPanel()">✕</button>
+        </div>
+        <div id="progress-panel-content" class="progress-panel-content">
+            <div style="text-align: center; padding: 2rem; color: #858585;">No active tasks</div>
+        </div>
+    </div>
+
     <script src="js/diagram.js"></script>
     <script src="js/error-formatter.js"></script>
     <script src="js/trace-renderer.js"></script>
     <script src="js/keyboard-shortcuts.js"></script>
+    <script src="js/progress-renderer.js"></script>
+    <script src="js/progress-manager.js"></script>
     <script src="js/admin-workspace.js"></script>
     <script src="js/admin-lsp.js"></script>
     <script src="js/admin-dap.js"></script>

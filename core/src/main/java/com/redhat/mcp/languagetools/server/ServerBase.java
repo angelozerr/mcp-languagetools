@@ -343,15 +343,6 @@ public abstract class ServerBase<T extends ServerConfigBase> extends BindEndpoin
     }
 
     /**
-     * Ensure server is installed before starting.
-     * Should be called at the beginning of start() in subclasses.
-     */
-    protected CompletableFuture<Void> ensureInstalled() {
-        return config.ensureInstalled(workspace.getApplication().getPathManager(), this::setStatus)
-                .thenApply(result -> null);
-    }
-
-    /**
      * Check if server can start and prepare for starting.
      * Returns true if can proceed, false if should skip (already running).
      * Common logic for both LSP and DAP servers.

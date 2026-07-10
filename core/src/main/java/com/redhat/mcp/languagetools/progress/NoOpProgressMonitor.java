@@ -64,4 +64,39 @@ public class NoOpProgressMonitor implements ProgressMonitor {
         // No cancellation support, return future as-is
         return future;
     }
+
+    @Override
+    public void addStep(String stepId, double weight) {
+        // No-op
+    }
+
+    @Override
+    public ProgressMonitor beginStep(String stepId) {
+        return this; // Return self
+    }
+
+    @Override
+    public void completeStep(String stepId) {
+        // No-op
+    }
+
+    @Override
+    public String startTask(String taskId) {
+        return taskId;
+    }
+
+    @Override
+    public void endTask(String taskId) {
+        // No-op
+    }
+
+    @Override
+    public void cancel(String taskId) {
+        // No-op - cannot be cancelled
+    }
+
+    @Override
+    public ProgressMonitor createSubMonitor(double start, double end) {
+        return this; // Return self
+    }
 }

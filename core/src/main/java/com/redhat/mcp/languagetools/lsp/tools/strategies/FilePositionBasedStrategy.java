@@ -18,6 +18,7 @@ import com.redhat.mcp.languagetools.lsp.server.LspServer;
 import com.redhat.mcp.languagetools.lsp.server.LspServerResolver;
 import com.redhat.mcp.languagetools.lsp.tools.LspRequestExecutor;
 import com.redhat.mcp.languagetools.lsp.tools.params.FilePositionRequestParams;
+import com.redhat.mcp.languagetools.progress.ProgressMonitor;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -48,7 +49,8 @@ public abstract class FilePositionBasedStrategy<TLspParams, TResult>
     @Override
     public CompletableFuture<List<LspServer>> resolveServers(
             LspServerResolver resolver,
-            FilePositionRequestParams params) {
+            FilePositionRequestParams params,
+            ProgressMonitor progressMonitor) {
 
         // Create language document (detects language once)
         LanguageDocument document = languageRegistry.createDocument(params.getFileUri());
@@ -57,7 +59,8 @@ public abstract class FilePositionBasedStrategy<TLspParams, TResult>
         return resolver.getLspServersForFile(
                 document,
                 params.getCwd(),
-                server -> server.isEnabled() && server.supportsCapability(getCapability(), document)
+                server -> server.isEnabled() && server.supportsCapability(getCapability(), document),
+                progressMonitor
         );
     }
 

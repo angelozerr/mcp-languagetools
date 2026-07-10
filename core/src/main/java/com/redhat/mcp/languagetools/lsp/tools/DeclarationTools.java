@@ -12,11 +12,11 @@
 package com.redhat.mcp.languagetools.lsp.tools;
 
 import com.redhat.mcp.languagetools.language.LanguageRegistry;
-import com.redhat.mcp.languagetools.lsp.client.LspCapability;
 import com.redhat.mcp.languagetools.lsp.tools.params.FilePositionRequestParams;
 import com.redhat.mcp.languagetools.lsp.tools.strategies.DeclarationStrategy;
 import com.redhat.mcp.languagetools.tools.ToolArgDescriptions;
 import io.quarkiverse.mcp.server.Cancellation;
+import io.quarkiverse.mcp.server.Progress;
 import io.quarkiverse.mcp.server.Tool;
 import io.quarkiverse.mcp.server.ToolArg;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -44,13 +44,14 @@ public class DeclarationTools {
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
             @ToolArg(description = ToolArgDescriptions.POSITION_LINE) int line,
             @ToolArg(description = ToolArgDescriptions.POSITION_CHARACTER) int character,
-            @ToolArg(description = ToolArgDescriptions.CANCELLATION) Cancellation cancellation) {
+            @ToolArg(description = ToolArgDescriptions.CANCELLATION) Cancellation cancellation,
+            Progress progress) {
 
         FilePositionRequestParams params = new FilePositionRequestParams(cwd, fileUri, line, character);
         return requestExecutor.execute(
                 params,
                 new DeclarationStrategy(languageRegistry),
-                cancellation
-        );
+                cancellation,
+                progress);
     }
 }

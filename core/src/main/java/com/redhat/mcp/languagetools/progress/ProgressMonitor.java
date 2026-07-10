@@ -81,6 +81,66 @@ public interface ProgressMonitor {
     boolean isSupported();
 
     /**
+     * Declare a step with a relative weight.
+     * All steps should be declared upfront before execution begins.
+     * Weights are relative and don't need to sum to 1.0.
+     *
+     * @param stepId Unique identifier for this step
+     * @param weight Relative weight of this step (e.g., 0.4 for 40%)
+     */
+    void addStep(String stepId, double weight);
+
+    /**
+     * Begin executing a step. Returns a sub-monitor scaled to this step's range.
+     * Must be called in the same order as addStep().
+     * Auto-completes the previous step if still active.
+     *
+     * @param stepId Step identifier (must have been declared via addStep)
+     * @return A sub-monitor that scales progress to this step's range
+     */
+    ProgressMonitor beginStep(String stepId);
+
+    /**
+     * Mark a step as complete.
+     * Optional - beginStep auto-completes the previous step.
+     *
+     * @param stepId Step identifier
+     */
+    void completeStep(String stepId);
+
+    /**
+     * Start a tracked task/operation.
+     *
+     * @param taskId Unique identifier for this task
+     * @return The task ID (same as input)
+     */
+    String startTask(String taskId);
+
+    /**
+     * End a tracked task.
+     *
+     * @param taskId Task identifier
+     */
+    void endTask(String taskId);
+
+    /**
+     * Cancel a specific task by ID.
+     * Implementations decide whether to honor this cancellation.
+     *
+     * @param taskId Task identifier
+     */
+    void cancel(String taskId);
+
+    /**
+     * Create a sub-monitor that scales progress to a portion of the parent.
+     *
+     * @param start Start percentage (0.0 to 1.0)
+     * @param end End percentage (0.0 to 1.0)
+     * @return A sub-monitor that scales progress to the parent's range
+     */
+    ProgressMonitor createSubMonitor(double start, double end);
+
+    /**
      * Create a no-op progress monitor that does nothing.
      * Useful for operations that don't need progress tracking.
      *

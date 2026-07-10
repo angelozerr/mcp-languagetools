@@ -17,6 +17,7 @@ import org.eclipse.lsp4j.debug.Thread;
 
 import java.net.URI;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
@@ -187,6 +188,7 @@ public class DapDebugTools {
             Cancellation cancellation,
             Progress progress) {
 
+        // Use MultiProgressMonitor to broadcast progress to both MCP client (AI) and Admin UI
         ProgressMonitor progressMonitor = new McpProgressMonitor(progress, cancellation);
 
         // Convert cwd to URI (handle both file:// URIs and Windows/Unix paths)
@@ -195,7 +197,7 @@ public class DapDebugTools {
             uri = URI.create(cwd);
         } else {
             // Convert path to URI
-            Path path = java.nio.file.Paths.get(cwd);
+            Path path = Paths.get(cwd);
             uri = path.toUri();
         }
 
@@ -225,38 +227,47 @@ public class DapDebugTools {
         }
 
         // Chain: breakpoints → launch/attach → add metadata
-        return executeWithCancellation(
-                breakpointsFuture.thenCompose(v -> {
-                    String request = (String) configuration.get("request");
+        // Note: progressMonitor.executeWithCancellation is already called inside trackFuture,
+        // so we don't need to wrap again here (would create double wrapping)
+        return breakpointsFuture.thenCompose(v -> {
+            String request = (String) configuration.get("request");
 
-                    if ("attach".equals(request)) {
-                        // Attach mode
-                        Integer processId = (Integer) configuration.get("processId");
-                        if (processId != null) {
-                            return session.attach(processId, progressMonitor);
-                        } else {
-                            // Attach via port/host
-                            return session.launch(configuration, actualDebugMode, DapSession.SessionActor.AI_AGENT, progressMonitor);
-                        }
-                    } else {
-                        // Launch mode (default)
-                        return session.launch(configuration, actualDebugMode, DapSession.SessionActor.AI_AGENT, progressMonitor);
-                    }
-                }).thenApply(result -> {
-                    // Add sessionId to result
-                    result.put("sessionId", sessionId);
-                    result.put("language", session.getLanguage());
-                    return result;
-                }).exceptionally(ex -> {
-                    // Ensure the future always completes (never hangs)
-                    Map<String, Object> errorResult = new HashMap<>();
-                    errorResult.put("success", false);
-                    errorResult.put("sessionId", sessionId);
-                    errorResult.put("error", ex.getCause() != null ? ex.getCause().getMessage() : ex.getMessage());
-                    return errorResult;
-                }),
-                cancellation
-        );
+            if ("attach".equals(request)) {
+                // Attach mode
+                Integer processId = (Integer) configuration.get("processId");
+                if (processId != null) {
+                    return session.attach(processId, progressMonitor);
+                } else {
+                    // Attach via port/host
+                    return session.launch(configuration, actualDebugMode, DapSession.SessionActor.AI_AGENT, progressMonitor);
+                }
+            } else {
+                // Launch mode (default)
+                return session.launch(configuration, actualDebugMode, DapSession.SessionActor.AI_AGENT, progressMonitor);
+            }
+        }).thenApply(result -> {
+            // Add sessionId to result
+            result.put("sessionId", sessionId);
+            result.put("language", session.getLanguage());
+
+            // IMPORTANT: Check if session terminated during launch (e.g., program crashed immediately)
+            // This can happen when the program has errors and exits before debugging starts
+            if (session.getState() == DapSession.SessionState.TERMINATED) {
+                // Override success flag - session started but immediately terminated
+                result.put("success", false);
+                result.put("state", "terminated");
+                result.put("message", "Program terminated immediately after launch (check console output for errors)");
+            }
+
+            return result;
+        }).exceptionally(ex -> {
+            // Ensure the future always completes (never hangs)
+            Map<String, Object> errorResult = new HashMap<>();
+            errorResult.put("success", false);
+            errorResult.put("sessionId", sessionId);
+            errorResult.put("error", ex.getCause() != null ? ex.getCause().getMessage() : ex.getMessage());
+            return errorResult;
+        });
     }
 
     @Tool(description = "Detach from the debugged process without terminating it.")

@@ -6,6 +6,7 @@ import com.google.gson.JsonObject;
 import com.redhat.mcp.languagetools.lsp.Contributes;
 import com.redhat.mcp.languagetools.lsp.server.LspServer;
 import com.redhat.mcp.languagetools.lsp.server.LspServerConfig;
+import com.redhat.mcp.languagetools.progress.ProgressMonitor;
 import com.redhat.mcp.languagetools.server.ServerConfigBase;
 import com.redhat.mcp.languagetools.workspace.Workspace;
 import org.eclipse.lsp4j.jsonrpc.ResponseErrorException;
@@ -74,6 +75,9 @@ public class BindEndpointSupport {
      * Automatically finds the target server from contributes.*.bindRequest configuration
      * and routes the request to that server.
      *
+     * Note: This method is called by LSP4J framework, so we can't add parameters.
+     * Progress monitoring is not available for bind requests - they use ProgressMonitor.none().
+     *
      * @param method Request method (e.g., "vscode.java.startDebugSession")
      * @param params Request parameters
      * @return CompletableFuture with the response
@@ -96,9 +100,14 @@ public class BindEndpointSupport {
             LOG.infof("[%s] Routing bindRequest %s to server %s as %s (mode: %s)",
                 serverId, method, targetServerId, targetMethod, bindMode.getValue());
 
+            // Bind requests are not monitored (called by LSP4J framework, no way to pass ProgressMonitor)
+            // Use none() - acceptable since bind requests are not the main user operations
+            ProgressMonitor progressMonitor = ProgressMonitor.none();
+
             // Ensure target server is started (handles external instances, installation, etc.)
             // Returns the ready LspServer instance
-            return workspace.ensureLspServerReady(targetServerId)
+
+            return workspace.ensureLspServerReady(targetServerId, progressMonitor)
                     .thenCompose(targetServer -> {
                         LOG.debugf("Server %s is ready, routing request %s", targetServerId, targetMethod);
 

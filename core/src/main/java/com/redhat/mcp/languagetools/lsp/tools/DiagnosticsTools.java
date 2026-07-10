@@ -2,17 +2,22 @@ package com.redhat.mcp.languagetools.lsp.tools;
 
 import com.redhat.mcp.languagetools.Application;
 import com.redhat.mcp.languagetools.lsp.annotations.RequireDidOpen;
+import com.redhat.mcp.languagetools.progress.*;
 import com.redhat.mcp.languagetools.tools.ToolArgDescriptions;
 import com.redhat.mcp.languagetools.workspace.Workspace;
+import io.quarkiverse.mcp.server.Cancellation;
+import io.quarkiverse.mcp.server.Progress;
 import io.quarkiverse.mcp.server.Tool;
 import io.quarkiverse.mcp.server.ToolArg;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import org.eclipse.lsp4j.Diagnostic;
 import org.jboss.logging.Logger;
 
 import java.io.File;
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -27,6 +32,9 @@ public class DiagnosticsTools {
     @Inject
     Application application;
 
+    @Inject
+    Instance<ProgressMonitorContributor> progressContributors;
+
     @Tool(
             name = "get_diagnostics",
             description = "Get diagnostics (errors, warnings) for a file from all language servers. " +
@@ -36,12 +44,36 @@ public class DiagnosticsTools {
     @RequireDidOpen(uriParam = "fileUri")
     public String getDiagnostics(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
-            @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri) {
+            @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
+            Cancellation cancellation,
+            Progress progress) {
+
+        // Create MCP progress monitor
+        McpProgressMonitor mcpMonitor = new McpProgressMonitor(progress, cancellation);
+        LOG.infof("Progress token present: %s", progress != null && progress.token().isPresent());
+
+        // Collect additional monitors from contributors (e.g., Admin module)
+        List<ProgressMonitor> monitors = new ArrayList<>();
+        monitors.add(mcpMonitor);
+
+        ProgressContext context = ProgressContext.forOperation(null, "get_diagnostics");
+        for (ProgressMonitorContributor contributor : progressContributors) {
+            ProgressMonitor contributed = contributor.createMonitor(context);
+            if (contributed != null && contributed != ProgressMonitor.none()) {
+                monitors.add(contributed);
+            }
+        }
+
+        // Use MultiProgressMonitor if we have multiple monitors
+        ProgressMonitor progressMonitor = monitors.size() > 1
+                ? new MultiProgressMonitor(monitors.toArray(new ProgressMonitor[0]))
+                : mcpMonitor;
+
         try {
             URI uri = URI.create(fileUri);
             LOG.infof("Getting diagnostics for: %s (from cwd: %s)", uri, cwd);
 
-            Workspace ws = application.getWorkspaceForFile(uri).join();
+            Workspace ws = application.getWorkspaceForFile(uri, progressMonitor).join();
 
             StringBuilder result = new StringBuilder();
             result.append("Diagnostics for: ").append(uri).append("\n\n");

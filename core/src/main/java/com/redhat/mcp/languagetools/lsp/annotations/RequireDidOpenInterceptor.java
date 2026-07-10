@@ -11,6 +11,8 @@
  *******************************************************************************/
 package com.redhat.mcp.languagetools.lsp.annotations;
 
+import com.redhat.mcp.languagetools.progress.ProgressMonitor;
+import io.quarkiverse.mcp.server.ToolArg;
 import jakarta.annotation.Priority;
 import jakarta.inject.Inject;
 import jakarta.interceptor.AroundInvoke;
@@ -61,6 +63,8 @@ public class RequireDidOpenInterceptor {
 
     @AroundInvoke
     public Object ensureFileOpened(InvocationContext context) throws Exception {
+        // TODO: get progressMonitor from tool....
+        ProgressMonitor progressMonitor = ProgressMonitor.none();
         Method method = context.getMethod();
         RequireDidOpen annotation = method.getAnnotation(RequireDidOpen.class);
 
@@ -80,8 +84,8 @@ public class RequireDidOpenInterceptor {
 
         // Strategy 1: Find parameter with @ToolArg whose description contains "URI" or matches uriParamName pattern
         for (int i = 0; i < parameters.length; i++) {
-            if (parameters[i].isAnnotationPresent(io.quarkiverse.mcp.server.ToolArg.class)) {
-                io.quarkiverse.mcp.server.ToolArg toolArg = parameters[i].getAnnotation(io.quarkiverse.mcp.server.ToolArg.class);
+            if (parameters[i].isAnnotationPresent(ToolArg.class)) {
+                ToolArg toolArg = parameters[i].getAnnotation(ToolArg.class);
                 String description = toolArg.description().toLowerCase();
 
                 // Match if description contains "file" and "uri", or if it's explicitly the URI param
@@ -117,7 +121,7 @@ public class RequireDidOpenInterceptor {
         LOG.infof("Processing @RequireDidOpen for file: %s", fileUri);
 
         URI uri = URI.create(fileUri);
-        Workspace workspace = application.getWorkspaceForFile(uri).join();
+        Workspace workspace = application.getWorkspaceForFile(uri, progressMonitor).join();
 
         if (workspace == null) {
             LOG.warnf("No workspace found for %s", fileUri);

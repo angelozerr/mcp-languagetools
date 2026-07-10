@@ -5,6 +5,8 @@ import com.redhat.mcp.languagetools.PathManager;
 import com.redhat.mcp.languagetools.installer.*;
 import com.redhat.mcp.languagetools.lsp.Contributes;
 import com.redhat.mcp.languagetools.lsp.DocumentSelector;
+import com.redhat.mcp.languagetools.progress.ProgressMonitor;
+import com.redhat.mcp.languagetools.progress.SharedProgressMonitor;
 import com.redhat.mcp.languagetools.trace.TraceCollector;
 
 import java.nio.file.Path;
@@ -39,6 +41,9 @@ public abstract class ServerConfigBase implements ServerConfig {
 
     // Install progress monitor (set when installation starts)
     private TraceProgressMonitor installProgress;
+
+    // Shared progress monitor for installation (allows multiple listeners)
+    private volatile SharedProgressMonitor sharedInstallProgress;
 
     // Installation state - shared across all workspaces
     private volatile CompletableFuture<InstallResult> installationFuture;
@@ -184,9 +189,17 @@ public abstract class ServerConfigBase implements ServerConfig {
      * This method is thread-safe - only one installation will run even if called from multiple workspaces.
      * Returns a CompletableFuture that completes when installation is done.
      * If installation fails, the future is reset to null to allow retry.
+     *
+     * @param pathManager Path manager
+     * @param serverStatusCallback Status callback
+     * @param progressMonitor Progress monitor (never null, use ProgressMonitor.none() if not available)
      */
     public CompletableFuture<InstallResult> ensureInstalled(PathManager pathManager,
-                                                            Consumer<ServerStatus> serverStatusCallback) {
+                                                            Consumer<ServerStatus> serverStatusCallback,
+                                                            ProgressMonitor progressMonitor) {
+        // progressMonitor must never be null - use ProgressMonitor.none() instead
+        // If null, let it fail with NullPointerException to catch bugs early
+
         ServerInstaller installer = getInstaller();
         if (installer == null) {
             // No installer - server is assumed to be already available
@@ -199,9 +212,22 @@ public abstract class ServerConfigBase implements ServerConfig {
             synchronized (this) {
                 future = installationFuture;
                 if (future == null) {
-                    // Create and start installation (only once)
-                    TraceProgressMonitor progress = new TraceProgressMonitor(traceCollector);
-                    setInstallProgress(progress);
+                    // FIRST caller - create SharedProgressMonitor for this installation
+                    sharedInstallProgress = new SharedProgressMonitor();
+
+                    // Create task ID for this installation
+                    String taskId = "install-" + serverId;
+                    sharedInstallProgress.startTask(taskId);
+
+                    // Add TraceProgressMonitor for Admin UI
+                    TraceProgressMonitor traceProgress = new TraceProgressMonitor(traceCollector);
+                    setInstallProgress(traceProgress);
+                    sharedInstallProgress.addListener(traceProgress);
+
+                    // Add progress monitor from parameter (never null)
+                    if (progressMonitor != ProgressMonitor.none()) {
+                        sharedInstallProgress.addListener(progressMonitor);
+                    }
 
                     // Map InstallationStatus to ServerStatus
                     Consumer<InstallationStatus> installStatusCallback = installStatus -> {
@@ -215,11 +241,14 @@ public abstract class ServerConfigBase implements ServerConfig {
                         }
                     };
 
-                    InstallerContext context = new InstallerContext(this, progress, installStatusCallback);
+                    InstallerContext context = new InstallerContext(this, sharedInstallProgress, installStatusCallback);
                     context.setVariable("USER_HOME", pathManager.getMcpLangToolsRoot().toString());
 
                     future = installer.ensureInstalled(context)
                             .whenComplete((result, error) -> {
+                                sharedInstallProgress.endTask(taskId);
+                                sharedInstallProgress = null;
+
                                 // Reset on failure to allow retry
                                 if (error != null) {
                                     synchronized (this) {
@@ -229,6 +258,11 @@ public abstract class ServerConfigBase implements ServerConfig {
                             });
                     installationFuture = future;
                 }
+            }
+        } else if (sharedInstallProgress != null) {
+            // SUBSEQUENT callers - register as listener to get installation progress
+            if (progressMonitor != ProgressMonitor.none()) {
+                sharedInstallProgress.addListener(progressMonitor);
             }
         }
         return future;

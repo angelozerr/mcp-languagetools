@@ -83,34 +83,91 @@ public class JavaDebugServer extends DapServer {
             Map<String, Object> launchConfig,
             String sessionId) {
 
-        LOG.infof("Enriching launch configuration for Java");
+        String request = (String) launchConfig.get("request");
+        LOG.infof("Enriching configuration for Java, request type: %s", request);
 
         // Resolve classpath, java executable, etc. via JDTLS commands
         return resolveLaunchConfiguration(launchConfig, sessionId)
                 .thenCompose(enrichedConfig -> {
-                    // Start debug session (loads java-debug bundle in JDTLS and returns port)
-                    return startDebugSession(sessionId)
-                            .thenCompose(port -> {
-                                String workspaceRootUri = getWorkspace().getNormalizedUri();
+                    // For "attach" request, connect directly to the target application
+                    // For "launch" request, start debug session in JDTLS first
+                    if ("attach".equals(request)) {
+                        return handleAttachRequest(enrichedConfig, sessionId);
+                    } else {
+                        return handleLaunchRequest(enrichedConfig, sessionId);
+                    }
+                });
+    }
 
+    /**
+     * Handle "launch" request: start debug session in JDTLS, then connect to it.
+     */
+    private CompletableFuture<Map<String, Object>> handleLaunchRequest(
+            Map<String, Object> enrichedConfig,
+            String sessionId) {
+
+        // Start debug session (loads java-debug bundle in JDTLS and returns port)
+        return startDebugSession(sessionId)
+                .thenCompose(port -> {
+                    String workspaceRootUri = getWorkspace().getNormalizedUri();
+
+                    getTraceCollector().addTrace(
+                            workspaceRootUri,
+                            sessionId,
+                            TraceCollector.MessageDirection.CLIENT_TO_SERVER,
+                            String.format("Connecting to DAP server on port %d...", port)
+                    );
+
+                    // Use DapServer's connectToSocket() - much simpler!
+                    return connectToSocket("localhost", port)
+                            .thenApply(v -> {
                                 getTraceCollector().addTrace(
                                         workspaceRootUri,
                                         sessionId,
-                                        TraceCollector.MessageDirection.CLIENT_TO_SERVER,
-                                        String.format("Connecting to DAP server on port %d...", port)
+                                        TraceCollector.MessageDirection.SERVER_TO_CLIENT,
+                                        String.format("Connected to DAP server on port %d", port)
                                 );
+                                return enrichedConfig;
+                            });
+                });
+    }
 
-                                // Use DapServer's connectToSocket() - much simpler!
-                                return connectToSocket("localhost", port)
-                                        .thenApply(v -> {
-                                            getTraceCollector().addTrace(
-                                                    workspaceRootUri,
-                                                    sessionId,
-                                                    TraceCollector.MessageDirection.SERVER_TO_CLIENT,
-                                                    String.format("Connected to DAP server on port %d", port)
-                                            );
-                                            return enrichedConfig;
-                                        });
+    /**
+     * Handle "attach" request: start debug session in JDTLS to load java-debug bundle,
+     * then the DAP session will use the hostName/port from the config to attach.
+     */
+    private CompletableFuture<Map<String, Object>> handleAttachRequest(
+            Map<String, Object> enrichedConfig,
+            String sessionId) {
+
+        String workspaceRootUri = getWorkspace().getNormalizedUri();
+
+        // For attach, we still need to start the debug session in JDTLS
+        // to load the java-debug bundle, but we won't use its port.
+        // Instead, the DAP protocol will use hostName/port from enrichedConfig
+        // to attach to the target application.
+        return startDebugSession(sessionId)
+                .thenCompose(jdtlsPort -> {
+                    getTraceCollector().addTrace(
+                            workspaceRootUri,
+                            sessionId,
+                            TraceCollector.MessageDirection.CLIENT_TO_SERVER,
+                            String.format("Connecting to DAP server on port %d (JDTLS debug adapter)...", jdtlsPort)
+                    );
+
+                    // Connect to JDTLS debug adapter
+                    return connectToSocket("localhost", jdtlsPort)
+                            .thenApply(v -> {
+                                getTraceCollector().addTrace(
+                                        workspaceRootUri,
+                                        sessionId,
+                                        TraceCollector.MessageDirection.SERVER_TO_CLIENT,
+                                        String.format("Connected to DAP server on port %d. Will attach to target at %s:%s",
+                                                jdtlsPort,
+                                                enrichedConfig.get("hostName"),
+                                                enrichedConfig.get("port"))
+                                );
+                                return enrichedConfig;
                             });
                 });
     }
@@ -127,9 +184,25 @@ public class JavaDebugServer extends DapServer {
             Map<String, Object> launchConfig,
             String sessionId) {
 
+        String request = (String) launchConfig.get("request");
+        String workspaceRootUri = getWorkspace().getNormalizedUri();
+
+        LOG.infof("Resolving configuration for request type: %s", request);
+
+        // Handle "attach" request type
+        if ("attach".equals(request)) {
+            return resolveAttachConfiguration(launchConfig, sessionId);
+        }
+
+        // Handle "launch" request type
+        if (!"launch".equals(request)) {
+            String error = String.format("Request type \"%s\" is not supported. Only \"launch\" and \"attach\" are supported.", request);
+            LOG.error(error);
+            return CompletableFuture.failedFuture(new IllegalArgumentException(error));
+        }
+
         String mainClass = (String) launchConfig.get("mainClass");
         String projectName = (String) launchConfig.get("projectName");
-        String workspaceRootUri = getWorkspace().getNormalizedUri();
 
         LOG.infof("Resolving launch configuration for mainClass=%s, projectName=%s", mainClass, projectName);
 
@@ -175,6 +248,87 @@ public class JavaDebugServer extends DapServer {
                     );
                     throw new RuntimeException(error, ex);
                 });
+    }
+
+    /**
+     * Resolve attach configuration.
+     * Validates that either hostName/port or processId is configured.
+     *
+     * @param launchConfig The initial attach configuration
+     * @param sessionId The session ID for tracing
+     * @return The attach configuration (validated but not enriched)
+     */
+    private CompletableFuture<Map<String, Object>> resolveAttachConfiguration(
+            Map<String, Object> launchConfig,
+            String sessionId) {
+
+        String workspaceRootUri = getWorkspace().getNormalizedUri();
+        String hostName = (String) launchConfig.get("hostName");
+        Object portObj = launchConfig.get("port");
+        Object processIdObj = launchConfig.get("processId");
+
+        LOG.infof("Resolving attach configuration: hostName=%s, port=%s, processId=%s",
+                hostName, portObj, processIdObj);
+
+        // Check if hostName and port are configured
+        if (hostName != null && !hostName.isEmpty() && portObj != null) {
+            // Convert port to integer if needed
+            int port;
+            if (portObj instanceof Number) {
+                port = ((Number) portObj).intValue();
+            } else if (portObj instanceof String) {
+                try {
+                    port = Integer.parseInt((String) portObj);
+                } catch (NumberFormatException e) {
+                    String error = String.format("Invalid port value: %s", portObj);
+                    LOG.error(error);
+                    return CompletableFuture.failedFuture(new IllegalArgumentException(error));
+                }
+            } else {
+                String error = String.format("Port must be a number, got: %s", portObj.getClass().getSimpleName());
+                LOG.error(error);
+                return CompletableFuture.failedFuture(new IllegalArgumentException(error));
+            }
+
+            launchConfig.put("port", port);
+            launchConfig.remove("processId"); // Ensure processId is not set
+            LOG.infof("Attach configuration validated: hostName=%s, port=%d", hostName, port);
+
+            getTraceCollector().addTrace(
+                    workspaceRootUri,
+                    sessionId,
+                    TraceCollector.MessageDirection.SERVER_TO_CLIENT,
+                    String.format("Attach config validated: hostName=%s, port=%d", hostName, port)
+            );
+
+            return CompletableFuture.completedFuture(launchConfig);
+        }
+
+        // Check if processId is configured (not supported in this implementation)
+        if (processIdObj != null) {
+            // Note: processId resolution would require additional JDTLS support
+            // For now, we return an error
+            String error = "Attach by processId is not yet supported. Please use hostName and port.";
+            LOG.error(error);
+            getTraceCollector().addTrace(
+                    workspaceRootUri,
+                    sessionId,
+                    TraceCollector.MessageDirection.SERVER_TO_CLIENT,
+                    String.format("ERROR: %s", error)
+            );
+            return CompletableFuture.failedFuture(new UnsupportedOperationException(error));
+        }
+
+        // Neither hostName/port nor processId is configured
+        String error = "Please specify the hostName/port directly, or provide the processId of the remote debuggee in the launch configuration.";
+        LOG.error(error);
+        getTraceCollector().addTrace(
+                workspaceRootUri,
+                sessionId,
+                TraceCollector.MessageDirection.SERVER_TO_CLIENT,
+                String.format("ERROR: %s", error)
+        );
+        return CompletableFuture.failedFuture(new IllegalArgumentException(error));
     }
 
     /**
