@@ -5,6 +5,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.redhat.mcp.languagetools.lsp.Contributes;
 import com.redhat.mcp.languagetools.lsp.server.LspServer;
+import com.redhat.mcp.languagetools.lsp.server.LspServerConfig;
 import com.redhat.mcp.languagetools.server.ServerConfigBase;
 import com.redhat.mcp.languagetools.workspace.Workspace;
 import org.eclipse.lsp4j.jsonrpc.ResponseErrorException;
@@ -95,24 +96,13 @@ public class BindEndpointSupport {
             LOG.infof("[%s] Routing bindRequest %s to server %s as %s (mode: %s)",
                 serverId, method, targetServerId, targetMethod, bindMode.getValue());
 
-            // Look up the target server via workspace
-            LspServer targetServer = workspace.getLspServer(targetServerId);
-            if (targetServer == null) {
-                LOG.warnf("Target server '%s' not found for bindRequest: %s", targetServerId, method);
-                return CompletableFuture.failedFuture(
-                        new IllegalStateException("Target server not found: " + targetServerId)
-                );
-            }
-
-            // Wait for target server to be ready before routing (important for JDT.LS)
-            LOG.debugf("Routing request %s to server %s (mode: %s), waiting for server to be ready...",
-                    targetMethod, targetServerId, bindMode.getValue());
-
-            return targetServer.waitUntilReady()
-                    .thenCompose(v -> {
+            // Ensure target server is started (handles external instances, installation, etc.)
+            // Returns the ready LspServer instance
+            return workspace.ensureLspServerReady(targetServerId)
+                    .thenCompose(targetServer -> {
                         LOG.debugf("Server %s is ready, routing request %s", targetServerId, targetMethod);
 
-                        if (BindMode.DIRECT.equals(bindMode)) {
+                        if (BindMode.DIRECT == bindMode) {
                             // Direct JSON-RPC request
                             return targetServer.sendRequest(targetMethod, params);
                         } else {

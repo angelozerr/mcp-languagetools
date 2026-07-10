@@ -181,7 +181,7 @@ public class LspAdminResource {
                 return Response.status(404).entity(new ErrorResponse("Workspace not found")).build();
             }
 
-            workspace.restartLspServer(serverId).join();
+            workspace.restartLspServer(serverId);
 
             return Response.ok().entity(new StatusResponse("restarted")).build();
         } catch (Exception e) {

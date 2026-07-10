@@ -117,28 +117,27 @@ public class Workspace {
 
         LspServer oldServer = getLspServer(serverId);
 
-        return CompletableFuture.runAsync(() -> {
-            try {
-                // Shutdown old server if it exists and is not already stopped
-                if (oldServer != null && oldServer.getStatus() != ServerStatus.STOPPED) {
-                    oldServer.shutdown().join();
-                }
+        // Shutdown old server if it exists
+        CompletableFuture<Void> shutdownFuture;
+        if (oldServer != null && oldServer.getStatus() != ServerStatus.STOPPED) {
+            shutdownFuture = oldServer.shutdown();
+        } else {
+            shutdownFuture = CompletableFuture.completedFuture(null);
+        }
 
-                // Create new server instance using factory
-                LspServer newServer = createLspServer(serverConfig);
-                lspServers.put(serverId, newServer);
+        return shutdownFuture.thenCompose(v -> {
+            // Create new server instance using factory
+            LspServer newServer = createLspServer(serverConfig);
+            lspServers.put(serverId, newServer);
 
-                // Start and initialize (will detect IDE instance)
-                newServer.start()
-                        .thenCompose(v -> newServer.initialize())
-                        .join();
-
-                LOG.infof("Restarted LSP server '%s' for workspace: %s", serverId, rootUri);
-
-            } catch (Exception e) {
-                LOG.errorf(e, "Failed to restart LSP server '%s'", serverId);
-                throw new RuntimeException("Failed to restart server: " + e.getMessage(), e);
-            }
+            // Start and initialize (will detect IDE instance)
+            return newServer.start()
+                    .thenCompose(initV -> newServer.initialize())
+                    .thenRun(() -> LOG.infof("Restarted LSP server '%s' for workspace: %s", serverId, rootUri))
+                    .exceptionally(ex -> {
+                        LOG.errorf(ex, "Failed to restart LSP server '%s'", serverId);
+                        throw new RuntimeException("Failed to restart server: " + ex.getMessage(), ex);
+                    });
         });
     }
 
