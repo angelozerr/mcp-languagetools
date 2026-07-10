@@ -1,16 +1,15 @@
 package com.redhat.mcp.languagetools.lsp.tools;
 
+import com.redhat.mcp.languagetools.Application;
+import com.redhat.mcp.languagetools.lsp.annotations.RequireDidOpen;
+import com.redhat.mcp.languagetools.tools.ToolArgDescriptions;
+import com.redhat.mcp.languagetools.workspace.Workspace;
 import io.quarkiverse.mcp.server.Tool;
 import io.quarkiverse.mcp.server.ToolArg;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.lsp4j.Diagnostic;
 import org.jboss.logging.Logger;
-
-import com.redhat.mcp.languagetools.lsp.annotations.RequireDidOpen;
-import com.redhat.mcp.languagetools.tools.ToolArgDescriptions;
-import com.redhat.mcp.languagetools.workspace.Workspace;
-import com.redhat.mcp.languagetools.Application;
 
 import java.io.File;
 import java.net.URI;
@@ -28,10 +27,12 @@ public class DiagnosticsTools {
     @Inject
     Application application;
 
-    @Tool(description = "Get diagnostics (errors, warnings) for a file from all language servers. " +
-                        "The workspace is auto-detected and initialized if needed. " +
-                        "The file will be automatically opened if needed to get fresh diagnostics. " +
-                        "Example: getDiagnostics(cwd='/home/user/projects/my-app', fileUri='file:///home/user/projects/my-app/src/Main.java')")
+    @Tool(
+            name = "get_diagnostics",
+            description = "Get diagnostics (errors, warnings) for a file from all language servers. " +
+            "The workspace is auto-detected and initialized if needed. " +
+            "The file will be automatically opened if needed to get fresh diagnostics. " +
+            "Example: getDiagnostics(cwd='/home/user/projects/my-app', fileUri='file:///home/user/projects/my-app/src/Main.java')")
     @RequireDidOpen(uriParam = "fileUri")
     public String getDiagnostics(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
@@ -84,9 +85,11 @@ public class DiagnosticsTools {
         }
     }
 
-    @Tool(description = "Get all diagnostics from all files in a workspace. " +
-                        "The workspace is auto-detected and initialized if needed. " +
-                        "Example: getAllDiagnostics(cwd='/home/user/projects/my-app')")
+    @Tool(
+            name="get_all_diagnostics",
+            description = "Get all diagnostics from all files in a workspace. " +
+            "The workspace is auto-detected and initialized if needed. " +
+            "Example: get_all_diagnostics(cwd='/home/user/projects/my-app')")
     public String getAllDiagnostics(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd) {
         try {

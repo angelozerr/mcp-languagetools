@@ -202,7 +202,7 @@ public class Workspace {
      * - Starting and initializing the server
      *
      * @param serverId The server ID to ensure is started
-     * @return CompletableFuture<LspServer> that completes with the ready server instance
+     * @return CompletableFuture<LspServer> that completes when server is started (not necessarily ready)
      */
     public CompletableFuture<LspServer> ensureLspServerStarted(String serverId) {
         // Already running?
@@ -210,7 +210,7 @@ public class Workspace {
             LspServer server = getLspServer(serverId);
             if (server != null && server.getStatus() != ServerStatus.STOPPED) {
                 LOG.debugf("Server '%s' already running in workspace: %s", serverId, rootUri);
-                return server.waitUntilReady().thenApply(v -> server);
+                return CompletableFuture.completedFuture(server);
             }
         }
 
@@ -239,7 +239,6 @@ public class Workspace {
             if (server != null) {
                 return server.start()
                     .thenCompose(v -> server.initialize())
-                    .thenCompose(v -> server.waitUntilReady())
                     .thenApply(v -> server)
                     .exceptionally(ex -> {
                         LOG.errorf(ex, "Failed to connect to external %s", config.getName());
@@ -250,15 +249,29 @@ public class Workspace {
 
         // No external instance - start our own managed server (handles installation automatically)
         return startManagedLspServer(serverId)
-            .thenCompose(v -> {
+            .thenApply(v -> {
                 LspServer server = getLspServer(serverId);
                 if (server == null) {
-                    return CompletableFuture.failedFuture(
-                        new IllegalStateException("Server failed to start: " + serverId)
-                    );
+                    throw new IllegalStateException("Server failed to start: " + serverId);
                 }
-                return server.waitUntilReady().thenApply(v2 -> server);
+                return server;
             });
+    }
+
+    /**
+     * Ensure an LSP server is started and ready in this workspace.
+     * This method calls ensureLspServerStarted() and waits until the server is ready.
+     * Handles:
+     * - Checking for external instances (launched by IDE)
+     * - Installing if needed
+     * - Starting, initializing and waiting for the server to be ready
+     *
+     * @param serverId The server ID to ensure is ready
+     * @return CompletableFuture<LspServer> that completes when server is ready
+     */
+    public CompletableFuture<LspServer> ensureLspServerReady(String serverId) {
+        return ensureLspServerStarted(serverId)
+            .thenCompose(server -> server.waitUntilReady().thenApply(v -> server));
     }
 
     /**

@@ -30,7 +30,7 @@
                             and triggers LSP server initialization.
                         </div>
                         <div class="empty-workspaces-hint">
-                            💡 Try calling: getDiagnostics(cwd: "/path/to/project", fileUri: "file://...")
+                            💡 Try calling: get_diagnostics(cwd: "/path/to/project", fileUri: "file://...")
                         </div>
                     </div>
                 `;
