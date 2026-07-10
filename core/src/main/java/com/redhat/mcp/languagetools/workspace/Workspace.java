@@ -95,11 +95,7 @@ public class Workspace {
      * @param config           Server configuration
      */
     public void addLspServer(LspServerConfig config) {
-        // Set trace collector for installation support
-        if (config.getTraceCollector() == null) {
-            // Create a TraceCollector wrapper around LspTraceCollector
-            config.setTraceCollector(new LspTraceCollectorWrapper(lspTraceCollector, rootUri.toString(), config.getServerId()));
-        }
+        // TraceCollector is now configured in createLspServer()
         createLspServer(config);
         LOG.infof("Added LSP server '%s' to workspace: %s", config.getServerId(), rootUri);
     }
@@ -458,6 +454,12 @@ public class Workspace {
     }
 
     private LspServer createLspServer(LspServerConfig serverConfig) {
+        // Set trace collector for installation and LSP communication support
+        if (serverConfig.getTraceCollector() == null) {
+            // Create a TraceCollector wrapper around LspTraceCollector
+            serverConfig.setTraceCollector(new LspTraceCollectorWrapper(lspTraceCollector, rootUri.toString(), serverConfig.getServerId()));
+        }
+
         // Create new server instance using factory
         LspServer newServer = LspServerFactoryRegistry.getInstance().createServer(serverConfig, this);
         lspServers.put(newServer.getId(), newServer);

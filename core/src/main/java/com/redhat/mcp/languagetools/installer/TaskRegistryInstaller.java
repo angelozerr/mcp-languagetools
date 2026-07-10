@@ -27,7 +27,6 @@ public class TaskRegistryInstaller implements ServerInstaller {
     private final InstallerTaskRegistry registry;
     private final Gson gson;
     private final AtomicReference<InstallationStatus> status = new AtomicReference<>(InstallationStatus.NOT_INSTALLED);
-    private volatile TraceProgressIndicator progressIndicator;
 
     public TaskRegistryInstaller(ServerConfigBase config) {
         this.config = config;
@@ -111,7 +110,7 @@ public class TaskRegistryInstaller implements ServerInstaller {
 
                 return new InstallResult(context.getInstallDir(), command, InstallationStatus.INSTALLED);
 
-            } catch (TraceProgressIndicator.CancellationException e) {
+            } catch (java.util.concurrent.CancellationException e) {
                 setStatus(context, InstallationStatus.STOPPED);
                 TraceCollector trace = config.getTraceCollector();
                 if (trace != null) {
@@ -142,9 +141,7 @@ public class TaskRegistryInstaller implements ServerInstaller {
 
     @Override
     public void stop() {
-        if (progressIndicator != null) {
-            progressIndicator.cancel();
-        }
+        // Cancellation is handled via InstallerContext.checkCanceled()
         status.set(InstallationStatus.STOPPED);
     }
 

@@ -37,8 +37,8 @@ public abstract class ServerConfigBase implements ServerConfig {
     // Lazy-loaded installer instance
     private ServerInstaller installer;
 
-    // Install progress indicator (set when installation starts)
-    private TraceProgressIndicator installProgress;
+    // Install progress monitor (set when installation starts)
+    private TraceProgressMonitor installProgress;
 
     // Installation state - shared across all workspaces
     private volatile CompletableFuture<InstallResult> installationFuture;
@@ -166,16 +166,16 @@ public abstract class ServerConfigBase implements ServerConfig {
     }
 
     /**
-     * Gets the install progress indicator (used to show visual progress bar in UI).
+     * Gets the install progress monitor (used to show visual progress bar in UI).
      */
-    public TraceProgressIndicator getInstallProgress() {
+    public TraceProgressMonitor getInstallProgress() {
         return installProgress;
     }
 
     /**
-     * Sets the install progress indicator (called when installation starts).
+     * Sets the install progress monitor (called when installation starts).
      */
-    public void setInstallProgress(TraceProgressIndicator installProgress) {
+    public void setInstallProgress(TraceProgressMonitor installProgress) {
         this.installProgress = installProgress;
     }
 
@@ -194,11 +194,13 @@ public abstract class ServerConfigBase implements ServerConfig {
         }
 
         // Double-checked locking pattern
-        if (installationFuture == null) {
+        CompletableFuture<InstallResult> future = installationFuture;
+        if (future == null) {
             synchronized (this) {
-                if (installationFuture == null) {
-                    // Create and start installation
-                    TraceProgressIndicator progress = new TraceProgressIndicator(traceCollector);
+                future = installationFuture;
+                if (future == null) {
+                    // Create and start installation (only once)
+                    TraceProgressMonitor progress = new TraceProgressMonitor(traceCollector);
                     setInstallProgress(progress);
 
                     // Map InstallationStatus to ServerStatus
@@ -216,7 +218,7 @@ public abstract class ServerConfigBase implements ServerConfig {
                     InstallerContext context = new InstallerContext(this, progress, installStatusCallback);
                     context.setVariable("USER_HOME", pathManager.getMcpLangToolsRoot().toString());
 
-                    installationFuture = installer.ensureInstalled(context)
+                    future = installer.ensureInstalled(context)
                             .whenComplete((result, error) -> {
                                 // Reset on failure to allow retry
                                 if (error != null) {
@@ -225,10 +227,11 @@ public abstract class ServerConfigBase implements ServerConfig {
                                     }
                                 }
                             });
+                    installationFuture = future;
                 }
             }
         }
-        return installationFuture;
+        return future;
     }
 
 }

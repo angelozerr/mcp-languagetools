@@ -3,8 +3,11 @@ package com.redhat.mcp.languagetools.dap.tools;
 import com.redhat.mcp.languagetools.Application;
 import com.redhat.mcp.languagetools.dap.session.DapSession;
 import com.redhat.mcp.languagetools.dap.session.DapSessionManager;
+import com.redhat.mcp.languagetools.progress.McpProgressMonitor;
+import com.redhat.mcp.languagetools.progress.ProgressMonitor;
 import com.redhat.mcp.languagetools.tools.ToolArgDescriptions;
 import io.quarkiverse.mcp.server.Cancellation;
+import io.quarkiverse.mcp.server.Progress;
 import io.quarkiverse.mcp.server.Tool;
 import io.quarkiverse.mcp.server.ToolArg;
 import jakarta.inject.Inject;
@@ -13,6 +16,7 @@ import org.eclipse.lsp4j.debug.*;
 import org.eclipse.lsp4j.debug.Thread;
 
 import java.net.URI;
+import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
@@ -155,9 +159,9 @@ public class DapDebugTools {
             @ToolArg(description = "Optional breakpoints to set before starting [{file, line, condition?}]") List<Map<String, Object>> breakpoints,
             @ToolArg(description = "Optional session name (auto-generated if not provided)") String sessionName,
             @ToolArg(description = "Debug mode: true=debug with breakpoints, false=run without debugging (default)") Boolean debugMode,
-            Cancellation cancellation) {
-        // CRITICAL: Use .handle() instead of .exceptionally().join() to avoid re-throwing
-        return startDebugging(debuggerId, cwd, configuration, breakpoints, sessionName, debugMode, cancellation)
+            Cancellation cancellation,
+            Progress progress) {
+        return startDebugging(debuggerId, cwd, configuration, breakpoints, sessionName, debugMode, cancellation, progress)
                 .handle((result, ex) -> {
                     if (ex != null) {
                         // Error case - return error result
@@ -180,7 +184,10 @@ public class DapDebugTools {
             List<Map<String, Object>> breakpoints,
             String sessionName,
             Boolean debugMode,
-            Cancellation cancellation) {
+            Cancellation cancellation,
+            Progress progress) {
+
+        ProgressMonitor progressMonitor = new McpProgressMonitor(progress, cancellation);
 
         // Convert cwd to URI (handle both file:// URIs and Windows/Unix paths)
         URI uri;
@@ -188,7 +195,7 @@ public class DapDebugTools {
             uri = URI.create(cwd);
         } else {
             // Convert path to URI
-            java.nio.file.Path path = java.nio.file.Paths.get(cwd);
+            Path path = java.nio.file.Paths.get(cwd);
             uri = path.toUri();
         }
 
@@ -226,14 +233,14 @@ public class DapDebugTools {
                         // Attach mode
                         Integer processId = (Integer) configuration.get("processId");
                         if (processId != null) {
-                            return session.attach(processId);
+                            return session.attach(processId, progressMonitor);
                         } else {
                             // Attach via port/host
-                            return session.launch(configuration, actualDebugMode, DapSession.SessionActor.AI_AGENT);
+                            return session.launch(configuration, actualDebugMode, DapSession.SessionActor.AI_AGENT, progressMonitor);
                         }
                     } else {
                         // Launch mode (default)
-                        return session.launch(configuration, actualDebugMode, DapSession.SessionActor.AI_AGENT);
+                        return session.launch(configuration, actualDebugMode, DapSession.SessionActor.AI_AGENT, progressMonitor);
                     }
                 }).thenApply(result -> {
                     // Add sessionId to result

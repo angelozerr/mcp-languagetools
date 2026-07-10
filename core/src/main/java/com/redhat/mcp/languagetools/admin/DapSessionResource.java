@@ -1,11 +1,11 @@
 package com.redhat.mcp.languagetools.admin;
 
+import com.redhat.mcp.languagetools.Application;
 import com.redhat.mcp.languagetools.admin.dto.CreateDapSessionRequest;
 import com.redhat.mcp.languagetools.admin.dto.ErrorResponse;
 import com.redhat.mcp.languagetools.dap.server.DapServerConfig;
 import com.redhat.mcp.languagetools.dap.session.DapSession;
 import com.redhat.mcp.languagetools.dap.session.DapSessionManager;
-import com.redhat.mcp.languagetools.Application;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
@@ -106,13 +106,14 @@ public class DapSessionResource {
             }
 
             // Launch the session asynchronously (don't block HTTP thread!)
-            session.launch(launchConfig, debugMode, DapSession.SessionActor.MANUAL).whenComplete((result, error) -> {
-                if (error != null) {
-                    LOG.errorf(error, "DAP session launch failed: %s", sessionId);
-                } else {
-                    LOG.infof("DAP session launched successfully: %s", sessionId);
-                }
-            });
+            session.launch(launchConfig, debugMode, DapSession.SessionActor.MANUAL)
+                    .whenComplete((result, error) -> {
+                        if (error != null) {
+                            LOG.errorf(error, "DAP session launch failed: %s", sessionId);
+                        } else {
+                            LOG.infof("DAP session launched successfully: %s", sessionId);
+                        }
+                    });
 
             // Return immediately - client will get status updates via WebSocket
             return Response.accepted(Map.of(
