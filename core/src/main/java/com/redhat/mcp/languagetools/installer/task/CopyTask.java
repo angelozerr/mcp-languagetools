@@ -43,8 +43,7 @@ public class CopyTask implements InstallerTask {
             trace.info("Copying from: " + resolvedSource + " to: " + resolvedDestination);
         }
 
-        context.getProgress().setText("Copying " + name);
-        context.getProgress().setFraction(0.0);
+        context.getProgress().reportProgress("Copying " + name);
 
         try {
             Path destPath = Paths.get(resolvedDestination);
@@ -65,7 +64,7 @@ public class CopyTask implements InstallerTask {
                 Files.copy(is, destPath, StandardCopyOption.REPLACE_EXISTING);
             }
 
-            context.getProgress().setFraction(1.0);
+            context.getProgress().reportProgress(100, "Copy complete");
 
             if (trace != null) {
                 trace.info("Copied to: " + resolvedDestination);

@@ -1,6 +1,6 @@
 package com.redhat.mcp.languagetools.installer.download;
 
-import com.redhat.mcp.languagetools.installer.ProgressIndicator;
+import com.redhat.mcp.languagetools.progress.ProgressMonitor;
 import org.jboss.logging.Logger;
 
 import java.io.*;
@@ -34,13 +34,13 @@ public class DownloadUtils {
      *
      * @param downloadUrl the URL to download from (must be a valid HTTP or HTTPS URL).
      * @param downloadedFile the target path where the file will be saved.
-     * @param progressIndicator an optional progress indicator to display download progress.
+     * @param progressMonitor an optional progress monitor to display download progress.
      * @return download result with content length
      * @throws IOException if the download fails or the file cannot be written.
      */
     public static DownloadResult download(String downloadUrl,
                                           Path downloadedFile,
-                                          ProgressIndicator progressIndicator) throws IOException {
+                                          ProgressMonitor progressMonitor) throws IOException {
         try {
             HttpClient client = HttpClient.newHttpClient();
             HttpRequest request = HttpRequest.newBuilder()
@@ -69,9 +69,9 @@ public class DownloadUtils {
             // Get content length for progress tracking
             long contentLength = response.headers().firstValueAsLong("Content-Length").orElse(-1);
 
-            // Notify progress indicator about content length before starting
-            if (progressIndicator != null && progressIndicator instanceof ContentLengthAware) {
-                ((ContentLengthAware) progressIndicator).setContentLength(contentLength);
+            // Notify progress monitor about content length before starting
+            if (progressMonitor instanceof ContentLengthAware) {
+                ((ContentLengthAware) progressMonitor).setContentLength(contentLength);
             }
 
             // Ensure parent directory exists
@@ -86,16 +86,14 @@ public class DownloadUtils {
                 int bytesRead;
 
                 while ((bytesRead = inputStream.read(buffer)) != -1) {
-                    if (progressIndicator != null) {
-                        progressIndicator.checkCanceled();
-                    }
+                    progressMonitor.checkCancelled();
                     fileOut.write(buffer, 0, bytesRead);
                     downloaded += bytesRead;
 
                     // Update progress
-                    if (progressIndicator != null && contentLength > 0) {
+                    if (contentLength > 0) {
                         double fraction = (double) downloaded / contentLength;
-                        progressIndicator.setFraction(fraction);
+                        progressMonitor.reportProgress(fraction * 100, "Downloading...");
                     }
                 }
             }

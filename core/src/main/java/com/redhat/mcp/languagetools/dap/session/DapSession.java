@@ -4,9 +4,9 @@ import com.redhat.mcp.languagetools.dap.client.DapClient;
 import com.redhat.mcp.languagetools.dap.client.DapEventListener;
 import com.redhat.mcp.languagetools.dap.server.DapServer;
 import com.redhat.mcp.languagetools.dap.server.DapServerConfig;
-import com.redhat.mcp.languagetools.dap.server.DapServerFactory;
 import com.redhat.mcp.languagetools.dap.server.DapServerFactoryRegistry;
 import com.redhat.mcp.languagetools.dap.trace.DapTraceCollector;
+import com.redhat.mcp.languagetools.progress.ProgressMonitor;
 import com.redhat.mcp.languagetools.server.ServerStatus;
 import com.redhat.mcp.languagetools.trace.TraceCollector;
 import com.redhat.mcp.languagetools.workspace.Workspace;
@@ -19,13 +19,11 @@ import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 /**
  * Represents a single debug session.
  * One session = one program being debugged via DAP.
- *
+ * <p>
  * Lifecycle:
  * 1. create() - Create session with language/name
  * 2. setBreakpoint() - Set breakpoints before launch
@@ -141,9 +139,9 @@ public class DapSession implements DapEventListener {
         if (serverConfig.getTraceCollector() instanceof DapTraceCollectorWrapper) {
             // Replace with a new wrapper that uses the session's sessionId
             serverConfig.setTraceCollector(new DapTraceCollectorWrapper(
-                workspace.getApplication().getDapTraceCollector(),
-                workspace.getNormalizedUri(),
-                sessionId
+                    workspace.getApplication().getDapTraceCollector(),
+                    workspace.getNormalizedUri(),
+                    sessionId
             ));
         }
 
@@ -162,7 +160,7 @@ public class DapSession implements DapEventListener {
      *
      * @param configuration the DAP configuration for the child session
      */
-    private CompletableFuture<com.redhat.mcp.languagetools.dap.client.DapClient> createChildSession(
+    private CompletableFuture<DapClient> createChildSession(
             Map<String, Object> configuration) {
 
         // Inherit debugMode from parent session
@@ -279,17 +277,17 @@ public class DapSession implements DapEventListener {
         // IMPORTANT: Like lsp4ij, child sessions receive parent's breakpoints
         // by calling sendAllBreakpointsToServer with the child server
         return childClient.connectAndInitialize(
-                childDebugServer,  // Use the child's own debug server proxy
-                configuration,
-                debugMode,
-                this.serverConfig.getServerId(),
-                debugMode ? () -> sendAllBreakpointsToServer(childDebugServer) : null  // Send parent's breakpoints to child server
-            )
-            .thenApply(v -> childClient)
-            .exceptionally(ex -> {
-                LOG.errorf(ex, "Failed to create child debug session");
-                throw new RuntimeException("Failed to create child debug session", ex);
-            });
+                        childDebugServer,  // Use the child's own debug server proxy
+                        configuration,
+                        debugMode,
+                        this.serverConfig.getServerId(),
+                        debugMode ? () -> sendAllBreakpointsToServer(childDebugServer) : null  // Send parent's breakpoints to child server
+                )
+                .thenApply(v -> childClient)
+                .exceptionally(ex -> {
+                    LOG.errorf(ex, "Failed to create child debug session");
+                    throw new RuntimeException("Failed to create child debug session", ex);
+                });
     }
 
     /**
@@ -297,12 +295,12 @@ public class DapSession implements DapEventListener {
      * Propagates ERROR status to the session.
      * Note: DapSessionManager also listens to status changes and fires WebSocket events.
      */
-    private void onServerStatusChanged(com.redhat.mcp.languagetools.server.ServerStatus oldStatus,
-                                       com.redhat.mcp.languagetools.server.ServerStatus newStatus) {
+    private void onServerStatusChanged(ServerStatus oldStatus,
+                                       ServerStatus newStatus) {
         LOG.infof("DAP server status changed for session %s: %s -> %s", sessionId, oldStatus, newStatus);
 
         // Propagate ERROR status to session state
-        if (newStatus == com.redhat.mcp.languagetools.server.ServerStatus.ERROR) {
+        if (newStatus == ServerStatus.ERROR) {
             setState(SessionState.ERROR);
         }
     }
@@ -316,29 +314,29 @@ public class DapSession implements DapEventListener {
     public CompletableFuture<Void> initialize() {
         LOG.infof("Initializing DAP session: %s (%s)", sessionName, sessionId);
         return trackFuture(dapServer.start()
-            .thenAccept(v -> {
-                // Server is now RUNNING, session stays CREATED until launch
-                LOG.infof("DAP session initialized: %s", sessionId);
-                // Event listener will be set in launch() before connectAndInitialize
-            })
-            .exceptionally(ex -> {
-                LOG.errorf(ex, "Failed to initialize DAP session: %s", sessionId);
-                setState(SessionState.ERROR);
+                .thenAccept(v -> {
+                    // Server is now RUNNING, session stays CREATED until launch
+                    LOG.infof("DAP session initialized: %s", sessionId);
+                    // Event listener will be set in launch() before connectAndInitialize
+                })
+                .exceptionally(ex -> {
+                    LOG.errorf(ex, "Failed to initialize DAP session: %s", sessionId);
+                    setState(SessionState.ERROR);
 
-                // Send error to traces
-                traceCollector.addTrace(
-                    workspace.getNormalizedUri(),
-                    sessionId,
-                    TraceCollector.MessageDirection.SERVER_TO_CLIENT,
-                    "❌ Failed to initialize: " + ex.getMessage()
-                );
+                    // Send error to traces
+                    traceCollector.addTrace(
+                            workspace.getNormalizedUri(),
+                            sessionId,
+                            TraceCollector.MessageDirection.SERVER_TO_CLIENT,
+                            "❌ Failed to initialize: " + ex.getMessage()
+                    );
 
-                // Propagate exception instead of returning null
-                if (ex instanceof RuntimeException) {
-                    throw (RuntimeException) ex;
-                }
-                throw new RuntimeException("Failed to initialize DAP session", ex);
-            }));
+                    // Propagate exception instead of returning null
+                    if (ex instanceof RuntimeException) {
+                        throw (RuntimeException) ex;
+                    }
+                    throw new RuntimeException("Failed to initialize DAP session", ex);
+                }));
     }
 
     /**
@@ -349,9 +347,20 @@ public class DapSession implements DapEventListener {
      * @return the same future for chaining
      */
     private <T> CompletableFuture<T> trackFuture(CompletableFuture<T> future) {
+        return trackFuture(future, null);
+    }
+
+    /**
+     * Track a CompletableFuture so it can be cancelled if the session terminates.
+     * Automatically removes the future from tracking when it completes.
+     *
+     * @param future the future to track
+     * @return the same future for chaining
+     */
+    private <T> CompletableFuture<T> trackFuture(CompletableFuture<T> future, ProgressMonitor progressMonitor) {
         pendingRequests.add(future);
         future.whenComplete((result, error) -> pendingRequests.remove(future));
-        return future;
+        return progressMonitor != null ? progressMonitor.executeWithCancellation(future) : future;
     }
 
     /**
@@ -367,7 +376,7 @@ public class DapSession implements DapEventListener {
 
         // Complete all pending futures exceptionally
         RuntimeException sessionTerminated = new RuntimeException(
-            "Session " + sessionId + " terminated - cancelling pending request"
+                "Session " + sessionId + " terminated - cancelling pending request"
         );
 
         pendingRequests.forEach(future -> {
@@ -389,9 +398,30 @@ public class DapSession implements DapEventListener {
      * Launch with full launch configuration (from launch.json).
      *
      * @param launchConfig the launch configuration
-     * @param debugMode true to launch in debug mode (with breakpoints), false to run without debugging
+     * @param debugMode    true to launch in debug mode (with breakpoints), false to run without debugging
      */
-    public CompletableFuture<Map<String, Object>> launch(Map<String, Object> launchConfig, boolean debugMode, SessionActor launchedBy) {
+    public CompletableFuture<Map<String, Object>> launch(Map<String, Object> launchConfig,
+                                                         boolean debugMode,
+                                                         SessionActor launchedBy) {
+        return launch(launchConfig, debugMode, launchedBy, ProgressMonitor.none());
+    }
+    /**
+     * Launch a program for debugging.
+     *
+     * @param scriptPath Path to the script/program to debug
+     * @param args Additional launch arguments
+     */
+    /**
+     * Launch with full launch configuration (from launch.json).
+     *
+     * @param launchConfig    the launch configuration
+     * @param debugMode       true to launch in debug mode (with breakpoints), false to run without debugging
+     * @param progressMonitor the MCP progress + cancellation
+     */
+    public CompletableFuture<Map<String, Object>> launch(Map<String, Object> launchConfig,
+                                                         boolean debugMode,
+                                                         SessionActor launchedBy,
+                                                         ProgressMonitor progressMonitor) {
         LOG.infof("Launching debug session: %s (debugMode=%s, launchedBy=%s) with config: %s", sessionId, debugMode, launchedBy, launchConfig);
 
         // Store launch configuration for later retrieval
@@ -416,12 +446,14 @@ public class DapSession implements DapEventListener {
         // If session was TERMINATED, stop server first to clear vscode-js-debug DI state
         if (state == SessionState.TERMINATED && serverStatus == ServerStatus.RUNNING) {
             LOG.infof("Session TERMINATED but server RUNNING - stopping server to clear state");
-            initFuture = dapServer.stop2().thenCompose(v -> initialize());
+            initFuture = dapServer
+                    .stop2()
+                    .thenCompose(v -> initialize());
         } else if (state == SessionState.CREATED
-            || serverStatus == ServerStatus.NOT_STARTED
-            || serverStatus == ServerStatus.START_FAILED
-            || serverStatus == ServerStatus.ERROR
-            || serverStatus == ServerStatus.STOPPED) {
+                || serverStatus == ServerStatus.NOT_STARTED
+                || serverStatus == ServerStatus.START_FAILED
+                || serverStatus == ServerStatus.ERROR
+                || serverStatus == ServerStatus.STOPPED) {
             LOG.infof("Server not running or in error, starting and initializing...");
             initFuture = initialize();
         } else {
@@ -433,7 +465,7 @@ public class DapSession implements DapEventListener {
             // Verify server is actually running
             if (dapServer.getStatus() != ServerStatus.RUNNING) {
                 return CompletableFuture.failedFuture(new IllegalStateException(
-                    "DAP server not running (status: " + dapServer.getStatus() + ")"));
+                        "DAP server not running (status: " + dapServer.getStatus() + ")"));
             }
 
             // Resolve variables in launch config (like lsp4ij)
@@ -466,21 +498,21 @@ public class DapSession implements DapEventListener {
                         }
 
                         return dapServer.getDapClient().connectAndInitialize(
-                                dapServer.getDebugServer(),
-                                enrichedConfig,
-                                debugMode,  // Pass debugMode to control breakpoint initialization
-                                dapServer.getConfig().getServerId(),
-                                debugMode ? this::sendAllBreakpoints : null  // Send breakpoints if debug mode
-                        )
-                        .thenApply(result -> {
-                            setState(SessionState.RUNNING);
-                            LOG.infof("Debug session fully initialized and running");
-                            Map<String, Object> response = new HashMap<>();
-                            response.put("success", true);
-                            response.put("state", "running");
-                            response.put("message", "Debugging started");
-                            return response;
-                        });
+                                        dapServer.getDebugServer(),
+                                        enrichedConfig,
+                                        debugMode,  // Pass debugMode to control breakpoint initialization
+                                        dapServer.getConfig().getServerId(),
+                                        debugMode ? this::sendAllBreakpoints : null  // Send breakpoints if debug mode
+                                )
+                                .thenApply(result -> {
+                                    setState(SessionState.RUNNING);
+                                    LOG.infof("Debug session fully initialized and running");
+                                    Map<String, Object> response = new HashMap<>();
+                                    response.put("success", true);
+                                    response.put("state", "running");
+                                    response.put("message", "Debugging started");
+                                    return response;
+                                });
                     })
                     .handle((result, ex) -> {
                         if (ex != null) {
@@ -501,7 +533,7 @@ public class DapSession implements DapEventListener {
                                 cause = cause.getCause();
                                 if (cause != null) {
                                     errorTrace.append("Caused by: ").append(cause.getClass().getName())
-                                              .append(": ").append(cause.getMessage()).append("\n");
+                                            .append(": ").append(cause.getMessage()).append("\n");
                                 }
                             }
 
@@ -517,15 +549,17 @@ public class DapSession implements DapEventListener {
                         }
                         return result;
                     });
-        }));
+        }), progressMonitor);
     }
 
     /**
      * Attach to a running process.
      *
-     * @param processId Process ID to attach to
+     * @param processId       Process ID to attach to
+     * @param progressMonitor MCP progress + cancellation
      */
-    public CompletableFuture<Map<String, Object>> attach(int processId) {
+    public CompletableFuture<Map<String, Object>> attach(int processId,
+                                                         ProgressMonitor progressMonitor) {
         LOG.infof("Attaching debug session: %s to process: %d", sessionId, processId);
 
         Map<String, Object> attachArgs = new HashMap<>();
@@ -537,14 +571,14 @@ public class DapSession implements DapEventListener {
         }
 
         return trackFuture(server.attach(attachArgs)
-            .thenApply(v -> {
-                setState(SessionState.RUNNING);
-                return Map.of(
-                    "success", true,
-                    "state", "attached",
-                    "message", "Attached to process " + processId
-                );
-            }));
+                .thenApply(v -> {
+                    setState(SessionState.RUNNING);
+                    return Map.of(
+                            "success", true,
+                            "state", "attached",
+                            "message", "Attached to process " + processId
+                    );
+                }));
     }
 
     /**
@@ -565,59 +599,59 @@ public class DapSession implements DapEventListener {
 
         // DO NOT track terminate() itself - it should never be cancelled
         return CompletableFuture.allOf(childTerminations.toArray(new CompletableFuture[0]))
-            .thenCompose(v -> {
-                // Then terminate this session
-                IDebugProtocolServer server = dapServer.getDebugServer();
-                if (server != null) {
-                    // Like lsp4ij: prefer terminate() over disconnect() for LAUNCH mode
-                    Capabilities capabilities = dapServer.getDapClient().getCapabilities();
-                    boolean supportsTerminateRequest = capabilities != null
-                        && Boolean.TRUE.equals(capabilities.getSupportsTerminateRequest());
-                    boolean isLaunchMode = launchConfiguration != null
-                        && "launch".equals(launchConfiguration.get("request"));
+                .thenCompose(v -> {
+                    // Then terminate this session
+                    IDebugProtocolServer server = dapServer.getDebugServer();
+                    if (server != null) {
+                        // Like lsp4ij: prefer terminate() over disconnect() for LAUNCH mode
+                        Capabilities capabilities = dapServer.getDapClient().getCapabilities();
+                        boolean supportsTerminateRequest = capabilities != null
+                                && Boolean.TRUE.equals(capabilities.getSupportsTerminateRequest());
+                        boolean isLaunchMode = launchConfiguration != null
+                                && "launch".equals(launchConfiguration.get("request"));
 
-                    boolean shouldSendTerminateRequest = !sentTerminateRequest
-                        && supportsTerminateRequest
-                        && isLaunchMode;
+                        boolean shouldSendTerminateRequest = !sentTerminateRequest
+                                && supportsTerminateRequest
+                                && isLaunchMode;
 
-                    if (shouldSendTerminateRequest) {
-                        sentTerminateRequest = true;
-                        server.terminate(new TerminateArguments()).whenComplete((r, e) -> {
-                            if (e != null) {
-                                LOG.debugf("Terminate error: %s", e.getMessage());
-                            }
-                        });
-                    } else {
-                        DisconnectArguments args = new DisconnectArguments();
-                        server.disconnect(args).whenComplete((r, e) -> {
-                            if (e != null) {
-                                LOG.debugf("Disconnect error (expected if server terminated): %s", e.getMessage());
-                            }
-                        });
+                        if (shouldSendTerminateRequest) {
+                            sentTerminateRequest = true;
+                            server.terminate(new TerminateArguments()).whenComplete((r, e) -> {
+                                if (e != null) {
+                                    LOG.debugf("Terminate error: %s", e.getMessage());
+                                }
+                            });
+                        } else {
+                            DisconnectArguments args = new DisconnectArguments();
+                            server.disconnect(args).whenComplete((r, e) -> {
+                                if (e != null) {
+                                    LOG.debugf("Disconnect error (expected if server terminated): %s", e.getMessage());
+                                }
+                            });
+                        }
                     }
-                }
 
-                return dapServer.stop2();
-            })
-            .handle((result, error) -> {
-                // Always mark as terminated and clean up
-                setState(SessionState.TERMINATED);
-                childSessions.clear();
+                    return dapServer.stop2();
+                })
+                .handle((result, error) -> {
+                    // Always mark as terminated and clean up
+                    setState(SessionState.TERMINATED);
+                    childSessions.clear();
 
-                if (error != null) {
-                    LOG.errorf(error, "Error during session termination: %s", sessionId);
-                    traceCollector.addTrace(
-                        workspace.getNormalizedUri(),
-                        sessionId,
-                        com.redhat.mcp.languagetools.trace.TraceCollector.MessageDirection.CLIENT_TO_SERVER,
-                        "⚠️ Termination error: " + error.getMessage()
-                    );
-                } else {
-                    LOG.infof("DAP session terminated: %s", sessionId);
-                }
+                    if (error != null) {
+                        LOG.errorf(error, "Error during session termination: %s", sessionId);
+                        traceCollector.addTrace(
+                                workspace.getNormalizedUri(),
+                                sessionId,
+                                com.redhat.mcp.languagetools.trace.TraceCollector.MessageDirection.CLIENT_TO_SERVER,
+                                "⚠️ Termination error: " + error.getMessage()
+                        );
+                    } else {
+                        LOG.infof("DAP session terminated: %s", sessionId);
+                    }
 
-                return null;
-            });
+                    return null;
+                });
     }
 
     // ========== Breakpoints ==========
@@ -827,13 +861,13 @@ public class DapSession implements DapEventListener {
         args.setThreadId(currentThreadId);
 
         return trackFuture(server.continue_(args)
-            .thenApply(response -> {
-                setState(SessionState.RUNNING);
-                return createResultWithOutput(Map.of(
-                    "success", true,
-                    "allThreadsContinued", response.getAllThreadsContinued() != null ? response.getAllThreadsContinued() : false
-                ));
-            }));
+                .thenApply(response -> {
+                    setState(SessionState.RUNNING);
+                    return createResultWithOutput(Map.of(
+                            "success", true,
+                            "allThreadsContinued", response.getAllThreadsContinued() != null ? response.getAllThreadsContinued() : false
+                    ));
+                }));
     }
 
     /**
@@ -851,7 +885,7 @@ public class DapSession implements DapEventListener {
         args.setThreadId(currentThreadId);
 
         return trackFuture(server.next(args)
-            .thenApply(v -> createResultWithOutput(Map.of("success", true))));
+                .thenApply(v -> createResultWithOutput(Map.of("success", true))));
     }
 
     /**
@@ -869,7 +903,7 @@ public class DapSession implements DapEventListener {
         args.setThreadId(currentThreadId);
 
         return trackFuture(server.stepIn(args)
-            .thenApply(v -> createResultWithOutput(Map.of("success", true))));
+                .thenApply(v -> createResultWithOutput(Map.of("success", true))));
     }
 
     /**
@@ -887,7 +921,7 @@ public class DapSession implements DapEventListener {
         args.setThreadId(currentThreadId);
 
         return trackFuture(server.stepOut(args)
-            .thenApply(v -> createResultWithOutput(Map.of("success", true))));
+                .thenApply(v -> createResultWithOutput(Map.of("success", true))));
     }
 
     /**
@@ -920,7 +954,7 @@ public class DapSession implements DapEventListener {
         args.setThreadId(currentThreadId);
 
         return trackFuture(server.pause(args)
-            .thenAccept(v -> setState(SessionState.PAUSED)));
+                .thenAccept(v -> setState(SessionState.PAUSED)));
     }
 
     // ========== Inspection ==========
@@ -953,10 +987,10 @@ public class DapSession implements DapEventListener {
         args.setThreadId(currentThreadId);
 
         return trackFuture(server.stackTrace(args)
-            .thenApply(response -> {
-                currentStackFrames = response.getStackFrames();
-                return currentStackFrames;
-            }));
+                .thenApply(response -> {
+                    currentStackFrames = response.getStackFrames();
+                    return currentStackFrames;
+                }));
     }
 
     /**
@@ -971,13 +1005,13 @@ public class DapSession implements DapEventListener {
         }
 
         return trackFuture(server.threads()
-            .thenApply(response -> {
-                threads = response.getThreads();
-                if (threads.length > 0 && currentThreadId == null) {
-                    currentThreadId = threads[0].getId();
-                }
-                return threads;
-            }));
+                .thenApply(response -> {
+                    threads = response.getThreads();
+                    if (threads.length > 0 && currentThreadId == null) {
+                        currentThreadId = threads[0].getId();
+                    }
+                    return threads;
+                }));
     }
 
     /**
@@ -995,7 +1029,7 @@ public class DapSession implements DapEventListener {
         args.setFrameId(frameId);
 
         return trackFuture(server.scopes(args)
-            .thenApply(ScopesResponse::getScopes));
+                .thenApply(ScopesResponse::getScopes));
     }
 
     /**
@@ -1013,7 +1047,7 @@ public class DapSession implements DapEventListener {
         args.setVariablesReference(variablesReference);
 
         return trackFuture(server.variables(args)
-            .thenApply(VariablesResponse::getVariables));
+                .thenApply(VariablesResponse::getVariables));
     }
 
     /**
@@ -1094,9 +1128,9 @@ public class DapSession implements DapEventListener {
             }
 
             com.redhat.mcp.languagetools.trace.TraceCollector.MessageDirection direction =
-                "stderr".equals(category)
-                    ? TraceCollector.MessageDirection.SERVER_TO_CLIENT
-                    : TraceCollector.MessageDirection.SERVER_TO_CLIENT;
+                    "stderr".equals(category)
+                            ? TraceCollector.MessageDirection.SERVER_TO_CLIENT
+                            : TraceCollector.MessageDirection.SERVER_TO_CLIENT;
 
             // For console/stdout/stderr, send just the output without trace prefix
             // These are ALWAYS shown, regardless of trace level
@@ -1120,18 +1154,18 @@ public class DapSession implements DapEventListener {
             // Use the DapTraceCollector's addTrace with messageType
             if (traceCollector instanceof DapTraceCollector) {
                 ((DapTraceCollector) traceCollector).addTrace(
-                    workspace.getNormalizedUri(),
-                    sessionId,
-                    direction,
-                    displayText,
-                    messageType
+                        workspace.getNormalizedUri(),
+                        sessionId,
+                        direction,
+                        displayText,
+                        messageType
                 );
             } else {
                 traceCollector.addTrace(
-                    workspace.getNormalizedUri(),
-                    sessionId,
-                    direction,
-                    displayText
+                        workspace.getNormalizedUri(),
+                        sessionId,
+                        direction,
+                        displayText
                 );
             }
         }
@@ -1146,7 +1180,7 @@ public class DapSession implements DapEventListener {
             // Find and update corresponding BreakpointInfo
             for (BreakpointInfo info : breakpoints.values()) {
                 if (info.dapBreakpoint != null && info.dapBreakpoint.getId() != null
-                    && info.dapBreakpoint.getId().equals(bp.getId())) {
+                        && info.dapBreakpoint.getId().equals(bp.getId())) {
                     info.verified = bp.isVerified();
                     info.dapBreakpoint = bp;
                     break;

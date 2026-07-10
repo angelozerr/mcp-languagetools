@@ -87,7 +87,7 @@ public class DapClient implements IDebugProtocolClient {
     /**
      * Get the capabilities from initialize response.
      */
-    public org.eclipse.lsp4j.debug.Capabilities getCapabilities() {
+    public Capabilities getCapabilities() {
         return capabilitiesFuture.getNow(null);
     }
 

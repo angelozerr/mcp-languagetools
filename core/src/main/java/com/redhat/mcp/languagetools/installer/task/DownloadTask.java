@@ -3,7 +3,9 @@ package com.redhat.mcp.languagetools.installer.task;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.redhat.mcp.languagetools.installer.InstallerContext;
-import com.redhat.mcp.languagetools.installer.ProgressIndicator;
+import com.redhat.mcp.languagetools.installer.download.ContentLengthAware;
+import com.redhat.mcp.languagetools.progress.AbstractProgressMonitor;
+import com.redhat.mcp.languagetools.progress.ProgressMonitor;
 import com.redhat.mcp.languagetools.installer.download.AssetFetcher;
 import com.redhat.mcp.languagetools.installer.download.DecompressorUtils;
 import com.redhat.mcp.languagetools.installer.download.DownloadUtils;
@@ -70,8 +72,7 @@ public class DownloadTask implements InstallerTask {
             trace.info("Downloading from: " + resolvedUrl);
         }
 
-        context.getProgress().setText("Downloading " + name);
-        context.getProgress().setFraction(0.0);
+        context.getProgress().reportProgress("Downloading " + name);
 
         try {
             Path outputPath = Paths.get(resolvedOutputDir);
@@ -86,9 +87,9 @@ public class DownloadTask implements InstallerTask {
 
             try {
                 // Download file with progress tracking
-                // Note: Don't enable sendProgressUpdates on TraceProgressIndicator because
-                // ProgressIndicatorWrapper already sends its own UPDATE messages with MB/MB display
-                ProgressIndicatorWrapper downloadProgress = new ProgressIndicatorWrapper(context, trace, name);
+                // Note: Don't enable sendProgressUpdates on TraceProgressMonitor because
+                // ProgressMonitorWrapper already sends its own UPDATE messages with MB/MB display
+                ProgressMonitorWrapper downloadProgress = new ProgressMonitorWrapper(context, trace, name);
 
                 // Download (contentLength will be set automatically via ContentLengthAware interface)
                 DownloadUtils.DownloadResult result = DownloadUtils.download(resolvedUrl, downloadedFile, downloadProgress);
@@ -97,21 +98,17 @@ public class DownloadTask implements InstallerTask {
                 DecompressorUtils.Decompressor decompressor = DecompressorUtils.getDecompressor(downloadedFile);
                 if (decompressor != null) {
                     // Archive file - extract it
-                    context.getProgress().setText("Extracting " + name);
-                    context.getProgress().setFraction(0.7);
-
+                    // Don't call reportProgress here - keep the current progress from download
                     if (trace != null) {
-                        trace.info("Extracting to: " + resolvedOutputDir);
+                        trace.update("Extracting " + name);
                     }
 
                     Path rootDir = decompressor.decompress(downloadedFile, outputPath);
                 } else {
                     // Not an archive - copy the file directly
-                    context.getProgress().setText("Installing " + name);
-                    context.getProgress().setFraction(0.7);
-
+                    // Don't call reportProgress here - keep the current progress from download
                     if (trace != null) {
-                        trace.info("Copying file to: " + resolvedOutputDir);
+                        trace.update("Installing " + name);
                     }
 
                     // Determine the target file name
@@ -136,8 +133,6 @@ public class DownloadTask implements InstallerTask {
                         targetFile.toFile().setExecutable(true, false);
                     }
                 }
-
-                context.getProgress().setFraction(1.0);
 
                 // Store output dir and file name in context for onSuccess tasks
                 context.setVariable("output.dir", resolvedOutputDir);
@@ -385,15 +380,15 @@ public class DownloadTask implements InstallerTask {
     }
 
     /**
-     * Wrapper for ProgressIndicator that tracks download progress with TraceCollector.
+     * Wrapper for ProgressMonitor that tracks download progress with TraceCollector.
      */
-    private static class ProgressIndicatorWrapper implements ProgressIndicator, com.redhat.mcp.languagetools.installer.download.ContentLengthAware {
+    private static class ProgressMonitorWrapper extends AbstractProgressMonitor implements ContentLengthAware {
         private final InstallerContext context;
         private final TraceCollector trace;
         private final String name;
         private long contentLength = -1;
 
-        public ProgressIndicatorWrapper(InstallerContext context, TraceCollector trace, String name) {
+        public ProgressMonitorWrapper(InstallerContext context, TraceCollector trace, String name) {
             this.context = context;
             this.trace = trace;
             this.name = name;
@@ -404,38 +399,50 @@ public class DownloadTask implements InstallerTask {
         }
 
         @Override
-        public void setText(String text) {
-            context.getProgress().setText(text);
-        }
+        public void reportProgress(double progress, String message) {
+            // Don't scale progress - use the actual percentage for both badge and console
+            // Update the progress monitor (for badge display)
+            context.getProgress().reportProgress(progress, message);
 
-        @Override
-        public void setText2(String text) {
-            context.getProgress().setText2(text);
-        }
-
-        @Override
-        public void setFraction(double fraction) {
-            // Scale to 70% (download takes 70%, extract takes 30%)
-            context.getProgress().setFraction(fraction * 0.7);
-
-            // Update trace with MB/MB and %
+            // Update trace with MB/MB and % (directly from wrapper, like before)
             if (trace != null && contentLength > 0) {
+                double fraction = progress / 100.0;
                 long downloaded = (long) (fraction * contentLength);
                 String downloadedMB = String.format("%.1f", downloaded / 1024.0 / 1024.0);
                 String totalMB = String.format("%.1f", contentLength / 1024.0 / 1024.0);
                 trace.update(String.format("Downloading %s: %s MB / %s MB (%.0f%%)",
-                        name, downloadedMB, totalMB, fraction * 100));
+                        name, downloadedMB, totalMB, progress));
             }
         }
 
         @Override
-        public boolean isCanceled() {
-            return context.getProgress().isCanceled();
+        public void reportProgress(String message) {
+            context.getProgress().reportProgress(message);
         }
 
         @Override
-        public void checkCanceled() {
+        public void setComplete() {
+            context.getProgress().setComplete();
+        }
+
+        @Override
+        public boolean isCancelled() {
+            return context.getProgress().isCancelled();
+        }
+
+        @Override
+        public void checkCancelled() {
             context.checkCanceled();
+        }
+
+        @Override
+        public <T> java.util.concurrent.CompletableFuture<T> executeWithCancellation(java.util.concurrent.CompletableFuture<T> future) {
+            return context.getProgress().executeWithCancellation(future);
+        }
+
+        @Override
+        public boolean isSupported() {
+            return context.getProgress().isSupported();
         }
     }
 

@@ -1,5 +1,6 @@
 package com.redhat.mcp.languagetools.installer;
 
+import com.redhat.mcp.languagetools.progress.ProgressMonitor;
 import com.redhat.mcp.languagetools.server.ServerConfigBase;
 
 import java.nio.file.Path;
@@ -11,10 +12,10 @@ import java.util.regex.Pattern;
 
 /**
  * Context for installation tasks.
- * Contains progress indicator, variables, and configuration.
+ * Contains progress monitor, variables, and configuration.
  */
 public class InstallerContext {
-    private final ProgressIndicator progress;
+    private final ProgressMonitor progress;
     private final Map<String, String> variables;
     private final Path installDir;
     private final ServerConfigBase config;
@@ -22,11 +23,11 @@ public class InstallerContext {
 
     private static final Pattern VARIABLE_PATTERN = Pattern.compile("\\$\\{([^}]+)}|\\$([A-Z_]+)\\$");
 
-    public InstallerContext(ServerConfigBase config, ProgressIndicator progress) {
+    public InstallerContext(ServerConfigBase config, ProgressMonitor progress) {
         this(config, progress, null);
     }
 
-    public InstallerContext(ServerConfigBase config, ProgressIndicator progress, Consumer<InstallationStatus> statusChangeCallback) {
+    public InstallerContext(ServerConfigBase config, ProgressMonitor progress, Consumer<InstallationStatus> statusChangeCallback) {
         this.config = config;
         this.installDir = config.getServerHome();
         this.progress = progress;
@@ -51,7 +52,7 @@ public class InstallerContext {
         }
     }
 
-    public ProgressIndicator getProgress() {
+    public ProgressMonitor getProgress() {
         return progress;
     }
 
@@ -109,13 +110,13 @@ public class InstallerContext {
      * Checks if installation was cancelled.
      */
     public boolean isCanceled() {
-        return progress.isCanceled();
+        return progress.isCancelled();
     }
 
     /**
      * Throws exception if cancelled.
      */
     public void checkCanceled() {
-        progress.checkCanceled();
+        progress.checkCancelled();
     }
 }

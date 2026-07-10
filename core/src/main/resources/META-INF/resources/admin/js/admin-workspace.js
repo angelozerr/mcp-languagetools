@@ -1,6 +1,9 @@
         // Global variable to store DAP sessions
         let dapSessions = [];
 
+        // Track if user explicitly selected a server (to prevent auto-switching)
+        let userExplicitlySelectedServer = false;
+
         // Load DAP sessions from API
         async function loadDapSessions() {
             try {
@@ -91,6 +94,7 @@
             // Only reset server selection if we're changing workspace
             if (selectedWorkspace !== uri) {
                 selectedServer = null;
+                userExplicitlySelectedServer = false; // Reset explicit selection when changing workspace
             }
 
             selectedWorkspace = uri;
@@ -367,25 +371,42 @@
             const contributedByMap = buildContributedByMap(servers);
 
             // Auto-select server logic:
-            // 1. If a server is selected and still exists in the list, keep it selected
-            // 2. Otherwise, select first RUNNING server
-            // 3. Otherwise, select first server
+            // ONLY auto-switch if user has NOT explicitly selected a server
+            // 1. If there's a server with status != STOPPED, auto-select it (prefer RUNNING over others)
+            // 2. If a server is selected and still exists, keep it if it's != STOPPED
+            // 3. Otherwise, select first non-STOPPED server
+            // 4. Otherwise, select first server
+
             if (selectedServer) {
-                const stillExists = servers.find(s => s.id === selectedServer.id);
-                if (!stillExists) {
+                const currentServer = servers.find(s => s.id === selectedServer.id);
+                if (currentServer) {
+                    // Only auto-switch if user has NOT explicitly selected
+                    if (!userExplicitlySelectedServer && currentServer.status === 'STOPPED') {
+                        // Prefer RUNNING, then any non-STOPPED status
+                        const runningServer = servers.find(s => s.status === 'RUNNING');
+                        const activeServer = runningServer || servers.find(s => s.status !== 'STOPPED');
+                        if (activeServer) {
+                            console.log('Auto-switching from', selectedServer.id, '(STOPPED) to active server:', activeServer.id, '(status:', activeServer.status, ')');
+                            selectServer(activeServer, false); // false = not a user action
+                        }
+                    } else {
+                        console.log('Keeping selected server:', selectedServer.id, '(status:', currentServer.status, ', userExplicit:', userExplicitlySelectedServer, ')');
+                    }
+                } else {
                     console.log('Selected server no longer exists, auto-selecting...');
                     selectedServer = null;
-                } else {
-                    console.log('Keeping selected server:', selectedServer.id);
+                    userExplicitlySelectedServer = false; // Reset since server disappeared
                 }
             }
 
+            // If no server selected, auto-select first non-STOPPED server
             if (!selectedServer && servers.length > 0) {
-                console.log('Auto-selecting server - selectedServer is null, servers:', servers);
+                console.log('Auto-selecting server - selectedServer is null, servers:', servers.length);
                 const runningServer = servers.find(s => s.status === 'RUNNING');
-                const serverToSelect = runningServer || servers[0];
-                console.log('Server to auto-select:', serverToSelect);
-                selectServer(serverToSelect);
+                const activeServer = runningServer || servers.find(s => s.status !== 'STOPPED');
+                const serverToSelect = activeServer || servers[0];
+                console.log('Server to auto-select:', serverToSelect.id, '(status:', serverToSelect.status, ')');
+                selectServer(serverToSelect, false); // false = not a user action
             }
 
             return `
@@ -441,7 +462,7 @@
                     return `
                         <div class="server-item ${serverClass} ${extensionClass} ${selectedServer?.id === server.id ? 'active' : ''}"
                              data-server-id="${server.id}"
-                             onclick='selectServer(${JSON.stringify(server)})'
+                             onclick='selectServer(${JSON.stringify(server)}, true)'
                              ${tooltipText ? `title="${tooltipText.replace(/"/g, '&quot;')}"` : ''}>
                             <div class="server-name">
                                 <span class="server-source-icon" title="${sourceLabel}">${sourceIcon}</span>
@@ -552,9 +573,15 @@
         // Expose for diagram navigation
         window.selectDapSessionByServerId = selectDapSessionByServerId;
 
-        function selectServer(server) {
+        function selectServer(server, isUserAction = false) {
             const wasAlreadySelected = selectedServer && selectedServer.id === server.id;
             selectedServer = server;
+
+            // Track if this is an explicit user action
+            if (isUserAction) {
+                userExplicitlySelectedServer = true;
+                console.log('User explicitly selected server:', server.id);
+            }
 
             // Clear DAP session when selecting an LSP server
             window.currentDapSessionId = null;

@@ -316,10 +316,62 @@
                 tracesByServer[trace.serverId] = tracesByServer[trace.serverId].slice(-200);
             }
 
+            // If this is an installation trace (INFO, UPDATE, ERROR) and no server is currently selected,
+            // auto-select this server to show installation progress
+            if ((trace.messageType === 'INFO' || trace.messageType === 'UPDATE' || trace.messageType === 'ERROR') &&
+                !currentServerId) {
+                console.log('Auto-selecting server for installation:', trace.serverId);
+
+                // Find the workspace and server
+                const workspace = workspaces.find(w => w.rootUri === trace.workspaceUri);
+                if (workspace && workspace.lspServers) {
+                    const server = workspace.lspServers.find(s => s.id === trace.serverId);
+                    if (server) {
+                        // Update selected workspace
+                        selectedWorkspace = trace.workspaceUri;
+
+                        console.log('Calling window.selectServer with:', server);
+                        // Call the global selectServer function if it exists
+                        if (typeof window.selectServer === 'function') {
+                            window.selectServer(server);
+                        } else {
+                            console.log('window.selectServer not found, using fallback');
+                            // Fallback: just set currentServerId and render
+                            currentServerId = trace.serverId;
+                            if (typeof renderConsole === 'function') {
+                                renderConsole();
+                            }
+                        }
+                    } else {
+                        console.log('Server not found in workspace:', trace.serverId);
+                    }
+                } else {
+                    console.log('Workspace not found:', trace.workspaceUri);
+                }
+            }
+
             // Refresh console if this trace is for the currently selected server
             if (trace.workspaceUri === selectedWorkspace && trace.serverId === currentServerId) {
                 console.log('Refreshing console for current server');
                 renderConsole();
+            }
+
+            // If this is an UPDATE message with installProgress, update the server badge
+            if (trace.messageType === 'UPDATE' && trace.installProgress != null) {
+                console.log('UPDATE with installProgress:', trace.serverId, 'progress:', trace.installProgress);
+                const workspace = workspaces.find(w => w.rootUri === trace.workspaceUri);
+                if (workspace && workspace.lspServers) {
+                    const server = workspace.lspServers.find(s => s.id === trace.serverId);
+                    if (server) {
+                        console.log('Updating server badge - old progress:', server.installProgress, 'new:', trace.installProgress);
+                        server.installProgress = trace.installProgress;
+                        updateServerStatusBadge(trace.serverId, server);
+                    } else {
+                        console.warn('Server not found in workspace.lspServers for badge update:', trace.serverId);
+                    }
+                } else {
+                    console.warn('Workspace or lspServers not found for badge update:', trace.workspaceUri);
+                }
             }
         }
 

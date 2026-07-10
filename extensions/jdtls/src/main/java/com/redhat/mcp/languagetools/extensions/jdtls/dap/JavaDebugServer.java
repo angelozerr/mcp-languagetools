@@ -8,6 +8,7 @@ import com.redhat.mcp.languagetools.trace.TraceCollector;
 import com.redhat.mcp.languagetools.workspace.Workspace;
 import org.jboss.logging.Logger;
 
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -346,7 +347,8 @@ public class JavaDebugServer extends DapServer {
             String projectName,
             String sessionId) {
 
-        List<Object> args = List.of(mainClass, projectName);
+        // Use Arrays.asList instead of List.of because List.of doesn't allow null values
+        List<Object> args = Arrays.asList(mainClass, projectName);
         String workspaceRootUri = getWorkspace().getNormalizedUri();
 
         getTraceCollector().addTrace(
