@@ -8,6 +8,7 @@ import com.redhat.mcp.languagetools.lsp.LspInstanceRegistry;
 import com.redhat.mcp.languagetools.lsp.server.*;
 import com.redhat.mcp.languagetools.lsp.trace.LspTraceCollector;
 import com.redhat.mcp.languagetools.progress.ProgressMonitor;
+import com.redhat.mcp.languagetools.progress.ProgressStep;
 import com.redhat.mcp.languagetools.server.ServerBase;
 import com.redhat.mcp.languagetools.server.ServerStatus;
 import org.jboss.logging.Logger;
@@ -113,13 +114,38 @@ public class Workspace {
      */
     public CompletableFuture<Void> restartLspServer(String serverId, ProgressMonitor progressMonitor) {
         LspServerConfig serverConfig = application.getLspServerConfig(serverId);
+        String serverName = serverConfig != null ? serverConfig.getName() : serverId;
+
+        ProgressMonitor installMonitor = progressMonitor.beginStep(ProgressStep.INSTALLING);
+        installMonitor.reportProgress(0.0, "Installing " + serverName);
+        return prepareRestartLspServer(serverId, installMonitor)
+                .thenCompose(server -> {
+                    progressMonitor.beginStep(ProgressStep.STARTING);
+                    progressMonitor.beginStep(ProgressStep.INITIALIZING);
+                    return server.initialize();
+                })
+                .thenRun(() -> {
+                    progressMonitor.setComplete();
+                    LOG.infof("Restarted LSP server '%s' for workspace: %s", serverId, rootUri);
+                })
+                .exceptionally(ex -> {
+                    LOG.errorf(ex, "Failed to restart LSP server '%s'", serverId);
+                    throw new RuntimeException("Failed to restart server: " + ex.getMessage(), ex);
+                });
+    }
+
+    /**
+     * Prepare a restart: shutdown old server, create new, install and start (but NOT initialize).
+     * Callers can chain server.initialize() after step transitions.
+     */
+    public CompletableFuture<LspServer> prepareRestartLspServer(String serverId, ProgressMonitor progressMonitor) {
+        LspServerConfig serverConfig = application.getLspServerConfig(serverId);
         if (serverConfig == null) {
             return CompletableFuture.failedFuture(new IllegalArgumentException("Server not found: " + serverId));
         }
 
         LspServer oldServer = getLspServer(serverId);
 
-        // Shutdown old server if it exists
         CompletableFuture<Void> shutdownFuture;
         if (oldServer != null && oldServer.getStatus() != ServerStatus.STOPPED) {
             shutdownFuture = oldServer.shutdown();
@@ -128,18 +154,11 @@ public class Workspace {
         }
 
         return shutdownFuture.thenCompose(v -> {
-            // Create new server instance using factory
             LspServer newServer = createLspServer(serverConfig);
             lspServers.put(serverId, newServer);
 
-            // Start and initialize (will detect IDE instance)
             return newServer.start(progressMonitor)
-                    .thenCompose(initV -> newServer.initialize())
-                    .thenRun(() -> LOG.infof("Restarted LSP server '%s' for workspace: %s", serverId, rootUri))
-                    .exceptionally(ex -> {
-                        LOG.errorf(ex, "Failed to restart LSP server '%s'", serverId);
-                        throw new RuntimeException("Failed to restart server: " + ex.getMessage(), ex);
-                    });
+                    .thenApply(initV -> newServer);
         });
     }
 
@@ -152,6 +171,28 @@ public class Workspace {
      */
     public CompletableFuture<Void> startManagedLspServer(String serverId, ProgressMonitor progressMonitor) {
         LspServerConfig serverConfig = application.getLspServerConfig(serverId);
+        String serverName = serverConfig != null ? serverConfig.getName() : serverId;
+
+        ProgressMonitor installMonitor = progressMonitor.beginStep(ProgressStep.INSTALLING);
+        installMonitor.reportProgress(0.0, "Installing " + serverName);
+        return prepareManagedLspServer(serverId, installMonitor)
+                .thenCompose(server -> {
+                    progressMonitor.beginStep(ProgressStep.STARTING);
+                    progressMonitor.beginStep(ProgressStep.INITIALIZING);
+                    return server.initialize();
+                })
+                .thenRun(() -> {
+                    progressMonitor.setComplete();
+                    LOG.infof("Started MCP-managed LSP server '%s' for workspace: %s", serverId, rootUri);
+                });
+    }
+
+    /**
+     * Prepare a managed server: shutdown old, create new, install and start (but NOT initialize).
+     * Callers can chain server.initialize() after step transitions.
+     */
+    public CompletableFuture<LspServer> prepareManagedLspServer(String serverId, ProgressMonitor progressMonitor) {
+        LspServerConfig serverConfig = application.getLspServerConfig(serverId);
         if (serverConfig == null) {
             return CompletableFuture.failedFuture(new IllegalArgumentException("Server not found: " + serverId));
         }
@@ -160,7 +201,6 @@ public class Workspace {
 
         LspServer oldServer = getLspServer(serverId);
 
-        // Shutdown old server if it exists
         CompletableFuture<Void> shutdownFuture;
         if (oldServer != null && oldServer.getStatus() != ServerStatus.STOPPED) {
             shutdownFuture = oldServer.shutdown();
@@ -170,23 +210,17 @@ public class Workspace {
 
         return shutdownFuture
                 .thenCompose(v -> {
-            // Create new server instance BEFORE installation so we can set INSTALLING status
             LspServer newServer = createLspServer(serverConfig);
 
-            // Set status to INSTALLING if installer exists (BEFORE adding to lspServers map)
             if (serverConfig.getInstaller() != null) {
                 newServer.setStatus(ServerStatus.INSTALLING);
             }
 
-
-            // Step 1: Start and initialize (installation happens inside start())
             return newServer.startManagedOnly(progressMonitor)
-                    .thenCompose(initV -> newServer.initialize())
-                    .thenRun(() -> LOG.infof("Started MCP-managed LSP server '%s' for workspace: %s", serverId, rootUri))
+                    .thenApply(initV -> newServer)
                     .exceptionally(ex -> {
                         LOG.errorf(ex, "Failed to start MCP-managed LSP server '%s'", serverId);
 
-                        // Update server status based on the type of failure
                         Throwable cause = ex.getCause();
                         if (cause instanceof InstallationException
                                 || ex instanceof InstallationException) {

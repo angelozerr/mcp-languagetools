@@ -13,6 +13,8 @@ public record ProgressUpdateWsMessage(
     String title,  // Human-readable title (e.g., "Installing Eclipse JDT LS")
     Double progress,  // Progress fraction (0.0 to 1.0)
     String message,  // Optional progress message
-    String status  // Task status: "running", "completed", "failed"
+    String status,  // Task status: "running", "completed", "failed"
+    String stepId,  // Current step ID (null when no steps)
+    Double stepProgress  // Progress fraction within current step, 0.0 to 1.0 (null when no steps)
 ) {
 }

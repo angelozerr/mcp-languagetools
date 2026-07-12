@@ -219,6 +219,7 @@
                 'INSTALLING': 'Installing',
                 'INSTALL_FAILED': 'Install Failed',
                 'START_FAILED': 'Start Failed',
+                'ERROR': 'Error',
                 'SWITCHING': 'Switching',
                 'CONNECTING_TO_IDE': 'Connecting to IDE',
                 'CONNECTED_TO_IDE': 'Connected to IDE',
@@ -425,7 +426,7 @@
                                     <button class="server-action-btn" onclick='event.stopPropagation(); restartServerAction("${server.id}")' title="Restart">↻</button>
                                     <button class="server-action-btn" onclick='event.stopPropagation(); stopServerAction("${server.id}")' title="Stop">■</button>
                                 `;
-                            } else if (server.status === 'STOPPED') {
+                            } else if (server.status === 'STOPPED' || server.status === 'START_FAILED' || server.status === 'INSTALL_FAILED' || server.status === 'ERROR') {
                                 actions = `
                                     <button class="server-action-btn" onclick='event.stopPropagation(); startManagedServerAction("${server.id}")' title="Start MCP-managed server">▶</button>
                                     <button class="server-action-btn" onclick='event.stopPropagation(); connectToIdeAction("${server.id}")' title="Try to connect to IDE instance">🔗</button>

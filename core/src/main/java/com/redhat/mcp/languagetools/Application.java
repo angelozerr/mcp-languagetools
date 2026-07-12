@@ -11,6 +11,7 @@ import com.redhat.mcp.languagetools.lsp.server.LspServerStatusChangeEvent;
 import com.redhat.mcp.languagetools.lsp.trace.LspTraceCollector;
 import com.redhat.mcp.languagetools.mcp.McpClientTracker;
 import com.redhat.mcp.languagetools.progress.ProgressMonitor;
+import com.redhat.mcp.languagetools.progress.ProgressStep;
 import com.redhat.mcp.languagetools.server.ServerDescriptorRegistry;
 import com.redhat.mcp.languagetools.workspace.Workspace;
 import com.redhat.mcp.languagetools.workspace.WorkspaceChangeEvent;
@@ -174,33 +175,15 @@ public class Application {
         String language = languageId.get();
         LOG.debugf("Detected language '%s' for: %s", language, fileUri);
 
-        // Find ALL servers that can handle this language (may be multiple, e.g., JDT.LS + MicroProfile LS for Java)
-        List<CompletableFuture<Void>> serverFutures = new ArrayList<>();
-
+        // Collect configs that need starting
+        List<LspServerConfig> configsToStart = new ArrayList<>();
         for (LspServerConfig config : lspServerConfigs.values()) {
-            // Skip contribution-only configs (they don't run as servers)
             if (config.isContributionOnly()) {
                 continue;
             }
-
             if (config.canHandle(fileUri.toString(), language)) {
-                // Check if server already exists in workspace
                 if (!workspace.hasLspServer(config.getServerId())) {
-                    LOG.infof("Need %s for language '%s' in workspace: %s",
-                            config.getName(), language, workspace.getNormalizedUri());
-
-                    // Ensure server is started (handles external instances, installation, etc.)
-                    CompletableFuture<Void> future = workspace.ensureLspServerStarted(
-                                    config.getServerId(),
-                                    progressMonitor)
-                            .thenAccept(server -> {
-                                // Server is ready, nothing else to do
-                            })
-                            .exceptionally(ex -> {
-                                LOG.errorf(ex, "Failed to start %s", config.getName());
-                                return null;
-                            });
-                    serverFutures.add(future);
+                    configsToStart.add(config);
                 }
             }
         }
@@ -208,9 +191,34 @@ public class Application {
         // Also find and add matching DAP servers (without starting them)
         ensureDapServersForFile(workspace, fileUri, language);
 
-        // Wait for all servers to start (continue even if some fail)
-        if (serverFutures.isEmpty()) {
+        if (configsToStart.isEmpty()) {
             return CompletableFuture.completedFuture(null);
+        }
+
+        // Split progress range across servers so each has its own sub-range
+        int count = configsToStart.size();
+        List<CompletableFuture<Void>> serverFutures = new ArrayList<>();
+        for (int i = 0; i < count; i++) {
+            LspServerConfig config = configsToStart.get(i);
+            LOG.infof("Need %s for language '%s' in workspace: %s",
+                    config.getName(), language, workspace.getNormalizedUri());
+
+            double start = (double) i / count;
+            double end = (double) (i + 1) / count;
+            ProgressMonitor serverMonitor = count > 1
+                    ? progressMonitor.createSubMonitor(start, end)
+                    : progressMonitor;
+
+            CompletableFuture<Void> future = workspace.ensureLspServerStarted(
+                            config.getServerId(),
+                            serverMonitor)
+                    .thenAccept(server -> {
+                    })
+                    .exceptionally(ex -> {
+                        LOG.errorf(ex, "Failed to start %s", config.getName());
+                        return null;
+                    });
+            serverFutures.add(future);
         }
 
         return CompletableFuture.allOf(serverFutures.toArray(new CompletableFuture[0]));
@@ -419,14 +427,20 @@ public class Application {
             lspServer = workspace.getLspServer(serverId);
         }
 
-        // Start managed server (handles installation automatically)
+        // Start managed server with step-based progress (Installing → Starting → Initializing)
         String taskId = "start-" + serverId;
         String title = "Start " + serverId;
-        ProgressMonitor progressMonitor = new TraceProgressMonitor(
+        TraceProgressMonitor progressMonitor = new TraceProgressMonitor(
                 lspServer.getTraceCollector(), 100.0, progressBroadcaster, taskId, serverId, title);
+        progressMonitor.addStep(ProgressStep.INSTALLING, 0.50);
+        progressMonitor.addStep(ProgressStep.STARTING, 0.10);
+        progressMonitor.addStep(ProgressStep.INITIALIZING, 0.40);
+        progressMonitor.initializeSteps();
+
         return workspace.startManagedLspServer(serverId, progressMonitor)
                 .exceptionally(ex -> {
                     LOG.errorf(ex, "Failed to start %s", config.getName());
+                    progressMonitor.setFailed(ex.getMessage());
                     return null;
                 });
     }

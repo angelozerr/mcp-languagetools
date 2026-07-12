@@ -57,20 +57,19 @@ public class McpProgressMonitor extends AbstractProgressMonitor {
 
     @Override
     public void reportProgress(double progress, String message) {
-        setCurrent(progress);
+        double scaled = scaleToActiveStep(progress);
+        setCurrent(scaled);
         this.lastMessage = message;
 
         if (tracker != null) {
             // Calculate delta from current tracker progress
             BigDecimal currentProgress = tracker.progress();
-            BigDecimal targetProgress = BigDecimal.valueOf(progress);
+            BigDecimal targetProgress = BigDecimal.valueOf(scaled);
             BigDecimal delta = targetProgress.subtract(currentProgress);
 
             if (delta.compareTo(BigDecimal.ZERO) > 0) {
                 tracker.advanceAndForget(delta);
             }
-            // Note: ProgressTracker doesn't have a setCurrent method
-            // We can only advance forward
         }
     }
 
@@ -114,16 +113,19 @@ public class McpProgressMonitor extends AbstractProgressMonitor {
     @Override
     public boolean isCancelled() {
         // Check both parent's task-based cancellation and MCP cancellation
-        return super.isCancelled() || (cancellation != null && !cancellation.check().isRequested());
+        return super.isCancelled() || (cancellation != null && cancellation.check().isRequested());
     }
 
     @Override
     public void checkCancelled() {
-        if (cancellation != null) {
-            cancellation.skipProcessingIfCancelled();
-        }
+        // Check parent's task-based cancellation first
         if (super.isCancelled()) {
             throw new RuntimeException("Task cancelled");
+        }
+
+        // Only check MCP cancellation if it was actually requested
+        if (cancellation != null && cancellation.check().isRequested()) {
+            cancellation.skipProcessingIfCancelled();
         }
     }
 

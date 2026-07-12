@@ -366,7 +366,7 @@ public abstract class ServerBase<T extends ServerConfigBase> extends BindEndpoin
     }
 
     /**
-     * Log error with full stack trace to trace collector and update server status.
+     * Log error with full stack trace to trace collector.
      */
     protected void logErrorToTrace(Exception e, com.redhat.mcp.languagetools.trace.TraceCollector traceCollector, String contextId) {
         LOG.errorf(e, "Failed to start %s", config.getServerId());
@@ -397,10 +397,6 @@ public abstract class ServerBase<T extends ServerConfigBase> extends BindEndpoin
         } catch (Exception traceEx) {
             LOG.errorf(traceEx, "Failed to add trace for error!");
         }
-
-        // Update status
-        setStatus(ServerStatus.ERROR);
-        setStatusMessage(e.getMessage());
     }
 
     /**
@@ -409,10 +405,11 @@ public abstract class ServerBase<T extends ServerConfigBase> extends BindEndpoin
     protected <T> CompletableFuture<T> withErrorLogging(CompletableFuture<T> future,
                                                         com.redhat.mcp.languagetools.trace.TraceCollector traceCollector,
                                                         String contextId) {
-        return future.exceptionally(throwable -> {
-            Exception e = throwable instanceof Exception ? (Exception) throwable : new Exception(throwable);
-            logErrorToTrace(e, traceCollector, contextId);
-            return null;
+        return future.whenComplete((result, throwable) -> {
+            if (throwable != null) {
+                Exception e = throwable instanceof Exception ? (Exception) throwable : new Exception(throwable);
+                logErrorToTrace(e, traceCollector, contextId);
+            }
         });
     }
 

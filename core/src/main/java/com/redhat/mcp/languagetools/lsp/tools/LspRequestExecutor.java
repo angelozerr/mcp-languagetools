@@ -15,7 +15,12 @@ import com.redhat.mcp.languagetools.lsp.client.LspCapability;
 import com.redhat.mcp.languagetools.lsp.server.LspServer;
 import com.redhat.mcp.languagetools.lsp.server.LspServerResolver;
 import com.redhat.mcp.languagetools.lsp.tools.params.LspRequestParams;
-import com.redhat.mcp.languagetools.progress.*;
+import com.redhat.mcp.languagetools.progress.McpProgressMonitor;
+import com.redhat.mcp.languagetools.progress.MultiProgressMonitor;
+import com.redhat.mcp.languagetools.progress.ProgressContext;
+import com.redhat.mcp.languagetools.progress.ProgressMonitor;
+import com.redhat.mcp.languagetools.progress.ProgressMonitorContributor;
+import com.redhat.mcp.languagetools.progress.ProgressStep;
 import io.quarkiverse.mcp.server.Cancellation;
 import io.quarkiverse.mcp.server.Progress;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -83,32 +88,66 @@ public class LspRequestExecutor {
                 ? new MultiProgressMonitor(monitors.toArray(new ProgressMonitor[0]))
                 : mcpMonitor;
 
-        // Report progress: Resolving language servers
-        progressMonitor.reportProgress(10.0, "Resolving language servers");
+        // Define steps for LSP operations
+        progressMonitor.addStep(ProgressStep.INSTALLING, 0.40);
+        progressMonitor.addStep(ProgressStep.STARTING, 0.10);
+        progressMonitor.addStep(ProgressStep.INDEXING, 0.35);
+        progressMonitor.addStep(ProgressStep.EXECUTING, 0.15);
 
-        // Step 1: Resolve LSP servers (strategy decides how)
-        return strategy.resolveServers(serverResolver, params, progressMonitor)
+        // Initialize steps for WebSocket monitors (broadcast step definitions)
+        if (progressMonitor instanceof com.redhat.mcp.languagetools.progress.MultiProgressMonitor multiMonitor) {
+            for (ProgressMonitor monitor : multiMonitor.getDelegates()) {
+                if (monitor instanceof com.redhat.mcp.languagetools.admin.WebSocketProgressMonitor wsMonitor) {
+                    wsMonitor.initializeSteps();
+                }
+            }
+        } else if (progressMonitor instanceof com.redhat.mcp.languagetools.admin.WebSocketProgressMonitor wsMonitor) {
+            wsMonitor.initializeSteps();
+        }
+
+        ProgressMonitor installMonitor = progressMonitor.beginStep(ProgressStep.INSTALLING);
+        installMonitor.reportProgress(0.0, "Installing language server");
+
+        return strategy.resolveServers(serverResolver, params, installMonitor)
                 .thenCompose(servers -> {
                     if (servers.isEmpty()) {
-                        progressMonitor.reportProgress(100.0, "No language server found");
+                        progressMonitor.setComplete();
                         return CompletableFuture.completedFuture(
                                 strategy.formatNoServerFound(params)
                         );
                     }
 
-                    // Report progress: Executing request
-                    progressMonitor.reportProgress(30.0, String.format("Executing %s on %d server(s)",
-                        strategy.getCapability().name(), servers.size()));
+                    // Build server names for progress messages
+                    String serverNames = servers.stream()
+                            .map(s -> s.getConfig().getName())
+                            .reduce((a, b) -> a + ", " + b)
+                            .orElse("");
 
-                    // Step 2: Build LSP request parameters
+                    progressMonitor.beginStep(ProgressStep.STARTING);
+                    ProgressMonitor indexingMonitor = progressMonitor.beginStep(ProgressStep.INDEXING);
+                    indexingMonitor.reportProgress(0.0, "Indexing " + serverNames);
+
+                    // Build LSP request parameters
                     TLspParams lspParams = strategy.buildLspParams(params);
 
                     // Execute LSP request on all servers in parallel (wait for ready first)
                     List<CompletableFuture<TResult>> futures = servers.stream()
                             .map(server -> server.waitUntilReady()
-                                    .thenCompose(v ->
-                                            // Register futures for automatic cancellation
-                                            progressMonitor.executeWithCancellation(strategy.executeRequest(server, lspParams)))
+                                    .thenApply(v -> {
+                                        // Server ready - complete indexing step
+                                        indexingMonitor.setComplete();
+
+                                        ProgressMonitor execMonitor = progressMonitor.beginStep(ProgressStep.EXECUTING);
+                                        execMonitor.reportProgress(0.0, "Executing " + strategy.getCapability().name().toLowerCase());
+                                        return execMonitor;
+                                    })
+                                    .thenCompose(execMonitor ->
+                                            // Execute request
+                                            progressMonitor.executeWithCancellation(strategy.executeRequest(server, lspParams))
+                                                    .thenApply(result -> {
+                                                        execMonitor.setComplete();
+                                                        return result;
+                                                    }))
                                     .exceptionally(ex -> {
                                         LOG.warnf("Failed to execute %s on server %s: %s",
                                                 strategy.getCapability(), server.getConfig().getServerId(), ex.getMessage());
@@ -118,30 +157,27 @@ public class LspRequestExecutor {
 
 
 
+
+
+
                     // Step 3: Wait for all to complete and merge results
                     return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
                             .thenApply(v -> {
-                                // Report progress: Processing results
-                                progressMonitor.reportProgress(80.0, "Processing results");
-
                                 List<TResult> results = futures.stream()
                                         .map(CompletableFuture::join)
                                         .filter(strategy::isValidResult)
                                         .toList();
 
                                 if (results.isEmpty()) {
-                                    progressMonitor.reportProgress(100.0, "No results found");
+                                    progressMonitor.setComplete();
                                     return strategy.formatNoResultFound(params);
                                 }
-
-                                // Report progress: Formatting results
-                                progressMonitor.reportProgress(90.0, String.format("Formatting %d result(s)", results.size()));
 
                                 // Format and return results
                                 String formatted = strategy.formatResults(params, results);
 
-                                // Report complete
-                                progressMonitor.reportProgress(100.0, "Done");
+                                // Mark complete
+                                progressMonitor.setComplete();
 
                                 return formatted;
                             });

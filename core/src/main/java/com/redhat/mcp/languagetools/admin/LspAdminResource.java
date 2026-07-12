@@ -14,6 +14,7 @@ import com.redhat.mcp.languagetools.installer.TraceProgressMonitor;
 import com.redhat.mcp.languagetools.lsp.server.LspServer;
 import com.redhat.mcp.languagetools.lsp.server.LspServerConfig;
 import com.redhat.mcp.languagetools.progress.ProgressMonitor;
+import com.redhat.mcp.languagetools.progress.ProgressStep;
 import com.redhat.mcp.languagetools.workspace.Workspace;
 import com.redhat.mcp.languagetools.Application;
 import jakarta.inject.Inject;
@@ -187,14 +188,19 @@ public class LspAdminResource {
                 return Response.status(404).entity(new ErrorResponse("Workspace not found")).build();
             }
 
-            // Restart from Admin UI - create ProgressMonitor for user feedback
+            // Restart from Admin UI - create ProgressMonitor with steps for user feedback
             LspServer server = workspace.getLspServer(serverId);
             String taskId = "restart-" + serverId;
             String title = "Restart " + serverId;
-            ProgressMonitor progressMonitor = new TraceProgressMonitor(
-                    server.getTraceCollector(), 100.0, progressBroadcaster, taskId, serverId, title);
+            TraceProgressMonitor progressMonitor = createServerStartMonitor(
+                    server.getTraceCollector(), taskId, serverId, title);
 
-            workspace.restartLspServer(serverId, progressMonitor);
+            workspace.restartLspServer(serverId, progressMonitor)
+                    .exceptionally(ex -> {
+                        LOG.errorf(ex, "Failed to restart server '%s'", serverId);
+                        progressMonitor.setFailed(ex.getMessage());
+                        return null;
+                    });
 
             return Response.ok().entity(new StatusResponse("restarted")).build();
         } catch (Exception e) {
@@ -219,12 +225,18 @@ public class LspAdminResource {
 
             var existingServer = workspace.getLspServer(serverId);
             if (existingServer != null) {
-                // Start from Admin UI - create ProgressMonitor for user feedback
+                // Start from Admin UI - create ProgressMonitor with steps for user feedback
                 String taskId = "start-" + serverId;
                 String title = "Start " + serverId;
-                ProgressMonitor progressMonitor = new TraceProgressMonitor(
-                        existingServer.getTraceCollector(), 100.0, progressBroadcaster, taskId, serverId, title);
-                workspace.startManagedLspServer(serverId, progressMonitor);
+                TraceProgressMonitor progressMonitor = createServerStartMonitor(
+                        existingServer.getTraceCollector(), taskId, serverId, title);
+
+                workspace.startManagedLspServer(serverId, progressMonitor)
+                        .exceptionally(ex -> {
+                            LOG.errorf(ex, "Failed to start server '%s'", serverId);
+                            progressMonitor.setFailed(ex.getMessage());
+                            return null;
+                        });
             } else {
                 application.ensureServerStarted(serverId, workspaceUri);
             }
@@ -342,5 +354,49 @@ public class LspAdminResource {
                     .entity("{\"error\": \"" + e.getMessage() + "\"}")
                     .build();
         }
+    }
+
+    // ========== Progress Task Control ==========
+
+    /**
+     * Cancel a progress task (e.g., an installation).
+     * Only works for tasks marked as cancellable (Admin-initiated tasks).
+     */
+    @POST
+    @Path("/progress/{taskId}/cancel")
+    public Response cancelTask(@PathParam("taskId") String taskId) {
+        // Extract serverId from taskId (e.g., "install-jdtls" → "jdtls", "start-jdtls" → "jdtls")
+        String serverId = taskId.replaceFirst("^(install|start|restart)-", "");
+
+        var config = application.getLspServerConfig(serverId);
+        if (config == null) {
+            return Response.status(404).entity(new ErrorResponse("Server not found: " + serverId)).build();
+        }
+
+        var sharedProgress = config.getSharedInstallProgress();
+        if (sharedProgress == null) {
+            return Response.status(404).entity(new ErrorResponse("No active task to cancel")).build();
+        }
+
+        LOG.infof("Cancelling task '%s' for server '%s'", taskId, serverId);
+        sharedProgress.cancel(taskId);
+
+        return Response.ok().entity(new StatusResponse("cancelled")).build();
+    }
+
+    /**
+     * Create a TraceProgressMonitor with standard server startup steps
+     * (Installing → Starting → Initializing).
+     */
+    private TraceProgressMonitor createServerStartMonitor(
+            com.redhat.mcp.languagetools.trace.TraceCollector traceCollector,
+            String taskId, String serverId, String title) {
+        TraceProgressMonitor monitor = new TraceProgressMonitor(
+                traceCollector, 100.0, progressBroadcaster, taskId, serverId, title);
+        monitor.addStep(ProgressStep.INSTALLING, 0.50);
+        monitor.addStep(ProgressStep.STARTING, 0.10);
+        monitor.addStep(ProgressStep.INITIALIZING, 0.40);
+        monitor.initializeSteps();
+        return monitor;
     }
 }
