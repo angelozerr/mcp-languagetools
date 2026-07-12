@@ -312,6 +312,13 @@ public class AdminWebSocketEndpoint {
     }
 
     /**
+     * CDI observer for progress initialization (steps definition).
+     */
+    void onProgressInit(@Observes com.redhat.mcp.languagetools.admin.ws.ProgressInitWsMessage msg) {
+        broadcast(msg);
+    }
+
+    /**
      * CDI observer for workspace changes (created/closed).
      */
     void onWorkspaceChange(@Observes WorkspaceChangeEvent event) {

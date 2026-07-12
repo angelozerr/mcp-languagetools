@@ -178,6 +178,14 @@ public abstract class ServerConfigBase implements ServerConfig {
     }
 
     /**
+     * Gets the shared install progress monitor (used for cancellation from Admin UI).
+     * Returns null if no installation is in progress.
+     */
+    public SharedProgressMonitor getSharedInstallProgress() {
+        return sharedInstallProgress;
+    }
+
+    /**
      * Sets the install progress monitor (called when installation starts).
      */
     public void setInstallProgress(TraceProgressMonitor installProgress) {

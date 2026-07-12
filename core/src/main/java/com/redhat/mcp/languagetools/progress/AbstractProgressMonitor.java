@@ -34,6 +34,7 @@ public abstract class AbstractProgressMonitor implements ProgressMonitor {
     private double totalWeight = 0.0;
     private double completedWeight = 0.0;
     private String currentStepId;
+    private volatile boolean insideStepReport;
 
     // Task tracking
     private final Set<String> cancelledTasks = ConcurrentHashMap.newKeySet();
@@ -82,6 +83,41 @@ public abstract class AbstractProgressMonitor implements ProgressMonitor {
         this.current = current;
     }
 
+    /**
+     * Scale a raw progress value (0-total) into the active step's range.
+     * If no step is active or the call originates from a SubProgressMonitor
+     * (already scaled), returns the value unchanged.
+     */
+    protected double scaleToActiveStep(double progress) {
+        if (insideStepReport || currentStepId == null || steps.isEmpty()) {
+            return progress;
+        }
+        StepInfo step = steps.get(currentStepId);
+        if (step == null) {
+            return progress;
+        }
+        double fraction = total > 0 ? progress / total : 0.0;
+        return (step.startPercent + fraction * (step.endPercent - step.startPercent)) * total;
+    }
+
+    /**
+     * Called by SubProgressMonitor to report already-scaled progress
+     * without triggering step scaling again.
+     * Includes a never-decrease guard to handle multiple sources reporting
+     * to the same parent (e.g., parallel server installs sharing one step monitor).
+     */
+    void reportProgressFromStep(double progress, String message) {
+        if (progress < current) {
+            progress = current;
+        }
+        insideStepReport = true;
+        try {
+            reportProgress(progress, message);
+        } finally {
+            insideStepReport = false;
+        }
+    }
+
     @Override
     public void addStep(String stepId, double weight) {
         if (weight <= 0) {
@@ -128,7 +164,7 @@ public abstract class AbstractProgressMonitor implements ProgressMonitor {
             step.completed = true;
             completedWeight += step.weight;
             double progressPercent = totalWeight > 0 ? completedWeight / totalWeight : 1.0;
-            reportProgress(progressPercent, "Completed " + stepId);
+            reportProgressFromStep(progressPercent * total, stepId);
         }
     }
 
@@ -171,9 +207,46 @@ public abstract class AbstractProgressMonitor implements ProgressMonitor {
     }
 
     /**
+     * Get the current step ID, or null if no step is active.
+     */
+    public String getCurrentStepId() {
+        return currentStepId;
+    }
+
+    /**
+     * Compute the progress fraction (0.0-1.0) within the current step,
+     * given the global scaled progress value.
+     * Returns -1 if no step is active.
+     */
+    public double getStepLocalFraction(double scaledProgress) {
+        if (currentStepId == null || steps.isEmpty()) {
+            return -1;
+        }
+        StepInfo step = steps.get(currentStepId);
+        if (step == null) {
+            return -1;
+        }
+        double stepStart = step.startPercent * total;
+        double stepRange = (step.endPercent - step.startPercent) * total;
+        if (stepRange <= 0) {
+            return 0;
+        }
+        double fraction = (scaledProgress - stepStart) / stepRange;
+        return Math.max(0, Math.min(1, fraction));
+    }
+
+    /**
+     * Get all declared steps.
+     * @return Unmodifiable map of step ID to StepInfo
+     */
+    public Map<String, StepInfo> getSteps() {
+        return java.util.Collections.unmodifiableMap(steps);
+    }
+
+    /**
      * Internal class to track step information.
      */
-    private static class StepInfo {
+    public static class StepInfo {
         final String id;
         final double weight;
         double startPercent;  // Calculated dynamically in beginStep()
@@ -187,5 +260,10 @@ public abstract class AbstractProgressMonitor implements ProgressMonitor {
             this.startPercent = startPercent;
             this.endPercent = endPercent;
         }
+
+        public String getId() { return id; }
+        public double getWeight() { return weight; }
+        public boolean isStarted() { return started; }
+        public boolean isCompleted() { return completed; }
     }
 }

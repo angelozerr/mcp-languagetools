@@ -160,7 +160,7 @@ public class MultiProgressMonitor implements ProgressMonitor {
                 })
                 .toArray(ProgressMonitor[]::new);
 
-        return new MultiProgressMonitor(subDelegates);
+        return new MultiProgressMonitor(1.0, subDelegates);
     }
 
     @Override
@@ -221,6 +221,6 @@ public class MultiProgressMonitor implements ProgressMonitor {
                 })
                 .toArray(ProgressMonitor[]::new);
 
-        return new MultiProgressMonitor(subDelegates);
+        return new MultiProgressMonitor(1.0, subDelegates);
     }
 }

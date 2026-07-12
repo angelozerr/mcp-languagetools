@@ -400,18 +400,25 @@ public class DownloadTask implements InstallerTask {
 
         @Override
         public void reportProgress(double progress, String message) {
-            // Don't scale progress - use the actual percentage for both badge and console
-            // Update the progress monitor (for badge display)
-            context.getProgress().reportProgress(progress, message);
-
-            // Update trace with MB/MB and % (directly from wrapper, like before)
-            if (trace != null && contentLength > 0) {
+            // Build a message that includes the download percentage
+            String progressMessage;
+            if (contentLength > 0) {
                 double fraction = progress / 100.0;
                 long downloaded = (long) (fraction * contentLength);
                 String downloadedMB = String.format("%.1f", downloaded / 1024.0 / 1024.0);
                 String totalMB = String.format("%.1f", contentLength / 1024.0 / 1024.0);
-                trace.update(String.format("Downloading %s: %s MB / %s MB (%.0f%%)",
-                        name, downloadedMB, totalMB, progress));
+                progressMessage = String.format("Downloading %s: %s MB / %s MB (%.0f%%)",
+                        name, downloadedMB, totalMB, progress);
+            } else {
+                progressMessage = String.format("Downloading %s (%.0f%%)", name, progress);
+            }
+
+            // Update the progress monitor (for badge display and MCP progress)
+            context.getProgress().reportProgress(progress, progressMessage);
+
+            // Update trace console
+            if (trace != null) {
+                trace.update(progressMessage);
             }
         }
 

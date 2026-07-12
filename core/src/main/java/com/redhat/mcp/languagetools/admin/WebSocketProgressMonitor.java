@@ -1,6 +1,10 @@
 package com.redhat.mcp.languagetools.admin;
 
+import com.redhat.mcp.languagetools.admin.ws.ProgressInitWsMessage;
 import com.redhat.mcp.languagetools.progress.AbstractProgressMonitor;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Progress monitor that broadcasts progress updates via WebSocket to Admin UI.
@@ -12,6 +16,7 @@ public class WebSocketProgressMonitor extends AbstractProgressMonitor {
     private final String taskId;
     private final String serverId;
     private final String title;
+    private boolean stepsInitialized = false;
 
     public WebSocketProgressMonitor(
             ProgressBroadcaster broadcaster,
@@ -25,18 +30,69 @@ public class WebSocketProgressMonitor extends AbstractProgressMonitor {
         this.title = title;
     }
 
+    /**
+     * Override addStep to broadcast steps to WebSocket when all steps are defined.
+     */
+    @Override
+    public void addStep(String stepId, double weight) {
+        super.addStep(stepId, weight);
+    }
+
+    /**
+     * Broadcast steps initialization to WebSocket.
+     * This should be called after all steps are added with addStep().
+     */
+    public void initializeSteps() {
+        if (stepsInitialized || broadcaster == null) {
+            return;
+        }
+
+        // Convert steps to ProgressInitWsMessage.StepInfo
+        List<ProgressInitWsMessage.StepInfo> stepInfos = new ArrayList<>();
+        for (var entry : getSteps().entrySet()) {
+            var stepInfo = entry.getValue();
+            stepInfos.add(new ProgressInitWsMessage.StepInfo(
+                stepInfo.getId(),
+                stepInfo.getWeight(),
+                stepInfo.getId()
+            ));
+        }
+
+        if (!stepInfos.isEmpty()) {
+            broadcaster.initTaskWithSteps(taskId, serverId, title, stepInfos, false);
+            stepsInitialized = true;
+        }
+    }
+
     @Override
     public void reportProgress(double progress, String message) {
-        setCurrent(progress);
+        double scaled = scaleToActiveStep(progress);
+        setCurrent(scaled);
         if (broadcaster != null) {
-            broadcaster.taskRunning(taskId, serverId, title, progress / total, message);
+            String stepId = getCurrentStepId();
+            Double stepProgress = null;
+            if (stepId != null) {
+                double frac = getStepLocalFraction(scaled);
+                if (frac >= 0) {
+                    stepProgress = frac;
+                }
+            }
+            broadcaster.taskRunning(taskId, serverId, title, scaled / total, message, stepId, stepProgress);
         }
     }
 
     @Override
     public void reportProgress(String message) {
         if (broadcaster != null) {
-            broadcaster.taskRunning(taskId, serverId, title, getCurrent() / total, message);
+            String stepId = getCurrentStepId();
+            Double stepProgress = null;
+            if (stepId != null) {
+                double frac = getStepLocalFraction(getCurrent());
+                if (frac >= 0) {
+                    stepProgress = frac;
+                }
+            }
+            broadcaster.taskRunning(taskId, serverId, title, getCurrent() / total, message, stepId, stepProgress);
         }
     }
 

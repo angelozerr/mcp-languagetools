@@ -27,19 +27,32 @@ public class SubProgressMonitor implements ProgressMonitor {
     private final String taskId;
     private final double startPercent;
     private final double endPercent;
+    // Track max to prevent regression when multiple sources share this monitor
+    private volatile double maxScaled;
 
     public SubProgressMonitor(ProgressMonitor parent, String taskId, double startPercent, double endPercent) {
         this.parent = parent;
         this.taskId = taskId;
         this.startPercent = startPercent;
         this.endPercent = endPercent;
+        this.maxScaled = startPercent;
     }
 
     @Override
     public void reportProgress(double progress, String message) {
-        // Scale progress to parent's range
+        // Scale progress (0.0-1.0) to parent's range and total
         double scaled = startPercent + (progress * (endPercent - startPercent));
-        parent.reportProgress(scaled, message);
+        if (scaled > maxScaled) {
+            maxScaled = scaled;
+        }
+        // Use maxScaled to prevent regression (e.g., when multiple servers
+        // share the same install monitor and one completes before the other)
+        double scaledValue = maxScaled * parent.getTotal();
+        if (parent instanceof AbstractProgressMonitor apm) {
+            apm.reportProgressFromStep(scaledValue, message);
+        } else {
+            parent.reportProgress(scaledValue, message);
+        }
     }
 
     @Override
@@ -49,8 +62,16 @@ public class SubProgressMonitor implements ProgressMonitor {
 
     @Override
     public void setComplete() {
-        // Report 100% within this sub-task's range
-        parent.reportProgress(endPercent, "Completed");
+        double scaled = endPercent;
+        if (scaled > maxScaled) {
+            maxScaled = scaled;
+        }
+        double scaledValue = maxScaled * parent.getTotal();
+        if (parent instanceof AbstractProgressMonitor apm) {
+            apm.reportProgressFromStep(scaledValue, "Completed");
+        } else {
+            parent.reportProgress(scaledValue, "Completed");
+        }
     }
 
     @Override
@@ -80,19 +101,19 @@ public class SubProgressMonitor implements ProgressMonitor {
 
     @Override
     public void addStep(String stepId, double weight) {
-        // Delegate to parent (but steps are scoped to this sub-monitor)
-        // For now, we don't support nested steps - keep it simple
-        throw new UnsupportedOperationException("Sub-monitors don't support nested steps yet");
+        // No-op: sub-monitors don't own steps, the parent does
     }
 
     @Override
     public ProgressMonitor beginStep(String stepId) {
-        throw new UnsupportedOperationException("Sub-monitors don't support nested steps yet");
+        // No-op: return this so callers can use a single code path
+        // regardless of whether the monitor has steps or not
+        return this;
     }
 
     @Override
     public void completeStep(String stepId) {
-        throw new UnsupportedOperationException("Sub-monitors don't support nested steps yet");
+        // No-op
     }
 
     @Override

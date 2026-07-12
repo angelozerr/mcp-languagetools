@@ -90,6 +90,10 @@ public interface ProgressMonitor {
      */
     void addStep(String stepId, double weight);
 
+    default void addStep(ProgressStep step, double weight) {
+        addStep(step.label(), weight);
+    }
+
     /**
      * Begin executing a step. Returns a sub-monitor scaled to this step's range.
      * Must be called in the same order as addStep().
@@ -100,6 +104,10 @@ public interface ProgressMonitor {
      */
     ProgressMonitor beginStep(String stepId);
 
+    default ProgressMonitor beginStep(ProgressStep step) {
+        return beginStep(step.label());
+    }
+
     /**
      * Mark a step as complete.
      * Optional - beginStep auto-completes the previous step.
@@ -107,6 +115,10 @@ public interface ProgressMonitor {
      * @param stepId Step identifier
      */
     void completeStep(String stepId);
+
+    default void completeStep(ProgressStep step) {
+        completeStep(step.label());
+    }
 
     /**
      * Start a tracked task/operation.

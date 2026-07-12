@@ -268,6 +268,11 @@
                 case 'dap-session-update':
                     handleDapSessionUpdate(message);
                     break;
+                case 'progress-init':
+                    if (typeof handleProgressInit === 'function') {
+                        handleProgressInit(message);
+                    }
+                    break;
                 case 'progress-update':
                     if (typeof handleProgressUpdate === 'function') {
                         handleProgressUpdate(message);

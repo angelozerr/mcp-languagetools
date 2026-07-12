@@ -14,6 +14,7 @@ package com.redhat.mcp.languagetools.progress;
 import org.jboss.logging.Logger;
 
 import java.util.List;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -56,10 +57,15 @@ public class SharedProgressMonitor extends AbstractProgressMonitor {
     public void reportProgress(double progress, String message) {
         setCurrent(progress);
 
+        // Normalize progress to a fraction (0.0-1.0), then scale to each listener's total.
+        // This prevents scale mismatch when listeners have different totals
+        // (e.g., SubProgressMonitor with total=1.0 receiving raw 0-100 values).
+        double fraction = total > 0 ? progress / total : 0.0;
+
         // Broadcast to all listeners
         for (ProgressMonitor listener : listeners) {
             try {
-                listener.reportProgress(progress, message);
+                listener.reportProgress(fraction * listener.getTotal(), message);
             } catch (Exception e) {
                 LOG.warnf(e, "Listener failed to receive progress update: %s", e.getMessage());
                 // Continue with other listeners
@@ -93,8 +99,10 @@ public class SharedProgressMonitor extends AbstractProgressMonitor {
 
     @Override
     public void checkCancelled() {
-        for (ProgressMonitor listener : listeners) {
-            listener.checkCancelled();
+        // Use isCancelled() which requires ALL listeners to be cancelled.
+        // One MCP client disconnecting must not kill a shared installation.
+        if (isCancelled()) {
+            throw new CancellationException("Operation cancelled");
         }
     }
 
@@ -115,13 +123,9 @@ public class SharedProgressMonitor extends AbstractProgressMonitor {
 
     @Override
     public boolean isCancelled() {
-        // Cancelled if ALL listeners are cancelled
-        // (Not just one - prevents one listener from cancelling shared work)
-        if (listeners.isEmpty()) {
-            return super.isCancelled();
-        }
-
-        return listeners.stream().allMatch(ProgressMonitor::isCancelled);
+        // Only check our own task-based cancellation (Admin UI cancel button).
+        // MCP client timeouts/disconnects must not kill shared installations.
+        return super.isCancelled();
     }
 
     @Override

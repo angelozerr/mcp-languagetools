@@ -1,9 +1,12 @@
 package com.redhat.mcp.languagetools.installer;
 
 import com.redhat.mcp.languagetools.admin.ProgressBroadcaster;
+import com.redhat.mcp.languagetools.admin.ws.ProgressInitWsMessage;
 import com.redhat.mcp.languagetools.progress.AbstractProgressMonitor;
 import com.redhat.mcp.languagetools.trace.TraceCollector;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -50,15 +53,42 @@ public class TraceProgressMonitor extends AbstractProgressMonitor {
         this.title = title;
     }
 
+    public void initializeSteps() {
+        if (broadcaster == null || taskId == null) {
+            return;
+        }
+        List<ProgressInitWsMessage.StepInfo> stepInfos = new ArrayList<>();
+        for (var entry : getSteps().entrySet()) {
+            var stepInfo = entry.getValue();
+            stepInfos.add(new ProgressInitWsMessage.StepInfo(
+                    stepInfo.getId(),
+                    stepInfo.getWeight(),
+                    stepInfo.getId()
+            ));
+        }
+        if (!stepInfos.isEmpty()) {
+            broadcaster.initTaskWithSteps(taskId, serverId, title, stepInfos, true);
+        }
+    }
+
     @Override
     public void reportProgress(double progress, String message) {
-        setCurrent(progress);
+        double scaled = scaleToActiveStep(progress);
+        setCurrent(scaled);
         this.currentText = message;
 
         // Broadcast to Admin UI if configured
         if (broadcaster != null && taskId != null) {
-            double fraction = total > 0 ? current / total : 0.0;
-            broadcaster.taskRunning(taskId, serverId, title, fraction, message);
+            double fraction = total > 0 ? scaled / total : 0.0;
+            String stepId = getCurrentStepId();
+            Double stepProgress = null;
+            if (stepId != null) {
+                double frac = getStepLocalFraction(scaled);
+                if (frac >= 0) {
+                    stepProgress = frac;
+                }
+            }
+            broadcaster.taskRunning(taskId, serverId, title, fraction, message, stepId, stepProgress);
         }
     }
 
@@ -72,7 +102,15 @@ public class TraceProgressMonitor extends AbstractProgressMonitor {
         // Broadcast to Admin UI if configured
         if (broadcaster != null && taskId != null) {
             double fraction = total > 0 ? current / total : 0.0;
-            broadcaster.taskRunning(taskId, serverId, title, fraction, message);
+            String stepId = getCurrentStepId();
+            Double stepProgress = null;
+            if (stepId != null) {
+                double frac = getStepLocalFraction(current);
+                if (frac >= 0) {
+                    stepProgress = frac;
+                }
+            }
+            broadcaster.taskRunning(taskId, serverId, title, fraction, message, stepId, stepProgress);
         }
     }
 
@@ -83,6 +121,12 @@ public class TraceProgressMonitor extends AbstractProgressMonitor {
         // Broadcast completion
         if (broadcaster != null && taskId != null) {
             broadcaster.taskCompleted(taskId, serverId, title);
+        }
+    }
+
+    public void setFailed(String message) {
+        if (broadcaster != null && taskId != null) {
+            broadcaster.taskFailed(taskId, serverId, title, message);
         }
     }
 
