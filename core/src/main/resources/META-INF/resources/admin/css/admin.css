@@ -33,7 +33,7 @@ body {
 .app-container {
     display: grid;
     grid-template-columns: 400px 300px 1fr;
-    height: 100vh;
+    height: calc(100vh - 2rem);
 }
 
 /* Left sidebar - Workspaces */
@@ -406,7 +406,7 @@ body {
     display: flex;
     flex-direction: column;
     position: relative;
-    height: 100vh;
+    height: 100%;
     overflow: hidden;
 }
 
