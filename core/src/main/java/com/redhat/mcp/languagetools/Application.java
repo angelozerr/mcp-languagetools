@@ -184,6 +184,10 @@ public class Application {
             }
 
             if (config.canHandle(fileUri.toString(), language)) {
+                // Before starting this server, ensure all contribution-only configs that
+                // target it have their installation completed (e.g. lemminx-liberty → lemminx).
+                ensureContributorsInstalled(config.getServerId(), progressMonitor);
+
                 // Check if server already exists in workspace
                 if (!workspace.hasLspServer(config.getServerId())) {
                     LOG.infof("Need %s for language '%s' in workspace: %s",
@@ -395,6 +399,31 @@ public class Application {
                     // Fire workspace closed event
                     sendWorkspaceChangeEvent(WorkspaceChangeEvent.Type.CLOSED, workspaceUri);
                 });
+    }
+
+    /**
+     * Synchronously ensure all contribution-only configs that target the given serverId
+     * have their installation completed before the target server starts.
+     * This is needed so classpath contributors (e.g. lemminx-liberty → lemminx) have
+     * their JARs on disk before the target server builds its launch command.
+     */
+    private void ensureContributorsInstalled(String targetServerId, ProgressMonitor progressMonitor) {
+        for (LspServerConfig config : lspServerConfigs.values()) {
+            if (!config.isContributionOnly()) {
+                continue;
+            }
+            var contributes = config.getContributes();
+            if (contributes == null || contributes.getContribution(targetServerId) == null) {
+                continue;
+            }
+            // Trigger installation synchronously (blocks until JAR is on disk)
+            try {
+                config.ensureInstalled(pathManager, null, progressMonitor).get();
+                LOG.infof("Contributor '%s' installed for target '%s'", config.getServerId(), targetServerId);
+            } catch (Exception e) {
+                LOG.warnf("Failed to install contributor '%s': %s", config.getServerId(), e.getMessage());
+            }
+        }
     }
 
     /**

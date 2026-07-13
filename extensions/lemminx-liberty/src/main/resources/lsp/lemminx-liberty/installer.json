@@ -1,0 +1,17 @@
+{
+  "id": "lemminx-liberty",
+  "name": "LemMinX Liberty Extension",
+  "check": {
+    "fileExists": {
+      "name": "Check if LemMinX Liberty plugin is installed",
+      "file": "$SERVER_HOME$/lib/liberty-langserver-lemminx.jar"
+    }
+  },
+  "run": {
+    "copy": {
+      "name": "Copy bundled LemMinX Liberty plugin",
+      "source": "/lsp/lemminx-liberty/lib/liberty-langserver-lemminx.jar",
+      "destination": "$SERVER_HOME$/lib/liberty-langserver-lemminx.jar"
+    }
+  }
+}

@@ -19,5 +19,12 @@
     "aliases": ["Properties"],
     "filenames": [],
     "filenamePatterns": []
+  },
+  {
+    "id": "server-env",
+    "extensions": [".env"],
+    "aliases": ["Server Env"],
+    "filenames": ["server.env"],
+    "filenamePatterns": []
   }
 ]

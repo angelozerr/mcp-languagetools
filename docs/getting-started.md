@@ -68,11 +68,13 @@ Listening on: http://localhost:7654
 
 ---
 
-## Step 2: Configure Claude, Bob
+## Step 2: Configure Claude / Bob
 
-### Add MCP Language Tools to Claude, Bob
+### Option A: Connect Bob IDE
 
-See doc at Claude/Bob to register MCP Server like this:
+Bob stores its MCP server configuration in `~/.bob/mcp.json`.
+
+**1. Open (or create) `~/.bob/mcp.json`** and add the entry:
 
 ```json
 {
@@ -85,21 +87,67 @@ See doc at Claude/Bob to register MCP Server like this:
 }
 ```
 
-### Restart Claude/Bob
+If the file already contains other servers, add only the `"mcp-languagetools"` entry inside the existing `"mcpServers"` object.
 
-Close and reopen Claude.
+**2. Restart Bob** (close all Bob windows / terminals and reopen).
 
-### Open a project folder in Claude
+**3. Verify the tools are available** — in any Bob session run:
+
+```
+/tools
+```
+
+You should see `get_diagnostics` and `find_references` listed under `mcp-languagetools`.
+
+**4. Open your project folder** in a Bob session:
 
 ```shell
-cd microprofile-health-3
+cd your-project
+bob
+```
+
+Bob automatically passes the current working directory as the workspace root to MCP Language Tools.
+
+---
+
+### Option B: Connect Claude Desktop
+
+**1. Open the Claude Desktop config file**:
+
+- **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+
+**2. Add the MCP server entry**:
+
+```json
+{
+  "mcpServers": {
+    "mcp-languagetools": {
+      "type": "http",
+      "url": "http://localhost:7654/mcp"
+    }
+  }
+}
+```
+
+**3. Restart Claude Desktop** — close the app completely and reopen it.
+
+**4. Open your project folder** with Claude Code:
+
+```shell
+cd your-project
 claude
 ```
 
-```shell
-cd microprofile-health-3
-bob
-```
+---
+
+### Verify the Connection
+
+After restarting your MCP client, confirm the connection is live:
+
+1. Open the Admin UI at `http://localhost:7654/admin`
+2. Go to the **MCP** tab
+3. You should see your client (`bob` or `claude-code`) listed under **AI Clients** with a green connected status
 
 ## Step 3: Try It Out - MicroProfile Example
 
@@ -233,6 +281,7 @@ Out of the box:
 - ✅ **Qute Templates** (Qute LS)
 - ✅ **XML** (LemMinX) - server.xml, pom.xml, etc.
 - ✅ **Properties files**
+- ✅ **Liberty** (`bootstrap.properties`, `server.env`, `server.xml`)
 
 ---
 
@@ -250,6 +299,11 @@ Check `extensions/` folder for available language servers:
 - `microprofile` - MicroProfile
 - `qute` - Qute templates
 - `lemminx` - XML
+- `liberty-ls` - Liberty config files
+
+### Test the Liberty Integration
+📖 **[Liberty Testing Guide](./liberty-testing.md)** — step-by-step test using the
+ready-made `test-projects/liberty-config/` project with intentional errors.
 
 ### Try Advanced Features
 - Ask Claude to fix validation errors

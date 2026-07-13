@@ -1,0 +1,15 @@
+{
+  "id": "liberty-ls",
+  "name": "Liberty Config Language Server",
+  "description": "Language server for Liberty bootstrap.properties and server.env files",
+  "command": "java -jar ${serverHome}/liberty-langserver.jar",
+  "documentSelector": [
+    {
+      "language": "properties",
+      "pattern": "**/bootstrap.properties"
+    },
+    {
+      "language": "server-env"
+    }
+  ]
+}

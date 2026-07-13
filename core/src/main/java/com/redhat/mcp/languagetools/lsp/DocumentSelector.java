@@ -1,5 +1,7 @@
 package com.redhat.mcp.languagetools.lsp;
 
+import java.util.regex.Pattern;
+
 /**
  * Document selector as defined in LSP specification.
  * Determines which files a language server is interested in.
@@ -54,11 +56,21 @@ public class DocumentSelector {
 
         // Check pattern (simple glob matching)
         if (this.pattern != null) {
-            String globRegex = this.pattern
-                    .replace(".", "\\.")
-                    .replace("**", ".*")
-                    .replace("*", "[^/]*");
-            return uri.matches(globRegex);
+            // Build the regex by splitting on glob tokens so that
+            // literal characters (including '.') are properly escaped
+            // and '**' / '*' are expanded without interfering with each other.
+            String[] parts = this.pattern.split("(?<=\\*\\*)|(?=\\*\\*)|(?<=[^*])(?=\\*)|(?<=\\*)(?=[^*])", -1);
+            StringBuilder globRegex = new StringBuilder();
+            for (String part : parts) {
+                if ("**".equals(part)) {
+                    globRegex.append(".*");
+                } else if ("*".equals(part)) {
+                    globRegex.append("[^/]*");
+                } else {
+                    globRegex.append(Pattern.quote(part));
+                }
+            }
+            return uri.matches(globRegex.toString());
         }
 
         return true;
