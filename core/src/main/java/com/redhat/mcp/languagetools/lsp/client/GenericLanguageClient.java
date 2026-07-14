@@ -7,6 +7,7 @@ import org.eclipse.lsp4j.jsonrpc.Endpoint;
 import org.eclipse.lsp4j.services.LanguageClient;
 import org.jboss.logging.Logger;
 
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -68,7 +69,11 @@ public class GenericLanguageClient extends BindEndpointSupport implements Langua
         return CompletableFuture.completedFuture(null);
     }
 
-    // ===== Endpoint implementation for bindRequest routing (inherited from BindEndpointSupport) =====
-    // request() and notify() methods are provided by BindEndpointSupport base class
-
+    @Override
+    public CompletableFuture<List<Object>> configuration(ConfigurationParams configurationParams) {
+        List<Object> settings = configurationParams.getItems().stream()
+                .map(item -> (Object) null)
+                .toList();
+        return CompletableFuture.completedFuture(settings);
+    }
 }
