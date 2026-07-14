@@ -785,6 +785,21 @@ body {
     border-color: #007acc;
 }
 
+.editor-separator {
+    width: 1px;
+    background: #555;
+    align-self: stretch;
+    margin: 2px 0;
+}
+
+.install-run-btn {
+    color: #4ec9b0 !important;
+}
+
+.install-force-btn {
+    color: #dcdcaa !important;
+}
+
 .json-editor {
     width: 100%;
     min-height: 300px;

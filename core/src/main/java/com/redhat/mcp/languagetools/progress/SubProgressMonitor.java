@@ -100,8 +100,9 @@ public class SubProgressMonitor implements ProgressMonitor {
     }
 
     @Override
-    public void addStep(String stepId, double weight) {
+    public ProgressMonitor addStep(String stepId, double weight) {
         // No-op: sub-monitors don't own steps, the parent does
+        return this;
     }
 
     @Override

@@ -21,6 +21,8 @@ public class InstallerContext {
     private final ServerConfigBase config;
     private final Consumer<InstallationStatus> statusChangeCallback;
 
+    private boolean forceInstall;
+
     private static final Pattern VARIABLE_PATTERN = Pattern.compile("\\$\\{([^}]+)}|\\$([A-Z_]+)\\$");
 
     public InstallerContext(ServerConfigBase config, ProgressMonitor progress) {
@@ -104,6 +106,14 @@ public class InstallerContext {
         matcher.appendTail(result);
 
         return result.toString();
+    }
+
+    public boolean isForceInstall() {
+        return forceInstall;
+    }
+
+    public void setForceInstall(boolean forceInstall) {
+        this.forceInstall = forceInstall;
     }
 
     /**

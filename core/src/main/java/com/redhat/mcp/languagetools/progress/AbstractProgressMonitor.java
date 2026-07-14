@@ -119,7 +119,7 @@ public abstract class AbstractProgressMonitor implements ProgressMonitor {
     }
 
     @Override
-    public void addStep(String stepId, double weight) {
+    public ProgressMonitor addStep(String stepId, double weight) {
         if (weight <= 0) {
             throw new IllegalArgumentException("Step weight must be positive: " + weight);
         }
@@ -128,13 +128,14 @@ public abstract class AbstractProgressMonitor implements ProgressMonitor {
         // This makes it safer: ranges are always recalculated based on current state
         steps.put(stepId, new StepInfo(stepId, weight, 0.0, 0.0));
         totalWeight += weight;
+        return this;
     }
 
     @Override
     public ProgressMonitor beginStep(String stepId) {
         StepInfo step = steps.get(stepId);
         if (step == null) {
-            throw new IllegalArgumentException("Step not declared: " + stepId + ". Call addStep() first.");
+            return this;
         }
 
         // Auto-complete previous step

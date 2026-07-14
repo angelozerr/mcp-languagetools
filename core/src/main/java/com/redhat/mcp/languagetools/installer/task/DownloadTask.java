@@ -57,12 +57,12 @@ public class DownloadTask implements InstallerTask {
     @Override
     public boolean execute(InstallerContext context) {
         context.checkCanceled();
+        context.getProgress().beginStep(getName());
 
         // Get download URL (try asset fetcher first, fallback to direct URL)
         String resolvedUrl = getDownloadUrl(context);
         if (resolvedUrl == null) {
-            LOG.error("No download URL available");
-            return false;
+            throw new IllegalStateException("No download URL available for '" + name + "'");
         }
 
         String resolvedOutputDir = context.resolveVariables(outputInfo.outputDir());
@@ -96,17 +96,16 @@ public class DownloadTask implements InstallerTask {
 
                 // Decompress based on file extension, or simply copy if not an archive
                 DecompressorUtils.Decompressor decompressor = DecompressorUtils.getDecompressor(downloadedFile);
+                context.getProgress().beginStep(getExtractStepName(name));
                 if (decompressor != null) {
-                    // Archive file - extract it
-                    // Don't call reportProgress here - keep the current progress from download
+                    context.getProgress().reportProgress("Extracting " + name);
                     if (trace != null) {
                         trace.update("Extracting " + name);
                     }
 
-                    Path rootDir = decompressor.decompress(downloadedFile, outputPath);
+                    Path rootDir = decompressor.decompress(downloadedFile, outputPath, context.getProgress());
                 } else {
-                    // Not an archive - copy the file directly
-                    // Don't call reportProgress here - keep the current progress from download
+                    context.getProgress().reportProgress("Installing " + name);
                     if (trace != null) {
                         trace.update("Installing " + name);
                     }
@@ -162,13 +161,24 @@ public class DownloadTask implements InstallerTask {
             if (trace != null) {
                 trace.error("Download failed: " + e.getMessage());
             }
-            return false;
+            throw new IllegalStateException("Download '" + name + "' failed: " + e.getMessage(), e);
         }
     }
 
     @Override
     public String getName() {
         return name;
+    }
+
+    /**
+     * Derive the extract step name from a download task name.
+     * "Download vscode-js-debug" → "Extract vscode-js-debug"
+     */
+    public static String getExtractStepName(String downloadName) {
+        if (downloadName.startsWith("Download ")) {
+            return "Extract " + downloadName.substring("Download ".length());
+        }
+        return "Extract " + downloadName;
     }
 
     /**
@@ -212,6 +222,9 @@ public class DownloadTask implements InstallerTask {
         private static final String MAVEN_JSON_PROPERTY = "maven";
         private static final String MAVEN_GROUP_ID_JSON_PROPERTY = "groupId";
         private static final String MAVEN_ARTIFACT_ID_JSON_PROPERTY = "artifactId";
+        private static final String OPENVSX_JSON_PROPERTY = "openvsx";
+        private static final String OPENVSX_NAMESPACE_JSON_PROPERTY = "namespace";
+        private static final String OPENVSX_EXTENSION_NAME_JSON_PROPERTY = "extensionName";
         private static final String OUTPUT_JSON_PROPERTY = "output";
         private static final String OUTPUT_DIR_JSON_PROPERTY = "dir";
         private static final String OUTPUT_FILE_JSON_PROPERTY = "file";
@@ -288,7 +301,11 @@ public class DownloadTask implements InstallerTask {
             if (assetFetcher != null) {
                 return assetFetcher;
             }
-            return getMavenArtifactFetcher(json);
+            assetFetcher = getMavenArtifactFetcher(json);
+            if (assetFetcher != null) {
+                return assetFetcher;
+            }
+            return getOpenVsxAssetFetcher(json);
         }
 
         private AssetFetcherInfo getGithubAssetFetcher(JsonObject json) {
@@ -333,6 +350,27 @@ public class DownloadTask implements InstallerTask {
             String artifactId = mavenObj.get(MAVEN_ARTIFACT_ID_JSON_PROPERTY).getAsString();
 
             var assetFetcher = InstallerTaskFactory.getMavenArtifactFetcherManager().getArtifactFetcher(groupId, artifactId);
+            return new AssetFetcherInfo(assetFetcher,
+                    obj -> true,
+                    obj -> true);
+        }
+
+        private AssetFetcherInfo getOpenVsxAssetFetcher(JsonObject json) {
+            if (!json.has(OPENVSX_JSON_PROPERTY)) {
+                return null;
+            }
+            JsonElement openvsxElement = json.get(OPENVSX_JSON_PROPERTY);
+            if (!openvsxElement.isJsonObject()) {
+                return null;
+            }
+            JsonObject openvsxObj = openvsxElement.getAsJsonObject();
+            if (!openvsxObj.has(OPENVSX_NAMESPACE_JSON_PROPERTY) || !openvsxObj.has(OPENVSX_EXTENSION_NAME_JSON_PROPERTY)) {
+                return null;
+            }
+            String namespace = openvsxObj.get(OPENVSX_NAMESPACE_JSON_PROPERTY).getAsString();
+            String extensionName = openvsxObj.get(OPENVSX_EXTENSION_NAME_JSON_PROPERTY).getAsString();
+
+            var assetFetcher = InstallerTaskFactory.getOpenVsxAssetFetcherManager().getAssetFetcher(namespace, extensionName);
             return new AssetFetcherInfo(assetFetcher,
                     obj -> true,
                     obj -> true);

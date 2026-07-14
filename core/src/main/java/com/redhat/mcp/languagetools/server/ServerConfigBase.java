@@ -8,6 +8,7 @@ import com.redhat.mcp.languagetools.lsp.DocumentSelector;
 import com.redhat.mcp.languagetools.progress.ProgressMonitor;
 import com.redhat.mcp.languagetools.progress.SharedProgressMonitor;
 import com.redhat.mcp.languagetools.trace.TraceCollector;
+import org.jboss.logging.Logger;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -20,6 +21,8 @@ import java.util.function.Consumer;
  * Contains common fields: id, name, description, installer, documentSelector.
  */
 public abstract class ServerConfigBase implements ServerConfig {
+
+    private static final Logger LOG = Logger.getLogger(ServerConfigBase.class);
 
     private final String serverId;
     private final Path serverHome;
@@ -193,6 +196,19 @@ public abstract class ServerConfigBase implements ServerConfig {
     }
 
     /**
+     * Reset installation state so the next ensureInstalled call starts fresh.
+     * Called from admin UI endpoints when the user explicitly requests an install.
+     */
+    public void resetInstallState() {
+        synchronized (this) {
+            CompletableFuture<InstallResult> future = installationFuture;
+            if (future != null && future.isDone()) {
+                installationFuture = null;
+            }
+        }
+    }
+
+    /**
      * Ensure server is installed.
      * This method is thread-safe - only one installation will run even if called from multiple workspaces.
      * Returns a CompletableFuture that completes when installation is done.
@@ -205,13 +221,29 @@ public abstract class ServerConfigBase implements ServerConfig {
     public CompletableFuture<InstallResult> ensureInstalled(PathManager pathManager,
                                                             Consumer<ServerStatus> serverStatusCallback,
                                                             ProgressMonitor progressMonitor) {
+        return ensureInstalled(pathManager, serverStatusCallback, progressMonitor, false);
+    }
+
+    public CompletableFuture<InstallResult> ensureInstalled(PathManager pathManager,
+                                                            Consumer<ServerStatus> serverStatusCallback,
+                                                            ProgressMonitor progressMonitor,
+                                                            boolean force) {
         // progressMonitor must never be null - use ProgressMonitor.none() instead
         // If null, let it fail with NullPointerException to catch bugs early
 
         ServerInstaller installer = getInstaller();
         if (installer == null) {
-            // No installer - server is assumed to be already available
+            LOG.warnf("No installer for server '%s' (installerConfig=%s)", serverId, installerConfig != null ? "present" : "NULL");
             return CompletableFuture.completedFuture(null);
+        }
+        LOG.infof("ensureInstalled called for '%s', force=%s, installationFuture=%s",
+                serverId, force, installationFuture != null ? (installationFuture.isDone() ? "done" : "running") : "null");
+
+        // Force install: reset previous installation state
+        if (force) {
+            synchronized (this) {
+                installationFuture = null;
+            }
         }
 
         // Double-checked locking pattern
@@ -251,6 +283,7 @@ public abstract class ServerConfigBase implements ServerConfig {
 
                     InstallerContext context = new InstallerContext(this, sharedInstallProgress, installStatusCallback);
                     context.setVariable("USER_HOME", pathManager.getMcpLangToolsRoot().toString());
+                    context.setForceInstall(force);
 
                     future = installer.ensureInstalled(context)
                             .whenComplete((result, error) -> {

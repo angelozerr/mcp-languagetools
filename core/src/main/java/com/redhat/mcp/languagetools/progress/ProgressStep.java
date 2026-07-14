@@ -5,6 +5,7 @@ package com.redhat.mcp.languagetools.progress;
  */
 public enum ProgressStep {
 
+    CHECKING("Checking"),
     INSTALLING("Installing"),
     STARTING("Starting"),
     INITIALIZING("Initializing"),

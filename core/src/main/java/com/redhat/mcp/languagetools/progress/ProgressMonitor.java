@@ -88,10 +88,10 @@ public interface ProgressMonitor {
      * @param stepId Unique identifier for this step
      * @param weight Relative weight of this step (e.g., 0.4 for 40%)
      */
-    void addStep(String stepId, double weight);
+    ProgressMonitor addStep(String stepId, double weight);
 
-    default void addStep(ProgressStep step, double weight) {
-        addStep(step.label(), weight);
+    default ProgressMonitor addStep(ProgressStep step, double weight) {
+        return addStep(step.label(), weight);
     }
 
     /**

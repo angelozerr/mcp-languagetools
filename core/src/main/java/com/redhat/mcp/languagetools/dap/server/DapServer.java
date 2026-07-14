@@ -109,14 +109,33 @@ public class DapServer extends ServerBase<DapServerConfig> {
      *   <li><b>Embedded</b>: Calls LSP method via {@code launchMethod} to get DAP port</li>
      * </ul>
      */
-    public CompletableFuture<Void> start() {
-        // Common startup checks and preparation
+    public final CompletableFuture<Void> start(ProgressMonitor progressMonitor) {
         if (!checkAndPrepareStart()) {
             return CompletableFuture.completedFuture(null);
         }
 
-        // Start in standalone mode (launch external process)
-        return startStandalone();
+        return withErrorLogging(
+            getConfig().ensureInstalled(
+                    getWorkspace().getApplication().getPathManager(),
+                    this::setStatus,
+                    progressMonitor)
+                .thenCompose(v -> doStart()),
+            getTraceCollector(),
+            sessionId
+        );
+    }
+
+    /**
+     * Subclass hook called after installation is ensured.
+     * Standalone servers launch a process; embedded servers (e.g., java-debug) can just set RUNNING.
+     */
+    protected CompletableFuture<Void> doStart() {
+        if (getConfig().getLaunchForCurrentOS() != null) {
+            return startServerProcess()
+                .thenCompose(this::waitForServerReady)
+                .thenCompose(this::createLauncher);
+        }
+        return CompletableFuture.completedFuture(null);
     }
 
     /**
@@ -133,25 +152,6 @@ public class DapServer extends ServerBase<DapServerConfig> {
             String sessionId) {
         // Default implementation: return config as-is
         return CompletableFuture.completedFuture(launchConfig);
-    }
-
-    /**
-     * Start in standalone mode: launch external process.
-     * Used for DAP servers that run as separate processes (e.g., vscode-js-debug).
-     */
-    private CompletableFuture<Void> startStandalone() {
-        // Ensure server is installed first (DAP servers don't support progress monitoring during start)
-        return withErrorLogging(
-            getConfig().ensureInstalled(
-                    getWorkspace().getApplication().getPathManager(),
-                    this::setStatus,
-                    ProgressMonitor.none())
-                .thenCompose(v -> startServerProcess())
-                .thenCompose(this::waitForServerReady)
-                .thenCompose(this::createLauncher),
-            getTraceCollector(),
-            sessionId
-        );
     }
 
     /**

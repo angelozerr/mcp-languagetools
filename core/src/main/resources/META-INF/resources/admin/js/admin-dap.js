@@ -766,11 +766,13 @@ async function showDapServerDetails(serverId) {
                             <div class="editor-actions">
                                 <button class="editor-btn" onclick="saveDapInstallerJson('${server.id}')" title="Save">💾 Save</button>
                                 <button class="editor-btn" onclick="resetDapInstallerJson('${server.id}')" title="Reset">↻ Reset</button>
+                                <span class="editor-separator"></span>
+                                <button class="editor-btn install-run-btn" onclick="runDapInstaller('${server.id}', false)" title="Install (check first, skip if already installed)">▶ Install</button>
+                                <button class="editor-btn install-force-btn" onclick="runDapInstaller('${server.id}', true)" title="Force Install (skip check, always re-install)">⟳ Force Install</button>
                             </div>
                         </div>
                         <textarea id="dap-installer-json-editor" class="json-editor" spellcheck="false"></textarea>
                     </div>
-                    <button class="install-button" onclick="runDapInstaller('${server.id}')">▶ Run Installer</button>
                     <div id="dap-install-output" class="install-output"></div>
                 </div>
             </div>
@@ -804,7 +806,7 @@ function switchDapServerTab(tab) {
  */
 async function loadDapInstallerJson(serverId) {
     try {
-        const response = await fetch(`/api/admin/dap-servers/${serverId}/installer`);
+        const response = await fetch(`/api/admin/dap/configs/${serverId}/installer`);
         if (!response.ok) throw new Error('Failed to load installer.json');
 
         const installerJson = await response.json();
@@ -831,7 +833,7 @@ async function saveDapInstallerJson(serverId) {
     try {
         const installerJson = JSON.parse(editor.value);
 
-        const response = await fetch(`/api/admin/dap-servers/${serverId}/installer`, {
+        const response = await fetch(`/api/admin/dap/configs/${serverId}/installer`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(installerJson)
@@ -860,27 +862,27 @@ async function resetDapInstallerJson(serverId) {
 /**
  * Run installer for a DAP server.
  */
-async function runDapInstaller(serverId) {
+async function runDapInstaller(serverId, force) {
     const outputDiv = document.getElementById('dap-install-output');
     if (!outputDiv) return;
 
-    outputDiv.innerHTML = '<div style="color: #4ec9b0;">Running installer...</div>';
+    const label = force ? 'Force installing' : 'Installing';
+    outputDiv.innerHTML = `<div style="color: #4ec9b0;">${label}...</div>`;
 
     try {
-        const response = await fetch(`/api/admin/dap-servers/${serverId}/install`, {
-            method: 'POST'
-        });
+        const url = `/api/admin/dap/configs/${serverId}/install${force ? '?force=true' : ''}`;
+        const response = await fetch(url, { method: 'POST' });
 
         if (!response.ok) throw new Error('Installation failed');
 
         const result = await response.json();
         outputDiv.innerHTML = `
-            <div style="color: #4ec9b0;">✓ Installation completed successfully</div>
+            <div style="color: #4ec9b0;">✓ Installation started</div>
             <pre style="margin-top: 0.5rem; color: #d4d4d4;">${JSON.stringify(result, null, 2)}</pre>
         `;
     } catch (error) {
         console.error('Failed to run DAP installer:', error);
-        outputDiv.innerHTML = `<div style="color: #f48771;">❌ Installation failed: ${error.message}</div>`;
+        outputDiv.innerHTML = `<div style="color: #f48771;">✗ Installation failed: ${error.message}</div>`;
     }
 }
 

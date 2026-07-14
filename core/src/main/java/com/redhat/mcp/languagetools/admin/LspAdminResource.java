@@ -10,6 +10,7 @@ import com.redhat.mcp.languagetools.admin.dto.LspConfigDTO;
 import com.redhat.mcp.languagetools.admin.dto.ServerDTOBuilder;
 import com.redhat.mcp.languagetools.admin.dto.StatusResponse;
 import com.redhat.mcp.languagetools.config.GlobalConfiguration;
+import com.redhat.mcp.languagetools.installer.TaskRegistryInstaller;
 import com.redhat.mcp.languagetools.installer.TraceProgressMonitor;
 import com.redhat.mcp.languagetools.lsp.server.LspServer;
 import com.redhat.mcp.languagetools.lsp.server.LspServerConfig;
@@ -144,6 +145,43 @@ public class LspAdminResource {
         }
     }
 
+    /**
+     * Run installer for an LSP server.
+     */
+    @POST
+    @Path("/configs/{serverId}/install")
+    public Response runInstaller(@PathParam("serverId") String serverId,
+                                 @QueryParam("force") @DefaultValue("false") boolean force) {
+        LspServerConfig config = application.getLspServerConfig(serverId);
+        if (config == null) {
+            throw new NotFoundException("LSP server not found: " + serverId);
+        }
+        if (config.getInstaller() == null) {
+            return Response.status(404).entity(new ErrorResponse("No installer configured for: " + serverId)).build();
+        }
+
+        String taskId = "install-" + serverId;
+        String title = "Install " + serverId;
+        TraceProgressMonitor progressMonitor = new TraceProgressMonitor(
+                config.getTraceCollector(), 100.0, progressBroadcaster, taskId, serverId, title);
+        TaskRegistryInstaller.configureInstallerSteps(progressMonitor, config.getInstallerConfig(), force);
+        progressMonitor.initializeSteps();
+
+        config.resetInstallState();
+        config.ensureInstalled(application.getPathManager(), null, progressMonitor, force)
+                .whenComplete((result, ex) -> {
+                    if (ex != null) {
+                        Throwable cause = ex.getCause() != null ? ex.getCause() : ex;
+                        LOG.errorf(ex, "Failed to install server '%s'", serverId);
+                        progressMonitor.setFailed(cause.getMessage());
+                    } else {
+                        progressMonitor.setComplete();
+                    }
+                });
+
+        return Response.ok().entity(new StatusResponse("installing")).build();
+    }
+
     // ========== LSP Server Control ==========
 
     /**
@@ -196,10 +234,13 @@ public class LspAdminResource {
                     server.getTraceCollector(), taskId, serverId, title);
 
             workspace.restartLspServer(serverId, progressMonitor)
-                    .exceptionally(ex -> {
-                        LOG.errorf(ex, "Failed to restart server '%s'", serverId);
-                        progressMonitor.setFailed(ex.getMessage());
-                        return null;
+                    .whenComplete((result, ex) -> {
+                        if (ex != null) {
+                            LOG.errorf(ex, "Failed to restart server '%s'", serverId);
+                            progressMonitor.setFailed(ex.getMessage());
+                        } else {
+                            progressMonitor.setComplete();
+                        }
                     });
 
             return Response.ok().entity(new StatusResponse("restarted")).build();
@@ -232,10 +273,13 @@ public class LspAdminResource {
                         existingServer.getTraceCollector(), taskId, serverId, title);
 
                 workspace.startManagedLspServer(serverId, progressMonitor)
-                        .exceptionally(ex -> {
-                            LOG.errorf(ex, "Failed to start server '%s'", serverId);
-                            progressMonitor.setFailed(ex.getMessage());
-                            return null;
+                        .whenComplete((result, ex) -> {
+                            if (ex != null) {
+                                LOG.errorf(ex, "Failed to start server '%s'", serverId);
+                                progressMonitor.setFailed(ex.getMessage());
+                            } else {
+                                progressMonitor.setComplete();
+                            }
                         });
             } else {
                 application.ensureServerStarted(serverId, workspaceUri);
@@ -302,6 +346,7 @@ public class LspAdminResource {
                     server.getTraceCollector(), 100.0, progressBroadcaster, taskId, serverId, title);
 
             workspace.restartLspServer(serverId, progressMonitor).join();
+            progressMonitor.setComplete();
 
             return Response.ok().entity(new StatusResponse("connected")).build();
         } catch (Exception e) {

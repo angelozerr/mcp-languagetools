@@ -137,7 +137,7 @@ public class MultiProgressMonitor implements ProgressMonitor {
     }
 
     @Override
-    public void addStep(String stepId, double weight) {
+    public ProgressMonitor addStep(String stepId, double weight) {
         for (ProgressMonitor delegate : delegates) {
             try {
                 delegate.addStep(stepId, weight);
@@ -145,6 +145,7 @@ public class MultiProgressMonitor implements ProgressMonitor {
                 // Don't let one delegate's failure break others
             }
         }
+        return this;
     }
 
     @Override

@@ -7,6 +7,7 @@ import com.redhat.mcp.languagetools.dap.server.DapServerConfig;
 import com.redhat.mcp.languagetools.dap.server.DapServerFactoryRegistry;
 import com.redhat.mcp.languagetools.dap.trace.DapTraceCollector;
 import com.redhat.mcp.languagetools.progress.ProgressMonitor;
+import com.redhat.mcp.languagetools.progress.ProgressStep;
 import com.redhat.mcp.languagetools.server.ServerStatus;
 import com.redhat.mcp.languagetools.trace.TraceCollector;
 import com.redhat.mcp.languagetools.workspace.Workspace;
@@ -311,9 +312,9 @@ public class DapSession implements DapEventListener {
      * Initialize the DAP server and establish connection.
      * Installation happens automatically inside dapServer.start().
      */
-    public CompletableFuture<Void> initialize() {
+    public CompletableFuture<Void> initialize(ProgressMonitor progressMonitor) {
         LOG.infof("Initializing DAP session: %s (%s)", sessionName, sessionId);
-        return trackFuture(dapServer.start()
+        return trackFuture(dapServer.start(progressMonitor)
                 .thenAccept(v -> {
                     // Server is now RUNNING, session stays CREATED until launch
                     LOG.infof("DAP session initialized: %s", sessionId);
@@ -433,6 +434,7 @@ public class DapSession implements DapEventListener {
 
         // Report progress: Starting debug adapter
         if (progressMonitor != null) {
+            progressMonitor.beginStep(ProgressStep.STARTING);
             progressMonitor.reportProgress(10.0, "Starting debug adapter");
         }
 
@@ -446,14 +448,14 @@ public class DapSession implements DapEventListener {
             LOG.infof("Session TERMINATED but server RUNNING - stopping server to clear state");
             initFuture = dapServer
                     .stop2()
-                    .thenCompose(v -> initialize());
+                    .thenCompose(v -> initialize(progressMonitor));
         } else if (state == SessionState.CREATED
                 || serverStatus == ServerStatus.NOT_STARTED
                 || serverStatus == ServerStatus.START_FAILED
                 || serverStatus == ServerStatus.ERROR
                 || serverStatus == ServerStatus.STOPPED) {
             LOG.infof("Server not running or in error, starting and initializing...");
-            initFuture = initialize();
+            initFuture = initialize(progressMonitor);
         } else {
             LOG.infof("Server already running, skipping init");
             initFuture = CompletableFuture.completedFuture(null);
@@ -485,6 +487,7 @@ public class DapSession implements DapEventListener {
 
             // Report progress: Preparing launch configuration
             if (progressMonitor != null) {
+                progressMonitor.beginStep(ProgressStep.EXECUTING);
                 progressMonitor.reportProgress(30.0, "Preparing launch configuration");
             }
 

@@ -21,6 +21,7 @@ public class ConfigureServerTask implements InstallerTask {
     @Override
     public boolean execute(InstallerContext context) {
         context.checkCanceled();
+        context.getProgress().beginStep(getName());
 
         String resolvedCommand = context.resolveVariables(command);
 

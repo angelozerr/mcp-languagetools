@@ -1,7 +1,14 @@
 package com.redhat.mcp.languagetools.progress;
 
+import io.quarkiverse.mcp.server.Cancellation;
+import io.quarkiverse.mcp.server.Progress;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.enterprise.inject.Instance;
+import jakarta.inject.Inject;
+
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -14,6 +21,9 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 @ApplicationScoped
 public class ProgressMonitorManager {
+
+    @Inject
+    Instance<ProgressMonitorContributor> progressContributors;
 
     // Map: context ID -> ProgressMonitor
     private final Map<String, ProgressMonitor> monitors = new ConcurrentHashMap<>();
@@ -101,6 +111,43 @@ public class ProgressMonitorManager {
     public void clear() {
         contexts.clear();
         monitors.clear();
+    }
+
+    /**
+     * Create a progress monitor that broadcasts to both MCP client and admin contributors.
+     *
+     * @param progress     MCP progress (from tool method)
+     * @param cancellation MCP cancellation (from tool method)
+     * @param context      Progress context identifying the operation
+     * @return A progress monitor (MultiProgressMonitor if contributors exist, McpProgressMonitor otherwise)
+     */
+    public ProgressMonitor createProgressMonitor(Progress progress, Cancellation cancellation, ProgressContext context) {
+        McpProgressMonitor mcpMonitor = new McpProgressMonitor(progress, cancellation);
+
+        List<ProgressMonitor> monitors = new ArrayList<>();
+        monitors.add(mcpMonitor);
+
+        for (ProgressMonitorContributor contributor : progressContributors) {
+            ProgressMonitor contributed = contributor.createMonitor(context);
+            if (contributed != null && contributed != ProgressMonitor.none()) {
+                monitors.add(contributed);
+            }
+        }
+
+        ProgressMonitor result = monitors.size() > 1
+                ? new MultiProgressMonitor(monitors.toArray(new ProgressMonitor[0]))
+                : mcpMonitor;
+
+        // Initialize steps for WebSocket monitors
+        if (result instanceof MultiProgressMonitor multiMonitor) {
+            for (ProgressMonitor monitor : multiMonitor.getDelegates()) {
+                if (monitor instanceof com.redhat.mcp.languagetools.admin.WebSocketProgressMonitor wsMonitor) {
+                    wsMonitor.initializeSteps();
+                }
+            }
+        }
+
+        return result;
     }
 
     /**

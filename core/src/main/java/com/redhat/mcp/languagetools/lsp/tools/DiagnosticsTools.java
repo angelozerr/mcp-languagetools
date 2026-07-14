@@ -2,7 +2,9 @@ package com.redhat.mcp.languagetools.lsp.tools;
 
 import com.redhat.mcp.languagetools.Application;
 import com.redhat.mcp.languagetools.lsp.annotations.RequireDidOpen;
-import com.redhat.mcp.languagetools.progress.*;
+import com.redhat.mcp.languagetools.progress.ProgressContext;
+import com.redhat.mcp.languagetools.progress.ProgressMonitor;
+import com.redhat.mcp.languagetools.progress.ProgressMonitorManager;
 import com.redhat.mcp.languagetools.tools.ToolArgDescriptions;
 import com.redhat.mcp.languagetools.workspace.Workspace;
 import io.quarkiverse.mcp.server.Cancellation;
@@ -10,14 +12,12 @@ import io.quarkiverse.mcp.server.Progress;
 import io.quarkiverse.mcp.server.Tool;
 import io.quarkiverse.mcp.server.ToolArg;
 import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import org.eclipse.lsp4j.Diagnostic;
 import org.jboss.logging.Logger;
 
 import java.io.File;
 import java.net.URI;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -33,7 +33,7 @@ public class DiagnosticsTools {
     Application application;
 
     @Inject
-    Instance<ProgressMonitorContributor> progressContributors;
+    ProgressMonitorManager progressMonitorManager;
 
     @Tool(
             name = "get_diagnostics",
@@ -48,26 +48,9 @@ public class DiagnosticsTools {
             Cancellation cancellation,
             Progress progress) {
 
-        // Create MCP progress monitor
-        McpProgressMonitor mcpMonitor = new McpProgressMonitor(progress, cancellation);
-        LOG.infof("Progress token present: %s", progress != null && progress.token().isPresent());
-
-        // Collect additional monitors from contributors (e.g., Admin module)
-        List<ProgressMonitor> monitors = new ArrayList<>();
-        monitors.add(mcpMonitor);
-
-        ProgressContext context = ProgressContext.forOperation(null, "get_diagnostics");
-        for (ProgressMonitorContributor contributor : progressContributors) {
-            ProgressMonitor contributed = contributor.createMonitor(context);
-            if (contributed != null && contributed != ProgressMonitor.none()) {
-                monitors.add(contributed);
-            }
-        }
-
-        // Use MultiProgressMonitor if we have multiple monitors
-        ProgressMonitor progressMonitor = monitors.size() > 1
-                ? new MultiProgressMonitor(monitors.toArray(new ProgressMonitor[0]))
-                : mcpMonitor;
+        // Create progress monitor (MCP + Admin WebSocket contributors)
+        ProgressMonitor progressMonitor = progressMonitorManager.createProgressMonitor(
+                progress, cancellation, ProgressContext.forOperation(null, "get_diagnostics"));
 
         try {
             URI uri = URI.create(fileUri);
@@ -114,6 +97,8 @@ public class DiagnosticsTools {
         } catch (Exception e) {
             LOG.error("Failed to get diagnostics", e);
             return "Failed to get diagnostics: " + e.getMessage();
+        } finally {
+            progressMonitor.setComplete();
         }
     }
 

@@ -7,7 +7,11 @@ import com.redhat.mcp.languagetools.PathManager;
 import com.redhat.mcp.languagetools.admin.dto.ContributionDTOBuilder;
 import com.redhat.mcp.languagetools.admin.dto.DapConfigDTO;
 import com.redhat.mcp.languagetools.admin.dto.ErrorResponse;
+import com.redhat.mcp.languagetools.admin.dto.StatusResponse;
 import com.redhat.mcp.languagetools.dap.server.DapServerConfig;
+import com.redhat.mcp.languagetools.installer.TaskRegistryInstaller;
+import com.redhat.mcp.languagetools.installer.TraceProgressMonitor;
+import com.redhat.mcp.languagetools.progress.ProgressStep;
 import com.redhat.mcp.languagetools.Application;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
@@ -39,6 +43,9 @@ public class DapAdminResource {
 
     @Inject
     ContributionDTOBuilder contributionBuilder;
+
+    @Inject
+    ProgressBroadcaster progressBroadcaster;
 
     private final Gson gson = new GsonBuilder().setPrettyPrinting().create();
 
@@ -130,6 +137,41 @@ public class DapAdminResource {
                     .entity(new ErrorResponse("Failed to save installer.json: " + e.getMessage()))
                     .build();
         }
+    }
+
+    /**
+     * Run installer for a DAP server.
+     */
+    @POST
+    @Path("/configs/{serverId}/install")
+    public Response runInstaller(@PathParam("serverId") String serverId,
+                                 @QueryParam("force") @DefaultValue("false") boolean force) {
+        DapServerConfig config = application.getDapServerConfig(serverId);
+        if (config == null) {
+            throw new NotFoundException("DAP server not found: " + serverId);
+        }
+        if (config.getInstaller() == null) {
+            return Response.status(404).entity(new ErrorResponse("No installer configured for: " + serverId)).build();
+        }
+
+        String taskId = "install-" + serverId;
+        String title = "Install " + serverId;
+        TraceProgressMonitor progressMonitor = new TraceProgressMonitor(
+                config.getTraceCollector(), 100.0, progressBroadcaster, taskId, serverId, title);
+        TaskRegistryInstaller.configureInstallerSteps(progressMonitor, config.getInstallerConfig(), force);
+        progressMonitor.initializeSteps();
+
+        config.resetInstallState();
+        config.ensureInstalled(pathManager, null, progressMonitor, force)
+                .thenRun(() -> progressMonitor.setComplete())
+                .exceptionally(ex -> {
+                    Throwable cause = ex.getCause() != null ? ex.getCause() : ex;
+                    LOG.errorf(ex, "Failed to install server '%s'", serverId);
+                    progressMonitor.setFailed(cause.getMessage());
+                    return null;
+                });
+
+        return Response.ok().entity(new StatusResponse("installing")).build();
     }
 
     // ========== DAP Launch Configuration Templates ==========

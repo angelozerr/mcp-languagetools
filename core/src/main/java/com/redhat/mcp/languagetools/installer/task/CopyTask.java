@@ -34,6 +34,7 @@ public class CopyTask implements InstallerTask {
     @Override
     public boolean execute(InstallerContext context) {
         context.checkCanceled();
+        context.getProgress().beginStep(getName());
 
         String resolvedSource = context.resolveVariables(source);
         String resolvedDestination = context.resolveVariables(destination);
@@ -53,11 +54,7 @@ public class CopyTask implements InstallerTask {
             ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
             InputStream resourceStream = classLoader.getResourceAsStream(resolvedSource.startsWith("/") ? resolvedSource.substring(1) : resolvedSource);
             if (resourceStream == null) {
-                LOG.errorf("Resource not found: %s", resolvedSource);
-                if (trace != null) {
-                    trace.error("Resource not found: " + resolvedSource);
-                }
-                return false;
+                throw new IOException("Resource not found: " + resolvedSource);
             }
 
             try (InputStream is = resourceStream) {
@@ -82,7 +79,7 @@ public class CopyTask implements InstallerTask {
             if (trace != null) {
                 trace.error("Copy failed: " + e.getMessage());
             }
-            return false;
+            throw new IllegalStateException("Copy '" + name + "' failed: " + e.getMessage(), e);
         }
     }
 

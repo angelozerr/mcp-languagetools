@@ -29,6 +29,15 @@
         window.mergeServerData = mergeServerData;
 
         /**
+         * Returns the API base path for a server: '/api/admin/dap/configs' or '/api/admin/lsp/configs'.
+         */
+        function getServerApiBase(serverId) {
+            const isDap = window.dapConfigs && window.dapConfigs[serverId];
+            return isDap ? '/api/admin/dap/configs' : '/api/admin/lsp/configs';
+        }
+        window.getServerApiBase = getServerApiBase;
+
+        /**
          * Show or hide the search box based on whether we're viewing trace console.
          */
         function updateSearchBoxVisibility(showSearchBox) {

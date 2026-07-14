@@ -5,15 +5,18 @@ import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.jboss.logging.Logger;
 import org.tukaani.xz.XZInputStream;
 
+import com.redhat.mcp.languagetools.progress.ProgressMonitor;
+
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Enumeration;
 import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
+import java.util.zip.ZipFile;
 
 /**
  * Utility class for decompressing archives.
@@ -30,10 +33,11 @@ public class DecompressorUtils {
          *
          * @param filePath the path to the compressed file.
          * @param targetDir the directory where the contents will be extracted.
+         * @param progress optional progress monitor for reporting extraction progress.
          * @return the root directory of the extracted content, or null if there is no single root.
          * @throws IOException if decompression fails.
          */
-        Path decompress(Path filePath, Path targetDir) throws IOException;
+        Path decompress(Path filePath, Path targetDir, ProgressMonitor progress) throws IOException;
     }
 
     /**
@@ -63,18 +67,20 @@ public class DecompressorUtils {
     /**
      * Decompresses a ZIP archive (.zip or .vsix).
      */
-    private static Path decompressZip(Path filePath, Path targetDir) throws IOException {
+    private static Path decompressZip(Path filePath, Path targetDir, ProgressMonitor progress) throws IOException {
         Files.createDirectories(targetDir);
         Set<String> topLevel = new HashSet<>();
 
-        try (InputStream fis = Files.newInputStream(filePath);
-             ZipInputStream zipInputStream = new ZipInputStream(fis)) {
+        try (ZipFile zipFile = new ZipFile(filePath.toFile())) {
+            int totalEntries = zipFile.size();
+            int processed = 0;
+            int reportInterval = Math.max(1, totalEntries / 50);
 
-            ZipEntry entry;
-            while ((entry = zipInputStream.getNextEntry()) != null) {
+            Enumeration<? extends ZipEntry> entries = zipFile.entries();
+            while (entries.hasMoreElements()) {
+                ZipEntry entry = entries.nextElement();
                 String entryName = entry.getName().replace("\\", "/");
 
-                // Track top-level entries
                 String[] parts = entryName.split("/");
                 if (parts.length > 0 && !parts[0].isEmpty()) {
                     topLevel.add(parts[0]);
@@ -86,11 +92,19 @@ public class DecompressorUtils {
                     Files.createDirectories(entryPath);
                 } else {
                     Files.createDirectories(entryPath.getParent());
-                    try (OutputStream out = Files.newOutputStream(entryPath)) {
-                        zipInputStream.transferTo(out);
+                    try (InputStream in = zipFile.getInputStream(entry);
+                         OutputStream out = Files.newOutputStream(entryPath)) {
+                        in.transferTo(out);
                     }
                 }
-                zipInputStream.closeEntry();
+
+                processed++;
+                if (progress != null && totalEntries > 0
+                        && (processed % reportInterval == 0 || processed == totalEntries)) {
+                    double pct = (double) processed / totalEntries * 100.0;
+                    progress.reportProgress(pct,
+                            "Extracting (" + processed + "/" + totalEntries + " files)");
+                }
             }
         }
 
@@ -100,9 +114,13 @@ public class DecompressorUtils {
     /**
      * Decompresses a TAR archive (.tar).
      */
-    private static Path decompressTar(Path filePath, Path targetDir) throws IOException {
+    private static Path decompressTar(Path filePath, Path targetDir, ProgressMonitor progress) throws IOException {
         Files.createDirectories(targetDir);
         Set<String> topLevel = new HashSet<>();
+        long totalSize = Files.size(filePath);
+        long bytesProcessed = 0;
+        int fileCount = 0;
+        long lastReportedPercent = -1;
 
         try (InputStream fis = Files.newInputStream(filePath);
              TarArchiveInputStream tarInputStream = new TarArchiveInputStream(fis)) {
@@ -111,7 +129,6 @@ public class DecompressorUtils {
             while ((entry = tarInputStream.getNextTarEntry()) != null) {
                 String entryName = entry.getName().replace("\\", "/");
 
-                // Track top-level entries
                 String[] parts = entryName.split("/");
                 if (parts.length > 0 && !parts[0].isEmpty()) {
                     topLevel.add(parts[0]);
@@ -127,9 +144,19 @@ public class DecompressorUtils {
                         tarInputStream.transferTo(out);
                     }
 
-                    // Preserve executable permissions
                     if ((entry.getMode() & 0100) != 0) {
                         entryPath.toFile().setExecutable(true);
+                    }
+                }
+
+                bytesProcessed += entry.getSize() + 512;
+                fileCount++;
+                if (progress != null && totalSize > 0) {
+                    long currentPercent = Math.min(bytesProcessed * 100 / totalSize, 99);
+                    if (currentPercent != lastReportedPercent) {
+                        lastReportedPercent = currentPercent;
+                        progress.reportProgress(currentPercent,
+                                "Extracting (" + fileCount + " files)");
                     }
                 }
             }
@@ -141,7 +168,7 @@ public class DecompressorUtils {
     /**
      * Decompresses a GZIP-compressed TAR archive (.tar.gz or .tgz).
      */
-    private static Path decompressTgz(Path filePath, Path targetDir) throws IOException {
+    private static Path decompressTgz(Path filePath, Path targetDir, ProgressMonitor progress) throws IOException {
         try (InputStream fis = Files.newInputStream(filePath);
              BufferedInputStream bis = new BufferedInputStream(fis);
              GZIPInputStream gzipInputStream = new GZIPInputStream(bis)) {
@@ -149,8 +176,7 @@ public class DecompressorUtils {
             Path tarFilePath = Files.createTempFile("temp", ".tar");
             try {
                 Files.copy(gzipInputStream, tarFilePath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-                Path result = decompressTar(tarFilePath, targetDir);
-                return result;
+                return decompressTar(tarFilePath, targetDir, progress);
             } finally {
                 Files.deleteIfExists(tarFilePath);
             }
@@ -160,7 +186,7 @@ public class DecompressorUtils {
     /**
      * Decompresses a GZIP file (not a TAR archive).
      */
-    private static Path decompressGz(Path filePath, Path targetDir) throws IOException {
+    private static Path decompressGz(Path filePath, Path targetDir, ProgressMonitor progress) throws IOException {
         Files.createDirectories(targetDir);
 
         try (InputStream fis = Files.newInputStream(filePath);
@@ -176,7 +202,7 @@ public class DecompressorUtils {
     /**
      * Decompresses a XZ-compressed TAR archive (.tar.xz or .txz).
      */
-    private static Path decompressTxz(Path filePath, Path targetDir) throws IOException {
+    private static Path decompressTxz(Path filePath, Path targetDir, ProgressMonitor progress) throws IOException {
         try (InputStream fis = Files.newInputStream(filePath);
              BufferedInputStream bis = new BufferedInputStream(fis);
              XZInputStream xzInputStream = new XZInputStream(bis)) {
@@ -184,8 +210,7 @@ public class DecompressorUtils {
             Path tarFilePath = Files.createTempFile("temp", ".tar");
             try {
                 Files.copy(xzInputStream, tarFilePath, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-                Path result = decompressTar(tarFilePath, targetDir);
-                return result;
+                return decompressTar(tarFilePath, targetDir, progress);
             } finally {
                 Files.deleteIfExists(tarFilePath);
             }

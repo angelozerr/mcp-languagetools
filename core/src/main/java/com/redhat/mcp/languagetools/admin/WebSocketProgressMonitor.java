@@ -2,6 +2,7 @@ package com.redhat.mcp.languagetools.admin;
 
 import com.redhat.mcp.languagetools.admin.ws.ProgressInitWsMessage;
 import com.redhat.mcp.languagetools.progress.AbstractProgressMonitor;
+import com.redhat.mcp.languagetools.progress.ProgressMonitor;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -34,8 +35,8 @@ public class WebSocketProgressMonitor extends AbstractProgressMonitor {
      * Override addStep to broadcast steps to WebSocket when all steps are defined.
      */
     @Override
-    public void addStep(String stepId, double weight) {
-        super.addStep(stepId, weight);
+    public ProgressMonitor addStep(String stepId, double weight) {
+        return super.addStep(stepId, weight);
     }
 
     /**

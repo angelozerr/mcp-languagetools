@@ -113,6 +113,7 @@ public class DapSessionResource {
             // Launch the session asynchronously (don't block HTTP thread!)
             session.launch(launchConfig, debugMode, DapSession.SessionActor.MANUAL, progressMonitor)
                     .whenComplete((result, error) -> {
+                        progressMonitor.setComplete();
                         if (error != null) {
                             LOG.errorf(error, "DAP session launch failed: %s", sessionId);
                         } else {

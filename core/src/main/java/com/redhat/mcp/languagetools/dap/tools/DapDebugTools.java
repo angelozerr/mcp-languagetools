@@ -3,8 +3,10 @@ package com.redhat.mcp.languagetools.dap.tools;
 import com.redhat.mcp.languagetools.Application;
 import com.redhat.mcp.languagetools.dap.session.DapSession;
 import com.redhat.mcp.languagetools.dap.session.DapSessionManager;
-import com.redhat.mcp.languagetools.progress.McpProgressMonitor;
+import com.redhat.mcp.languagetools.progress.ProgressContext;
 import com.redhat.mcp.languagetools.progress.ProgressMonitor;
+import com.redhat.mcp.languagetools.progress.ProgressMonitorManager;
+import com.redhat.mcp.languagetools.progress.ProgressStep;
 import com.redhat.mcp.languagetools.tools.ToolArgDescriptions;
 import io.quarkiverse.mcp.server.Cancellation;
 import io.quarkiverse.mcp.server.Progress;
@@ -41,6 +43,9 @@ public class DapDebugTools {
 
     @Inject
     Application application;
+
+    @Inject
+    ProgressMonitorManager progressMonitorManager;
 
     // ========== Session Management ==========
 
@@ -163,18 +168,6 @@ public class DapDebugTools {
             Cancellation cancellation,
             Progress progress) {
         return startDebugging(debuggerId, cwd, configuration, breakpoints, sessionName, debugMode, cancellation, progress)
-                .handle((result, ex) -> {
-                    if (ex != null) {
-                        // Error case - return error result
-                        Map<String, Object> errorResult = new HashMap<>();
-                        errorResult.put("success", false);
-                        errorResult.put("error", ex.getCause() != null ? ex.getCause().getMessage() : ex.getMessage());
-                        return errorResult;
-                    } else {
-                        // Success case - return result as-is
-                        return result;
-                    }
-                })
                 .join();
     }
 
@@ -188,8 +181,18 @@ public class DapDebugTools {
             Cancellation cancellation,
             Progress progress) {
 
-        // Use MultiProgressMonitor to broadcast progress to both MCP client (AI) and Admin UI
-        ProgressMonitor progressMonitor = new McpProgressMonitor(progress, cancellation);
+        // Create progress monitor (MCP + Admin WebSocket contributors)
+        ProgressMonitor progressMonitor = progressMonitorManager.createProgressMonitor(
+                progress, cancellation, ProgressContext.forOperation(debuggerId, "start_debugging"));
+
+        // Define steps for DAP operations
+        progressMonitor
+                .addStep(ProgressStep.INSTALLING, 0.40)
+                .addStep(ProgressStep.STARTING, 0.20)
+                .addStep(ProgressStep.EXECUTING, 0.40);
+
+        progressMonitor.beginStep(ProgressStep.INSTALLING);
+        progressMonitor.reportProgress(0.0, "Installing debug adapter");
 
         // Convert cwd to URI (handle both file:// URIs and Windows/Unix paths)
         URI uri;
@@ -260,8 +263,9 @@ public class DapDebugTools {
             }
 
             return result;
+        }).whenComplete((result, ex) -> {
+            progressMonitor.setComplete();
         }).exceptionally(ex -> {
-            // Ensure the future always completes (never hangs)
             Map<String, Object> errorResult = new HashMap<>();
             errorResult.put("success", false);
             errorResult.put("sessionId", sessionId);
@@ -571,77 +575,4 @@ public class DapDebugTools {
         }
     }
 
-    @Tool(description = "Validate a debug configuration before using it with start_debugging. " +
-            "Checks for required fields and parameter types.")
-    public Map<String, Object> validate_debug_config(
-            Map<String, Object> configuration) {
-
-        List<String> errors = new ArrayList<>();
-        List<String> warnings = new ArrayList<>();
-
-        // Check required fields based on type
-        String type = (String) configuration.get("type");
-        String request = (String) configuration.get("request");
-
-        if (type == null || type.isEmpty()) {
-            errors.add("Missing required field: 'type' (e.g., 'node', 'java', 'python', 'go')");
-        }
-
-        if (request == null || request.isEmpty()) {
-            errors.add("Missing required field: 'request' (should be 'launch' or 'attach')");
-        }
-
-        // Type-specific validation
-        if (type != null) {
-            switch (type.toLowerCase()) {
-                case "java":
-                    if ("launch".equals(request) && !configuration.containsKey("mainClass")) {
-                        errors.add("Java launch requires 'mainClass' parameter");
-                    }
-                    if ("attach".equals(request) && !configuration.containsKey("port")) {
-                        errors.add("Java attach requires 'port' parameter");
-                    }
-                    if (!configuration.containsKey("projectName")) {
-                        warnings.add("Recommended: specify 'projectName' for Java projects");
-                    }
-                    break;
-
-                case "node":
-                case "javascript":
-                    if (!configuration.containsKey("program") && "launch".equals(request)) {
-                        errors.add("Node.js launch requires 'program' parameter (path to .js file)");
-                    }
-                    if (!configuration.containsKey("port") && "attach".equals(request)) {
-                        errors.add("Node.js attach requires 'port' parameter");
-                    }
-                    break;
-
-                case "python":
-                    if (!configuration.containsKey("program") && "launch".equals(request)) {
-                        errors.add("Python launch requires 'program' parameter (path to .py file)");
-                    }
-                    if (!configuration.containsKey("connect") && "attach".equals(request)) {
-                        errors.add("Python attach requires 'connect' parameter with host and port");
-                    }
-                    break;
-
-                case "go":
-                    if (!configuration.containsKey("program") && "launch".equals(request)) {
-                        errors.add("Go launch requires 'program' parameter (package path)");
-                    }
-                    if (!configuration.containsKey("processId") && "attach".equals(request)) {
-                        errors.add("Go attach requires 'processId' parameter");
-                    }
-                    break;
-            }
-        }
-
-        Map<String, Object> result = new HashMap<>();
-        result.put("valid", errors.isEmpty());
-        result.put("errors", errors);
-        result.put("warnings", warnings);
-        result.put("configuration", configuration);
-
-        return result;
-    }
 }

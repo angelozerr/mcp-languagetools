@@ -66,8 +66,9 @@ public class NoOpProgressMonitor implements ProgressMonitor {
     }
 
     @Override
-    public void addStep(String stepId, double weight) {
+    public ProgressMonitor addStep(String stepId, double weight) {
         // No-op
+        return this;
     }
 
     @Override

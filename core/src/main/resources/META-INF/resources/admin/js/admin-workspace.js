@@ -741,11 +741,13 @@
                                         <div class="editor-actions">
                                             <button class="editor-btn" onclick="saveInstallerJson('${server.id}')" title="Save">💾 Save</button>
                                             <button class="editor-btn" onclick="resetInstallerJson('${server.id}')" title="Reset">↻ Reset</button>
+                                            <span class="editor-separator"></span>
+                                            <button class="editor-btn install-run-btn" onclick="runInstaller('${server.id}', false)" title="Install (check first, skip if already installed)">▶ Install</button>
+                                            <button class="editor-btn install-force-btn" onclick="runInstaller('${server.id}', true)" title="Force Install (skip check, always re-install)">⟳ Force Install</button>
                                         </div>
                                     </div>
                                     <textarea id="installer-json-editor" class="json-editor" spellcheck="false"></textarea>
                                 </div>
-                                <button class="install-button" onclick="runInstaller('${server.id}')">▶ Run Installer</button>
                                 <div id="install-output" class="install-output"></div>
                             </div>
                         </div>
@@ -817,81 +819,6 @@
             loadInstallerJson(server.id);
         }
 
-        let originalInstallerJson = null;
-
-        async function loadInstallerJson(serverId) {
-            try {
-                const editor = document.getElementById('installer-json-editor');
-                if (!editor) {
-                    console.warn('installer-json-editor element not found, skipping load');
-                    return;
-                }
-
-                // Check if it's a DAP or LSP server
-                const isDap = window.dapConfigs && window.dapConfigs[serverId];
-                const endpoint = isDap
-                    ? `/api/admin/dap/configs/${serverId}/installer`
-                    : `/api/admin/lsp/configs/${serverId}/installer`;
-
-                const response = await fetch(endpoint);
-                if (!response.ok) {
-                    editor.value = '// No installer.json found';
-                    return;
-                }
-
-                const installerJson = await response.json();
-                const formatted = JSON.stringify(installerJson, null, 2);
-                originalInstallerJson = formatted;
-
-                editor.value = formatted;
-            } catch (error) {
-                console.error('Failed to load installer.json:', error);
-                const editor = document.getElementById('installer-json-editor');
-                if (editor) {
-                    editor.value = `// Error loading installer.json: ${error.message}`;
-                }
-            }
-        }
-
-        async function saveInstallerJson(serverId) {
-            const editor = document.getElementById('installer-json-editor');
-            const content = editor.value;
-
-            try {
-                // Validate JSON
-                JSON.parse(content);
-
-                // Check if it's a DAP or LSP server
-                const isDap = window.dapConfigs && window.dapConfigs[serverId];
-                const endpoint = isDap
-                    ? `/api/admin/dap/configs/${serverId}/installer`
-                    : `/api/admin/lsp/configs/${serverId}/installer`;
-
-                const response = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: content
-                });
-
-                if (response.ok) {
-                    originalInstallerJson = content;
-                    showAlert('Success', 'Installer configuration saved successfully.');
-                } else {
-                    const error = await response.text();
-                    showAlert('Error', `Failed to save: ${error}`);
-                }
-            } catch (error) {
-                showAlert('Error', `Invalid JSON: ${error.message}`);
-            }
-        }
-
-        function resetInstallerJson(serverId) {
-            if (originalInstallerJson) {
-                document.getElementById('installer-json-editor').value = originalInstallerJson;
-            } else {
-                loadInstallerJson(serverId);
-            }
-        }
 
         async function loadServerDetails(serverId) {
             console.log('loadServerDetails called for:', serverId);
@@ -1201,65 +1128,6 @@
             // Render diagram when switching to contributions tab
             if (tabName === 'contributions' && window.currentDiagramServers) {
                 renderServerDiagram(window.currentDiagramServers, window.currentDiagramServerId);
-            }
-        }
-
-        async function runInstaller(serverId) {
-            const output = document.getElementById('install-output');
-            output.innerHTML = `
-                <div class="install-status">
-                    <div class="spinner"></div>
-                    <p>Running installer...</p>
-                    <p class="hint">Check the <strong>Traces</strong> tab for real-time progress.</p>
-                </div>
-            `;
-
-            try {
-                const encodedWorkspace = encodeURIComponent(selectedWorkspace);
-                const response = await fetch(`/api/admin/install/${encodedWorkspace}/${serverId}`, {
-                    method: 'POST'
-                });
-
-                const result = await response.json();
-
-                if (response.ok) {
-                    output.innerHTML = `
-                        <div class="install-success">
-                            <h4>✓ Installation Successful</h4>
-                            <p><strong>Status:</strong> ${result.status}</p>
-                            <p><strong>Message:</strong> ${result.message}</p>
-                            ${result.serverHome ? `<p><strong>Server Home:</strong> <code>${result.serverHome}</code></p>` : ''}
-                            <p class="hint">Check the <strong>Traces</strong> tab for installation logs.</p>
-                        </div>
-                    `;
-
-                    // Refresh server list to show updated status
-                    setTimeout(() => loadWorkspaces(), 1000);
-                } else {
-                    output.innerHTML = `
-                        <div class="install-error">
-                            <h4>✗ Installation Failed</h4>
-                            <p><strong>Status:</strong> ${result.status}</p>
-                            <p><strong>Message:</strong> ${result.message}</p>
-                            ${result.error ? `
-                                <div class="error-details">
-                                    <strong>Error Details:</strong>
-                                    <pre>${result.error}</pre>
-                                </div>
-                            ` : ''}
-                            <p class="hint">Check the <strong>Traces</strong> tab for detailed error logs.</p>
-                        </div>
-                    `;
-                }
-            } catch (error) {
-                console.error('Failed to run installer:', error);
-                output.innerHTML = `
-                    <div class="install-error">
-                        <h4>✗ Request Failed</h4>
-                        <p><strong>Error:</strong> ${error.message}</p>
-                        <p class="hint">Could not communicate with the server.</p>
-                    </div>
-                `;
             }
         }
 

@@ -3,8 +3,10 @@ package com.redhat.mcp.languagetools.installer;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.redhat.mcp.languagetools.installer.task.DownloadTask;
 import com.redhat.mcp.languagetools.installer.task.InstallerTask;
 import com.redhat.mcp.languagetools.installer.task.InstallerTaskRegistry;
+import com.redhat.mcp.languagetools.progress.ProgressMonitor;
 import com.redhat.mcp.languagetools.server.ServerConfigBase;
 import com.redhat.mcp.languagetools.trace.TraceCollector;
 import org.jboss.logging.Logger;
@@ -60,8 +62,9 @@ public class TaskRegistryInstaller implements ServerInstaller {
                     trace.info("Starting installation for: " + config.getName());
                 }
 
-                // Check if already installed
-                if (installerConfig.has(FIELD_CHECK)) {
+                // Check if already installed (skip when force install)
+                if (!context.isForceInstall() && installerConfig.has(FIELD_CHECK)) {
+                    context.getProgress().beginStep(com.redhat.mcp.languagetools.progress.ProgressStep.CHECKING);
                     InstallerTask checkTask = parseTaskNode(installerConfig.get(FIELD_CHECK));
                     if (checkTask != null && checkTask.execute(context)) {
                         // Already installed - extract command
@@ -77,6 +80,7 @@ public class TaskRegistryInstaller implements ServerInstaller {
                 }
 
                 // Not installed - run installation
+                context.getProgress().beginStep(com.redhat.mcp.languagetools.progress.ProgressStep.INSTALLING);
                 setStatus(context, InstallationStatus.INSTALLING);
 
                 if (trace != null) {
@@ -95,7 +99,7 @@ public class TaskRegistryInstaller implements ServerInstaller {
                 boolean success = runTask.execute(context);
                 if (!success) {
                     setStatus(context, InstallationStatus.FAILED);
-                    throw new IllegalStateException("Installation failed");
+                    throw new IllegalStateException("Task '" + runTask.getName() + "' failed");
                 }
 
                 // Extract command after installation
@@ -129,7 +133,7 @@ public class TaskRegistryInstaller implements ServerInstaller {
                         trace.error("Cause: " + cause.getMessage());
                     }
                 }
-                throw new InstallationException("Installation failed: " + e.getMessage(), e);
+                throw new InstallationException(e.getMessage(), e);
             }
         });
     }
@@ -176,5 +180,68 @@ public class TaskRegistryInstaller implements ServerInstaller {
         }
 
         return command;
+    }
+
+    /**
+     * Configure progress steps from installer.json task tree.
+     * Walks the check and run task nodes (including onSuccess chains)
+     * and adds a step for each declared task.
+     *
+     * @param progress the progress monitor to configure
+     * @param installerConfig the installer.json content
+     * @param force true to skip the check task
+     */
+    public static void configureInstallerSteps(ProgressMonitor progress, JsonElement installerConfig, boolean force) {
+        if (installerConfig == null || !installerConfig.isJsonObject()) {
+            return;
+        }
+        JsonObject config = installerConfig.getAsJsonObject();
+
+        if (!force && config.has(FIELD_CHECK)) {
+            collectTaskSteps(config.get(FIELD_CHECK), progress);
+        }
+
+        if (config.has(FIELD_RUN)) {
+            collectTaskSteps(config.get(FIELD_RUN), progress);
+        }
+    }
+
+    private static void collectTaskSteps(JsonElement taskNode, ProgressMonitor progress) {
+        if (taskNode == null || !taskNode.isJsonObject()) {
+            return;
+        }
+        JsonObject taskObj = taskNode.getAsJsonObject();
+        if (taskObj.isEmpty()) {
+            return;
+        }
+
+        String taskType = taskObj.keySet().iterator().next();
+        JsonElement taskConfigElement = taskObj.get(taskType);
+        if (taskConfigElement == null || !taskConfigElement.isJsonObject()) {
+            return;
+        }
+        JsonObject taskConfig = taskConfigElement.getAsJsonObject();
+
+        String name = taskConfig.has("name") ? taskConfig.get("name").getAsString() : taskType;
+        double weight = getTaskWeight(taskType);
+        progress.addStep(name, weight);
+
+        if ("download".equals(taskType)) {
+            progress.addStep(DownloadTask.getExtractStepName(name), 5.0);
+        }
+
+        if (taskConfig.has("onSuccess")) {
+            collectTaskSteps(taskConfig.get("onSuccess"), progress);
+        }
+    }
+
+    private static double getTaskWeight(String taskType) {
+        return switch (taskType) {
+            case "download" -> 20.0;
+            case "copy" -> 10.0;
+            case "fileExists" -> 1.0;
+            case "configureServer" -> 1.0;
+            default -> 5.0;
+        };
     }
 }

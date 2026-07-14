@@ -55,21 +55,10 @@ public class JavaDebugServer extends DapServer {
     }
 
     @Override
-    public CompletableFuture<Void> start() {
-        // Common startup checks
-        if (!checkAndPrepareStart()) {
-            return CompletableFuture.completedFuture(null);
-        }
-
+    protected CompletableFuture<Void> doStart() {
         LOG.infof("Starting Java Debug Server (embedded mode via JDTLS)");
-        setStatus(ServerStatus.STARTING);
-
-        // For embedded mode, we don't start a process
-        // The debug adapter runs inside JDTLS and is started when we call vscode.java.startDebugSession
-        // So we just mark as RUNNING immediately
         setStatus(ServerStatus.RUNNING);
         setReady(true);
-
         return CompletableFuture.completedFuture(null);
     }
 

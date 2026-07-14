@@ -15,20 +15,16 @@ import com.redhat.mcp.languagetools.lsp.client.LspCapability;
 import com.redhat.mcp.languagetools.lsp.server.LspServer;
 import com.redhat.mcp.languagetools.lsp.server.LspServerResolver;
 import com.redhat.mcp.languagetools.lsp.tools.params.LspRequestParams;
-import com.redhat.mcp.languagetools.progress.McpProgressMonitor;
-import com.redhat.mcp.languagetools.progress.MultiProgressMonitor;
 import com.redhat.mcp.languagetools.progress.ProgressContext;
 import com.redhat.mcp.languagetools.progress.ProgressMonitor;
-import com.redhat.mcp.languagetools.progress.ProgressMonitorContributor;
+import com.redhat.mcp.languagetools.progress.ProgressMonitorManager;
 import com.redhat.mcp.languagetools.progress.ProgressStep;
 import io.quarkiverse.mcp.server.Cancellation;
 import io.quarkiverse.mcp.server.Progress;
 import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.enterprise.inject.Instance;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
@@ -52,7 +48,7 @@ public class LspRequestExecutor {
     LspServerResolver serverResolver;
 
     @Inject
-    Instance<ProgressMonitorContributor> progressContributors;
+    ProgressMonitorManager progressMonitorManager;
 
     /**
      * Execute an LSP request across all capable servers.
@@ -68,42 +64,16 @@ public class LspRequestExecutor {
             LspRequestStrategy<TRequestParams, TLspParams, TResult> strategy,
             Cancellation cancellation,
             Progress progress) {
-        // Create MCP progress monitor
-        McpProgressMonitor mcpMonitor = new McpProgressMonitor(progress, cancellation);
-
-        // Collect additional monitors from contributors (e.g., Admin module)
-        List<ProgressMonitor> monitors = new ArrayList<>();
-        monitors.add(mcpMonitor);
-
-        ProgressContext context = ProgressContext.forOperation(null, strategy.getCapability().name());
-        for (ProgressMonitorContributor contributor : progressContributors) {
-            ProgressMonitor contributed = contributor.createMonitor(context);
-            if (contributed != null && contributed != ProgressMonitor.none()) {
-                monitors.add(contributed);
-            }
-        }
-
-        // Use MultiProgressMonitor if we have multiple monitors
-        ProgressMonitor progressMonitor = monitors.size() > 1
-                ? new MultiProgressMonitor(monitors.toArray(new ProgressMonitor[0]))
-                : mcpMonitor;
+        // Create progress monitor (MCP + Admin WebSocket contributors)
+        ProgressMonitor progressMonitor = progressMonitorManager.createProgressMonitor(
+                progress, cancellation, ProgressContext.forOperation(null, strategy.getCapability().name()));
 
         // Define steps for LSP operations
-        progressMonitor.addStep(ProgressStep.INSTALLING, 0.40);
-        progressMonitor.addStep(ProgressStep.STARTING, 0.10);
-        progressMonitor.addStep(ProgressStep.INDEXING, 0.35);
-        progressMonitor.addStep(ProgressStep.EXECUTING, 0.15);
-
-        // Initialize steps for WebSocket monitors (broadcast step definitions)
-        if (progressMonitor instanceof com.redhat.mcp.languagetools.progress.MultiProgressMonitor multiMonitor) {
-            for (ProgressMonitor monitor : multiMonitor.getDelegates()) {
-                if (monitor instanceof com.redhat.mcp.languagetools.admin.WebSocketProgressMonitor wsMonitor) {
-                    wsMonitor.initializeSteps();
-                }
-            }
-        } else if (progressMonitor instanceof com.redhat.mcp.languagetools.admin.WebSocketProgressMonitor wsMonitor) {
-            wsMonitor.initializeSteps();
-        }
+        progressMonitor
+                .addStep(ProgressStep.INSTALLING, 0.40)
+                .addStep(ProgressStep.STARTING, 0.10)
+                .addStep(ProgressStep.INDEXING, 0.35)
+                .addStep(ProgressStep.EXECUTING, 0.15);
 
         ProgressMonitor installMonitor = progressMonitor.beginStep(ProgressStep.INSTALLING);
         installMonitor.reportProgress(0.0, "Installing language server");
@@ -111,7 +81,6 @@ public class LspRequestExecutor {
         return strategy.resolveServers(serverResolver, params, installMonitor)
                 .thenCompose(servers -> {
                     if (servers.isEmpty()) {
-                        progressMonitor.setComplete();
                         return CompletableFuture.completedFuture(
                                 strategy.formatNoServerFound(params)
                         );
@@ -155,12 +124,7 @@ public class LspRequestExecutor {
                                     }))
                             .toList();
 
-
-
-
-
-
-                    // Step 3: Wait for all to complete and merge results
+                    // Wait for all to complete and merge results
                     return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
                             .thenApply(v -> {
                                 List<TResult> results = futures.stream()
@@ -169,18 +133,13 @@ public class LspRequestExecutor {
                                         .toList();
 
                                 if (results.isEmpty()) {
-                                    progressMonitor.setComplete();
                                     return strategy.formatNoResultFound(params);
                                 }
 
-                                // Format and return results
-                                String formatted = strategy.formatResults(params, results);
-
-                                // Mark complete
-                                progressMonitor.setComplete();
-
-                                return formatted;
+                                return strategy.formatResults(params, results);
                             });
+                }).whenComplete((result, ex) -> {
+                    progressMonitor.setComplete();
                 }).exceptionally(ex -> {
                     LOG.error("Failed to execute LSP request", ex);
                     return strategy.formatError(params, ex);

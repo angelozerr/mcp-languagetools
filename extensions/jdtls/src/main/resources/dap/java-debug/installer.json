@@ -1,0 +1,22 @@
+{
+  "id": "java-debug-installer",
+  "name": "Java Debug",
+  "check": {
+    "fileExists": {
+      "name": "Check if java-debug is installed",
+      "file": "$SERVER_HOME$/plugins/com.microsoft.java.debug.plugin-*.jar"
+    }
+  },
+  "run": {
+    "download": {
+      "name": "Download vscode-java-debug",
+      "openvsx": {
+        "namespace": "vscjava",
+        "extensionName": "vscode-java-debug"
+      },
+      "output": {
+        "dir": "$SERVER_HOME$"
+      }
+    }
+  }
+}

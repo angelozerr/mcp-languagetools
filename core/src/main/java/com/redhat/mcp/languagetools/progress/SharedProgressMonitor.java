@@ -98,6 +98,29 @@ public class SharedProgressMonitor extends AbstractProgressMonitor {
     }
 
     @Override
+    public ProgressMonitor beginStep(String stepId) {
+        for (ProgressMonitor listener : listeners) {
+            try {
+                listener.beginStep(stepId);
+            } catch (Exception e) {
+                LOG.debugf("Listener does not support step '%s': %s", stepId, e.getMessage());
+            }
+        }
+        return this;
+    }
+
+    @Override
+    public void completeStep(String stepId) {
+        for (ProgressMonitor listener : listeners) {
+            try {
+                listener.completeStep(stepId);
+            } catch (Exception e) {
+                LOG.debugf("Listener does not support step '%s': %s", stepId, e.getMessage());
+            }
+        }
+    }
+
+    @Override
     public void checkCancelled() {
         // Use isCancelled() which requires ALL listeners to be cancelled.
         // One MCP client disconnecting must not kill a shared installation.

@@ -11,7 +11,7 @@
 	"contributes": {
 		"jdtls": {
 			"bundles": [
-				"plugins/*.jar"
+				"extension/server/*.jar"
 			],
 			"bindRequest": [
 				"vscode.java.validateLaunchConfig",

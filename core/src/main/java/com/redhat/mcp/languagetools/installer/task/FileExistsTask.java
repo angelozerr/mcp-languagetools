@@ -5,9 +5,13 @@ import com.google.gson.JsonObject;
 import com.redhat.mcp.languagetools.installer.InstallerContext;
 import com.redhat.mcp.languagetools.trace.TraceCollector;
 
+import java.io.IOException;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.PathMatcher;
 import java.nio.file.Paths;
+import java.util.stream.Stream;
 
 /**
  * Task that checks if a file exists.
@@ -24,11 +28,16 @@ public class FileExistsTask implements InstallerTask {
     @Override
     public boolean execute(InstallerContext context) {
         context.checkCanceled();
+        context.getProgress().beginStep(getName());
 
         String resolvedPath = context.resolveVariables(file);
-        Path path = Paths.get(resolvedPath);
+        boolean exists;
 
-        boolean exists = Files.exists(path);
+        if (resolvedPath.contains("*") || resolvedPath.contains("?")) {
+            exists = matchesGlob(resolvedPath);
+        } else {
+            exists = Files.exists(Paths.get(resolvedPath));
+        }
 
         TraceCollector trace = context.getConfig().getTraceCollector();
         if (trace != null) {
@@ -40,6 +49,27 @@ public class FileExistsTask implements InstallerTask {
         }
 
         return exists;
+    }
+
+    private boolean matchesGlob(String globPath) {
+        String normalized = globPath.replace('\\', '/');
+        int lastSlash = normalized.lastIndexOf('/');
+        if (lastSlash < 0) {
+            return false;
+        }
+        Path dir = Paths.get(normalized.substring(0, lastSlash));
+        String pattern = normalized.substring(lastSlash + 1);
+
+        if (!Files.isDirectory(dir)) {
+            return false;
+        }
+
+        PathMatcher matcher = FileSystems.getDefault().getPathMatcher("glob:" + pattern);
+        try (Stream<Path> files = Files.list(dir)) {
+            return files.anyMatch(p -> matcher.matches(p.getFileName()));
+        } catch (IOException e) {
+            return false;
+        }
     }
 
     @Override

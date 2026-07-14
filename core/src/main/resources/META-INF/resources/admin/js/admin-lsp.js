@@ -159,11 +159,13 @@ async function showServerDetails(serverId) {
                                 <div class="editor-actions">
                                     <button class="editor-btn" onclick="saveInstallerJson('${details.id}')" title="Save">💾 Save</button>
                                     <button class="editor-btn" onclick="resetInstallerJson('${details.id}')" title="Reset">↻ Reset</button>
+                                    <span class="editor-separator"></span>
+                                    <button class="editor-btn install-run-btn" onclick="runInstaller('${details.id}', false)" title="Install (check first, skip if already installed)">▶ Install</button>
+                                    <button class="editor-btn install-force-btn" onclick="runInstaller('${details.id}', true)" title="Force Install (skip check, always re-install)">⟳ Force Install</button>
                                 </div>
                             </div>
                             <textarea id="installer-json-editor" class="json-editor" spellcheck="false"></textarea>
                         </div>
-                        <button class="install-button" onclick="runInstaller('${details.id}')">▶ Run Installer</button>
                         <div id="install-output" class="install-output"></div>
                     </div>
                 </div>
@@ -316,13 +318,7 @@ function switchServerTab(tabName) {
  */
 async function loadInstallerJson(serverId) {
     try {
-        // Check if it's a DAP or LSP server
-        const isDap = window.dapConfigs && window.dapConfigs[serverId];
-        const endpoint = isDap
-            ? `/api/admin/dap/configs/${serverId}/installer`
-            : `/api/admin/lsp/configs/${serverId}/installer`;
-
-        const response = await fetch(endpoint);
+        const response = await fetch(`${getServerApiBase(serverId)}/${serverId}/installer`);
         if (!response.ok) {
             throw new Error('Failed to load installer.json');
         }
@@ -351,13 +347,7 @@ async function saveInstallerJson(serverId) {
     try {
         const installerJson = JSON.parse(editor.value);
 
-        // Check if it's a DAP or LSP server
-        const isDap = window.dapConfigs && window.dapConfigs[serverId];
-        const endpoint = isDap
-            ? `/api/admin/dap/configs/${serverId}/installer`
-            : `/api/admin/lsp/configs/${serverId}/installer`;
-
-        const response = await fetch(endpoint, {
+        const response = await fetch(`${getServerApiBase(serverId)}/${serverId}/installer`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(installerJson)
@@ -388,16 +378,16 @@ function resetInstallerJson(serverId) {
 /**
  * Run installer for an LSP server.
  */
-async function runInstaller(serverId) {
+async function runInstaller(serverId, force) {
     const outputDiv = document.getElementById('install-output');
     if (!outputDiv) return;
 
-    outputDiv.innerHTML = '<div style="color: #4ec9b0;">Running installer...</div>';
+    const label = force ? 'Force installing' : 'Installing';
+    outputDiv.innerHTML = `<div style="color: #4ec9b0;">${label}...</div>`;
 
     try {
-        const response = await fetch(`/api/admin/lsp/configs/${serverId}/install`, {
-            method: 'POST'
-        });
+        const url = `${getServerApiBase(serverId)}/${serverId}/install${force ? '?force=true' : ''}`;
+        const response = await fetch(url, { method: 'POST' });
 
         if (!response.ok) {
             throw new Error('Installation failed');
@@ -405,12 +395,12 @@ async function runInstaller(serverId) {
 
         const result = await response.json();
         outputDiv.innerHTML = `
-            <div style="color: #4ec9b0;">✓ Installation completed successfully</div>
+            <div style="color: #4ec9b0;">✓ Installation started</div>
             <pre style="margin-top: 0.5rem; color: #d4d4d4;">${JSON.stringify(result, null, 2)}</pre>
         `;
     } catch (error) {
         console.error('Failed to run installer:', error);
-        outputDiv.innerHTML = `<div style="color: #f48771;">❌ Installation failed: ${error.message}</div>`;
+        outputDiv.innerHTML = `<div style="color: #f48771;">✗ Installation failed: ${error.message}</div>`;
     }
 }
 
