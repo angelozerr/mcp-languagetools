@@ -7,6 +7,7 @@ import com.redhat.mcp.languagetools.progress.ProgressContext;
 import com.redhat.mcp.languagetools.progress.ProgressMonitor;
 import com.redhat.mcp.languagetools.progress.ProgressMonitorManager;
 import com.redhat.mcp.languagetools.progress.ProgressStep;
+import com.redhat.mcp.languagetools.utils.MapUtils;
 import com.redhat.mcp.languagetools.tools.ToolArgDescriptions;
 import io.quarkiverse.mcp.server.Cancellation;
 import io.quarkiverse.mcp.server.Progress;
@@ -220,9 +221,9 @@ public class DapDebugTools {
             CompletableFuture<?>[] bpFutures = breakpoints.stream()
                     .filter(bp -> bp.get("file") != null && bp.get("line") != null)
                     .map(bp -> {
-                        String file = (String) bp.get("file");
-                        Integer line = (Integer) bp.get("line");
-                        String condition = (String) bp.get("condition");
+                        String file = MapUtils.getString(bp, "file");
+                        int line = MapUtils.requireInteger(bp, "line");
+                        String condition = MapUtils.getString(bp, "condition");
                         return session.setBreakpoint(file, line, condition);
                     })
                     .toArray(CompletableFuture[]::new);
@@ -233,11 +234,11 @@ public class DapDebugTools {
         // Note: progressMonitor.executeWithCancellation is already called inside trackFuture,
         // so we don't need to wrap again here (would create double wrapping)
         return breakpointsFuture.thenCompose(v -> {
-            String request = (String) configuration.get("request");
+            String request = MapUtils.getString(configuration, "request");
 
             if ("attach".equals(request)) {
                 // Attach mode
-                Integer processId = (Integer) configuration.get("processId");
+                Integer processId = MapUtils.getInteger(configuration, "processId");
                 if (processId != null) {
                     return session.attach(processId, progressMonitor);
                 } else {

@@ -707,14 +707,18 @@ public class DapSession implements DapEventListener {
                 .thenAccept(response -> {
                     if (response.getBreakpoints() != null) {
                         Breakpoint[] dapBps = response.getBreakpoints();
+                        LOG.infof("setBreakpoints response: %d breakpoints returned for %s", dapBps.length, absolutePath);
                         for (int i = 0; i < Math.min(dapBps.length, fileBreakpoints.size()); i++) {
                             BreakpointInfo info = fileBreakpoints.get(i);
                             Breakpoint dapBp = dapBps[i];
                             info.verified = dapBp.isVerified();
                             info.dapBreakpoint = dapBp;
-                            LOG.infof("Breakpoint %s at %s:%d verified=%s",
-                                    info.breakpointId, info.file, info.line, info.verified);
+                            LOG.infof("Breakpoint %s at %s:%d verified=%s (id=%s, message=%s)",
+                                    info.breakpointId, info.file, info.line, info.verified,
+                                    dapBp.getId(), dapBp.getMessage());
                         }
+                    } else {
+                        LOG.warnf("setBreakpoints returned null breakpoints array for %s", absolutePath);
                     }
                 })
                 .exceptionally(t -> {
@@ -724,15 +728,16 @@ public class DapSession implements DapEventListener {
     }
 
     /**
-     * Resolve file path to absolute path.
-     * If the path is already absolute, returns it as-is.
+     * Resolve file path to absolute path with platform-native separators.
+     * If the path is already absolute, normalizes separators (e.g., forward slashes to backslashes on Windows).
      * If relative, resolves it against the workspace root.
      */
     private String resolveFilePath(String file) {
         // Check if already absolute
         java.nio.file.Path path = java.nio.file.Paths.get(file);
         if (path.isAbsolute()) {
-            return file;
+            // Normalize to platform-native separators (important for java-debug path matching on Windows)
+            return path.toString();
         }
 
         // Resolve against workspace root
@@ -825,7 +830,7 @@ public class DapSession implements DapEventListener {
                 .map(bp -> bp.file)
                 .collect(java.util.stream.Collectors.toSet());
 
-        LOG.infof("Sending breakpoints for %d file(s)", files.size());
+        LOG.infof("Sending breakpoints for %d file(s): %s", files.size(), files);
 
         // Send one setBreakpoints per file
         List<CompletableFuture<Void>> futures = files.stream()
@@ -1204,17 +1209,34 @@ public class DapSession implements DapEventListener {
 
     @Override
     public void onBreakpoint(BreakpointEventArguments event) {
-        LOG.infof("Session %s breakpoint event: %s", sessionId, event.getReason());
+        LOG.infof("Session %s breakpoint event: reason=%s, id=%s, verified=%s, message=%s",
+                sessionId, event.getReason(),
+                event.getBreakpoint() != null ? event.getBreakpoint().getId() : "null",
+                event.getBreakpoint() != null ? event.getBreakpoint().isVerified() : "null",
+                event.getBreakpoint() != null ? event.getBreakpoint().getMessage() : "null");
         // Update breakpoint verification status if needed
         if (event.getBreakpoint() != null) {
             Breakpoint bp = event.getBreakpoint();
+            boolean matched = false;
             // Find and update corresponding BreakpointInfo
             for (BreakpointInfo info : breakpoints.values()) {
                 if (info.dapBreakpoint != null && info.dapBreakpoint.getId() != null
                         && info.dapBreakpoint.getId().equals(bp.getId())) {
                     info.verified = bp.isVerified();
                     info.dapBreakpoint = bp;
+                    matched = true;
+                    LOG.infof("Breakpoint %s matched and updated: verified=%s", info.breakpointId, info.verified);
                     break;
+                }
+            }
+            if (!matched) {
+                LOG.warnf("Breakpoint event id=%s did not match any stored breakpoint (stored breakpoints: %d)",
+                        bp.getId(), breakpoints.size());
+                for (BreakpointInfo info : breakpoints.values()) {
+                    LOG.warnf("  Stored breakpoint %s: dapBreakpoint=%s, dapBreakpointId=%s",
+                            info.breakpointId,
+                            info.dapBreakpoint != null ? "present" : "null",
+                            info.dapBreakpoint != null ? info.dapBreakpoint.getId() : "null");
                 }
             }
         }
