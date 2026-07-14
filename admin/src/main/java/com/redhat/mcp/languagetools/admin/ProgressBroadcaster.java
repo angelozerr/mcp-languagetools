@@ -9,11 +9,8 @@ import org.jboss.logging.Logger;
 
 import java.util.List;
 
-/**
- * Broadcasts progress updates to the Admin UI via WebSocket.
- */
 @ApplicationScoped
-public class ProgressBroadcaster {
+public class ProgressBroadcaster implements com.redhat.mcp.languagetools.progress.ProgressBroadcaster {
 
     private static final Logger LOG = Logger.getLogger(ProgressBroadcaster.class);
 
@@ -23,9 +20,7 @@ public class ProgressBroadcaster {
     @Inject
     Event<ProgressInitWsMessage> progressInitEvent;
 
-    /**
-     * Send a progress update with step info.
-     */
+    @Override
     public void sendProgress(String taskId, String serverId, String title,
                              double progress, String message, String status,
                              String stepId, Double stepProgress) {
@@ -44,61 +39,47 @@ public class ProgressBroadcaster {
         progressUpdateEvent.fire(msg);
     }
 
-    /**
-     * Send a progress update without step info.
-     */
+    @Override
     public void sendProgress(String taskId, String serverId, String title,
                              double progress, String message, String status) {
         sendProgress(taskId, serverId, title, progress, message, status, null, null);
     }
 
-    /**
-     * Mark a task as running with step info.
-     */
+    @Override
     public void taskRunning(String taskId, String serverId, String title,
                             double progress, String message,
                             String stepId, Double stepProgress) {
         sendProgress(taskId, serverId, title, progress, message, "running", stepId, stepProgress);
     }
 
-    /**
-     * Mark a task as running without step info.
-     */
+    @Override
     public void taskRunning(String taskId, String serverId, String title, double progress, String message) {
         taskRunning(taskId, serverId, title, progress, message, null, null);
     }
 
-    /**
-     * Mark a task as completed.
-     */
+    @Override
     public void taskCompleted(String taskId, String serverId, String title) {
         sendProgress(taskId, serverId, title, 1.0, null, "completed");
     }
 
-    /**
-     * Mark a task as failed.
-     */
+    @Override
     public void taskFailed(String taskId, String serverId, String title, String errorMessage) {
         sendProgress(taskId, serverId, title, 0.0, errorMessage, "failed");
     }
 
-    /**
-     * Initialize a task with steps.
-     * This should be called before any progress updates to prepare the UI.
-     *
-     * @param taskId Unique task ID
-     * @param serverId Server ID (can be null for global tasks)
-     * @param title Task title
-     * @param steps List of steps with their relative weights
-     */
+    @Override
     public void initTaskWithSteps(String taskId, String serverId, String title,
-                                  List<ProgressInitWsMessage.StepInfo> steps, boolean cancellable) {
+                                  List<StepInfo> steps, boolean cancellable) {
+        List<ProgressInitWsMessage.StepInfo> wsSteps = steps.stream()
+                .map(s -> new ProgressInitWsMessage.StepInfo(s.id(), s.weight(), s.title()))
+                .toList();
+
         ProgressInitWsMessage msg = new ProgressInitWsMessage(
             "progress-init",
             taskId,
             serverId,
             title,
-            steps,
+            wsSteps,
             cancellable
         );
 

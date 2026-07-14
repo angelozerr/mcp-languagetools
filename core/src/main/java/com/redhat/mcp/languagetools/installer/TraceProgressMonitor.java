@@ -1,8 +1,7 @@
 package com.redhat.mcp.languagetools.installer;
 
-import com.redhat.mcp.languagetools.admin.ProgressBroadcaster;
-import com.redhat.mcp.languagetools.admin.ws.ProgressInitWsMessage;
 import com.redhat.mcp.languagetools.progress.AbstractProgressMonitor;
+import com.redhat.mcp.languagetools.progress.ProgressBroadcaster;
 import com.redhat.mcp.languagetools.trace.TraceCollector;
 
 import java.util.ArrayList;
@@ -53,14 +52,15 @@ public class TraceProgressMonitor extends AbstractProgressMonitor {
         this.title = title;
     }
 
+    @Override
     public void initializeSteps() {
         if (broadcaster == null || taskId == null) {
             return;
         }
-        List<ProgressInitWsMessage.StepInfo> stepInfos = new ArrayList<>();
+        List<ProgressBroadcaster.StepInfo> stepInfos = new ArrayList<>();
         for (var entry : getSteps().entrySet()) {
             var stepInfo = entry.getValue();
-            stepInfos.add(new ProgressInitWsMessage.StepInfo(
+            stepInfos.add(new ProgressBroadcaster.StepInfo(
                     stepInfo.getId(),
                     stepInfo.getWeight(),
                     stepInfo.getId()

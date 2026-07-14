@@ -1,6 +1,6 @@
 package com.redhat.mcp.languagetools;
 
-import com.redhat.mcp.languagetools.admin.McpClientChangeEvent;
+import com.redhat.mcp.languagetools.mcp.McpClientChangeEvent;
 import com.redhat.mcp.languagetools.dap.server.DapServerConfig;
 import com.redhat.mcp.languagetools.dap.trace.DapTraceCollector;
 import com.redhat.mcp.languagetools.installer.TraceProgressMonitor;
@@ -77,7 +77,7 @@ public class Application {
     Event<McpClientChangeEvent> mcpClientChangeEvent;
 
     @Inject
-    com.redhat.mcp.languagetools.admin.ProgressBroadcaster progressBroadcaster;
+    jakarta.enterprise.inject.Instance<com.redhat.mcp.languagetools.progress.ProgressBroadcaster> progressBroadcasterInstance;
 
     private final Map<URI, Workspace> workspaces = new ConcurrentHashMap<>();
     private final Map<String, LspServerConfig> lspServerConfigs = new ConcurrentHashMap<>();
@@ -431,7 +431,9 @@ public class Application {
         String taskId = "start-" + serverId;
         String title = "Start " + serverId;
         TraceProgressMonitor progressMonitor = new TraceProgressMonitor(
-                lspServer.getTraceCollector(), 100.0, progressBroadcaster, taskId, serverId, title);
+                lspServer.getTraceCollector(), 100.0,
+                progressBroadcasterInstance.isResolvable() ? progressBroadcasterInstance.get() : null,
+                taskId, serverId, title);
         progressMonitor.addStep(ProgressStep.INSTALLING, 0.50);
         progressMonitor.addStep(ProgressStep.STARTING, 0.10);
         progressMonitor.addStep(ProgressStep.INITIALIZING, 0.40);

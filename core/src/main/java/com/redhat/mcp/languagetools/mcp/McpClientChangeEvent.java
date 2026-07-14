@@ -1,4 +1,4 @@
-package com.redhat.mcp.languagetools.admin;
+package com.redhat.mcp.languagetools.mcp;
 
 /**
  * CDI event fired when MCP clients connect or disconnect.

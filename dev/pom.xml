@@ -24,6 +24,13 @@
             <version>${project.version}</version>
         </dependency>
 
+        <!-- Admin UI -->
+        <dependency>
+            <groupId>com.redhat.mcp</groupId>
+            <artifactId>mcp-language-tools-admin</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
         <!-- All extensions (runtime) -->
         <dependency>
             <groupId>com.redhat.mcp</groupId>

@@ -152,6 +152,9 @@ public interface ProgressMonitor {
      */
     ProgressMonitor createSubMonitor(double start, double end);
 
+    default void initializeSteps() {
+    }
+
     /**
      * Create a no-op progress monitor that does nothing.
      * Useful for operations that don't need progress tracking.

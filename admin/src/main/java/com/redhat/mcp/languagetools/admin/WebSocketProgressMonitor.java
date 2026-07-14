@@ -1,6 +1,5 @@
 package com.redhat.mcp.languagetools.admin;
 
-import com.redhat.mcp.languagetools.admin.ws.ProgressInitWsMessage;
 import com.redhat.mcp.languagetools.progress.AbstractProgressMonitor;
 import com.redhat.mcp.languagetools.progress.ProgressMonitor;
 
@@ -39,20 +38,16 @@ public class WebSocketProgressMonitor extends AbstractProgressMonitor {
         return super.addStep(stepId, weight);
     }
 
-    /**
-     * Broadcast steps initialization to WebSocket.
-     * This should be called after all steps are added with addStep().
-     */
+    @Override
     public void initializeSteps() {
         if (stepsInitialized || broadcaster == null) {
             return;
         }
 
-        // Convert steps to ProgressInitWsMessage.StepInfo
-        List<ProgressInitWsMessage.StepInfo> stepInfos = new ArrayList<>();
+        List<com.redhat.mcp.languagetools.progress.ProgressBroadcaster.StepInfo> stepInfos = new ArrayList<>();
         for (var entry : getSteps().entrySet()) {
             var stepInfo = entry.getValue();
-            stepInfos.add(new ProgressInitWsMessage.StepInfo(
+            stepInfos.add(new com.redhat.mcp.languagetools.progress.ProgressBroadcaster.StepInfo(
                 stepInfo.getId(),
                 stepInfo.getWeight(),
                 stepInfo.getId()

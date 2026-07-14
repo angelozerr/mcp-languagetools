@@ -138,12 +138,10 @@ public class ProgressMonitorManager {
                 ? new MultiProgressMonitor(monitors.toArray(new ProgressMonitor[0]))
                 : mcpMonitor;
 
-        // Initialize steps for WebSocket monitors
+        // Initialize steps for contributed monitors
         if (result instanceof MultiProgressMonitor multiMonitor) {
             for (ProgressMonitor monitor : multiMonitor.getDelegates()) {
-                if (monitor instanceof com.redhat.mcp.languagetools.admin.WebSocketProgressMonitor wsMonitor) {
-                    wsMonitor.initializeSteps();
-                }
+                monitor.initializeSteps();
             }
         }
 
