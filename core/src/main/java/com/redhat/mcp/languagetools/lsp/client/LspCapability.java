@@ -23,6 +23,8 @@ public enum LspCapability {
     HOVER(LspRequestConstants.TEXT_DOCUMENT_HOVER),
     COMPLETION(LspRequestConstants.TEXT_DOCUMENT_COMPLETION),
     DOCUMENT_SYMBOL(LspRequestConstants.TEXT_DOCUMENT_DOCUMENT_SYMBOL),
+    CODE_ACTION(LspRequestConstants.TEXT_DOCUMENT_CODE_ACTION),
+    RENAME(LspRequestConstants.TEXT_DOCUMENT_RENAME),
     WORKSPACE_SYMBOL(LspRequestConstants.WORKSPACE_SYMBOL);
 
     private final String method;

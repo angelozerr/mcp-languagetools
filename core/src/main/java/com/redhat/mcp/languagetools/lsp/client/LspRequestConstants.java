@@ -24,6 +24,8 @@ public class LspRequestConstants {
     public static final String TEXT_DOCUMENT_HOVER = "textDocument/hover";
     public static final String TEXT_DOCUMENT_COMPLETION = "textDocument/completion";
     public static final String TEXT_DOCUMENT_DOCUMENT_SYMBOL = "textDocument/documentSymbol";
+    public static final String TEXT_DOCUMENT_CODE_ACTION = "textDocument/codeAction";
+    public static final String TEXT_DOCUMENT_RENAME = "textDocument/rename";
 
     // workspace/* LSP requests
     public static final String WORKSPACE_SYMBOL = "workspace/symbol";

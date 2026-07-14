@@ -197,7 +197,7 @@ public class LspRequestExecutor {
          * Format error message when no server is found.
          */
         default String formatNoServerFound(TRequestParams params) {
-            return String.format("No language server with %s support found", getCapability());
+            return String.format("No language server with %s support found", getCapability().getMethod());
         }
 
         /**

@@ -328,6 +328,7 @@ public class LspServer extends ServerBase<LspServerConfig> {
         textDocument.setDefinition(new DefinitionCapabilities());
         textDocument.setReferences(new ReferencesCapabilities());
         textDocument.setDocumentSymbol(new DocumentSymbolCapabilities());
+        textDocument.setRename(new RenameCapabilities());
         capabilities.setTextDocument(textDocument);
 
         params.setCapabilities(capabilities);
