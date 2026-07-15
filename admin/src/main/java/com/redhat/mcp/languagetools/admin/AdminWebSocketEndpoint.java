@@ -5,6 +5,7 @@ import com.redhat.mcp.languagetools.admin.dto.*;
 import com.redhat.mcp.languagetools.admin.ws.*;
 import com.redhat.mcp.languagetools.dap.session.DapSessionEvent;
 import com.redhat.mcp.languagetools.dap.session.DapSessionManager;
+import com.redhat.mcp.languagetools.dap.trace.DapTraceCollector;
 import com.redhat.mcp.languagetools.dap.trace.DapTraceMessage;
 import com.redhat.mcp.languagetools.lsp.server.LspServerStatusChangeEvent;
 import com.redhat.mcp.languagetools.lsp.trace.LspTraceCollector;
@@ -55,16 +56,10 @@ public class AdminWebSocketEndpoint {
     McpTraceCollector mcpTraceCollector;
 
     @Inject
-    com.redhat.mcp.languagetools.dap.trace.DapTraceCollector dapTraceCollector;
-
-    @Inject
-    ServerDTOBuilder serverDTOBuilder;
+    DapTraceCollector dapTraceCollector;
 
     @Inject
     DapSessionManager dapSessionManager;
-
-    @Inject
-    ContributionDTOBuilder contributionBuilder;
 
     @Inject
     AdminProgressBroadcaster progressBroadcaster;

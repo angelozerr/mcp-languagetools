@@ -62,19 +62,6 @@ public class LspTraceCollector implements TracingMessageConsumer.TraceCollectorA
         traceEvent.fire(message);
     }
 
-    public List<LspTraceMessage> getRecentTraces(int limit) {
-        return traces.stream()
-            .skip(Math.max(0, traces.size() - limit))
-            .toList();
-    }
-
-    public List<LspTraceMessage> getTracesForServer(String serverId, int limit) {
-        return traces.stream()
-            .filter(t -> t.serverId().equals(serverId))
-            .skip(Math.max(0, traces.size() - limit))
-            .toList();
-    }
-
     public List<LspTraceMessage> getTracesForWorkspaceAndServer(String workspaceUri, String serverId, int limit) {
         return traces.stream()
             .filter(t -> t.workspaceUri().equals(workspaceUri) && t.serverId().equals(serverId))

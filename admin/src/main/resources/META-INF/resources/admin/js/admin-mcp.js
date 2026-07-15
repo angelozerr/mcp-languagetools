@@ -98,45 +98,23 @@ function renderMcpClients() {
     }
 }
 
-async function selectMcpClient(clientId) {
+function selectMcpClient(clientId) {
     selectedMcpClient = clientId;
     renderMcpClients();
 
-    // Load initial traces if not already loaded
-    await loadInitialMcpTraces();
+    // Initialize traces if not already done
+    loadInitialMcpTraces();
 
     loadMcpConsole(clientId);
 }
 
 /**
- * Load initial MCP traces from backend (called once when accessing MCP tab).
+ * Initialize MCP traces (called once when accessing MCP tab).
+ * Trace history is received via WebSocket on connect.
  */
-async function loadInitialMcpTraces() {
+function loadInitialMcpTraces() {
     if (mcpTracesLoaded) return;
     mcpTracesLoaded = true;
-
-    try {
-        const allTraces = await fetch('/api/admin/mcp/traces?limit=500').then(r => r.json());
-
-        // Organize traces by connectionId (client)
-        mcpTracesByClient = {};
-        allTraces.forEach(trace => {
-            const connectionId = trace.connectionId;
-            if (!mcpTracesByClient[connectionId]) {
-                mcpTracesByClient[connectionId] = [];
-            }
-            mcpTracesByClient[connectionId].push(trace);
-        });
-
-        console.log('Loaded initial MCP traces:', Object.keys(mcpTracesByClient).length, 'clients');
-
-        // Re-render console if a client is selected
-        if (selectedMcpClient) {
-            renderMcpConsole();
-        }
-    } catch (e) {
-        console.error('Failed to load initial MCP traces:', e);
-    }
 }
 
 async function loadMcpTracesConsole() {

@@ -64,18 +64,10 @@ public class DapTraceCollector implements TracingMessageConsumer.TraceCollectorA
         traceEvent.fire(message);
     }
 
-    public List<DapTraceMessage> getRecentTraces(int limit) {
-        return traces.stream()
-            .skip(Math.max(0, traces.size() - limit))
-            .toList();
-    }
-
     public List<DapTraceMessage> getTracesForSession(String sessionId, int limit) {
         var filtered = traces.stream()
             .filter(t -> t.sessionId().equals(sessionId))
             .toList();
-
-        // Return last 'limit' traces for this session
         int skip = Math.max(0, filtered.size() - limit);
         return filtered.stream()
             .skip(skip)

@@ -917,7 +917,12 @@ function toggleAllDapTraces(sessionId) {
 /**
  * Clear DAP traces for a session.
  */
-function clearDapConsole(sessionId) {
+async function clearDapConsole(sessionId) {
+    try {
+        await fetch('/api/admin/dap/traces', { method: 'DELETE' });
+    } catch (e) {
+        console.error('Failed to clear DAP traces on server:', e);
+    }
     if (window.dapTracesBySession) {
         window.dapTracesBySession[sessionId] = [];
     }

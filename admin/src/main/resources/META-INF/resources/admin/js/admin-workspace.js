@@ -791,23 +791,11 @@
 
             // Load traces for specific workspace + server
             try {
-                const encodedWorkspace = encodeURIComponent(selectedWorkspace);
-
-                console.log('loadConsole - serverId:', server.id, 'existing traces:', tracesByServer[server.id]?.length || 0);
-
-                // Only load from API if we don't have traces for this server yet
-                if (!tracesByServer[server.id] || tracesByServer[server.id].length === 0) {
-                    console.log('Loading traces from API for server:', server.id);
-                    const response = await fetch(`/api/admin/lsp/traces/workspace/${encodedWorkspace}/server/${server.id}?limit=50`);
-                    const loadedTraces = await response.json();
-                    tracesByServer[server.id] = loadedTraces || [];
-                    console.log('Loaded', loadedTraces.length, 'traces for', server.id);
-                } else {
-                    console.log('Using cached traces for', server.id);
+                // Traces are populated via WebSocket (history on connect + real-time updates)
+                if (!tracesByServer[server.id]) {
+                    tracesByServer[server.id] = [];
                 }
-
                 renderConsole();
-                // WebSocket now handles real-time trace updates
             } catch (error) {
                 console.error('Failed to load traces:', error);
             }
