@@ -35,15 +35,22 @@ public abstract class FilePositionBasedStrategy<TLspParams, TResult>
 
     protected final LanguageRegistry languageRegistry;
     private final LspCapability capability;
+    private final String title;
 
-    protected FilePositionBasedStrategy(LanguageRegistry languageRegistry, LspCapability capability) {
+    protected FilePositionBasedStrategy(LanguageRegistry languageRegistry, LspCapability capability, String title) {
         this.languageRegistry = languageRegistry;
         this.capability = capability;
+        this.title = title;
     }
 
     @Override
     public LspCapability getCapability() {
         return capability;
+    }
+
+    @Override
+    public String getTitle() {
+        return title;
     }
 
     @Override

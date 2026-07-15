@@ -66,7 +66,7 @@ public class LspRequestExecutor {
             Progress progress) {
         // Create progress monitor (MCP + Admin WebSocket contributors)
         ProgressMonitor progressMonitor = progressMonitorManager.createProgressMonitor(
-                progress, cancellation, ProgressContext.forOperation(null, strategy.getCapability().name()));
+                progress, cancellation, ProgressContext.forOperation(strategy.getCapability().name(), strategy.getTitle()));
 
         // Define steps for LSP operations
         progressMonitor
@@ -159,6 +159,13 @@ public class LspRequestExecutor {
          * Get the LSP capability for this request.
          */
         LspCapability getCapability();
+
+        /**
+         * Get human-readable title for progress display.
+         */
+        default String getTitle() {
+            return getCapability().name();
+        }
 
         /**
          * Resolve LSP servers for this request.

@@ -30,14 +30,6 @@ public class WebSocketProgressMonitor extends AbstractProgressMonitor {
         this.title = title;
     }
 
-    /**
-     * Override addStep to broadcast steps to WebSocket when all steps are defined.
-     */
-    @Override
-    public ProgressMonitor addStep(String stepId, double weight) {
-        return super.addStep(stepId, weight);
-    }
-
     @Override
     public void initializeSteps() {
         if (stepsInitialized || broadcaster == null) {

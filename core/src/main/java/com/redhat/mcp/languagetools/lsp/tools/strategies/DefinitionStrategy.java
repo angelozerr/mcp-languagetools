@@ -28,7 +28,7 @@ import java.util.concurrent.CompletableFuture;
 public class DefinitionStrategy extends FilePositionBasedStrategy<DefinitionParams, Either<List<? extends Location>, List<? extends LocationLink>>> {
 
     public DefinitionStrategy(LanguageRegistry languageRegistry) {
-        super(languageRegistry, LspCapability.DEFINITION);
+        super(languageRegistry, LspCapability.DEFINITION, "Go to definition");
     }
 
     @Override

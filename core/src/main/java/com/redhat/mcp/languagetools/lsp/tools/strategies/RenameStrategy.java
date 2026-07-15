@@ -29,6 +29,11 @@ public class RenameStrategy implements LspRequestExecutor.LspRequestStrategy<Ren
     }
 
     @Override
+    public String getTitle() {
+        return "Rename symbol";
+    }
+
+    @Override
     public CompletableFuture<List<LspServer>> resolveServers(
             LspServerResolver resolver,
             RenameRequestParams params,

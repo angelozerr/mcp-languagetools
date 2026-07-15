@@ -8,35 +8,22 @@ import java.util.Objects;
  */
 public class ProgressContext {
 
-    /**
-     * Type of operation being tracked
-     */
-    public enum OperationType {
-        INSTALLATION,   // Installing an LSP/DAP server
-        STARTING,       // Starting an LSP/DAP server
-        OPERATION       // Running an LSP operation (findReferences, etc.)
-    }
-
-    private final String id;                // Unique identifier
-    private final OperationType type;
-    private final String serverId;          // LSP/DAP server ID (if applicable)
-    private final String workspaceUri;      // Workspace URI (if applicable)
-    private final String operationName;     // Operation name (if type=OPERATION)
+    private final String taskId;
+    private final String serverId;
+    private final String workspaceUri;
+    private final String operationName;
+    private final String title;
 
     private ProgressContext(Builder builder) {
-        this.id = builder.id;
-        this.type = builder.type;
+        this.taskId = builder.taskId;
         this.serverId = builder.serverId;
         this.workspaceUri = builder.workspaceUri;
         this.operationName = builder.operationName;
+        this.title = builder.title;
     }
 
-    public String getId() {
-        return id;
-    }
-
-    public OperationType getType() {
-        return type;
+    public String getTaskId() {
+        return taskId;
     }
 
     public String getServerId() {
@@ -51,22 +38,8 @@ public class ProgressContext {
         return operationName;
     }
 
-    /**
-     * Get a human-readable description of this context.
-     */
-    public String getDescription() {
-        StringBuilder sb = new StringBuilder();
-        sb.append(type.name().toLowerCase());
-
-        if (serverId != null) {
-            sb.append(" [").append(serverId).append("]");
-        }
-
-        if (operationName != null) {
-            sb.append(" - ").append(operationName);
-        }
-
-        return sb.toString();
+    public String getTitle() {
+        return title;
     }
 
     @Override
@@ -74,35 +47,30 @@ public class ProgressContext {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         ProgressContext that = (ProgressContext) o;
-        return Objects.equals(id, that.id);
+        return Objects.equals(taskId, that.taskId);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(id);
+        return Objects.hash(taskId);
     }
 
     // ==================== Builder ====================
 
-    public static Builder builder() {
-        return new Builder();
+    public static Builder builder(String title) {
+        return new Builder(title);
     }
 
     public static class Builder {
-        private String id;
-        private OperationType type;
+        private String taskId;
         private String serverId;
         private String workspaceUri;
         private String operationName;
+        private final String title;
 
-        public Builder id(String id) {
-            this.id = id;
-            return this;
-        }
-
-        public Builder type(OperationType type) {
-            this.type = type;
-            return this;
+        public Builder(String title) {
+            Objects.requireNonNull(title, "title is required");
+            this.title = title;
         }
 
         public Builder serverId(String serverId) {
@@ -121,11 +89,7 @@ public class ProgressContext {
         }
 
         public ProgressContext build() {
-            // Generate ID if not provided
-            if (id == null) {
-                id = java.util.UUID.randomUUID().toString();
-            }
-            Objects.requireNonNull(type, "type is required");
+            taskId = java.util.UUID.randomUUID().toString();
             return new ProgressContext(this);
         }
     }
@@ -133,33 +97,19 @@ public class ProgressContext {
     // ==================== Convenience factory methods ====================
 
     /**
-     * Create context for server installation.
+     * Create context for a server operation (install, start, etc.).
      */
-    public static ProgressContext forInstallation(String serverId) {
-        return builder()
-                .type(OperationType.INSTALLATION)
+    public static ProgressContext forServer(String serverId, String title) {
+        return builder(title)
                 .serverId(serverId)
                 .build();
     }
 
     /**
-     * Create context for server starting.
+     * Create context for an LSP/DAP operation.
      */
-    public static ProgressContext forStarting(String serverId, String workspaceUri) {
-        return builder()
-                .type(OperationType.STARTING)
-                .serverId(serverId)
-                .workspaceUri(workspaceUri)
-                .build();
-    }
-
-    /**
-     * Create context for LSP operation.
-     */
-    public static ProgressContext forOperation(String serverId, String operationName) {
-        return builder()
-                .type(OperationType.OPERATION)
-                .serverId(serverId)
+    public static ProgressContext forOperation(String operationName, String title) {
+        return builder(title)
                 .operationName(operationName)
                 .build();
     }

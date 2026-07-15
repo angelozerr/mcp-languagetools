@@ -28,7 +28,7 @@ import java.util.concurrent.CompletableFuture;
 public class DeclarationStrategy extends FilePositionBasedStrategy<DeclarationParams, Either<List<? extends Location>, List<? extends LocationLink>>> {
 
     public DeclarationStrategy(LanguageRegistry languageRegistry) {
-        super(languageRegistry, LspCapability.DECLARATION);
+        super(languageRegistry, LspCapability.DECLARATION, "Go to declaration");
     }
 
     @Override

@@ -29,7 +29,7 @@ import java.util.stream.Collectors;
 public class ReferencesStrategy extends FilePositionBasedStrategy<ReferenceParams, List<? extends Location>> {
 
     public ReferencesStrategy(LanguageRegistry languageRegistry) {
-        super(languageRegistry, LspCapability.REFERENCES);
+        super(languageRegistry, LspCapability.REFERENCES, "Find references");
     }
 
     @Override

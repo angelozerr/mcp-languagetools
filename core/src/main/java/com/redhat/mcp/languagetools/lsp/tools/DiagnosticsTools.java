@@ -50,9 +50,11 @@ public class DiagnosticsTools {
 
         // Create progress monitor (MCP + Admin WebSocket contributors)
         ProgressMonitor progressMonitor = progressMonitorManager.createProgressMonitor(
-                progress, cancellation, ProgressContext.forOperation(null, "get_diagnostics"));
+                progress, cancellation, ProgressContext.forOperation("get_diagnostics", "Get diagnostics"));
 
         try {
+            progressMonitor.reportProgress(0.0, "Getting diagnostics");
+
             URI uri = URI.create(fileUri);
             LOG.infof("Getting diagnostics for: %s (from cwd: %s)", uri, cwd);
 

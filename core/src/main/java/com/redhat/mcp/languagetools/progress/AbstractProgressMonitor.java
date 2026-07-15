@@ -133,6 +133,7 @@ public abstract class AbstractProgressMonitor implements ProgressMonitor {
 
     @Override
     public ProgressMonitor beginStep(String stepId) {
+        initializeSteps();
         StepInfo step = steps.get(stepId);
         if (step == null) {
             return this;

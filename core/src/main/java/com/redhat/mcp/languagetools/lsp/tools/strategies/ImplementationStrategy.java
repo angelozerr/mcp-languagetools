@@ -28,7 +28,7 @@ import java.util.concurrent.CompletableFuture;
 public class ImplementationStrategy extends FilePositionBasedStrategy<ImplementationParams, Either<List<? extends Location>, List<? extends LocationLink>>> {
 
     public ImplementationStrategy(LanguageRegistry languageRegistry) {
-        super(languageRegistry, LspCapability.IMPLEMENTATION);
+        super(languageRegistry, LspCapability.IMPLEMENTATION, "Find implementations");
     }
 
     @Override

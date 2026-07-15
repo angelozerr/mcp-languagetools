@@ -37,6 +37,11 @@ public class WorkspaceSymbolStrategy implements LspRequestExecutor.LspRequestStr
     }
 
     @Override
+    public String getTitle() {
+        return "Workspace symbols";
+    }
+
+    @Override
     public CompletableFuture<List<LspServer>> resolveServers(
             LspServerResolver resolver,
             WorkspaceSymbolRequestParams params, ProgressMonitor progressMonitor) {

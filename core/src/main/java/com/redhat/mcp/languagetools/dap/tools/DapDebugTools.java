@@ -184,7 +184,7 @@ public class DapDebugTools {
 
         // Create progress monitor (MCP + Admin WebSocket contributors)
         ProgressMonitor progressMonitor = progressMonitorManager.createProgressMonitor(
-                progress, cancellation, ProgressContext.forOperation(debuggerId, "start_debugging"));
+                progress, cancellation, ProgressContext.forOperation("start_debugging", "Start debugging"));
 
         // Define steps for DAP operations
         progressMonitor

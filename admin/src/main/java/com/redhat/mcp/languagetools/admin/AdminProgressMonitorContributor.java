@@ -21,25 +21,11 @@ public class AdminProgressMonitorContributor implements ProgressMonitorContribut
 
     @Override
     public ProgressMonitor createMonitor(ProgressContext context) {
-        // Support both global progress (no serverId) and local progress (with serverId)
-        String serverId = context.getServerId();  // null for global operations
-        String operationName = context.getOperationName() != null ? context.getOperationName() : "operation";
+        String taskId = context.getTaskId();
+        String serverId = context.getServerId();
+        String title = context.getTitle();
 
-        // Generate taskId and title based on whether this is global or local
-        String taskId;
-        String title;
-        if (serverId != null) {
-            // Local progress: "install-eclipse-jdtls", "start-eclipse-jdtls"
-            taskId = operationName + "-" + serverId;
-            title = operationName + " " + serverId;
-        } else {
-            // Global progress: "REFERENCES", "DEFINITION", etc.
-            taskId = operationName;
-            title = operationName;
-        }
-
-        LOG.infof("Creating WebSocketProgressMonitor for task '%s' (serverId=%s, type=%s)",
-            taskId, serverId != null ? serverId : "global", context.getType());
+        LOG.infof("Creating WebSocketProgressMonitor for task '%s' (title=%s)", taskId, title);
 
         return new WebSocketProgressMonitor(
             broadcaster,

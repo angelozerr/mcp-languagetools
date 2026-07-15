@@ -17,7 +17,7 @@ import java.util.stream.Collectors;
 public class CodeActionStrategy extends FilePositionBasedStrategy<CodeActionParams, List<Either<Command, CodeAction>>> {
 
     public CodeActionStrategy(LanguageRegistry languageRegistry) {
-        super(languageRegistry, LspCapability.CODE_ACTION);
+        super(languageRegistry, LspCapability.CODE_ACTION, "Code actions");
     }
 
     @Override
