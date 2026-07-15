@@ -103,7 +103,6 @@ public class JavaDebugServer extends DapServer {
                     getTraceCollector().addTrace(
                             workspaceRootUri,
                             sessionId,
-                            TraceCollector.MessageDirection.CLIENT_TO_SERVER,
                             String.format("Connecting to DAP server on port %d...", port)
                     );
 
@@ -113,7 +112,6 @@ public class JavaDebugServer extends DapServer {
                                 getTraceCollector().addTrace(
                                         workspaceRootUri,
                                         sessionId,
-                                        TraceCollector.MessageDirection.SERVER_TO_CLIENT,
                                         String.format("Connected to DAP server on port %d", port)
                                 );
                                 return enrichedConfig;
@@ -140,7 +138,6 @@ public class JavaDebugServer extends DapServer {
                     getTraceCollector().addTrace(
                             workspaceRootUri,
                             sessionId,
-                            TraceCollector.MessageDirection.CLIENT_TO_SERVER,
                             String.format("Connecting to DAP server on port %d (JDTLS debug adapter)...", jdtlsPort)
                     );
 
@@ -150,7 +147,6 @@ public class JavaDebugServer extends DapServer {
                                 getTraceCollector().addTrace(
                                         workspaceRootUri,
                                         sessionId,
-                                        TraceCollector.MessageDirection.SERVER_TO_CLIENT,
                                         String.format("Connected to DAP server on port %d. Will attach to target at %s:%s",
                                                 jdtlsPort,
                                                 enrichedConfig.get("hostName"),
@@ -232,7 +228,6 @@ public class JavaDebugServer extends DapServer {
                     getTraceCollector().addTrace(
                             workspaceRootUri,
                             sessionId,
-                            TraceCollector.MessageDirection.SERVER_TO_CLIENT,
                             String.format("ERROR resolving launch config: %s", ex.getMessage())
                     );
                     throw new RuntimeException(error, ex);
@@ -286,7 +281,6 @@ public class JavaDebugServer extends DapServer {
             getTraceCollector().addTrace(
                     workspaceRootUri,
                     sessionId,
-                    TraceCollector.MessageDirection.SERVER_TO_CLIENT,
                     String.format("Attach config validated: hostName=%s, port=%d", hostName, port)
             );
 
@@ -302,7 +296,6 @@ public class JavaDebugServer extends DapServer {
             getTraceCollector().addTrace(
                     workspaceRootUri,
                     sessionId,
-                    TraceCollector.MessageDirection.SERVER_TO_CLIENT,
                     String.format("ERROR: %s", error)
             );
             return CompletableFuture.failedFuture(new UnsupportedOperationException(error));
@@ -314,7 +307,6 @@ public class JavaDebugServer extends DapServer {
         getTraceCollector().addTrace(
                 workspaceRootUri,
                 sessionId,
-                TraceCollector.MessageDirection.SERVER_TO_CLIENT,
                 String.format("ERROR: %s", error)
         );
         return CompletableFuture.failedFuture(new IllegalArgumentException(error));
@@ -333,7 +325,6 @@ public class JavaDebugServer extends DapServer {
         getTraceCollector().addTrace(
                 workspaceRootUri,
                 sessionId,
-                TraceCollector.MessageDirection.CLIENT_TO_SERVER,
                 String.format("Calling %s...", CMD_START_DEBUG_SESSION)
         );
 
@@ -352,7 +343,6 @@ public class JavaDebugServer extends DapServer {
                     getTraceCollector().addTrace(
                             workspaceRootUri,
                             sessionId,
-                            TraceCollector.MessageDirection.SERVER_TO_CLIENT,
                             String.format("Debug adapter listening on port: %d", port)
                     );
 
@@ -377,7 +367,6 @@ public class JavaDebugServer extends DapServer {
         getTraceCollector().addTrace(
                 workspaceRootUri,
                 sessionId,
-                TraceCollector.MessageDirection.CLIENT_TO_SERVER,
                 String.format("Calling %s...", CMD_VALIDATE_LAUNCH_CONFIG)
         );
 
@@ -389,7 +378,6 @@ public class JavaDebugServer extends DapServer {
                         getTraceCollector().addTrace(
                                 workspaceRootUri,
                                 sessionId,
-                                TraceCollector.MessageDirection.SERVER_TO_CLIENT,
                                 String.format("ERROR %s: %s", CMD_VALIDATE_LAUNCH_CONFIG, ex.getMessage())
                         );
                         throw new RuntimeException(error, ex);
@@ -398,7 +386,6 @@ public class JavaDebugServer extends DapServer {
                     getTraceCollector().addTrace(
                             workspaceRootUri,
                             sessionId,
-                            TraceCollector.MessageDirection.SERVER_TO_CLIENT,
                             String.format("%s: OK", CMD_VALIDATE_LAUNCH_CONFIG)
                     );
                     return result;
@@ -413,7 +400,6 @@ public class JavaDebugServer extends DapServer {
         getTraceCollector().addTrace(
                 workspaceRootUri,
                 sessionId,
-                TraceCollector.MessageDirection.CLIENT_TO_SERVER,
                 String.format("Calling %s...", CMD_BUILD_WORKSPACE)
         );
 
@@ -425,7 +411,6 @@ public class JavaDebugServer extends DapServer {
                         getTraceCollector().addTrace(
                                 workspaceRootUri,
                                 sessionId,
-                                TraceCollector.MessageDirection.SERVER_TO_CLIENT,
                                 String.format("ERROR %s: %s", CMD_BUILD_WORKSPACE, ex.getMessage())
                         );
                         throw new RuntimeException(error, ex);
@@ -434,7 +419,6 @@ public class JavaDebugServer extends DapServer {
                     getTraceCollector().addTrace(
                             workspaceRootUri,
                             sessionId,
-                            TraceCollector.MessageDirection.SERVER_TO_CLIENT,
                             String.format("%s: OK", CMD_BUILD_WORKSPACE)
                     );
                     return result;
@@ -453,7 +437,6 @@ public class JavaDebugServer extends DapServer {
         getTraceCollector().addTrace(
                 workspaceRootUri,
                 sessionId,
-                TraceCollector.MessageDirection.CLIENT_TO_SERVER,
                 String.format("Calling %s...", CMD_RESOLVE_CLASSPATH)
         );
 
@@ -465,7 +448,6 @@ public class JavaDebugServer extends DapServer {
                         getTraceCollector().addTrace(
                                 workspaceRootUri,
                                 sessionId,
-                                TraceCollector.MessageDirection.SERVER_TO_CLIENT,
                                 String.format("ERROR %s: %s", CMD_RESOLVE_CLASSPATH, ex.getMessage())
                         );
                         throw new RuntimeException(error, ex);
@@ -477,7 +459,6 @@ public class JavaDebugServer extends DapServer {
                     getTraceCollector().addTrace(
                             workspaceRootUri,
                             sessionId,
-                            TraceCollector.MessageDirection.SERVER_TO_CLIENT,
                             String.format("%s: %d modulePaths, %d classPaths",
                                     CMD_RESOLVE_CLASSPATH, classpaths.get(0).size(), classpaths.get(1).size())
                     );
@@ -497,7 +478,6 @@ public class JavaDebugServer extends DapServer {
         getTraceCollector().addTrace(
                 workspaceRootUri,
                 sessionId,
-                TraceCollector.MessageDirection.CLIENT_TO_SERVER,
                 String.format("Calling %s...", CMD_RESOLVE_JAVA_EXECUTABLE)
         );
 
@@ -509,7 +489,6 @@ public class JavaDebugServer extends DapServer {
                         getTraceCollector().addTrace(
                                 workspaceRootUri,
                                 sessionId,
-                                TraceCollector.MessageDirection.SERVER_TO_CLIENT,
                                 String.format("ERROR %s: %s", CMD_RESOLVE_JAVA_EXECUTABLE, ex.getMessage())
                         );
                         throw new RuntimeException(error, ex);
@@ -519,7 +498,6 @@ public class JavaDebugServer extends DapServer {
                     getTraceCollector().addTrace(
                             workspaceRootUri,
                             sessionId,
-                            TraceCollector.MessageDirection.SERVER_TO_CLIENT,
                             String.format("%s: %s", CMD_RESOLVE_JAVA_EXECUTABLE, javaExec)
                     );
                     return javaExec;

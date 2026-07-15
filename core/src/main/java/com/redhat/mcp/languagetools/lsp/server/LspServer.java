@@ -214,13 +214,11 @@ public class LspServer extends ServerBase<LspServerConfig> {
         getTraceCollector().addTrace(
             workspaceRoot.toString(),
             config.getServerId(),
-            TraceCollector.MessageDirection.SERVER_TO_CLIENT,
             String.format("Starting %s...", config.getName())
         );
         getTraceCollector().addTrace(
             workspaceRoot.toString(),
             config.getServerId(),
-            TraceCollector.MessageDirection.SERVER_TO_CLIENT,
             String.format("Command: %s", commandStr)
         );
 
@@ -238,7 +236,6 @@ public class LspServer extends ServerBase<LspServerConfig> {
             getTraceCollector().addTrace(
                 workspaceRoot.toString(),
                 config.getServerId(),
-                TraceCollector.MessageDirection.SERVER_TO_CLIENT,
                 String.format("Working directory: %s", config.getWorkingDirectory())
             );
         }
@@ -251,7 +248,6 @@ public class LspServer extends ServerBase<LspServerConfig> {
         getTraceCollector().addTrace(
             workspaceRoot.toString(),
             config.getServerId(),
-            TraceCollector.MessageDirection.SERVER_TO_CLIENT,
             String.format("LSP server process started (PID: %d)", serverProcess.pid())
         );
 

@@ -46,7 +46,6 @@ public class McpTraceCollector {
         String formattedMessage = formatMessage(direction, message, connectionId, now);
 
         McpTrace trace = new McpTrace(
-                direction.name().toLowerCase(),
                 connectionId,
                 formattedMessage,
                 now,

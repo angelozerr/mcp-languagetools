@@ -174,13 +174,11 @@ public class DapServer extends ServerBase<DapServerConfig> {
                 getTraceCollector().addTrace(
                     workspaceRootUri,
                     sessionId,
-                    TraceCollector.MessageDirection.SERVER_TO_CLIENT,
                     String.format("Starting %s...", config.getName())
                 );
                 getTraceCollector().addTrace(
                     workspaceRootUri,
                     sessionId,
-                    TraceCollector.MessageDirection.SERVER_TO_CLIENT,
                     String.format("Command: %s", commandStr)
                 );
 
@@ -193,7 +191,6 @@ public class DapServer extends ServerBase<DapServerConfig> {
                 getTraceCollector().addTrace(
                     workspaceRootUri,
                     sessionId,
-                    TraceCollector.MessageDirection.SERVER_TO_CLIENT,
                     String.format("Working directory: %s", workspaceDir)
                 );
 
@@ -210,7 +207,6 @@ public class DapServer extends ServerBase<DapServerConfig> {
                 getTraceCollector().addTrace(
                     workspaceRootUri,
                     sessionId,
-                    TraceCollector.MessageDirection.SERVER_TO_CLIENT,
                     String.format("DAP server process started (PID: %d)", serverProcess.pid())
                 );
 
@@ -233,7 +229,6 @@ public class DapServer extends ServerBase<DapServerConfig> {
                                     getTraceCollector().addTrace(
                                         workspaceRootUri,
                                         sessionId,
-                                        TraceCollector.MessageDirection.SERVER_TO_CLIENT,
                                         String.format("[Error - %s] %s process exited with code %d",
                                             java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss")),
                                             config.getName(),
@@ -272,7 +267,6 @@ public class DapServer extends ServerBase<DapServerConfig> {
             line -> getTraceCollector().addTrace(
                     workspaceRootUri,
                 sessionId,
-                TraceCollector.MessageDirection.SERVER_TO_CLIENT,
                 line
             )
         );
@@ -296,7 +290,6 @@ public class DapServer extends ServerBase<DapServerConfig> {
                 getTraceCollector().addTrace(
                     workspaceRootUri,
                     sessionId,
-                    TraceCollector.MessageDirection.SERVER_TO_CLIENT,
                     String.format("DAP server ready (address=%s, port=%s)",
                         readyTracker.getAddress(), readyTracker.getPort())
                 );
@@ -651,7 +644,6 @@ public class DapServer extends ServerBase<DapServerConfig> {
                         ((DapTraceCollector) getTraceCollector()).addTrace(
                             workspaceRootUri,
                             sessionId,
-                            TraceCollector.MessageDirection.SERVER_TO_CLIENT,
                             errorLine,
                             TraceCollector.MessageType.ERROR
                         );
@@ -659,7 +651,6 @@ public class DapServer extends ServerBase<DapServerConfig> {
                         getTraceCollector().addTrace(
                             workspaceRootUri,
                             sessionId,
-                            TraceCollector.MessageDirection.SERVER_TO_CLIENT,
                             String.format("[Error - %s] %s stderr: %s",
                                 java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss")),
                                 config.getName(),

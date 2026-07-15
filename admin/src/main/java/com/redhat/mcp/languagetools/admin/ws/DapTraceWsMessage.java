@@ -11,7 +11,6 @@ public record DapTraceWsMessage(
     String workspaceUri,
     String sessionId,
     String timestamp,
-    String direction,
     String jsonContent,
     String messageType  // "TRACE", "UPDATE", "ERROR", "INFO" - null = TRACE
 ) {

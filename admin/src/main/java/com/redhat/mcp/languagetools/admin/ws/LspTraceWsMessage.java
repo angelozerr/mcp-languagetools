@@ -11,9 +11,7 @@ public record LspTraceWsMessage(
     String workspaceUri,
     String serverId,
     String timestamp,
-    String direction,
     String jsonContent,
-    String messageType,  // "TRACE", "UPDATE", "ERROR", "INFO" - null = TRACE
-    Double installProgress  // Progress fraction (0.0-1.0) when messageType=UPDATE during installation, null otherwise
+    String messageType  // "TRACE", "UPDATE", "ERROR", "INFO" - null = TRACE
 ) {
 }

@@ -37,21 +37,18 @@ public class DapTraceCollector implements TracingMessageConsumer.TraceCollectorA
     @Override
     public void addTrace(String workspaceUri,
                          String sessionId,
-                         TraceCollector.MessageDirection direction,
                          String jsonContent) {
-        addTrace(workspaceUri, sessionId, direction, jsonContent, TraceCollector.MessageType.TRACE);
+        addTrace(workspaceUri, sessionId, jsonContent, TraceCollector.MessageType.TRACE);
     }
 
     public void addTrace(String workspaceUri,
                          String sessionId,
-                         TraceCollector.MessageDirection direction,
                          String jsonContent,
                          TraceCollector.MessageType messageType) {
         DapTraceMessage message = new DapTraceMessage(
             workspaceUri,
             sessionId,
             Instant.now(),
-            direction,
             jsonContent,
             messageType
         );
@@ -65,8 +62,6 @@ public class DapTraceCollector implements TracingMessageConsumer.TraceCollectorA
 
         // Fire CDI event for WebSocket streaming
         traceEvent.fire(message);
-
-        LOG.debugf("[%s/%s] %s: %s", workspaceUri, sessionId, direction, jsonContent.substring(0, Math.min(100, jsonContent.length())));
     }
 
     public List<DapTraceMessage> getRecentTraces(int limit) {

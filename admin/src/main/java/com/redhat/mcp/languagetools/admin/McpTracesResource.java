@@ -42,7 +42,6 @@ public class McpTracesResource {
 
     private McpTraceDto toDto(McpTrace trace) {
         return new McpTraceDto(
-                trace.direction(),
                 trace.connectionId(),
                 trace.message(),
                 trace.timestamp().toString()
@@ -51,7 +50,6 @@ public class McpTracesResource {
 
     @RegisterForReflection
     public record McpTraceDto(
-            String direction,
             String connectionId,
             String jsonContent,
             String timestamp

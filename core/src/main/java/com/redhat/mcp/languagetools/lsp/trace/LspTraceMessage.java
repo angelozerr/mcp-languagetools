@@ -12,7 +12,6 @@ public record LspTraceMessage(
     String workspaceUri,
     String serverId,
     Instant timestamp,
-    TraceCollector.MessageDirection direction,
     String jsonContent,
     TraceCollector.MessageType messageType  // null = TRACE (default)
 ) {

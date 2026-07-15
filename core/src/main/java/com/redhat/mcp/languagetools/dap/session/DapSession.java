@@ -328,7 +328,6 @@ public class DapSession implements DapEventListener {
                     traceCollector.addTrace(
                             workspace.getNormalizedUri(),
                             sessionId,
-                            TraceCollector.MessageDirection.SERVER_TO_CLIENT,
                             "❌ Failed to initialize: " + ex.getMessage()
                     );
 
@@ -547,7 +546,6 @@ public class DapSession implements DapEventListener {
                             dapServer.getTraceCollector().addTrace(
                                     workspace.getNormalizedUri(),
                                     sessionId,
-                                    TraceCollector.MessageDirection.SERVER_TO_CLIENT,
                                     errorTrace.toString()
                             );
                         }
@@ -646,7 +644,6 @@ public class DapSession implements DapEventListener {
                         traceCollector.addTrace(
                                 workspace.getNormalizedUri(),
                                 sessionId,
-                                com.redhat.mcp.languagetools.trace.TraceCollector.MessageDirection.CLIENT_TO_SERVER,
                                 "⚠️ Termination error: " + error.getMessage()
                         );
                     } else {
@@ -1163,11 +1160,6 @@ public class DapSession implements DapEventListener {
                 return;
             }
 
-            com.redhat.mcp.languagetools.trace.TraceCollector.MessageDirection direction =
-                    "stderr".equals(category)
-                            ? TraceCollector.MessageDirection.SERVER_TO_CLIENT
-                            : TraceCollector.MessageDirection.SERVER_TO_CLIENT;
-
             // For console/stdout/stderr, send just the output without trace prefix
             // These are ALWAYS shown, regardless of trace level
             String displayText;
@@ -1192,7 +1184,6 @@ public class DapSession implements DapEventListener {
                 ((DapTraceCollector) traceCollector).addTrace(
                         workspace.getNormalizedUri(),
                         sessionId,
-                        direction,
                         displayText,
                         messageType
                 );
@@ -1200,7 +1191,6 @@ public class DapSession implements DapEventListener {
                 traceCollector.addTrace(
                         workspace.getNormalizedUri(),
                         sessionId,
-                        direction,
                         displayText
                 );
             }

@@ -28,19 +28,16 @@ public class DapTraceCollectorWrapper extends TraceCollectorBase {
 
     @Override
     protected void addTrace(String message, MessageType type, String formattedMessage) {
-        // Send as SENT message in DAP trace
-        // MessageType will be handled by the trace display (UPDATE = replace last line)
         dapTraceCollector.addTrace(
             sessionId,
             serverId,
-            MessageDirection.CLIENT_TO_SERVER,
             formattedMessage,
             type
         );
     }
 
     @Override
-    public void addTrace(String workspaceUri, String serverId, MessageDirection direction, String message) {
-        dapTraceCollector.addTrace(workspaceUri, serverId, direction, message);
+    public void addTrace(String workspaceUri, String serverId, String message) {
+        dapTraceCollector.addTrace(workspaceUri, serverId, message);
     }
 }

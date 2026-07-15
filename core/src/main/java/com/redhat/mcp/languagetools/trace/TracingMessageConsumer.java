@@ -28,7 +28,6 @@ public class TracingMessageConsumer {
         @Override
         void addTrace(String workspaceUri,
                       String serverId,
-                      TraceCollector.MessageDirection direction,
                       String logContent);
     }
 
@@ -59,21 +58,17 @@ public class TracingMessageConsumer {
         final Instant now = clock.instant();
         final String date = dateTimeFormatter.format(now);
 
-        TraceCollector.MessageDirection direction;
         String logContent;
 
         if (messageConsumer instanceof StreamMessageConsumer) {
-            direction = TraceCollector.MessageDirection.CLIENT_TO_SERVER;
             logContent = consumeMessageSending(message, now, date);
         } else if (messageConsumer instanceof RemoteEndpoint) {
-            direction = TraceCollector.MessageDirection.SERVER_TO_CLIENT;
             logContent = consumeMessageReceiving(message, now, date);
         } else {
-            direction = TraceCollector.MessageDirection.SERVER_TO_CLIENT;
             logContent = String.format("Unknown MessageConsumer type: %s", messageConsumer);
         }
 
-        collector.addTrace(workspaceUri, serverId, direction, logContent);
+        collector.addTrace(workspaceUri, serverId, logContent);
     }
 
     private String consumeMessageSending(Message message, Instant now, String date) {

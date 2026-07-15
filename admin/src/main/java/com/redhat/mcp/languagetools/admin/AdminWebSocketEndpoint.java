@@ -11,7 +11,6 @@ import com.redhat.mcp.languagetools.lsp.trace.LspTraceCollector;
 import com.redhat.mcp.languagetools.lsp.trace.LspTraceMessage;
 import com.redhat.mcp.languagetools.mcp.trace.McpTrace;
 import com.redhat.mcp.languagetools.mcp.trace.McpTraceCollector;
-import com.redhat.mcp.languagetools.trace.TraceCollector;
 import com.redhat.mcp.languagetools.workspace.Workspace;
 import com.redhat.mcp.languagetools.workspace.WorkspaceChangeEvent;
 import com.redhat.mcp.languagetools.Application;
@@ -147,10 +146,8 @@ public class AdminWebSocketEndpoint {
                             trace.workspaceUri(),
                             trace.serverId(),
                             trace.timestamp().toString(),
-                            trace.direction().name(),
                             trace.jsonContent(),
-                            trace.messageType() != null ? trace.messageType().name() : null,
-                            null  // installProgress not available for historical traces
+                            trace.messageType() != null ? trace.messageType().name() : null
                         );
                         sendToSession(session, msg);
                     }
@@ -174,7 +171,6 @@ public class AdminWebSocketEndpoint {
             for (var trace : traces) {
                 McpTraceWsMessage msg = new McpTraceWsMessage(
                     "mcp-trace",
-                    trace.direction(),
                     trace.connectionId(),
                     trace.message(),
                     trace.timestamp().toString()
@@ -208,7 +204,6 @@ public class AdminWebSocketEndpoint {
                         trace.workspaceUri(),
                         trace.sessionId(),
                         trace.timestamp().toString(),
-                        trace.direction().name(),
                         trace.jsonContent(),
                         trace.messageType() != null ? trace.messageType().name() : null
                     );
@@ -225,27 +220,13 @@ public class AdminWebSocketEndpoint {
      * CDI observer for LSP trace events.
      */
     void onLspTrace(@Observes LspTraceMessage trace) {
-        // If this is an UPDATE message, include install progress for the badge
-        Double installProgress = null;
-        if (trace.messageType() == TraceCollector.MessageType.UPDATE) {
-            var config = application.getLspServerConfig(trace.serverId());
-            if (config != null) {
-                var progress = config.getInstallProgress();
-                if (progress != null) {
-                    installProgress = progress.getFraction();
-                }
-            }
-        }
-
         LspTraceWsMessage msg = new LspTraceWsMessage(
                 "lsp-trace",
                 trace.workspaceUri(),
                 trace.serverId(),
                 trace.timestamp().toString(),
-                trace.direction().name(),
                 trace.jsonContent(),
-                trace.messageType() != null ? trace.messageType().name() : null,
-                installProgress
+                trace.messageType() != null ? trace.messageType().name() : null
         );
         broadcast(msg);
     }
@@ -256,7 +237,6 @@ public class AdminWebSocketEndpoint {
     void onMcpTrace(@Observes McpTrace trace) {
         McpTraceWsMessage msg = new McpTraceWsMessage(
                 "mcp-trace",
-                trace.direction(),
                 trace.connectionId(),
                 trace.message(),
                 trace.timestamp().toString()
@@ -273,7 +253,6 @@ public class AdminWebSocketEndpoint {
                 trace.workspaceUri(),
                 trace.sessionId(),
                 trace.timestamp().toString(),
-                trace.direction().name(),
                 trace.jsonContent(),
                 trace.messageType() != null ? trace.messageType().name() : null
         );

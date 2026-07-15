@@ -17,11 +17,6 @@ public interface TraceCollector {
         INFO     // Info message
     }
 
-    enum MessageDirection {
-        CLIENT_TO_SERVER,
-        SERVER_TO_CLIENT
-    }
-
     /**
      * Send a trace message with specific level and type.
      *
@@ -64,5 +59,5 @@ public interface TraceCollector {
     /**
      * Add a trace message with workspace context.
      */
-    void addTrace(String workspaceUri, String serverId, MessageDirection direction, String message);
+    void addTrace(String workspaceUri, String serverId, String message);
 }

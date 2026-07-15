@@ -35,20 +35,18 @@ public class LspTraceCollector implements TracingMessageConsumer.TraceCollectorA
     }
 
     @Override
-    public void addTrace(String workspaceUri, String serverId, TraceCollector.MessageDirection direction, String jsonContent) {
-        addTrace(workspaceUri, serverId, direction, jsonContent, TraceCollector.MessageType.TRACE);
+    public void addTrace(String workspaceUri, String serverId, String jsonContent) {
+        addTrace(workspaceUri, serverId, jsonContent, TraceCollector.MessageType.TRACE);
     }
 
     public void addTrace(String workspaceUri,
                          String serverId,
-                         TraceCollector.MessageDirection direction,
                          String jsonContent,
                          TraceCollector.MessageType messageType) {
         LspTraceMessage message = new LspTraceMessage(
             workspaceUri,
             serverId,
             Instant.now(),
-            direction,
             jsonContent,
             messageType
         );
@@ -60,10 +58,8 @@ public class LspTraceCollector implements TracingMessageConsumer.TraceCollectorA
             traces.pollFirst();
         }
 
-        // Fire CDI event for SSE streaming
+        // Fire CDI event for real-time streaming
         traceEvent.fire(message);
-
-        LOG.debugf("[%s/%s] %s: %s", workspaceUri, serverId, direction, jsonContent.substring(0, Math.min(100, jsonContent.length())));
     }
 
     public List<LspTraceMessage> getRecentTraces(int limit) {

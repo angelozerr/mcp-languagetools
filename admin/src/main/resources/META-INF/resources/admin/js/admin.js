@@ -376,23 +376,6 @@
                 renderConsole();
             }
 
-            // If this is an UPDATE message with installProgress, update the server badge
-            if (trace.messageType === 'UPDATE' && trace.installProgress != null) {
-                console.log('UPDATE with installProgress:', trace.serverId, 'progress:', trace.installProgress);
-                const workspace = workspaces.find(w => w.rootUri === trace.workspaceUri);
-                if (workspace && workspace.lspServers) {
-                    const server = workspace.lspServers.find(s => s.id === trace.serverId);
-                    if (server) {
-                        console.log('Updating server badge - old progress:', server.installProgress, 'new:', trace.installProgress);
-                        server.installProgress = trace.installProgress;
-                        updateServerStatusBadge(trace.serverId, server);
-                    } else {
-                        console.warn('Server not found in workspace.lspServers for badge update:', trace.serverId);
-                    }
-                } else {
-                    console.warn('Workspace or lspServers not found for badge update:', trace.workspaceUri);
-                }
-            }
         }
 
         /**

@@ -13,7 +13,6 @@ public record DapTraceMessage(
     String workspaceUri,
     String sessionId,
     Instant timestamp,
-    TraceCollector.MessageDirection direction,
     String jsonContent,
     TraceCollector.MessageType messageType  // null = TRACE (default)
 ) {}

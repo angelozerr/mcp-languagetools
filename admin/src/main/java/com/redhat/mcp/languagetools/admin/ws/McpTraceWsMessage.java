@@ -8,7 +8,6 @@ import io.quarkus.runtime.annotations.RegisterForReflection;
 @RegisterForReflection
 public record McpTraceWsMessage(
     String type,  // "mcp-trace"
-    String direction,
     String connectionId,
     String jsonContent,
     String timestamp

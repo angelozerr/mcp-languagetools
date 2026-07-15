@@ -22,19 +22,16 @@ class LspTraceCollectorWrapper extends TraceCollectorBase {
 
     @Override
     protected void addTrace(String message, MessageType type, String formattedMessage) {
-        // Send as client->server message in LSP trace
-        // MessageType will be handled by the trace display (UPDATE = replace last line)
         lspTraceCollector.addTrace(
                 workspaceUri,
                 serverId,
-                MessageDirection.CLIENT_TO_SERVER,
                 formattedMessage,
                 type
         );
     }
 
     @Override
-    public void addTrace(String workspaceUri, String serverId, MessageDirection direction, String message) {
-        lspTraceCollector.addTrace(workspaceUri, serverId, direction, message);
+    public void addTrace(String workspaceUri, String serverId, String message) {
+        lspTraceCollector.addTrace(workspaceUri, serverId, message);
     }
 }

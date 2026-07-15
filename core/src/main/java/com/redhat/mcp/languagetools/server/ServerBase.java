@@ -223,7 +223,6 @@ public abstract class ServerBase<T extends ServerConfigBase> extends BindEndpoin
                             getTraceCollector().addTrace(
                                 workspaceOrSessionId,
                                 serverId,
-                                com.redhat.mcp.languagetools.trace.TraceCollector.MessageDirection.SERVER_TO_CLIENT,
                                 errorTrace
                             );
                             stackTraceBuffer.setLength(0);
@@ -238,7 +237,6 @@ public abstract class ServerBase<T extends ServerConfigBase> extends BindEndpoin
                         getTraceCollector().addTrace(
                             workspaceOrSessionId,
                             serverId,
-                            com.redhat.mcp.languagetools.trace.TraceCollector.MessageDirection.SERVER_TO_CLIENT,
                             errorTrace
                         );
                     }
@@ -253,7 +251,6 @@ public abstract class ServerBase<T extends ServerConfigBase> extends BindEndpoin
                     getTraceCollector().addTrace(
                         workspaceOrSessionId,
                         serverId,
-                        com.redhat.mcp.languagetools.trace.TraceCollector.MessageDirection.SERVER_TO_CLIENT,
                         errorTrace
                     );
                 }
@@ -391,7 +388,6 @@ public abstract class ServerBase<T extends ServerConfigBase> extends BindEndpoin
             traceCollector.addTrace(
                 workspace.getNormalizedUri(),
                 contextId,
-                com.redhat.mcp.languagetools.trace.TraceCollector.MessageDirection.SERVER_TO_CLIENT,
                 stackTrace.toString()
             );
         } catch (Exception traceEx) {
