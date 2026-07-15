@@ -3,6 +3,7 @@ package com.redhat.mcp.languagetools.admin;
 import com.redhat.mcp.languagetools.dap.session.DapSession;
 import com.redhat.mcp.languagetools.installer.TraceProgressMonitor;
 import com.redhat.mcp.languagetools.lsp.server.LspServer;
+import com.redhat.mcp.languagetools.progress.ProgressBroadcaster;
 import com.redhat.mcp.languagetools.progress.ProgressMonitor;
 import jakarta.enterprise.inject.spi.CDI;
 
@@ -69,9 +70,9 @@ public class AdminProgressMonitorHelper {
         String title = operation.substring(0, 1).toUpperCase() + operation.substring(1) + " " + session.getSessionId();
 
         // Try to get ProgressBroadcaster from CDI
-        ProgressBroadcaster broadcaster = null;
+        AdminProgressBroadcaster broadcaster = null;
         try {
-            broadcaster = CDI.current().select(ProgressBroadcaster.class).get();
+            broadcaster = CDI.current().select(AdminProgressBroadcaster.class).get();
         } catch (Exception e) {
             // CDI not available, will use trace-only
         }

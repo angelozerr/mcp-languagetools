@@ -11,15 +11,14 @@ import com.redhat.mcp.languagetools.admin.dto.StatusResponse;
 import com.redhat.mcp.languagetools.dap.server.DapServerConfig;
 import com.redhat.mcp.languagetools.installer.TaskRegistryInstaller;
 import com.redhat.mcp.languagetools.installer.TraceProgressMonitor;
-import com.redhat.mcp.languagetools.progress.ProgressStep;
 import com.redhat.mcp.languagetools.Application;
+import com.redhat.mcp.languagetools.progress.ProgressBroadcaster;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import org.jboss.logging.Logger;
 
-import java.io.InputStream;
 import java.nio.file.Files;
 import java.util.List;
 import java.util.Map;

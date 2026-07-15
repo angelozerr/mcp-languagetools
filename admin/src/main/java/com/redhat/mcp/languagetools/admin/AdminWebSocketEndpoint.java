@@ -11,6 +11,7 @@ import com.redhat.mcp.languagetools.lsp.trace.LspTraceCollector;
 import com.redhat.mcp.languagetools.lsp.trace.LspTraceMessage;
 import com.redhat.mcp.languagetools.mcp.trace.McpTrace;
 import com.redhat.mcp.languagetools.mcp.trace.McpTraceCollector;
+import com.redhat.mcp.languagetools.progress.ProgressBroadcaster;
 import com.redhat.mcp.languagetools.workspace.Workspace;
 import com.redhat.mcp.languagetools.workspace.WorkspaceChangeEvent;
 import com.redhat.mcp.languagetools.Application;
@@ -65,6 +66,9 @@ public class AdminWebSocketEndpoint {
     @Inject
     ContributionDTOBuilder contributionBuilder;
 
+    @Inject
+    AdminProgressBroadcaster progressBroadcaster;
+
     // Thread-safe set of active WebSocket sessions
     private final Set<Session> sessions = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
@@ -115,6 +119,9 @@ public class AdminWebSocketEndpoint {
 
             // Send DAP trace history
             sendDapTraceHistory(session);
+
+            // Send active progress state
+            sendProgressState(session);
 
             LOG.debugf("Initial state sent to session: %s", session.getId());
         } catch (Exception e) {
@@ -205,6 +212,25 @@ public class AdminWebSocketEndpoint {
             LOG.infof("DAP trace history sent to session: %s", session.getId());
         } catch (Exception e) {
             LOG.errorf(e, "Failed to send DAP trace history to session: %s", session.getId());
+        }
+    }
+
+    /**
+     * Send active progress state (init + last update) for tasks currently in progress.
+     */
+    private void sendProgressState(Session session) {
+        try {
+            for (AdminProgressBroadcaster.ActiveTask task : progressBroadcaster.getActiveTasks()) {
+                if (task.getInitMessage() != null) {
+                    sendToSession(session, task.getInitMessage());
+                }
+                if (task.getLastUpdate() != null) {
+                    sendToSession(session, task.getLastUpdate());
+                }
+            }
+            LOG.debugf("Progress state sent to session: %s", session.getId());
+        } catch (Exception e) {
+            LOG.errorf(e, "Failed to send progress state to session: %s", session.getId());
         }
     }
 

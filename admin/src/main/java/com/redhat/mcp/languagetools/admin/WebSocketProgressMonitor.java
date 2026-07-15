@@ -1,7 +1,7 @@
 package com.redhat.mcp.languagetools.admin;
 
 import com.redhat.mcp.languagetools.progress.AbstractProgressMonitor;
-import com.redhat.mcp.languagetools.progress.ProgressMonitor;
+import com.redhat.mcp.languagetools.progress.ProgressBroadcaster;
 
 import java.util.ArrayList;
 import java.util.List;

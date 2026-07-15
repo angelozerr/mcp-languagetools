@@ -2,17 +2,22 @@ package com.redhat.mcp.languagetools.admin;
 
 import com.redhat.mcp.languagetools.admin.ws.ProgressInitWsMessage;
 import com.redhat.mcp.languagetools.admin.ws.ProgressUpdateWsMessage;
+import com.redhat.mcp.languagetools.progress.ProgressBroadcaster;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Event;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
 
+import java.util.Collection;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 
 @ApplicationScoped
-public class ProgressBroadcaster implements com.redhat.mcp.languagetools.progress.ProgressBroadcaster {
+public class AdminProgressBroadcaster implements ProgressBroadcaster {
 
-    private static final Logger LOG = Logger.getLogger(ProgressBroadcaster.class);
+    private static final Logger LOG = Logger.getLogger(AdminProgressBroadcaster.class);
+
+    private final ConcurrentHashMap<String, ActiveTask> activeTasks = new ConcurrentHashMap<>();
 
     @Inject
     Event<ProgressUpdateWsMessage> progressUpdateEvent;
@@ -34,6 +39,18 @@ public class ProgressBroadcaster implements com.redhat.mcp.languagetools.progres
             stepId,
             stepProgress
         );
+
+        if ("completed".equals(status) || "failed".equals(status)) {
+            activeTasks.remove(taskId);
+        } else {
+            activeTasks.compute(taskId, (id, existing) -> {
+                if (existing == null) {
+                    return new ActiveTask(null, msg);
+                }
+                existing.lastUpdate = msg;
+                return existing;
+            });
+        }
 
         progressUpdateEvent.fire(msg);
     }
@@ -81,6 +98,36 @@ public class ProgressBroadcaster implements com.redhat.mcp.languagetools.progres
             cancellable
         );
 
+        activeTasks.compute(taskId, (id, existing) -> {
+            if (existing == null) {
+                return new ActiveTask(msg, null);
+            }
+            existing.initMessage = msg;
+            return existing;
+        });
+
         progressInitEvent.fire(msg);
+    }
+
+    public Collection<ActiveTask> getActiveTasks() {
+        return activeTasks.values();
+    }
+
+    public static class ActiveTask {
+        ProgressInitWsMessage initMessage;
+        ProgressUpdateWsMessage lastUpdate;
+
+        ActiveTask(ProgressInitWsMessage initMessage, ProgressUpdateWsMessage lastUpdate) {
+            this.initMessage = initMessage;
+            this.lastUpdate = lastUpdate;
+        }
+
+        public ProgressInitWsMessage getInitMessage() {
+            return initMessage;
+        }
+
+        public ProgressUpdateWsMessage getLastUpdate() {
+            return lastUpdate;
+        }
     }
 }

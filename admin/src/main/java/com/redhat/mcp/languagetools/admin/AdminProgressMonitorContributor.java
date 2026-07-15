@@ -1,5 +1,6 @@
 package com.redhat.mcp.languagetools.admin;
 
+import com.redhat.mcp.languagetools.progress.ProgressBroadcaster;
 import com.redhat.mcp.languagetools.progress.ProgressContext;
 import com.redhat.mcp.languagetools.progress.ProgressMonitor;
 import com.redhat.mcp.languagetools.progress.ProgressMonitorContributor;
