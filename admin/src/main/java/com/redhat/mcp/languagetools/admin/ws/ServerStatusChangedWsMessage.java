@@ -1,19 +1,34 @@
 package com.redhat.mcp.languagetools.admin.ws;
 
-import io.quarkus.runtime.annotations.RegisterForReflection;
+public class ServerStatusChangedWsMessage extends WsMessage {
 
-/**
- * WebSocket message for server status change events.
- */
-@RegisterForReflection
-public record ServerStatusChangedWsMessage(
-    String type,  // "server-status-changed"
-    String workspaceUri,
-    String serverId,
-    String oldStatus,
-    String newStatus,
-    String statusMessage,      // Status message (e.g., "Downloading dependencies...")
-    Double installProgress,    // Installation progress (0.0 to 1.0), null if not installing
-    Boolean isReady           // Whether server is ready to handle requests
-) {
+    private final String workspaceUri;
+    private final String serverId;
+    private final String oldStatus;
+    private final String newStatus;
+    private final String statusMessage;
+    private final Double installProgress;
+    private final Boolean isReady;
+
+    public ServerStatusChangedWsMessage(String workspaceUri, String serverId,
+                                        String oldStatus, String newStatus,
+                                        String statusMessage, Double installProgress,
+                                        Boolean isReady) {
+        super(WsMessageType.SERVER_STATUS_CHANGED);
+        this.workspaceUri = workspaceUri;
+        this.serverId = serverId;
+        this.oldStatus = oldStatus;
+        this.newStatus = newStatus;
+        this.statusMessage = statusMessage;
+        this.installProgress = installProgress;
+        this.isReady = isReady;
+    }
+
+    public String getWorkspaceUri() { return workspaceUri; }
+    public String getServerId() { return serverId; }
+    public String getOldStatus() { return oldStatus; }
+    public String getNewStatus() { return newStatus; }
+    public String getStatusMessage() { return statusMessage; }
+    public Double getInstallProgress() { return installProgress; }
+    public Boolean getIsReady() { return isReady; }
 }

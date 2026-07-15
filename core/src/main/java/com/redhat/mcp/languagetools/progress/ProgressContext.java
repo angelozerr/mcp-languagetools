@@ -1,6 +1,7 @@
 package com.redhat.mcp.languagetools.progress;
 
 import java.util.Objects;
+import java.util.UUID;
 
 /**
  * Context information for a progress monitor.
@@ -89,7 +90,7 @@ public class ProgressContext {
         }
 
         public ProgressContext build() {
-            taskId = java.util.UUID.randomUUID().toString();
+            taskId = UUID.randomUUID().toString();
             return new ProgressContext(this);
         }
     }

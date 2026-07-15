@@ -43,16 +43,14 @@ public class McpTracesResource {
     private McpTraceDto toDto(McpTrace trace) {
         return new McpTraceDto(
                 trace.connectionId(),
-                trace.message(),
-                trace.timestamp().toString()
+                trace.message()
         );
     }
 
     @RegisterForReflection
     public record McpTraceDto(
             String connectionId,
-            String jsonContent,
-            String timestamp
+            String content
     ) {
     }
 }

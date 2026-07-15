@@ -13,14 +13,14 @@ const TraceRenderer = (function() {
     /**
      * Render a single trace with folding support.
      *
-     * @param {Object} trace - Trace object with jsonContent field
+     * @param {Object} trace - Trace object with content field
      * @param {number} index - Trace index for ID generation
      * @param {string} traceLevel - 'messages' or 'verbose'
      * @param {string} searchQuery - Current search query for highlighting
      * @returns {string} HTML string
      */
     function renderTrace(trace, index, traceLevel, searchQuery) {
-        const content = trace.jsonContent;
+        const content = trace.content;
         const firstNewline = content.indexOf('\n');
 
         if (firstNewline === -1) {

@@ -85,8 +85,7 @@ const KeyboardShortcuts = (function() {
 
         let fullText = '';
         traces.forEach(trace => {
-            // Handle both trace.jsonContent (LSP/MCP) and trace content formats
-            const content = trace.jsonContent || trace.content || trace;
+            const content = trace.content || trace;
             fullText += content + '\n\n';
         });
 

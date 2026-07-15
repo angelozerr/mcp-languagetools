@@ -1,15 +1,15 @@
 package com.redhat.mcp.languagetools.admin.ws;
 
-import io.quarkus.runtime.annotations.RegisterForReflection;
+public class McpTraceWsMessage extends TraceWsMessage {
 
-/**
- * WebSocket message for MCP trace events.
- */
-@RegisterForReflection
-public record McpTraceWsMessage(
-    String type,  // "mcp-trace"
-    String connectionId,
-    String jsonContent,
-    String timestamp
-) {
+    private final String connectionId;
+
+    public McpTraceWsMessage(String connectionId, String content) {
+        super(WsMessageType.MCP_TRACE, content, null);
+        this.connectionId = connectionId;
+    }
+
+    public String getConnectionId() {
+        return connectionId;
+    }
 }

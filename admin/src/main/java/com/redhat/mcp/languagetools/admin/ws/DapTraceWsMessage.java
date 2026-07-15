@@ -1,17 +1,23 @@
 package com.redhat.mcp.languagetools.admin.ws;
 
-import io.quarkus.runtime.annotations.RegisterForReflection;
+import com.redhat.mcp.languagetools.trace.TraceCollector;
 
-/**
- * WebSocket message for DAP trace events.
- */
-@RegisterForReflection
-public record DapTraceWsMessage(
-    String type,  // "dap-trace"
-    String workspaceUri,
-    String sessionId,
-    String timestamp,
-    String jsonContent,
-    String messageType  // "TRACE", "UPDATE", "ERROR", "INFO" - null = TRACE
-) {
+public class DapTraceWsMessage extends TraceWsMessage {
+
+    private final String workspaceUri;
+    private final String sessionId;
+
+    public DapTraceWsMessage(String workspaceUri, String sessionId, String content, TraceCollector.MessageType messageType) {
+        super(WsMessageType.DAP_TRACE, content, messageType);
+        this.workspaceUri = workspaceUri;
+        this.sessionId = sessionId;
+    }
+
+    public String getWorkspaceUri() {
+        return workspaceUri;
+    }
+
+    public String getSessionId() {
+        return sessionId;
+    }
 }

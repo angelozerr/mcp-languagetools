@@ -1,17 +1,23 @@
 package com.redhat.mcp.languagetools.admin.ws;
 
-import io.quarkus.runtime.annotations.RegisterForReflection;
+import com.redhat.mcp.languagetools.trace.TraceCollector;
 
-/**
- * WebSocket message for LSP trace events.
- */
-@RegisterForReflection
-public record LspTraceWsMessage(
-    String type,  // "lsp-trace"
-    String workspaceUri,
-    String serverId,
-    String timestamp,
-    String jsonContent,
-    String messageType  // "TRACE", "UPDATE", "ERROR", "INFO" - null = TRACE
-) {
+public class LspTraceWsMessage extends TraceWsMessage {
+
+    private final String workspaceUri;
+    private final String serverId;
+
+    public LspTraceWsMessage(String workspaceUri, String serverId, String content, TraceCollector.MessageType messageType) {
+        super(WsMessageType.LSP_TRACE, content, messageType);
+        this.workspaceUri = workspaceUri;
+        this.serverId = serverId;
+    }
+
+    public String getWorkspaceUri() {
+        return workspaceUri;
+    }
+
+    public String getServerId() {
+        return serverId;
+    }
 }

@@ -97,14 +97,12 @@ public class AdminWebSocketEndpoint {
         try {
             // Send current workspaces
             WorkspacesUpdateWsMessage workspacesMsg = new WorkspacesUpdateWsMessage(
-                    "workspaces-update",
                     getCurrentWorkspaces()
             );
             sendToSession(session, workspacesMsg);
 
             // Send current MCP clients
             McpClientsUpdateWsMessage clientsMsg = new McpClientsUpdateWsMessage(
-                    "mcp-clients-update",
                     getCurrentMcpClients()
             );
             sendToSession(session, clientsMsg);
@@ -142,12 +140,10 @@ public class AdminWebSocketEndpoint {
                     // Send each trace
                     for (var trace : traces) {
                         LspTraceWsMessage msg = new LspTraceWsMessage(
-                            "lsp-trace",
                             trace.workspaceUri(),
                             trace.serverId(),
-                            trace.timestamp().toString(),
                             trace.jsonContent(),
-                            trace.messageType() != null ? trace.messageType().name() : null
+                            trace.messageType()
                         );
                         sendToSession(session, msg);
                     }
@@ -170,10 +166,8 @@ public class AdminWebSocketEndpoint {
             // Send each trace
             for (var trace : traces) {
                 McpTraceWsMessage msg = new McpTraceWsMessage(
-                    "mcp-trace",
                     trace.connectionId(),
-                    trace.message(),
-                    trace.timestamp().toString()
+                    trace.message()
                 );
                 sendToSession(session, msg);
             }
@@ -200,12 +194,10 @@ public class AdminWebSocketEndpoint {
                 // Send each trace
                 for (var trace : traces) {
                     DapTraceWsMessage msg = new DapTraceWsMessage(
-                        "dap-trace",
                         trace.workspaceUri(),
                         trace.sessionId(),
-                        trace.timestamp().toString(),
                         trace.jsonContent(),
-                        trace.messageType() != null ? trace.messageType().name() : null
+                        trace.messageType()
                     );
                     sendToSession(session, msg);
                 }
@@ -221,12 +213,10 @@ public class AdminWebSocketEndpoint {
      */
     void onLspTrace(@Observes LspTraceMessage trace) {
         LspTraceWsMessage msg = new LspTraceWsMessage(
-                "lsp-trace",
                 trace.workspaceUri(),
                 trace.serverId(),
-                trace.timestamp().toString(),
                 trace.jsonContent(),
-                trace.messageType() != null ? trace.messageType().name() : null
+                trace.messageType()
         );
         broadcast(msg);
     }
@@ -236,10 +226,8 @@ public class AdminWebSocketEndpoint {
      */
     void onMcpTrace(@Observes McpTrace trace) {
         McpTraceWsMessage msg = new McpTraceWsMessage(
-                "mcp-trace",
                 trace.connectionId(),
-                trace.message(),
-                trace.timestamp().toString()
+                trace.message()
         );
         broadcast(msg);
     }
@@ -249,12 +237,10 @@ public class AdminWebSocketEndpoint {
      */
     void onDapTrace(@Observes DapTraceMessage trace) {
         var msg = new DapTraceWsMessage(
-                "dap-trace",
                 trace.workspaceUri(),
                 trace.sessionId(),
-                trace.timestamp().toString(),
                 trace.jsonContent(),
-                trace.messageType() != null ? trace.messageType().name() : null
+                trace.messageType()
         );
         broadcast(msg);
     }
@@ -268,7 +254,6 @@ public class AdminWebSocketEndpoint {
             event.getOldStatus(), event.getNewStatus());
 
         var msg = new DapSessionUpdateWsMessage(
-                "dap-session-update",
                 event.getType().name(),
                 event.getSessionId(),
                 event.getWorkspaceUri(),
@@ -305,14 +290,12 @@ public class AdminWebSocketEndpoint {
 
         // Send full workspace list (simpler than delta updates)
         WorkspacesUpdateWsMessage msg = new WorkspacesUpdateWsMessage(
-                "workspaces-update",
                 getCurrentWorkspaces()
         );
         broadcast(msg);
 
         // Also send updated MCP clients list (tied to workspaces)
         McpClientsUpdateWsMessage clientsMsg = new McpClientsUpdateWsMessage(
-                "mcp-clients-update",
                 getCurrentMcpClients()
         );
         broadcast(clientsMsg);
@@ -350,7 +333,6 @@ public class AdminWebSocketEndpoint {
 
         // Send status change event with progress info
         ServerStatusChangedWsMessage msg = new ServerStatusChangedWsMessage(
-                "server-status-changed",
                 event.workspaceUri().toString(),
                 event.serverId(),
                 event.oldStatus().name(),
@@ -363,7 +345,6 @@ public class AdminWebSocketEndpoint {
 
         // Also send full workspace list to keep UI in sync
         WorkspacesUpdateWsMessage workspacesMsg = new WorkspacesUpdateWsMessage(
-                "workspaces-update",
                 getCurrentWorkspaces()
         );
         broadcast(workspacesMsg);

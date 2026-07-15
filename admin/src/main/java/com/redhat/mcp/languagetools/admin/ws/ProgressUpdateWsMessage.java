@@ -1,20 +1,36 @@
 package com.redhat.mcp.languagetools.admin.ws;
 
-import io.quarkus.runtime.annotations.RegisterForReflection;
+public class ProgressUpdateWsMessage extends WsMessage {
 
-/**
- * WebSocket message for progress updates.
- */
-@RegisterForReflection
-public record ProgressUpdateWsMessage(
-    String type,  // "progress-update"
-    String taskId,  // Unique task ID (e.g., "install-eclipse-jdt-ls")
-    String serverId,  // Server ID this task belongs to
-    String title,  // Human-readable title (e.g., "Installing Eclipse JDT LS")
-    Double progress,  // Progress fraction (0.0 to 1.0)
-    String message,  // Optional progress message
-    String status,  // Task status: "running", "completed", "failed"
-    String stepId,  // Current step ID (null when no steps)
-    Double stepProgress  // Progress fraction within current step, 0.0 to 1.0 (null when no steps)
-) {
+    private final String taskId;
+    private final String serverId;
+    private final String title;
+    private final Double progress;
+    private final String message;
+    private final String status;
+    private final String stepId;
+    private final Double stepProgress;
+
+    public ProgressUpdateWsMessage(String taskId, String serverId, String title,
+                                   Double progress, String message, String status,
+                                   String stepId, Double stepProgress) {
+        super(WsMessageType.PROGRESS_UPDATE);
+        this.taskId = taskId;
+        this.serverId = serverId;
+        this.title = title;
+        this.progress = progress;
+        this.message = message;
+        this.status = status;
+        this.stepId = stepId;
+        this.stepProgress = stepProgress;
+    }
+
+    public String getTaskId() { return taskId; }
+    public String getServerId() { return serverId; }
+    public String getTitle() { return title; }
+    public Double getProgress() { return progress; }
+    public String getMessage() { return message; }
+    public String getStatus() { return status; }
+    public String getStepId() { return stepId; }
+    public Double getStepProgress() { return stepProgress; }
 }

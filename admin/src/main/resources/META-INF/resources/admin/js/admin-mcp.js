@@ -59,19 +59,6 @@ function renderMcpClients() {
     }
 
     list.innerHTML = mcpClients.map(client => {
-        // Get first trace timestamp for this client
-        const clientTraces = mcpTracesByClient[client.id] || [];
-        let timeStr = '';
-        if (clientTraces.length > 0) {
-            const firstTrace = clientTraces[0];
-            try {
-                const date = new Date(firstTrace.timestamp);
-                timeStr = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-            } catch (e) {
-                timeStr = '';
-            }
-        }
-
         // Shorten connection ID for display (first 8 chars)
         const shortId = client.id.substring(0, 8) + '...';
 
@@ -81,7 +68,7 @@ function renderMcpClients() {
                  style="cursor: pointer;"
                  title="${window.escapeHtml ? window.escapeHtml(client.id) : client.id}">
                 <div style="font-weight: 600; margin-bottom: 0.25rem;">
-                    📱 ${window.escapeHtml ? window.escapeHtml(client.name) : client.name} ${timeStr ? `<span style="color: #666; font-weight: normal; font-size: 0.75rem;">@ ${timeStr}</span>` : ''}
+                    📱 ${window.escapeHtml ? window.escapeHtml(client.name) : client.name}
                 </div>
                 <div style="font-size: 0.75rem; color: #666; padding-left: 1.5rem;">
                     Session: ${window.escapeHtml ? window.escapeHtml(shortId) : shortId}

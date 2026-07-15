@@ -1,16 +1,17 @@
 package com.redhat.mcp.languagetools.admin.ws;
 
 import com.redhat.mcp.languagetools.admin.dto.WorkspaceDTO;
-import io.quarkus.runtime.annotations.RegisterForReflection;
 
 import java.util.List;
 
-/**
- * WebSocket message for full workspace list updates.
- */
-@RegisterForReflection
-public record WorkspacesUpdateWsMessage(
-    String type,  // "workspaces-update"
-    List<WorkspaceDTO> workspaces
-) {
+public class WorkspacesUpdateWsMessage extends WsMessage {
+
+    private final List<WorkspaceDTO> workspaces;
+
+    public WorkspacesUpdateWsMessage(List<WorkspaceDTO> workspaces) {
+        super(WsMessageType.WORKSPACES_UPDATE);
+        this.workspaces = workspaces;
+    }
+
+    public List<WorkspaceDTO> getWorkspaces() { return workspaces; }
 }

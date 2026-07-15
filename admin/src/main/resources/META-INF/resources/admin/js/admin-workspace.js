@@ -1159,7 +1159,7 @@
             }
 
             container.innerHTML = filteredTraces.map((trace, index) => {
-                const content = trace.jsonContent;
+                const content = trace.content;
 
                 // Parse the trace: first line is header, rest is body
                 const lines = content.split('\n');
@@ -1581,7 +1581,7 @@
             }
 
             container.innerHTML = filteredTraces.map((trace, index) => {
-                const content = trace.jsonContent;
+                const content = trace.content;
 
                 // Parse the trace: first line is header, rest is body
                 const lines = content.split('\n');

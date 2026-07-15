@@ -25,7 +25,6 @@ public class ProgressBroadcaster implements com.redhat.mcp.languagetools.progres
                              double progress, String message, String status,
                              String stepId, Double stepProgress) {
         ProgressUpdateWsMessage msg = new ProgressUpdateWsMessage(
-            "progress-update",
             taskId,
             serverId,
             title,
@@ -75,7 +74,6 @@ public class ProgressBroadcaster implements com.redhat.mcp.languagetools.progres
                 .toList();
 
         ProgressInitWsMessage msg = new ProgressInitWsMessage(
-            "progress-init",
             taskId,
             serverId,
             title,
