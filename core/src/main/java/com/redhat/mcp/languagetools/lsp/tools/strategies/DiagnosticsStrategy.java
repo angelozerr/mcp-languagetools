@@ -21,11 +21,6 @@ public class DiagnosticsStrategy
     }
 
     @Override
-    protected String getToolRequestName() {
-        return "diagnostics";
-    }
-
-    @Override
     public LspCapability getCapability() {
         return LspCapability.DIAGNOSTIC;
     }
@@ -60,18 +55,8 @@ public class DiagnosticsStrategy
     }
 
     @Override
-    protected Object buildCustomRequestParams(LspServer server, String fileUri, String lspParams) {
-        return server.buildDiagnosticsRequestParams(fileUri);
-    }
-
-    @Override
-    protected List<Diagnostic> parseCustomRequestResult(LspServer server, Object result) {
-        return server.parseDiagnosticsRequestResult(result);
-    }
-
-    @Override
-    protected CompletableFuture<List<Diagnostic>> executeAfterDidOpen(LspServer server, String fileUri) {
-        List<Diagnostic> cached = server.getDiagnosticsCache().get(fileUri);
+    protected CompletableFuture<List<Diagnostic>> executeAfterDiagnostics(LspServer server, String lspParams) {
+        List<Diagnostic> cached = server.getDiagnosticsCache().get(lspParams);
         return CompletableFuture.completedFuture(cached != null ? cached : Collections.emptyList());
     }
 

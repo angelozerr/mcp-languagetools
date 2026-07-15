@@ -392,56 +392,101 @@ public class LspServer extends ServerBase<LspServerConfig> {
         );
     }
 
-    /**
-     * Build parameters for a custom diagnostics request (via toolRequests config).
-     * Default: {@code Map.of("uri", fileUri)}.
-     * Subclasses override for LS-specific formats.
-     */
-    public Object buildDiagnosticsRequestParams(String fileUri) {
-        return java.util.Map.of("uri", fileUri);
-    }
+    private static final long DIAGNOSTICS_TIMEOUT_MS = 10_000;
 
     /**
-     * Build parameters for a custom codeAction request (via toolRequests config).
-     * Default: passes the {@link CodeActionParams} as-is.
-     * Subclasses override for LS-specific formats.
+     * Get diagnostics for a file URI.
+     * Checks cache first, then falls back to didOpen + waitForDiagnostics.
+     * Subclasses (e.g., MicroProfileLspServer) override to use custom requests.
+     *
+     * @param uri        file URI
+     * @param languageId language identifier for didOpen
+     * @param autoClose  if true, sends didClose after diagnostics are received
      */
-    public Object buildCodeActionRequestParams(String fileUri, CodeActionParams codeActionParams) {
-        return codeActionParams;
-    }
-
-    /**
-     * Parse the raw result of a custom diagnostics request.
-     * Default: converts LinkedTreeMap items to PublishDiagnosticsParams and flattens diagnostics.
-     */
-    public List<Diagnostic> parseDiagnosticsRequestResult(Object result) {
-        if (result instanceof List<?> list) {
-            return list.stream()
-                    .map(item -> JsonUtils.toModel(item, PublishDiagnosticsParams.class))
-                    .filter(Objects::nonNull)
-                    .filter(pdp -> pdp.getDiagnostics() != null)
-                    .flatMap(pdp -> pdp.getDiagnostics().stream())
-                    .toList();
+    public CompletableFuture<List<Diagnostic>> getDiagnostics(String uri, String languageId, boolean autoClose) {
+        List<Diagnostic> cached = diagnosticsCache.get(uri);
+        if (cached != null && !cached.isEmpty()) {
+            if (!autoClose && !isFileOpened(uri)) {
+                // Cache has diagnostics but file must be opened for subsequent operations (e.g. codeAction)
+                ensureFileOpened(uri, languageId);
+            }
+            return CompletableFuture.completedFuture(cached);
         }
-        return java.util.Collections.emptyList();
+        if (isFileOpened(uri)) {
+            return CompletableFuture.completedFuture(cached != null ? cached : Collections.emptyList());
+        }
+        return getDiagnosticsWithDidOpen(uri, languageId, autoClose);
+    }
+
+    private void ensureFileOpened(String uri, String languageId) {
+        if (languageServer == null) {
+            return;
+        }
+        try {
+            String content = Files.readString(Paths.get(URI.create(uri)));
+            DidOpenTextDocumentParams openParams = new DidOpenTextDocumentParams();
+            TextDocumentItem textDocument = new TextDocumentItem();
+            textDocument.setUri(uri);
+            textDocument.setLanguageId(languageId);
+            textDocument.setVersion(1);
+            textDocument.setText(content);
+            openParams.setTextDocument(textDocument);
+            languageServer.getTextDocumentService().didOpen(openParams);
+            markFileOpened(uri);
+        } catch (Exception e) {
+            LOG.warnf(e, "Failed to open file %s for ensureFileOpened", uri);
+        }
+    }
+
+    private CompletableFuture<List<Diagnostic>> getDiagnosticsWithDidOpen(String uri, String languageId, boolean autoClose) {
+        if (languageServer == null || languageClient == null) {
+            return CompletableFuture.completedFuture(Collections.emptyList());
+        }
+
+        String content;
+        try {
+            content = Files.readString(Paths.get(URI.create(uri)));
+        } catch (Exception e) {
+            LOG.warnf(e, "Failed to read file %s for didOpen", uri);
+            return CompletableFuture.completedFuture(Collections.emptyList());
+        }
+
+        CompletableFuture<List<Diagnostic>> diagnosticsFuture =
+                languageClient.waitForDiagnostics(uri, DIAGNOSTICS_TIMEOUT_MS);
+
+        DidOpenTextDocumentParams openParams = new DidOpenTextDocumentParams();
+        TextDocumentItem textDocument = new TextDocumentItem();
+        textDocument.setUri(uri);
+        textDocument.setLanguageId(languageId);
+        textDocument.setVersion(1);
+        textDocument.setText(content);
+        openParams.setTextDocument(textDocument);
+
+        languageServer.getTextDocumentService().didOpen(openParams);
+        markFileOpened(uri);
+
+        return diagnosticsFuture
+                .whenComplete((diags, ex) -> {
+                    if (autoClose) {
+                        try {
+                            DidCloseTextDocumentParams closeParams = new DidCloseTextDocumentParams();
+                            closeParams.setTextDocument(new TextDocumentIdentifier(uri));
+                            languageServer.getTextDocumentService().didClose(closeParams);
+                            markFileClosed(uri);
+                        } catch (Exception e) {
+                            LOG.warnf(e, "Failed to send didClose for %s", uri);
+                        }
+                    }
+                });
     }
 
     /**
-     * Parse the raw result of a custom codeAction request.
-     * Default: converts LinkedTreeMap items to CodeAction.
+     * Get code actions for the given params.
+     * Default: calls textDocument/codeAction.
+     * Subclasses (e.g., MicroProfileLspServer) override to use custom commands.
      */
-    @SuppressWarnings("unchecked")
-    public List<Either<Command, CodeAction>> parseCodeActionRequestResult(Object result) {
-        if (result instanceof List<?> list) {
-            return list.stream()
-                    .map(item -> {
-                        CodeAction ca = JsonUtils.toModel(item, CodeAction.class);
-                        return ca != null ? Either.<Command, CodeAction>forRight(ca) : null;
-                    })
-                    .filter(Objects::nonNull)
-                    .toList();
-        }
-        return java.util.Collections.emptyList();
+    public CompletableFuture<List<Either<Command, CodeAction>>> getCodeActions(CodeActionParams params, String languageId) {
+        return languageServer.getTextDocumentService().codeAction(params);
     }
 
     /**
@@ -635,12 +680,6 @@ public class LspServer extends ServerBase<LspServerConfig> {
         return languageClient;
     }
 
-    public CompletableFuture<List<Diagnostic>> waitForDiagnostics(String uri, long timeoutMs) {
-        if (languageClient == null) {
-            return CompletableFuture.completedFuture(Collections.emptyList());
-        }
-        return languageClient.waitForDiagnostics(uri, timeoutMs);
-    }
 
     /**
      * Get the process ID of the running server (if available).

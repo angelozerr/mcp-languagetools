@@ -10,6 +10,7 @@ import com.redhat.mcp.languagetools.progress.ProgressMonitor;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 
+import java.net.URI;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -21,11 +22,6 @@ public class CodeActionStrategy
 
     public CodeActionStrategy(LanguageRegistry languageRegistry) {
         super(languageRegistry);
-    }
-
-    @Override
-    protected String getToolRequestName() {
-        return "codeAction";
     }
 
     @Override
@@ -63,22 +59,17 @@ public class CodeActionStrategy
     }
 
     @Override
+    protected boolean autoClose() {
+        return false;
+    }
+
+    @Override
     protected String extractFileUri(CodeActionParams lspParams) {
         return lspParams.getTextDocument().getUri();
     }
 
     @Override
-    protected Object buildCustomRequestParams(LspServer server, String fileUri, CodeActionParams lspParams) {
-        return server.buildCodeActionRequestParams(fileUri, lspParams);
-    }
-
-    @Override
-    protected List<Either<Command, CodeAction>> parseCustomRequestResult(LspServer server, Object result) {
-        return server.parseCodeActionRequestResult(result);
-    }
-
-    @Override
-    protected CompletableFuture<List<Either<Command, CodeAction>>> executeAfterDidOpen(
+    protected CompletableFuture<List<Either<Command, CodeAction>>> executeAfterDiagnostics(
             LspServer server, CodeActionParams lspParams) {
         String fileUri = lspParams.getTextDocument().getUri();
         Position pos = lspParams.getRange().getStart();
@@ -94,9 +85,8 @@ public class CodeActionStrategy
         enrichedParams.setRange(range);
         enrichedParams.setContext(new CodeActionContext(relevantDiagnostics));
 
-        return server.getLanguageServer()
-                .getTextDocumentService()
-                .codeAction(enrichedParams);
+        String languageId = languageRegistry.detectLanguage(URI.create(fileUri)).orElse("");
+        return server.getCodeActions(enrichedParams, languageId);
     }
 
     private List<Diagnostic> filterDiagnosticsAtPosition(List<Diagnostic> diagnostics, Position pos) {

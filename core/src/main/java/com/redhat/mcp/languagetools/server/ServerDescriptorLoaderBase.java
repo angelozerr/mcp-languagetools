@@ -42,8 +42,6 @@ public abstract class ServerDescriptorLoaderBase<T extends ServerConfigBase> {
     private static final String FIELD_SCHEME = "scheme";
     private static final String FIELD_PATTERN = "pattern";
     private static final String FIELD_CONTRIBUTES = "contributes";
-    private static final String FIELD_TOOL_REQUESTS = "toolRequests";
-
     protected final Gson gson = new Gson();
 
     protected ServerDescriptorLoaderBase() {
@@ -134,15 +132,6 @@ public abstract class ServerDescriptorLoaderBase<T extends ServerConfigBase> {
 
         // Contributions
         fillContributions(config, jsonObject);
-
-        // Tool requests (custom LSP requests for MCP tools)
-        if (jsonObject.has(FIELD_TOOL_REQUESTS)) {
-            Map<String, String> toolRequests = new HashMap<>();
-            jsonObject.getAsJsonObject(FIELD_TOOL_REQUESTS).entrySet().forEach(entry ->
-                    toolRequests.put(entry.getKey(), entry.getValue().getAsString())
-            );
-            config.setToolRequests(toolRequests);
-        }
 
         return jsonObject;
     }

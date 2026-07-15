@@ -17,10 +17,6 @@
       "pattern": "**/application.properties"
     }
   ],
-  "toolRequests": {
-    "diagnostics": "microprofile/java/diagnostics",
-    "codeAction": "microprofile/java/codeAction"
-  },
   "contributes": {
     "jdtls": {
       "bundles": ["plugins/*.jar"],

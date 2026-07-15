@@ -35,12 +35,6 @@ public abstract class ServerConfigBase implements ServerConfig {
      */
     private Contributes contributes;
 
-    /**
-     * Custom LSP requests for MCP tools (e.g., "diagnostics" -> "microprofile/java/diagnostics").
-     * When a tool has an entry here, it calls the custom request via bindRequest instead of the default approach.
-     */
-    private Map<String, String> toolRequests = new HashMap<>();
-
     // Trace collector (set by workspace/session when server is added)
     protected TraceCollector traceCollector;
 
@@ -149,18 +143,6 @@ public abstract class ServerConfigBase implements ServerConfig {
 
     public void setContributes(Contributes contributes) {
         this.contributes = contributes;
-    }
-
-    public Map<String, String> getToolRequests() {
-        return toolRequests;
-    }
-
-    public void setToolRequests(Map<String, String> toolRequests) {
-        this.toolRequests = toolRequests;
-    }
-
-    public String getToolRequest(String toolName) {
-        return toolRequests.get(toolName);
     }
 
     /**
