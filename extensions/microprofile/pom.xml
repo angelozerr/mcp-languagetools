@@ -17,6 +17,16 @@
     <name>MicroProfile Extension</name>
     <description>MicroProfile language server extension for MCP Language Tools</description>
 
+    <dependencies>
+        <!-- Core dependency for compilation (provided = not packaged in JAR) -->
+        <dependency>
+            <groupId>com.redhat.mcp</groupId>
+            <artifactId>mcp-language-tools-core</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+
     <build>
         <plugins>
             <plugin>

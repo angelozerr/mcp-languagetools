@@ -1,23 +1,55 @@
 package com.redhat.mcp.languagetools.lsp.tools.strategies;
 
+import com.redhat.mcp.languagetools.language.LanguageDocument;
 import com.redhat.mcp.languagetools.language.LanguageRegistry;
 import com.redhat.mcp.languagetools.lsp.client.LspCapability;
 import com.redhat.mcp.languagetools.lsp.server.LspServer;
+import com.redhat.mcp.languagetools.lsp.server.LspServerResolver;
 import com.redhat.mcp.languagetools.lsp.tools.params.FilePositionRequestParams;
+import com.redhat.mcp.languagetools.progress.ProgressMonitor;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
-public class CodeActionStrategy extends FilePositionBasedStrategy<CodeActionParams, List<Either<Command, CodeAction>>> {
+public class CodeActionStrategy
+        extends DidOpenBasedStrategy<FilePositionRequestParams, CodeActionParams, List<Either<Command, CodeAction>>> {
 
     public CodeActionStrategy(LanguageRegistry languageRegistry) {
-        super(languageRegistry, LspCapability.CODE_ACTION, "Code actions");
+        super(languageRegistry);
+    }
+
+    @Override
+    protected String getToolRequestName() {
+        return "codeAction";
+    }
+
+    @Override
+    public LspCapability getCapability() {
+        return LspCapability.CODE_ACTION;
+    }
+
+    @Override
+    public String getTitle() {
+        return "Code actions";
+    }
+
+    @Override
+    public CompletableFuture<List<LspServer>> resolveServers(
+            LspServerResolver resolver,
+            FilePositionRequestParams params,
+            ProgressMonitor progressMonitor) {
+        LanguageDocument document = languageRegistry.createDocument(params.getFileUri());
+        return resolver.getLspServersForFile(
+                document,
+                params.getCwd(),
+                server -> server.isEnabled() && server.supportsCapability(getCapability(), document),
+                progressMonitor
+        );
     }
 
     @Override
@@ -31,7 +63,23 @@ public class CodeActionStrategy extends FilePositionBasedStrategy<CodeActionPara
     }
 
     @Override
-    public CompletableFuture<List<Either<Command, CodeAction>>> executeRequest(LspServer server, CodeActionParams lspParams) {
+    protected String extractFileUri(CodeActionParams lspParams) {
+        return lspParams.getTextDocument().getUri();
+    }
+
+    @Override
+    protected Object buildCustomRequestParams(LspServer server, String fileUri, CodeActionParams lspParams) {
+        return server.buildCodeActionRequestParams(fileUri, lspParams);
+    }
+
+    @Override
+    protected List<Either<Command, CodeAction>> parseCustomRequestResult(LspServer server, Object result) {
+        return server.parseCodeActionRequestResult(result);
+    }
+
+    @Override
+    protected CompletableFuture<List<Either<Command, CodeAction>>> executeAfterDidOpen(
+            LspServer server, CodeActionParams lspParams) {
         String fileUri = lspParams.getTextDocument().getUri();
         Position pos = lspParams.getRange().getStart();
         List<Diagnostic> cachedDiagnostics = server.getDiagnosticsCache().get(fileUri);

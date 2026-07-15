@@ -11,6 +11,7 @@ import com.redhat.mcp.languagetools.trace.TraceCollector;
 import com.redhat.mcp.languagetools.workspace.Workspace;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.Endpoint;
+import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import com.redhat.mcp.languagetools.utils.JsonUtils;
 import org.eclipse.lsp4j.jsonrpc.Launcher;
 import org.eclipse.lsp4j.services.LanguageClient;
@@ -48,6 +49,7 @@ public class LspServer extends ServerBase<LspServerConfig> {
 
     protected Socket socket;
     protected LanguageServer languageServer;
+    private GenericLanguageClient languageClient;
     private final Map<String, List<Diagnostic>> diagnosticsCache = new ConcurrentHashMap<>();
     private final Set<String> openedFiles = ConcurrentHashMap.newKeySet();
     private boolean isSocketConnection = false;
@@ -174,6 +176,9 @@ public class LspServer extends ServerBase<LspServerConfig> {
 
         // Create LSP client (subclasses can override to provide custom client)
         LanguageClient client = createLanguageClient();
+        if (client instanceof GenericLanguageClient glc) {
+            this.languageClient = glc;
+        }
 
         // Create LSP launcher with message tracing wrapper
         Launcher<LanguageServer> launcher = new Launcher.Builder<LanguageServer>()
@@ -256,6 +261,9 @@ public class LspServer extends ServerBase<LspServerConfig> {
 
         // Create LSP client (subclasses can override to provide custom client)
         LanguageClient client = createLanguageClient();
+        if (client instanceof GenericLanguageClient glc) {
+            this.languageClient = glc;
+        }
 
         // GenericLanguageClient already implements Endpoint for bindRequest routing,
         // so we can pass it directly - LSP4J will scan it for @JsonNotification
@@ -382,6 +390,58 @@ public class LspServer extends ServerBase<LspServerConfig> {
         return CompletableFuture.failedFuture(
             new UnsupportedOperationException("Server does not support direct requests")
         );
+    }
+
+    /**
+     * Build parameters for a custom diagnostics request (via toolRequests config).
+     * Default: {@code Map.of("uri", fileUri)}.
+     * Subclasses override for LS-specific formats.
+     */
+    public Object buildDiagnosticsRequestParams(String fileUri) {
+        return java.util.Map.of("uri", fileUri);
+    }
+
+    /**
+     * Build parameters for a custom codeAction request (via toolRequests config).
+     * Default: passes the {@link CodeActionParams} as-is.
+     * Subclasses override for LS-specific formats.
+     */
+    public Object buildCodeActionRequestParams(String fileUri, CodeActionParams codeActionParams) {
+        return codeActionParams;
+    }
+
+    /**
+     * Parse the raw result of a custom diagnostics request.
+     * Default: converts LinkedTreeMap items to PublishDiagnosticsParams and flattens diagnostics.
+     */
+    public List<Diagnostic> parseDiagnosticsRequestResult(Object result) {
+        if (result instanceof List<?> list) {
+            return list.stream()
+                    .map(item -> JsonUtils.toModel(item, PublishDiagnosticsParams.class))
+                    .filter(Objects::nonNull)
+                    .filter(pdp -> pdp.getDiagnostics() != null)
+                    .flatMap(pdp -> pdp.getDiagnostics().stream())
+                    .toList();
+        }
+        return java.util.Collections.emptyList();
+    }
+
+    /**
+     * Parse the raw result of a custom codeAction request.
+     * Default: converts LinkedTreeMap items to CodeAction.
+     */
+    @SuppressWarnings("unchecked")
+    public List<Either<Command, CodeAction>> parseCodeActionRequestResult(Object result) {
+        if (result instanceof List<?> list) {
+            return list.stream()
+                    .map(item -> {
+                        CodeAction ca = JsonUtils.toModel(item, CodeAction.class);
+                        return ca != null ? Either.<Command, CodeAction>forRight(ca) : null;
+                    })
+                    .filter(Objects::nonNull)
+                    .toList();
+        }
+        return java.util.Collections.emptyList();
     }
 
     /**
@@ -569,6 +629,17 @@ public class LspServer extends ServerBase<LspServerConfig> {
 
     public Map<String, List<Diagnostic>> getDiagnosticsCache() {
         return diagnosticsCache;
+    }
+
+    public GenericLanguageClient getLanguageClient() {
+        return languageClient;
+    }
+
+    public CompletableFuture<List<Diagnostic>> waitForDiagnostics(String uri, long timeoutMs) {
+        if (languageClient == null) {
+            return CompletableFuture.completedFuture(Collections.emptyList());
+        }
+        return languageClient.waitForDiagnostics(uri, timeoutMs);
     }
 
     /**

@@ -1,7 +1,6 @@
 package com.redhat.mcp.languagetools.lsp.tools;
 
 import com.redhat.mcp.languagetools.language.LanguageRegistry;
-import com.redhat.mcp.languagetools.lsp.annotations.RequireDidOpen;
 import com.redhat.mcp.languagetools.lsp.tools.params.FilePositionRequestParams;
 import com.redhat.mcp.languagetools.lsp.tools.strategies.CodeActionStrategy;
 import com.redhat.mcp.languagetools.tools.ToolArgDescriptions;
@@ -27,7 +26,6 @@ public class CodeActionTools {
           description = "Get available code actions (quick fixes, refactorings) at a specific position in a file. " +
                         "Returns the list of actions that can be applied. " +
                         "Example: get_code_actions(cwd='/home/user/project', fileUri='file:///home/user/project/src/Main.java', line=10, character=5)")
-    @RequireDidOpen(uriParam = "fileUri")
     public CompletableFuture<String> getCodeActions(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
