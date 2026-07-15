@@ -2,25 +2,25 @@ package com.redhat.mcp.languagetools.lsp.server;
 
 import com.redhat.mcp.languagetools.PathManager;
 import com.redhat.mcp.languagetools.language.LanguageDocument;
-import com.redhat.mcp.languagetools.lsp.*;
+import com.redhat.mcp.languagetools.lsp.InstanceFileWatcher;
+import com.redhat.mcp.languagetools.lsp.LspInstanceRegistry;
 import com.redhat.mcp.languagetools.lsp.client.GenericLanguageClient;
+import com.redhat.mcp.languagetools.lsp.client.LspCapability;
+import com.redhat.mcp.languagetools.lsp.client.LspClientFeatures;
 import com.redhat.mcp.languagetools.progress.ProgressMonitor;
 import com.redhat.mcp.languagetools.server.ServerBase;
 import com.redhat.mcp.languagetools.server.ServerStatus;
-import com.redhat.mcp.languagetools.trace.TraceCollector;
+import com.redhat.mcp.languagetools.settings.ServerTrace;
+import com.redhat.mcp.languagetools.trace.TracingMessageConsumer;
+import com.redhat.mcp.languagetools.utils.JsonUtils;
 import com.redhat.mcp.languagetools.workspace.Workspace;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.Endpoint;
-import org.eclipse.lsp4j.jsonrpc.messages.Either;
-import com.redhat.mcp.languagetools.utils.JsonUtils;
 import org.eclipse.lsp4j.jsonrpc.Launcher;
+import org.eclipse.lsp4j.jsonrpc.messages.Either;
 import org.eclipse.lsp4j.services.LanguageClient;
 import org.eclipse.lsp4j.services.LanguageServer;
 import org.jboss.logging.Logger;
-
-import com.redhat.mcp.languagetools.lsp.client.LspCapability;
-import com.redhat.mcp.languagetools.lsp.client.LspClientFeatures;
-import com.redhat.mcp.languagetools.trace.TracingMessageConsumer;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -91,40 +91,40 @@ public class LspServer extends ServerBase<LspServerConfig> {
 
         // Ensure server is installed first
         return withErrorLogging(
-            config.ensureInstalled(getWorkspace().getApplication().getPathManager(), this::setStatus, progressMonitor)
-                .thenCompose(v -> CompletableFuture.runAsync(() -> {
-                // Try to find existing instance first
-                String workspacePath = Paths.get(workspaceRoot).toString();
-                LspInstanceRegistry.InstanceInfo existingInstance = LspInstanceRegistry.findInstance(workspacePath, config.getServerId());
+                config.ensureInstalled(getWorkspace().getApplication().getPathManager(), this::setStatus, progressMonitor)
+                        .thenCompose(v -> CompletableFuture.runAsync(() -> {
+                            // Try to find existing instance first
+                            String workspacePath = Paths.get(workspaceRoot).toString();
+                            LspInstanceRegistry.InstanceInfo existingInstance = LspInstanceRegistry.findInstance(workspacePath, config.getServerId());
 
-                if (existingInstance != null) {
-                    // Connect to existing instance via socket
-                    setStatus(ServerStatus.CONNECTING_TO_IDE);
-                    try {
-                        connectToSocket(existingInstance.port);
-                        currentInstance = existingInstance;
-                        LOG.infof("Connected to existing %s instance on port %d (PID: %d)",
-                            config.getServerId(), existingInstance.port, existingInstance.pid);
-                        startFileWatcher(workspacePath);
-                        return;
-                    } catch (IOException e) {
-                        LOG.warnf("Failed to connect to existing instance on port %d, will launch new process: %s",
-                            existingInstance.port, e.getMessage());
-                        setStatus(ServerStatus.STARTING);
-                        // Fall through to launch new process
-                    }
-                }
+                            if (existingInstance != null) {
+                                // Connect to existing instance via socket
+                                setStatus(ServerStatus.CONNECTING_TO_IDE);
+                                try {
+                                    connectToSocket(existingInstance.port);
+                                    currentInstance = existingInstance;
+                                    LOG.infof("Connected to existing %s instance on port %d (PID: %d)",
+                                            config.getServerId(), existingInstance.port, existingInstance.pid);
+                                    startFileWatcher(workspacePath);
+                                    return;
+                                } catch (IOException e) {
+                                    LOG.warnf("Failed to connect to existing instance on port %d, will launch new process: %s",
+                                            existingInstance.port, e.getMessage());
+                                    setStatus(ServerStatus.STARTING);
+                                    // Fall through to launch new process
+                                }
+                            }
 
-                // No existing instance found or connection failed - launch new process
-                try {
-                    launchProcess();
-                    startFileWatcher(workspacePath);
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-            }, executorService)),
-            getTraceCollector(),
-            config.getServerId()
+                            // No existing instance found or connection failed - launch new process
+                            try {
+                                launchProcess();
+                                startFileWatcher(workspacePath);
+                            } catch (IOException e) {
+                                throw new RuntimeException(e);
+                            }
+                        }, executorService)),
+                getTraceCollector(),
+                config.getServerId()
         );
     }
 
@@ -140,24 +140,24 @@ public class LspServer extends ServerBase<LspServerConfig> {
 
         // Ensure server is installed first
         return withErrorLogging(
-            config.ensureInstalled(getWorkspace().getApplication().getPathManager(), this::setStatus, progressMonitor)
-                .thenCompose(v -> CompletableFuture.runAsync(() -> {
-                LOG.infof("=== Inside CompletableFuture.runAsync for %s ===", config.getServerId());
-                String workspacePath = Paths.get(workspaceRoot).toString();
-                LOG.infof("Workspace path: %s", workspacePath);
+                config.ensureInstalled(getWorkspace().getApplication().getPathManager(), this::setStatus, progressMonitor)
+                        .thenCompose(v -> CompletableFuture.runAsync(() -> {
+                            LOG.infof("=== Inside CompletableFuture.runAsync for %s ===", config.getServerId());
+                            String workspacePath = Paths.get(workspaceRoot).toString();
+                            LOG.infof("Workspace path: %s", workspacePath);
 
-                // Launch new process directly without checking for IDE instance
-                LOG.infof("About to call launchProcess() for %s", config.getServerId());
-                try {
-                    launchProcess();
-                    LOG.infof("launchProcess() completed for %s", config.getServerId());
-                    startFileWatcher(workspacePath);
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-            }, executorService)),
-            getTraceCollector(),
-            config.getServerId()
+                            // Launch new process directly without checking for IDE instance
+                            LOG.infof("About to call launchProcess() for %s", config.getServerId());
+                            try {
+                                launchProcess();
+                                LOG.infof("launchProcess() completed for %s", config.getServerId());
+                                startFileWatcher(workspacePath);
+                            } catch (IOException e) {
+                                throw new RuntimeException(e);
+                            }
+                        }, executorService)),
+                getTraceCollector(),
+                config.getServerId()
         );
     }
 
@@ -189,8 +189,10 @@ public class LspServer extends ServerBase<LspServerConfig> {
                 .setExecutorService(executorService)
                 .configureGson(JsonUtils::configureGson)
                 .wrapMessages(consumer -> message -> {
-                    // Log the message
-                    getTracing().log(message, consumer);
+                    if (getServerTrace() != ServerTrace.off) {
+                        // Log the message
+                        getTracing().log(message, consumer);
+                    }
                     // Forward to original consumer
                     consumer.consume(message);
                 })
@@ -217,14 +219,14 @@ public class LspServer extends ServerBase<LspServerConfig> {
 
         // Send startup traces (visible in UI) - separate lines, no folding
         getTraceCollector().addTrace(
-            workspaceRoot.toString(),
-            config.getServerId(),
-            String.format("Starting %s...", config.getName())
+                workspaceRoot.toString(),
+                config.getServerId(),
+                String.format("Starting %s...", config.getName())
         );
         getTraceCollector().addTrace(
-            workspaceRoot.toString(),
-            config.getServerId(),
-            String.format("Command: %s", commandStr)
+                workspaceRoot.toString(),
+                config.getServerId(),
+                String.format("Command: %s", commandStr)
         );
 
         ProcessBuilder pb = new ProcessBuilder(command);
@@ -239,9 +241,9 @@ public class LspServer extends ServerBase<LspServerConfig> {
             pb.directory(Paths.get(config.getWorkingDirectory()).toFile());
             // Trace working directory (one line - no folding)
             getTraceCollector().addTrace(
-                workspaceRoot.toString(),
-                config.getServerId(),
-                String.format("Working directory: %s", config.getWorkingDirectory())
+                    workspaceRoot.toString(),
+                    config.getServerId(),
+                    String.format("Working directory: %s", config.getWorkingDirectory())
             );
         }
 
@@ -251,9 +253,9 @@ public class LspServer extends ServerBase<LspServerConfig> {
 
         // Trace server started (one line - no folding)
         getTraceCollector().addTrace(
-            workspaceRoot.toString(),
-            config.getServerId(),
-            String.format("LSP server process started (PID: %d)", serverProcess.pid())
+                workspaceRoot.toString(),
+                config.getServerId(),
+                String.format("LSP server process started (PID: %d)", serverProcess.pid())
         );
 
         // Start monitoring stderr for errors (uses shared implementation from ServerBase)
@@ -276,8 +278,10 @@ public class LspServer extends ServerBase<LspServerConfig> {
                 .setExecutorService(executorService)
                 .configureGson(JsonUtils::configureGson)
                 .wrapMessages(consumer -> message -> {
-                    // Log the message
-                    getTracing().log(message, consumer);
+                    if (getServerTrace() != ServerTrace.off) {
+                        // Log the message
+                        getTracing().log(message, consumer);
+                    }
                     // Forward to original consumer
                     consumer.consume(message);
                 })
@@ -302,7 +306,7 @@ public class LspServer extends ServerBase<LspServerConfig> {
         // If connected to external instance (IDE), server is already initialized
         if (isSocketConnection && currentInstance != null) {
             LOG.infof("%s already initialized by IDE (port %d, PID %d)",
-                     config.getServerId(), currentInstance.port, currentInstance.pid);
+                    config.getServerId(), currentInstance.port, currentInstance.pid);
             setStatus(ServerStatus.CONNECTED_TO_IDE);
             return CompletableFuture.completedFuture(null);
         }
@@ -328,20 +332,14 @@ public class LspServer extends ServerBase<LspServerConfig> {
         workspace.setConfiguration(true);
         capabilities.setWorkspace(workspace);
 
-        TextDocumentClientCapabilities textDocument = new TextDocumentClientCapabilities();
-        textDocument.setPublishDiagnostics(new PublishDiagnosticsCapabilities());
-        textDocument.setCodeAction(new CodeActionCapabilities());
-        textDocument.setHover(new HoverCapabilities());
-        textDocument.setDefinition(new DefinitionCapabilities());
-        textDocument.setReferences(new ReferencesCapabilities());
-        textDocument.setDocumentSymbol(new DocumentSymbolCapabilities());
-        textDocument.setRename(new RenameCapabilities());
+        TextDocumentClientCapabilities textDocument = createTextDocumentClientCapabilities();
         capabilities.setTextDocument(textDocument);
 
         params.setCapabilities(capabilities);
 
-        // Set trace level from global config
-        params.setTrace(getTraceLevelFromConfig());
+        // Set trace level from .mcp-languagetools/settings.json
+        // lsp.${serverId}.trace = off | messages | verbose
+        params.setTrace(getServerTrace().name());
 
         // Prepare initialization options (hook for subclasses to add server-specific options)
         Object initOptions = prepareInitializationOptions();
@@ -366,6 +364,18 @@ public class LspServer extends ServerBase<LspServerConfig> {
                 });
     }
 
+    private static TextDocumentClientCapabilities createTextDocumentClientCapabilities() {
+        TextDocumentClientCapabilities textDocument = new TextDocumentClientCapabilities();
+        textDocument.setPublishDiagnostics(new PublishDiagnosticsCapabilities());
+        textDocument.setCodeAction(new CodeActionCapabilities());
+        textDocument.setHover(new HoverCapabilities());
+        textDocument.setDefinition(new DefinitionCapabilities());
+        textDocument.setReferences(new ReferencesCapabilities());
+        textDocument.setDocumentSymbol(new DocumentSymbolCapabilities());
+        textDocument.setRename(new RenameCapabilities());
+        return textDocument;
+    }
+
     /**
      * Send a request directly to the language server via JSON-RPC.
      * Used for custom LSP requests that are not standard LSP commands.
@@ -377,18 +387,18 @@ public class LspServer extends ServerBase<LspServerConfig> {
     public CompletableFuture<Object> sendRequest(String method, Object params) {
         if (languageServer == null) {
             return CompletableFuture.failedFuture(
-                new IllegalStateException("Language server not started")
+                    new IllegalStateException("Language server not started")
             );
         }
 
         // Send directly via Endpoint (JSON-RPC)
         if (languageServer instanceof Endpoint endpoint) {
             return endpoint.request(method, params)
-                .thenApply(result -> (Object) result);
+                    .thenApply(result -> (Object) result);
         }
 
         return CompletableFuture.failedFuture(
-            new UnsupportedOperationException("Server does not support direct requests")
+                new UnsupportedOperationException("Server does not support direct requests")
         );
     }
 
@@ -501,7 +511,7 @@ public class LspServer extends ServerBase<LspServerConfig> {
     public CompletableFuture<Object> sendCommandRequest(String method, Object params) {
         if (languageServer == null) {
             return CompletableFuture.failedFuture(
-                new IllegalStateException("Language server not started")
+                    new IllegalStateException("Language server not started")
             );
         }
 
@@ -519,8 +529,8 @@ public class LspServer extends ServerBase<LspServerConfig> {
         }
 
         return languageServer.getWorkspaceService()
-            .executeCommand(commandParams)
-            .thenApply(result -> result);
+                .executeCommand(commandParams)
+                .thenApply(result -> result);
     }
 
     /**
@@ -621,8 +631,8 @@ public class LspServer extends ServerBase<LspServerConfig> {
         // Determine configuration directory based on OS
         String os = System.getProperty("os.name").toLowerCase();
         String configuration = serverHome.resolve(
-            os.contains("win") ? "config_win" :
-            os.contains("mac") ? "config_mac" : "config_linux"
+                os.contains("win") ? "config_win" :
+                        os.contains("mac") ? "config_mac" : "config_linux"
         ).toString();
 
         // Substitute variables in command
@@ -731,10 +741,10 @@ public class LspServer extends ServerBase<LspServerConfig> {
         var config = super.getConfig();
         try {
             fileWatcher = new InstanceFileWatcher(
-                workspacePath,
-                config.getServerId(),
-                this::handleInstanceChanged,
-                this::handleInstanceRemoved
+                    workspacePath,
+                    config.getServerId(),
+                    this::handleInstanceChanged,
+                    this::handleInstanceRemoved
             );
             fileWatcher.start();
             LOG.infof("Started instance file watcher for %s", config.getServerId());
@@ -849,40 +859,9 @@ public class LspServer extends ServerBase<LspServerConfig> {
         return null;
     }
 
-    /**
-     * Get trace level from global config file (~/.mcp-languagetools/config.json).
-     * Returns "off", "messages", or "verbose" (default).
-     */
-    private String getTraceLevelFromConfig() {
-        var config = super.getConfig();
-        try {
-            Path configFile = pathManager.getGlobalConfigFile();
-            if (!Files.exists(configFile)) {
-                return "verbose"; // Default
-            }
-
-            String json = Files.readString(configFile);
-            com.google.gson.JsonObject root = com.google.gson.JsonParser.parseString(json).getAsJsonObject();
-
-            if (!root.has("servers")) {
-                return "verbose";
-            }
-
-            com.google.gson.JsonObject servers = root.getAsJsonObject("servers");
-            if (!servers.has(config.getServerId())) {
-                return "verbose";
-            }
-
-            com.google.gson.JsonObject serverConfig = servers.getAsJsonObject(config.getServerId());
-            if (!serverConfig.has("trace")) {
-                return "verbose";
-            }
-
-            return serverConfig.get("trace").getAsString();
-        } catch (Exception e) {
-            LOG.debugf("Failed to read trace level from config: %s", e.getMessage());
-            return "verbose"; // Default on error
-        }
+    @Override
+    public ServerTrace getServerTrace() {
+        return getWorkspace().getApplication().getSettings().getLspTraceLevel(getConfig().getServerId());
     }
 
     /**

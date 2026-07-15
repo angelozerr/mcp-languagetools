@@ -168,10 +168,6 @@ public class TracingMessageConsumer {
         return requestMetadata != null ? String.valueOf(now.toEpochMilli() - requestMetadata.start.toEpochMilli()) : "?";
     }
 
-    public TraceCollectorAdd getCollector() {
-        return collector;
-    }
-
     private static class RequestMetadata {
         final String method;
         final Instant start;

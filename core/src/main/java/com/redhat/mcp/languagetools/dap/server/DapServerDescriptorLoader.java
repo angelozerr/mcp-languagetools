@@ -2,7 +2,7 @@ package com.redhat.mcp.languagetools.dap.server;
 
 import com.google.gson.JsonObject;
 import com.redhat.mcp.languagetools.PathManager;
-import com.redhat.mcp.languagetools.config.PathConfig;
+import com.redhat.mcp.languagetools.settings.PathConfig;
 import com.redhat.mcp.languagetools.server.ServerDescriptorLoaderBase;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;

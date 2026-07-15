@@ -2,6 +2,7 @@ package com.redhat.mcp.languagetools.server;
 
 import com.redhat.mcp.languagetools.client.BindEndpointSupport;
 import com.redhat.mcp.languagetools.lsp.server.LspServer;
+import com.redhat.mcp.languagetools.settings.ServerTrace;
 import com.redhat.mcp.languagetools.trace.TracingMessageConsumer;
 import com.redhat.mcp.languagetools.workspace.Workspace;
 import org.jboss.logging.Logger;
@@ -417,6 +418,8 @@ public abstract class ServerBase<T extends ServerConfigBase> extends BindEndpoin
     public TracingMessageConsumer getTracing() {
         return tracing;
     }
+
+    public abstract ServerTrace getServerTrace();
 
     protected abstract TracingMessageConsumer.TraceCollectorAdd initializeTraceCollector(Workspace workspace);
 }

@@ -1,6 +1,6 @@
 package com.redhat.mcp.languagetools;
 
-import com.redhat.mcp.languagetools.config.PathConfig;
+import com.redhat.mcp.languagetools.settings.PathConfig;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
@@ -15,7 +15,7 @@ import java.nio.file.Path;
 public class PathManager {
 
     // File names (hardcoded constants)
-    public static final String CONFIG_JSON = "config.json";
+    public static final String SETTINGS_JSON = "settings.json";
 
     @Inject
     PathConfig pathConfig;
@@ -83,10 +83,10 @@ public class PathManager {
     }
 
     /**
-     * Get the global config file path (~/.mcp-languagetools/config.json)
+     * Get the settings file path (~/.mcp-languagetools/settings.json)
      */
-    public Path getGlobalConfigFile() {
-        return getMcpLangToolsRoot().resolve(CONFIG_JSON);
+    public Path getSettingsFile() {
+        return getMcpLangToolsRoot().resolve(SETTINGS_JSON);
     }
 
     /**

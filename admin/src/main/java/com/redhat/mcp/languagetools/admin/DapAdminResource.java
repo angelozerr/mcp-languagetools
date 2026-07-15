@@ -1,18 +1,19 @@
 package com.redhat.mcp.languagetools.admin;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.redhat.mcp.languagetools.PathManager;
 import com.redhat.mcp.languagetools.admin.dto.ContributionDTOBuilder;
 import com.redhat.mcp.languagetools.admin.dto.DapConfigDTO;
 import com.redhat.mcp.languagetools.admin.dto.ErrorResponse;
 import com.redhat.mcp.languagetools.admin.dto.StatusResponse;
+import com.redhat.mcp.languagetools.settings.Settings;
 import com.redhat.mcp.languagetools.dap.server.DapServerConfig;
 import com.redhat.mcp.languagetools.installer.TaskRegistryInstaller;
 import com.redhat.mcp.languagetools.installer.TraceProgressMonitor;
 import com.redhat.mcp.languagetools.Application;
 import com.redhat.mcp.languagetools.progress.ProgressBroadcaster;
+import com.redhat.mcp.languagetools.settings.ServerTrace;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
@@ -23,6 +24,8 @@ import java.nio.file.Files;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+
+import static com.redhat.mcp.languagetools.utils.JsonUtils.getPrettyPrintGson;
 
 /**
  * REST endpoint for all DAP-related admin operations.
@@ -46,7 +49,8 @@ public class DapAdminResource {
     @Inject
     ProgressBroadcaster progressBroadcaster;
 
-    private final Gson gson = new GsonBuilder().setPrettyPrinting().create();
+    @Inject
+    Settings settings;
 
     // ========== DAP Configs ==========
 
@@ -106,7 +110,7 @@ public class DapAdminResource {
             return Response.ok("{}").build();
         }
 
-        return Response.ok(gson.toJson(installerConfig)).build();
+        return Response.ok(getPrettyPrintGson().toJson(installerConfig)).build();
     }
 
     /**
@@ -126,7 +130,7 @@ public class DapAdminResource {
             var serverHome = config.getServerHome();
             Files.createDirectories(serverHome);
             var installerPath = serverHome.resolve("installer.json");
-            String json = gson.toJson(installerJson);
+            String json = getPrettyPrintGson().toJson(installerJson);
             Files.writeString(installerPath, json);
 
             return Response.ok().build();
@@ -192,4 +196,38 @@ public class DapAdminResource {
     }
 
     // Note: DAP sessions endpoints are in DapSessionResource (moved there)
+
+    @GET
+    @Path("/configs/{serverId}/trace")
+    public Response getTraceLevel(@PathParam("serverId") String serverId) {
+        ServerTrace level = settings.getDapTraceLevel(serverId);
+        return Response.ok()
+                .entity("{\"serverId\": \"" + serverId + "\", \"trace\": \"" + level + "\"}")
+                .build();
+    }
+
+    @PUT
+    @Path("/configs/{serverId}/trace")
+    @Consumes(MediaType.APPLICATION_JSON)
+    public Response setTraceLevel(@PathParam("serverId") String serverId, String body) {
+        try {
+            String trace = JsonParser.parseString(body)
+                    .getAsJsonObject()
+                    .get("trace")
+                    .getAsString();
+
+            ServerTrace level = ServerTrace.fromValue(trace);
+
+            settings.setDapTraceLevel(serverId, level);
+
+            return Response.ok()
+                    .entity("{\"serverId\": \"" + serverId + "\", \"trace\": \"" + level + "\"}")
+                    .build();
+
+        } catch (Exception e) {
+            return Response.status(400)
+                    .entity("{\"error\": \"" + e.getMessage() + "\"}")
+                    .build();
+        }
+    }
 }

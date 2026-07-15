@@ -1,7 +1,9 @@
 package com.redhat.mcp.languagetools.mcp.trace;
 
+import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonParser;
+import com.redhat.mcp.languagetools.utils.JsonUtils;
 import io.quarkiverse.mcp.server.McpConnection;
 import io.quarkiverse.mcp.server.RawMessage;
 import io.quarkus.logging.Log;
@@ -16,15 +18,14 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+import static com.redhat.mcp.languagetools.utils.JsonUtils.getPrettyPrintGson;
+
 /**
  * Collects MCP traffic traces from the Quarkus MCP server traffic logger.
  */
 @ApplicationScoped
 public class McpTraceCollector {
 
-    public static final com.google.gson.Gson PRETTY_PRINT_GSON = new GsonBuilder()
-            .setPrettyPrinting()
-            .create();
     private final List<McpTrace> traces = new CopyOnWriteArrayList<>();
     private static final int MAX_TRACES = 500;
 
@@ -128,7 +129,7 @@ public class McpTraceCollector {
             String jsonText = message.asString();
             try {
                 var json = JsonParser.parseString(jsonText);
-                return PRETTY_PRINT_GSON.toJson(json);
+                return getPrettyPrintGson().toJson(json);
             } catch (Exception ex) {
                 return jsonText;
             }

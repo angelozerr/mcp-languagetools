@@ -10,12 +10,12 @@ import com.redhat.mcp.languagetools.lsp.server.LspServerConfig;
 import com.redhat.mcp.languagetools.lsp.server.LspServerStatusChangeEvent;
 import com.redhat.mcp.languagetools.lsp.trace.LspTraceCollector;
 import com.redhat.mcp.languagetools.mcp.McpClientTracker;
+import com.redhat.mcp.languagetools.settings.Settings;
 import com.redhat.mcp.languagetools.progress.ProgressMonitor;
 import com.redhat.mcp.languagetools.progress.ProgressStep;
 import com.redhat.mcp.languagetools.server.ServerDescriptorRegistry;
 import com.redhat.mcp.languagetools.workspace.Workspace;
 import com.redhat.mcp.languagetools.workspace.WorkspaceChangeEvent;
-import io.quarkiverse.mcp.server.Progress;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -47,6 +47,9 @@ public class Application {
 
     @Inject
     PathManager pathManager;
+
+    @Inject
+    Settings settings;
 
     @Inject
     ServerDescriptorRegistry serverDescriptorRegistry;
@@ -449,6 +452,10 @@ public class Application {
 
     public PathManager getPathManager() {
         return pathManager;
+    }
+
+    public Settings getSettings() {
+        return settings;
     }
 
     // LSP servers

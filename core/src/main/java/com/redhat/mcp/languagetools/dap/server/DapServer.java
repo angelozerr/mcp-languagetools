@@ -10,6 +10,7 @@ import com.redhat.mcp.languagetools.trace.TraceCollector;
 import com.redhat.mcp.languagetools.trace.TracingMessageConsumer;
 import com.redhat.mcp.languagetools.server.ServerBase;
 import com.redhat.mcp.languagetools.server.ServerStatus;
+import com.redhat.mcp.languagetools.settings.ServerTrace;
 import com.redhat.mcp.languagetools.workspace.Workspace;
 import org.eclipse.lsp4j.debug.InitializeRequestArguments;
 import org.eclipse.lsp4j.debug.launch.DSPLauncher;
@@ -21,8 +22,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
@@ -55,48 +54,9 @@ public class DapServer extends ServerBase<DapServerConfig> {
         return workspace.getApplication().getDapTraceCollector();
     }
 
-    /**
-     * Get trace level from global config file (~/.mcp-languagetools/config.json).
-     * Returns "off", "messages", or "verbose" (default).
-     * Same behavior as LSP.
-     */
-    public String getTraceLevel() {
-        return getTraceLevelFromConfig(getConfig().getServerId(), "dapServers");
-    }
-
-    /**
-     * Shared utility to get trace level from config.
-     * Can be used by both LSP and DAP servers.
-     */
-    private String getTraceLevelFromConfig(String serverId, String serverSection) {
-        try {
-            Path configFile = getWorkspace().getApplication().getPathManager().getGlobalConfigFile();
-            if (!Files.exists(configFile)) {
-                return "verbose"; // Default
-            }
-
-            String json = Files.readString(configFile);
-            com.google.gson.JsonObject root = com.google.gson.JsonParser.parseString(json).getAsJsonObject();
-
-            if (!root.has(serverSection)) {
-                return "verbose";
-            }
-
-            com.google.gson.JsonObject servers = root.getAsJsonObject(serverSection);
-            if (!servers.has(serverId)) {
-                return "verbose";
-            }
-
-            com.google.gson.JsonObject serverConfig = servers.getAsJsonObject(serverId);
-            if (!serverConfig.has("trace")) {
-                return "verbose";
-            }
-
-            return serverConfig.get("trace").getAsString();
-        } catch (Exception e) {
-            LOG.debugf("Failed to read trace level from config: %s", e.getMessage());
-            return "verbose"; // Default on error
-        }
+    @Override
+    public ServerTrace getServerTrace() {
+        return getWorkspace().getApplication().getSettings().getDapTraceLevel(getConfig().getServerId());
     }
 
     /**
@@ -472,10 +432,12 @@ public class DapServer extends ServerBase<DapServerConfig> {
                     childTransportStreams.getOutputStream(),
                     executorService,
                     consumer -> message -> {
-                        try {
-                            getTracing().log(message, consumer);
-                        } catch (Exception e) {
-                            LOG.warnf(e, "Error tracing DAP message: %s", e.getMessage());
+                        if (getServerTrace() != ServerTrace.off) {
+                            try {
+                                getTracing().log(message, consumer);
+                            } catch (Exception e) {
+                                LOG.warnf(e, "Error tracing DAP message: %s", e.getMessage());
+                            }
                         }
                         consumer.consume(message);
                     });

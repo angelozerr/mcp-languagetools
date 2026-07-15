@@ -1,17 +1,12 @@
 package com.redhat.mcp.languagetools.lsp.server;
 
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.redhat.mcp.languagetools.PathManager;
-import com.redhat.mcp.languagetools.config.PathConfig;
-import com.redhat.mcp.languagetools.lsp.Contributes;
+import com.redhat.mcp.languagetools.settings.PathConfig;
 import com.redhat.mcp.languagetools.server.ServerDescriptorLoaderBase;
 import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
-import org.jboss.logging.Logger;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 

@@ -241,6 +241,23 @@ function showLaunchConfigForm(session, dapServerId) {
     // Load existing traces for this session (renderDapTracesForSession will be called by WebSocket when traces arrive)
     renderDapTracesForSession(sessionId);
 
+    // Load saved trace level from settings
+    const traceServerId = session.serverId || session.dapServerId || dapServerId;
+    if (traceServerId) {
+        fetch(`/api/admin/dap/configs/${traceServerId}/trace`)
+            .then(r => r.json())
+            .then(data => {
+                const level = data.trace || 'verbose';
+                currentDapTraceLevel[sessionId] = level;
+                const select = document.getElementById('dap-trace-level');
+                if (select) {
+                    select.value = level;
+                }
+                renderDapTracesForSession(sessionId);
+            })
+            .catch(e => console.error('Failed to load DAP trace level:', e));
+    }
+
     // Initialize button states based on session state
     const debugBtn = document.getElementById(`dap-debug-btn-${sessionId}`);
     const launchBtn = document.getElementById(`dap-launch-btn-${sessionId}`);
@@ -934,9 +951,23 @@ async function clearDapConsole(sessionId) {
  */
 let currentDapTraceLevel = {};
 
-function changeDapTraceLevel(sessionId, level) {
+async function changeDapTraceLevel(sessionId, level) {
     currentDapTraceLevel[sessionId] = level;
     renderDapTracesForSession(sessionId);
+
+    const session = window.dapSessions?.find(s => s.sessionId === sessionId);
+    const serverId = session?.serverId || session?.dapServerId;
+    if (serverId) {
+        try {
+            await fetch(`/api/admin/dap/configs/${serverId}/trace`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ trace: level })
+            });
+        } catch (e) {
+            console.error('Failed to save DAP trace level:', e);
+        }
+    }
 }
 
 function shouldShowDapTrace(trace, sessionId) {

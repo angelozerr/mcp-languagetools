@@ -1,6 +1,7 @@
 package com.redhat.mcp.languagetools.admin;
 
-import com.redhat.mcp.languagetools.config.GlobalConfiguration;
+import com.redhat.mcp.languagetools.settings.Settings;
+import com.redhat.mcp.languagetools.settings.ServerTrace;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
@@ -15,7 +16,7 @@ import jakarta.ws.rs.core.Response;
 public class McpAdminResource {
 
     @Inject
-    GlobalConfiguration globalConfig;
+    Settings settings;
 
     /**
      * Get MCP trace level.
@@ -23,7 +24,7 @@ public class McpAdminResource {
     @GET
     @Path("/config")
     public Response getMcpTraceLevel() {
-        String level = globalConfig.getMcpTraceLevel();
+        ServerTrace level = settings.getMcpTraceLevel();
         return Response.ok()
                 .entity("{\"trace\": \"" + level + "\"}")
                 .build();
@@ -42,17 +43,12 @@ public class McpAdminResource {
                     .get("trace")
                     .getAsString();
 
-            // Validate
-            if (!trace.equals("off") && !trace.equals("messages") && !trace.equals("verbose")) {
-                return Response.status(400)
-                        .entity("{\"error\": \"Invalid trace level. Must be: off, messages, or verbose\"}")
-                        .build();
-            }
+            ServerTrace level = ServerTrace.fromValue(trace);
 
-            globalConfig.setMcpTraceLevel(trace);
+            settings.setMcpTraceLevel(level);
 
             return Response.ok()
-                    .entity("{\"trace\": \"" + trace + "\"}")
+                    .entity("{\"trace\": \"" + level + "\"}")
                     .build();
 
         } catch (Exception e) {

@@ -8,7 +8,8 @@ import com.redhat.mcp.languagetools.admin.dto.ErrorResponse;
 import com.redhat.mcp.languagetools.admin.dto.LspConfigDTO;
 import com.redhat.mcp.languagetools.admin.dto.ServerDTOBuilder;
 import com.redhat.mcp.languagetools.admin.dto.StatusResponse;
-import com.redhat.mcp.languagetools.config.GlobalConfiguration;
+import com.redhat.mcp.languagetools.settings.Settings;
+import com.redhat.mcp.languagetools.settings.ServerTrace;
 import com.redhat.mcp.languagetools.installer.TaskRegistryInstaller;
 import com.redhat.mcp.languagetools.installer.TraceProgressMonitor;
 import com.redhat.mcp.languagetools.lsp.server.LspServer;
@@ -45,7 +46,7 @@ public class LspAdminResource {
     ServerDTOBuilder serverDTOBuilder;
 
     @Inject
-    GlobalConfiguration globalConfig;
+    Settings settings;
 
     @Inject
     ProgressBroadcaster progressBroadcaster;
@@ -361,7 +362,7 @@ public class LspAdminResource {
     @GET
     @Path("/configs/{serverId}/trace")
     public Response getTraceLevel(@PathParam("serverId") String serverId) {
-        String level = globalConfig.getServerTraceLevel(serverId);
+        ServerTrace level = settings.getLspTraceLevel(serverId);
         return Response.ok()
                 .entity("{\"serverId\": \"" + serverId + "\", \"trace\": \"" + level + "\"}")
                 .build();
@@ -380,17 +381,12 @@ public class LspAdminResource {
                     .get("trace")
                     .getAsString();
 
-            // Validate
-            if (!trace.equals("off") && !trace.equals("messages") && !trace.equals("verbose")) {
-                return Response.status(400)
-                        .entity("{\"error\": \"Invalid trace level. Must be: off, messages, or verbose\"}")
-                        .build();
-            }
+            ServerTrace level = ServerTrace.fromValue(trace);
 
-            globalConfig.setServerTraceLevel(serverId, trace);
+            settings.setLspTraceLevel(serverId, level);
 
             return Response.ok()
-                    .entity("{\"serverId\": \"" + serverId + "\", \"trace\": \"" + trace + "\"}")
+                    .entity("{\"serverId\": \"" + serverId + "\", \"trace\": \"" + level + "\"}")
                     .build();
 
         } catch (Exception e) {

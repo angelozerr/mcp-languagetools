@@ -1,9 +1,6 @@
 package com.redhat.mcp.languagetools.lsp.server;
 
-import com.google.gson.JsonObject;
 import com.redhat.mcp.languagetools.PathManager;
-import com.redhat.mcp.languagetools.config.PathConfig;
-import com.redhat.mcp.languagetools.lsp.Contributes;
 import com.redhat.mcp.languagetools.server.ServerConfigBase;
 
 import java.util.HashMap;

@@ -9,6 +9,10 @@ import java.util.HashMap;
 
 public class JsonUtils {
 
+    private static final Gson PRETTY_PRINT_GSON = new GsonBuilder()
+            .setPrettyPrinting()
+            .create();
+
     private static final Gson LSP4J_GSON = new MessageJsonHandler(new HashMap<>()).getGson();
 
     private JsonUtils() {
@@ -20,6 +24,10 @@ public class JsonUtils {
 
     public static Gson getLsp4jGson() {
         return LSP4J_GSON;
+    }
+
+    public static Gson getPrettyPrintGson() {
+        return PRETTY_PRINT_GSON;
     }
 
     public static <T> T toModel(Object object, Class<T> clazz) {
