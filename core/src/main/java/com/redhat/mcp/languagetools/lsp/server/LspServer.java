@@ -11,8 +11,8 @@ import com.redhat.mcp.languagetools.trace.TraceCollector;
 import com.redhat.mcp.languagetools.workspace.Workspace;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.Endpoint;
+import com.redhat.mcp.languagetools.utils.JsonUtils;
 import org.eclipse.lsp4j.jsonrpc.Launcher;
-import org.eclipse.lsp4j.launch.LSPLauncher;
 import org.eclipse.lsp4j.services.LanguageClient;
 import org.eclipse.lsp4j.services.LanguageServer;
 import org.jboss.logging.Logger;
@@ -176,18 +176,20 @@ public class LspServer extends ServerBase<LspServerConfig> {
         LanguageClient client = createLanguageClient();
 
         // Create LSP launcher with message tracing wrapper
-        Launcher<LanguageServer> launcher = LSPLauncher.createClientLauncher(
-                client,
-                in,
-                out,
-                executorService,
-                consumer -> message -> {
+        Launcher<LanguageServer> launcher = new Launcher.Builder<LanguageServer>()
+                .setLocalService(client)
+                .setRemoteInterface(LanguageServer.class)
+                .setInput(in)
+                .setOutput(out)
+                .setExecutorService(executorService)
+                .configureGson(JsonUtils::configureGson)
+                .wrapMessages(consumer -> message -> {
                     // Log the message
                     getTracing().log(message, consumer);
                     // Forward to original consumer
                     consumer.consume(message);
-                }
-        );
+                })
+                .create();
 
         languageServer = launcher.getRemoteProxy();
         launcher.startListening();
@@ -268,6 +270,7 @@ public class LspServer extends ServerBase<LspServerConfig> {
                 .setInput(serverProcess.getInputStream())
                 .setOutput(serverProcess.getOutputStream())
                 .setExecutorService(executorService)
+                .configureGson(JsonUtils::configureGson)
                 .wrapMessages(consumer -> message -> {
                     // Log the message
                     getTracing().log(message, consumer);

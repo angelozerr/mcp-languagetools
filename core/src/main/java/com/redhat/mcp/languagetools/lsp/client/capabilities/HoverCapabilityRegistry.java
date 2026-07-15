@@ -1,7 +1,7 @@
 package com.redhat.mcp.languagetools.lsp.client.capabilities;
 
-import com.google.gson.Gson;
 import com.google.gson.JsonObject;
+import com.redhat.mcp.languagetools.utils.JsonUtils;
 import com.redhat.mcp.languagetools.language.LanguageDocument;
 import com.redhat.mcp.languagetools.lsp.client.LspClientFeatures;
 import org.eclipse.lsp4j.HoverRegistrationOptions;
@@ -33,7 +33,7 @@ public class HoverCapabilityRegistry extends TextDocumentServerCapabilityRegistr
 
     @Override
     protected HoverRegistrationOptions create(JsonObject registerOptions) {
-        return new Gson().fromJson(registerOptions, ExtendedHoverRegistrationOptions.class);
+        return JsonUtils.getLsp4jGson().fromJson(registerOptions, ExtendedHoverRegistrationOptions.class);
     }
 
     public boolean isHoverSupported(LanguageDocument document) {

@@ -1,5 +1,6 @@
 package com.redhat.mcp.languagetools.trace;
 
+import com.redhat.mcp.languagetools.utils.JsonUtils;
 import org.eclipse.lsp4j.jsonrpc.MessageConsumer;
 import org.eclipse.lsp4j.jsonrpc.RemoteEndpoint;
 import org.eclipse.lsp4j.jsonrpc.json.MessageJsonHandler;
@@ -142,6 +143,7 @@ public class TracingMessageConsumer {
     private static String toJsonString(Object object) {
         if (toStringInstance == null) {
             toStringInstance = new MessageJsonHandler(Collections.emptyMap(), gsonBuilder -> {
+                JsonUtils.configureGson(gsonBuilder);
                 gsonBuilder.setPrettyPrinting();
             });
         }

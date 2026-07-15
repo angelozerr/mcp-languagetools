@@ -1,7 +1,7 @@
 package com.redhat.mcp.languagetools.lsp.client.capabilities;
 
-import com.google.gson.Gson;
 import com.google.gson.JsonObject;
+import com.redhat.mcp.languagetools.utils.JsonUtils;
 import com.redhat.mcp.languagetools.language.LanguageDocument;
 import com.redhat.mcp.languagetools.lsp.client.LspClientFeatures;
 import org.eclipse.lsp4j.DiagnosticRegistrationOptions;
@@ -33,7 +33,7 @@ public class DiagnosticCapabilityRegistry extends TextDocumentServerCapabilityRe
 
     @Override
     protected DiagnosticRegistrationOptions create(JsonObject registerOptions) {
-        return new Gson().fromJson(registerOptions, ExtendedDiagnosticRegistrationOptions.class);
+        return JsonUtils.getLsp4jGson().fromJson(registerOptions, ExtendedDiagnosticRegistrationOptions.class);
     }
 
     public boolean isDiagnosticSupported(LanguageDocument document) {

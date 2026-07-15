@@ -1,7 +1,7 @@
 package com.redhat.mcp.languagetools.lsp.client.capabilities;
 
-import com.google.gson.Gson;
 import com.google.gson.JsonObject;
+import com.redhat.mcp.languagetools.utils.JsonUtils;
 import com.redhat.mcp.languagetools.language.LanguageDocument;
 import com.redhat.mcp.languagetools.lsp.client.LspClientFeatures;
 import org.eclipse.lsp4j.ImplementationRegistrationOptions;
@@ -33,7 +33,7 @@ public class ImplementationCapabilityRegistry extends TextDocumentServerCapabili
 
     @Override
     protected ImplementationRegistrationOptions create(JsonObject registerOptions) {
-        return new Gson().fromJson(registerOptions, ExtendedImplementationRegistrationOptions.class);
+        return JsonUtils.getLsp4jGson().fromJson(registerOptions, ExtendedImplementationRegistrationOptions.class);
     }
 
     public boolean isImplementationSupported(LanguageDocument document) {
