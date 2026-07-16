@@ -1,0 +1,13 @@
+{
+  "id": "dart-debug",
+  "name": "Dart Debug Adapter",
+  "description": "Debug adapter for Dart from the Dart SDK",
+  "launch": {
+    "default": "dart debug_adapter"
+  },
+  "documentSelector": [
+    {
+      "language": "dart"
+    }
+  ]
+}

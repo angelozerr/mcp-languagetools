@@ -40,5 +40,54 @@
     "aliases": ["JavaScript"],
     "filenames": [],
     "filenamePatterns": []
+  },
+  {
+    "id": "rust",
+    "extensions": [".rs"],
+    "aliases": ["Rust"],
+    "filenames": [],
+    "filenamePatterns": []
+  },
+  {
+    "id": "c",
+    "extensions": [".c", ".h", ".i"],
+    "aliases": ["C"],
+    "filenames": [],
+    "filenamePatterns": []
+  },
+  {
+    "id": "cpp",
+    "extensions": [".cpp", ".cc", ".cxx", ".hpp", ".hh", ".hxx", ".ii", ".ino", ".inl", ".ipp", ".ixx", ".tpp", ".txx"],
+    "aliases": ["C++", "Cpp"],
+    "filenames": [],
+    "filenamePatterns": []
+  },
+  {
+    "id": "go",
+    "extensions": [".go"],
+    "aliases": ["Go"],
+    "filenames": [],
+    "filenamePatterns": []
+  },
+  {
+    "id": "go.mod",
+    "extensions": [],
+    "aliases": ["Go Module File"],
+    "filenames": ["go.mod"],
+    "filenamePatterns": []
+  },
+  {
+    "id": "go.sum",
+    "extensions": [],
+    "aliases": ["Go Checksum File"],
+    "filenames": ["go.sum"],
+    "filenamePatterns": []
+  },
+  {
+    "id": "dart",
+    "extensions": [".dart"],
+    "aliases": ["Dart"],
+    "filenames": [],
+    "filenamePatterns": []
   }
 ]

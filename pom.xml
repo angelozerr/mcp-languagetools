@@ -22,6 +22,10 @@
         <module>extensions/jdtls</module>
         <module>extensions/typescript</module>
         <module>extensions/python</module>
+        <module>extensions/rust</module>
+        <module>extensions/clangd</module>
+        <module>extensions/go</module>
+        <module>extensions/dart</module>
         <module>dev</module>
     </modules>
 

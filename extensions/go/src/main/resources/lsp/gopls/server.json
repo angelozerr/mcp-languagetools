@@ -1,0 +1,20 @@
+{
+  "id": "gopls",
+  "name": "Go Language Server",
+  "description": "Go language server based on gopls",
+  "command": "gopls -mode=stdio",
+  "initializationOptions": {
+    "ui.semanticTokens": true
+  },
+  "documentSelector": [
+    {
+      "language": "go"
+    },
+    {
+      "language": "go.mod"
+    },
+    {
+      "language": "go.sum"
+    }
+  ]
+}

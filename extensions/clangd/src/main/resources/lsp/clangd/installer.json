@@ -1,0 +1,43 @@
+{
+  "id": "clangd-installer",
+  "name": "clangd",
+  "check": {
+    "exec": {
+      "name": "Check if clangd is available",
+      "command": "clangd --version",
+      "timeout": 2000
+    }
+  },
+  "run": {
+    "download": {
+      "name": "Download clangd",
+      "github": {
+        "owner": "clangd",
+        "repository": "clangd",
+        "prerelease": true,
+        "asset": {
+          "windows": "clangd-windows*.zip",
+          "unix": "clangd-linux*.zip",
+          "mac": "clangd-mac*.zip"
+        }
+      },
+      "output": {
+        "dir": "$SERVER_HOME$",
+        "file": {
+          "name": {
+            "windows": "bin/clangd.exe",
+            "default": "bin/clangd"
+          },
+          "executable": true
+        }
+      },
+      "onSuccess": {
+        "configureServer": {
+          "name": "Configure clangd server command",
+          "command": "${output.dir}/${output.file.name}",
+          "update": true
+        }
+      }
+    }
+  }
+}

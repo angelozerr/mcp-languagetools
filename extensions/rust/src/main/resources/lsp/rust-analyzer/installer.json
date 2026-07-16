@@ -1,0 +1,72 @@
+{
+  "id": "rust-analyzer-installer",
+  "name": "rust-analyzer",
+  "check": {
+    "fileExists": {
+      "name": "Check if rust-analyzer is installed",
+      "file": {
+        "windows": "$SERVER_HOME$/rust-analyzer.exe",
+        "default": "$SERVER_HOME$/rust-analyzer"
+      }
+    }
+  },
+  "run": {
+    "download": {
+      "name": "Download rust-analyzer",
+      "github": {
+        "owner": "rust-lang",
+        "repository": "rust-analyzer",
+        "prerelease": false,
+        "asset": {
+          "windows": {
+            "x86_64": "rust-analyzer-x86_64-pc-windows-msvc.zip",
+            "x86": "rust-analyzer-i686-pc-windows-msvc.zip",
+            "arm64": "rust-analyzer-aarch64-pc-windows-msvc.zip"
+          },
+          "unix": {
+            "x86_64": "rust-analyzer-x86_64-unknown-linux-gnu.gz",
+            "arm64": "rust-analyzer-aarch64-unknown-linux-gnu.gz"
+          },
+          "mac": {
+            "x86_64": "rust-analyzer-x86_64-apple-darwin.gz",
+            "arm64": "rust-analyzer-aarch64-apple-darwin.gz"
+          }
+        }
+      },
+      "output": {
+        "dir": "$SERVER_HOME$",
+        "file": {
+          "name": {
+            "windows": "rust-analyzer.exe",
+            "unix": {
+              "x86_64": "rust-analyzer-x86_64-unknown-linux-gnu",
+              "arm64": "rust-analyzer-aarch64-unknown-linux-gnu"
+            },
+            "mac": {
+              "x86_64": "rust-analyzer-x86_64-apple-darwin",
+              "arm64": "rust-analyzer-aarch64-apple-darwin"
+            }
+          },
+          "executable": true
+        }
+      },
+      "onSuccess": {
+        "configureServer": {
+          "name": "Configure rust-analyzer server command",
+          "command": {
+            "windows": "$SERVER_HOME$/rust-analyzer.exe",
+            "unix": {
+              "x86_64": "$SERVER_HOME$/rust-analyzer-x86_64-unknown-linux-gnu",
+              "arm64": "$SERVER_HOME$/rust-analyzer-aarch64-unknown-linux-gnu"
+            },
+            "mac": {
+              "x86_64": "$SERVER_HOME$/rust-analyzer-x86_64-apple-darwin",
+              "arm64": "$SERVER_HOME$/rust-analyzer-aarch64-apple-darwin"
+            }
+          },
+          "update": true
+        }
+      }
+    }
+  }
+}

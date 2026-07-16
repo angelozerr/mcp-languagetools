@@ -1,0 +1,14 @@
+{
+  "id": "clangd",
+  "name": "Clangd",
+  "description": "C/C++ language server based on clangd",
+  "command": "clangd",
+  "documentSelector": [
+    {
+      "language": "c"
+    },
+    {
+      "language": "cpp"
+    }
+  ]
+}

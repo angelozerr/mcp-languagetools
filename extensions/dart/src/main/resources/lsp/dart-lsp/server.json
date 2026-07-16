@@ -1,0 +1,11 @@
+{
+  "id": "dart-lsp",
+  "name": "Dart LSP server",
+  "description": "Dart language server from the Dart SDK",
+  "command": "dart language-server",
+  "documentSelector": [
+    {
+      "language": "dart"
+    }
+  ]
+}

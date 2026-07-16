@@ -1,0 +1,24 @@
+{
+  "id": "gopls-installer",
+  "name": "gopls",
+  "check": {
+    "exec": {
+      "name": "Check if gopls is available",
+      "command": "gopls version",
+      "timeout": 2000
+    }
+  },
+  "run": {
+    "exec": {
+      "name": "Install gopls",
+      "command": "go install golang.org/x/tools/gopls@latest",
+      "onSuccess": {
+        "configureServer": {
+          "name": "Configure gopls server command",
+          "command": "gopls -mode=stdio",
+          "update": true
+        }
+      }
+    }
+  }
+}

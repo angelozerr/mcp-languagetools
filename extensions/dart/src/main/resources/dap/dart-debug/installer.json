@@ -1,0 +1,18 @@
+{
+  "id": "dart-debug-installer",
+  "name": "Dart Debug Adapter",
+  "check": {
+    "exec": {
+      "name": "Check if Dart SDK is available",
+      "command": "dart --version",
+      "timeout": 2000
+    }
+  },
+  "run": {
+    "configureServer": {
+      "name": "Configure Dart debug adapter command",
+      "command": "dart debug_adapter",
+      "update": true
+    }
+  }
+}

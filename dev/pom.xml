@@ -74,6 +74,30 @@
             <version>${project.version}</version>
             <scope>runtime</scope>
         </dependency>
+        <dependency>
+            <groupId>com.redhat.mcp</groupId>
+            <artifactId>rust-extension</artifactId>
+            <version>${project.version}</version>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.redhat.mcp</groupId>
+            <artifactId>clangd-extension</artifactId>
+            <version>${project.version}</version>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.redhat.mcp</groupId>
+            <artifactId>go-extension</artifactId>
+            <version>${project.version}</version>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.redhat.mcp</groupId>
+            <artifactId>dart-extension</artifactId>
+            <version>${project.version}</version>
+            <scope>runtime</scope>
+        </dependency>
     </dependencies>
 
     <build>

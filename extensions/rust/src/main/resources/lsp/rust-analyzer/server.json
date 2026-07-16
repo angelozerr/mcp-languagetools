@@ -1,0 +1,10 @@
+{
+  "id": "rust-analyzer",
+  "name": "Rust Language Server",
+  "description": "Rust language server based on rust-analyzer",
+  "documentSelector": [
+    {
+      "language": "rust"
+    }
+  ]
+}
