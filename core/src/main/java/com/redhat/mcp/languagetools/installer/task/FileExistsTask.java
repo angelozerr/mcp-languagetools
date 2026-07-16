@@ -3,7 +3,6 @@ package com.redhat.mcp.languagetools.installer.task;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.redhat.mcp.languagetools.installer.InstallerContext;
-import com.redhat.mcp.languagetools.trace.TraceCollector;
 
 import java.io.IOException;
 import java.nio.file.FileSystems;
@@ -13,9 +12,6 @@ import java.nio.file.PathMatcher;
 import java.nio.file.Paths;
 import java.util.stream.Stream;
 
-/**
- * Task that checks if a file exists.
- */
 public class FileExistsTask implements InstallerTask {
     private final String name;
     private final String file;
@@ -39,13 +35,10 @@ public class FileExistsTask implements InstallerTask {
             exists = Files.exists(Paths.get(resolvedPath));
         }
 
-        TraceCollector trace = context.getConfig().getTraceCollector();
-        if (trace != null) {
-            if (exists) {
-                trace.info("File exists: " + resolvedPath);
-            } else {
-                trace.info("File not found: " + resolvedPath);
-            }
+        if (exists) {
+            context.traceInfo("File exists: " + resolvedPath);
+        } else {
+            context.traceInfo("File not found: " + resolvedPath);
         }
 
         return exists;
@@ -77,9 +70,6 @@ public class FileExistsTask implements InstallerTask {
         return name;
     }
 
-    /**
-     * Factory for FileExistsTask.
-     */
     public static class Factory implements InstallerTaskFactory {
         @Override
         public String getType() {

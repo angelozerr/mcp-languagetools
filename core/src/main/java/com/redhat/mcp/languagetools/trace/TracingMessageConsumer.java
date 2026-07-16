@@ -23,28 +23,28 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class TracingMessageConsumer {
 
-    public interface TraceCollectorAdd extends TraceCollector {
-
-        @Override
-        void addTrace(String workspaceUri,
-                      String serverId,
-                      String logContent);
-    }
-
     private static MessageJsonHandler toStringInstance;
 
-    private final TraceCollectorAdd collector;
+    private final TraceCollector collector;
     private final String workspaceUri;
-    private final String serverId;
+
+    /**
+     * The context ID for traces:
+     * <ul>
+     *   <li>LSP: the server ID (e.g. "jdtls")</li>
+     *   <li>DAP: "serverId#sessionId" (e.g. "js-debug#session-123")</li>
+     * </ul>
+     */
+    private final String contextId;
     private final Map<String, RequestMetadata> sentRequests;
     private final Map<String, RequestMetadata> receivedRequests;
     private final Clock clock;
     private final DateTimeFormatter dateTimeFormatter;
 
-    public TracingMessageConsumer(TraceCollectorAdd collector, String workspaceUri, String serverId) {
+    public TracingMessageConsumer(TraceCollector collector, String workspaceUri, String contextId) {
         this.collector = collector;
         this.workspaceUri = workspaceUri;
-        this.serverId = serverId;
+        this.contextId = contextId;
         this.sentRequests = new ConcurrentHashMap<>();
         this.receivedRequests = new ConcurrentHashMap<>();
         this.clock = Clock.systemDefaultZone();
@@ -68,7 +68,7 @@ public class TracingMessageConsumer {
             logContent = String.format("Unknown MessageConsumer type: %s", messageConsumer);
         }
 
-        collector.addTrace(workspaceUri, serverId, logContent);
+        collector.addTrace(workspaceUri, contextId, logContent);
     }
 
     private String consumeMessageSending(Message message, Instant now, String date) {
@@ -147,7 +147,7 @@ public class TracingMessageConsumer {
             sb.append("\nParams: ").append(toJsonString(params));
         }
         sb.append("\n\n");
-        collector.addTrace(workspaceUri, serverId, sb.toString());
+        collector.addTrace(workspaceUri, contextId, sb.toString());
     }
 
     /**
@@ -165,7 +165,7 @@ public class TracingMessageConsumer {
             sb.append("\n").append(getResultTrace(resultJson, null));
         }
         sb.append("\n\n");
-        collector.addTrace(workspaceUri, serverId, sb.toString());
+        collector.addTrace(workspaceUri, contextId, sb.toString());
     }
 
     private static String toJsonString(Object object) {

@@ -354,21 +354,20 @@
                 !window.currentServerId) {
                 console.log('Auto-selecting server for installation:', trace.serverId);
 
-                // Find the workspace and server
-                const workspace = workspaces.find(w => w.rootUri === trace.workspaceUri);
+                // Find the workspace and server (installation traces may have null workspaceUri)
+                const workspace = trace.workspaceUri
+                    ? workspaces.find(w => w.rootUri === trace.workspaceUri)
+                    : workspaces.find(w => w.lspServers && w.lspServers.some(s => s.id === trace.serverId));
                 if (workspace && workspace.lspServers) {
                     const server = workspace.lspServers.find(s => s.id === trace.serverId);
                     if (server) {
-                        // Update selected workspace
-                        selectedWorkspace = trace.workspaceUri;
+                        selectedWorkspace = workspace.rootUri;
 
                         console.log('Calling window.selectServer with:', server);
-                        // Call the global selectServer function if it exists
                         if (typeof window.selectServer === 'function') {
                             window.selectServer(server);
                         } else {
                             console.log('window.selectServer not found, using fallback');
-                            // Fallback: just set window.currentServerId and render
                             window.currentServerId = trace.serverId;
                             if (typeof renderConsole === 'function') {
                                 renderConsole();
@@ -383,7 +382,9 @@
             }
 
             // Refresh console if this trace is for the currently selected server
-            if (trace.workspaceUri === selectedWorkspace && trace.serverId === window.currentServerId) {
+            // Installation traces have null workspaceUri — match by serverId only
+            if ((trace.workspaceUri == null || trace.workspaceUri === selectedWorkspace) &&
+                trace.serverId === window.currentServerId) {
                 console.log('Refreshing console for current server');
                 renderConsole();
             }
@@ -406,42 +407,70 @@
          * Handle DAP trace message from WebSocket.
          */
         function handleDapTrace(trace) {
-
-            // Store trace by session
             if (!window.dapTracesBySession) {
                 window.dapTracesBySession = {};
             }
-            if (!window.dapTracesBySession[trace.sessionId]) {
-                window.dapTracesBySession[trace.sessionId] = [];
+            if (!window.dapTracesByServer) {
+                window.dapTracesByServer = {};
             }
 
-            // Check if this is an UPDATE message (replaces previous line)
-            if (trace.messageType === 'UPDATE') {
-                const traces = window.dapTracesBySession[trace.sessionId];
-                const lastTrace = traces[traces.length - 1];
-                // Replace last trace if it was also an UPDATE
-                if (lastTrace && lastTrace.messageType === 'UPDATE') {
-                    traces[traces.length - 1] = trace;
+            if (trace.sessionId) {
+                // Protocol trace — store by sessionId
+                if (!window.dapTracesBySession[trace.sessionId]) {
+                    window.dapTracesBySession[trace.sessionId] = [];
+                }
+
+                if (trace.messageType === 'UPDATE') {
+                    const traces = window.dapTracesBySession[trace.sessionId];
+                    const lastTrace = traces[traces.length - 1];
+                    if (lastTrace && lastTrace.messageType === 'UPDATE') {
+                        traces[traces.length - 1] = trace;
+                    } else {
+                        traces.push(trace);
+                    }
                 } else {
-                    traces.push(trace);
+                    window.dapTracesBySession[trace.sessionId].push(trace);
                 }
-            } else {
-                window.dapTracesBySession[trace.sessionId].push(trace);
-            }
 
-            // Keep only last 200 traces per session
-            if (window.dapTracesBySession[trace.sessionId].length > 200) {
-                window.dapTracesBySession[trace.sessionId] = window.dapTracesBySession[trace.sessionId].slice(-200);
-            }
+                if (window.dapTracesBySession[trace.sessionId].length > 200) {
+                    window.dapTracesBySession[trace.sessionId] = window.dapTracesBySession[trace.sessionId].slice(-200);
+                }
 
-            // Refresh console if this session is selected
-            if (window.currentDapSessionId === trace.sessionId) {
-                if (typeof window.renderDapTracesForSession === 'function') {
-                    window.renderDapTracesForSession(trace.sessionId);
+                // Refresh if this session is currently displayed
+                if (window.currentDapSessionId === trace.sessionId) {
+                    if (typeof window.renderDapTracesForSession === 'function') {
+                        window.renderDapTracesForSession(trace.sessionId);
+                    }
+                }
+            } else if (trace.serverId) {
+                // Installation trace — store by serverId
+                if (!window.dapTracesByServer[trace.serverId]) {
+                    window.dapTracesByServer[trace.serverId] = [];
+                }
+
+                if (trace.messageType === 'UPDATE') {
+                    const traces = window.dapTracesByServer[trace.serverId];
+                    const lastTrace = traces[traces.length - 1];
+                    if (lastTrace && lastTrace.messageType === 'UPDATE') {
+                        traces[traces.length - 1] = trace;
+                    } else {
+                        traces.push(trace);
+                    }
+                } else {
+                    window.dapTracesByServer[trace.serverId].push(trace);
+                }
+
+                if (window.dapTracesByServer[trace.serverId].length > 200) {
+                    window.dapTracesByServer[trace.serverId] = window.dapTracesByServer[trace.serverId].slice(-200);
+                }
+
+                // Refresh current session if it belongs to this server
+                if (window.currentDapSessionId && window.currentDapServerId === trace.serverId) {
+                    if (typeof window.renderDapTracesForSession === 'function') {
+                        window.renderDapTracesForSession(window.currentDapSessionId);
+                    }
                 }
             }
-
-            console.log('DAP trace stored:', trace.sessionId, window.dapTracesBySession[trace.sessionId].length, 'traces');
         }
 
         /**
@@ -828,7 +857,10 @@
                         return {
                             type: 'dap',
                             containerId: `dap-traces-container-${window.currentDapSessionId}`,
-                            data: window.dapTracesBySession?.[window.currentDapSessionId] || []
+                            data: [
+                                ...(window.currentDapServerId && window.dapTracesByServer?.[window.currentDapServerId] || []),
+                                ...(window.dapTracesBySession?.[window.currentDapSessionId] || [])
+                            ]
                         };
                     }
 

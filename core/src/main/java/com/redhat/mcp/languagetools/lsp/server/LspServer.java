@@ -11,7 +11,7 @@ import com.redhat.mcp.languagetools.progress.ProgressMonitor;
 import com.redhat.mcp.languagetools.server.ServerBase;
 import com.redhat.mcp.languagetools.server.ServerStatus;
 import com.redhat.mcp.languagetools.settings.ServerTrace;
-import com.redhat.mcp.languagetools.trace.TracingMessageConsumer;
+import com.redhat.mcp.languagetools.trace.TraceCollector;
 import com.redhat.mcp.languagetools.utils.JsonUtils;
 import com.redhat.mcp.languagetools.workspace.Workspace;
 import org.eclipse.lsp4j.*;
@@ -68,7 +68,7 @@ public class LspServer extends ServerBase<LspServerConfig> {
     }
 
     @Override
-    protected TracingMessageConsumer.TraceCollectorAdd initializeTraceCollector(Workspace workspace) {
+    protected TraceCollector initializeTraceCollector(Workspace workspace) {
         return workspace.getApplication().getLspTraceCollector();
     }
 
@@ -122,9 +122,7 @@ public class LspServer extends ServerBase<LspServerConfig> {
                             } catch (IOException e) {
                                 throw new RuntimeException(e);
                             }
-                        }, executorService)),
-                getTraceCollector(),
-                config.getServerId()
+                        }, executorService))
         );
     }
 
@@ -155,9 +153,7 @@ public class LspServer extends ServerBase<LspServerConfig> {
                             } catch (IOException e) {
                                 throw new RuntimeException(e);
                             }
-                        }, executorService)),
-                getTraceCollector(),
-                config.getServerId()
+                        }, executorService))
         );
     }
 
@@ -218,16 +214,8 @@ public class LspServer extends ServerBase<LspServerConfig> {
         LOG.debugf("%s command: %s", config.getServerId(), commandStr);
 
         // Send startup traces (visible in UI) - separate lines, no folding
-        getTraceCollector().addTrace(
-                workspaceRoot.toString(),
-                config.getServerId(),
-                String.format("Starting %s...", config.getName())
-        );
-        getTraceCollector().addTrace(
-                workspaceRoot.toString(),
-                config.getServerId(),
-                String.format("Command: %s", commandStr)
-        );
+        addTrace(String.format("Starting %s...", config.getName()));
+        addTrace(String.format("Command: %s", commandStr));
 
         ProcessBuilder pb = new ProcessBuilder(command);
 
@@ -240,11 +228,7 @@ public class LspServer extends ServerBase<LspServerConfig> {
         if (config.getWorkingDirectory() != null) {
             pb.directory(Paths.get(config.getWorkingDirectory()).toFile());
             // Trace working directory (one line - no folding)
-            getTraceCollector().addTrace(
-                    workspaceRoot.toString(),
-                    config.getServerId(),
-                    String.format("Working directory: %s", config.getWorkingDirectory())
-            );
+            addTrace(String.format("Working directory: %s", config.getWorkingDirectory()));
         }
 
         // Don't redirect error stream - we want to capture it separately
@@ -252,14 +236,10 @@ public class LspServer extends ServerBase<LspServerConfig> {
         isSocketConnection = false;
 
         // Trace server started (one line - no folding)
-        getTraceCollector().addTrace(
-                workspaceRoot.toString(),
-                config.getServerId(),
-                String.format("LSP server process started (PID: %d)", serverProcess.pid())
-        );
+        addTrace(String.format("LSP server process started (PID: %d)", serverProcess.pid()));
 
         // Start monitoring stderr for errors (uses shared implementation from ServerBase)
-        startStderrMonitoring(workspaceRoot.toString(), config.getServerId());
+        startStderrMonitoring();
 
         // Create LSP client (subclasses can override to provide custom client)
         LanguageClient client = createLanguageClient();

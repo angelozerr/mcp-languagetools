@@ -3,6 +3,7 @@ package com.redhat.mcp.languagetools.server;
 import com.redhat.mcp.languagetools.client.BindEndpointSupport;
 import com.redhat.mcp.languagetools.lsp.server.LspServer;
 import com.redhat.mcp.languagetools.settings.ServerTrace;
+import com.redhat.mcp.languagetools.trace.TraceCollector;
 import com.redhat.mcp.languagetools.trace.TracingMessageConsumer;
 import com.redhat.mcp.languagetools.workspace.Workspace;
 import org.jboss.logging.Logger;
@@ -28,8 +29,16 @@ public abstract class ServerBase<T extends ServerConfigBase> extends BindEndpoin
 
     private final T config;
     private final Workspace workspace;
+    /**
+     * Composite context ID for trace messages:
+     * <ul>
+     *   <li>LSP: the server ID (e.g. "jdtls")</li>
+     *   <li>DAP: "serverId#sessionId" (e.g. "js-debug#session-123")</li>
+     * </ul>
+     */
+    private final String contextId;
     protected ExecutorService executorService; // Not final - can be recreated after error
-    private final TracingMessageConsumer.TraceCollectorAdd traceCollector;
+    private final TraceCollector traceCollector;
     private final TracingMessageConsumer tracing;
     private volatile ServerStatus status = ServerStatus.NOT_STARTED;
     private volatile String statusMessage = null;
@@ -44,19 +53,43 @@ public abstract class ServerBase<T extends ServerConfigBase> extends BindEndpoin
     }
 
     /**
-     * Constructor with explicit serverId for tracing.
-     * Used by DAP to pass sessionId instead of serverId.
+     * Constructor with explicit context ID for tracing.
+     * <p>
+     * The contextId identifies the trace source:
+     * <ul>
+     *   <li>LSP: the server ID (e.g. "jdtls")</li>
+     *   <li>DAP: "serverId#sessionId" (e.g. "js-debug#session-123")</li>
+     * </ul>
      */
-    protected ServerBase(T config, Workspace workspace, String traceServerId) {
+    protected ServerBase(T config, Workspace workspace, String contextId) {
         super(config, workspace);
         this.config = config;
         this.workspace = workspace;
+        this.contextId = contextId;
         this.executorService = Executors.newCachedThreadPool();
         this.readyFuture = new CompletableFuture<>();
 
         var workspaceRoot = workspace.getNormalizedUri();
         this.traceCollector = initializeTraceCollector(workspace);
-        this.tracing = new TracingMessageConsumer(traceCollector, workspaceRoot, traceServerId);
+        this.tracing = new TracingMessageConsumer(traceCollector, workspaceRoot, contextId);
+    }
+
+    public final String getContextId() {
+        return contextId;
+    }
+
+    /**
+     * Add a trace message using the stored workspace URI and context ID.
+     */
+    protected void addTrace(String content) {
+        traceCollector.addTrace(workspace.getNormalizedUri(), contextId, content);
+    }
+
+    /**
+     * Add a trace message with a specific message type.
+     */
+    protected void addTrace(String content, TraceCollector.MessageType messageType) {
+        traceCollector.addTrace(workspace.getNormalizedUri(), contextId, content, messageType);
     }
 
     /**
@@ -189,12 +222,9 @@ public abstract class ServerBase<T extends ServerConfigBase> extends BindEndpoin
     /**
      * Start monitoring stderr from the server process.
      * Captures errors and sends them to the trace collector.
-     * Common implementation for both LSP and DAP servers.
-     *
-     * @param workspaceOrSessionId Workspace URI for LSP, sessionId for DAP
-     * @param serverId Server ID for LSP, sessionId for DAP
+     * Uses the stored workspace URI and context ID.
      */
-    protected void startStderrMonitoring(String workspaceOrSessionId, String serverId) {
+    protected void startStderrMonitoring() {
         executorService.submit(() -> {
             try (var reader = new java.io.BufferedReader(new java.io.InputStreamReader(serverProcess.getErrorStream()))) {
                 String line;
@@ -209,56 +239,36 @@ public abstract class ServerBase<T extends ServerConfigBase> extends BindEndpoin
                     boolean isExceptionLine = trimmed.contains("Exception:") || trimmed.contains("Error:");
 
                     if (isStackTraceLine || (isExceptionLine && stackTraceBuffer.isEmpty())) {
-                        // Start or continue stack trace buffering
                         if (stackTraceBuffer.isEmpty()) {
                             stackTraceTimestamp = java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss"));
                         }
                         stackTraceBuffer.append(line).append("\n");
                     } else {
-                        // Flush buffered stack trace if any
                         if (!stackTraceBuffer.isEmpty()) {
-                            String errorTrace = String.format("[Error - %s] %s stderr: %s",
+                            addTrace(String.format("[Error - %s] %s stderr: %s",
                                 stackTraceTimestamp,
                                 config.getName(),
-                                stackTraceBuffer.toString().trim());
-                            getTraceCollector().addTrace(
-                                workspaceOrSessionId,
-                                serverId,
-                                errorTrace
-                            );
+                                stackTraceBuffer.toString().trim()));
                             stackTraceBuffer.setLength(0);
                             stackTraceTimestamp = null;
                         }
 
-                        // Send current line as regular error
-                        String errorTrace = String.format("[Error - %s] %s stderr: %s",
+                        addTrace(String.format("[Error - %s] %s stderr: %s",
                             java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss")),
                             config.getName(),
-                            line);
-                        getTraceCollector().addTrace(
-                            workspaceOrSessionId,
-                            serverId,
-                            errorTrace
-                        );
+                            line));
                     }
                 }
 
-                // Flush any remaining stack trace
                 if (!stackTraceBuffer.isEmpty()) {
-                    String errorTrace = String.format("[Error - %s] %s stderr: %s",
+                    addTrace(String.format("[Error - %s] %s stderr: %s",
                         stackTraceTimestamp,
                         config.getName(),
-                        stackTraceBuffer.toString().trim());
-                    getTraceCollector().addTrace(
-                        workspaceOrSessionId,
-                        serverId,
-                        errorTrace
-                    );
+                        stackTraceBuffer.toString().trim()));
                 }
 
                 LOG.infof("Stderr monitor for %s ended", config.getServerId());
             } catch (java.io.IOException e) {
-                // Stream closed or interrupted - expected during shutdown
                 if (!Thread.currentThread().isInterrupted()) {
                     LOG.errorf(e, "Error reading stderr for %s", config.getServerId());
                 } else {
@@ -366,10 +376,9 @@ public abstract class ServerBase<T extends ServerConfigBase> extends BindEndpoin
     /**
      * Log error with full stack trace to trace collector.
      */
-    protected void logErrorToTrace(Exception e, com.redhat.mcp.languagetools.trace.TraceCollector traceCollector, String contextId) {
+    protected void logErrorToTrace(Exception e) {
         LOG.errorf(e, "Failed to start %s", config.getServerId());
 
-        // Build full stack trace
         StringBuilder stackTrace = new StringBuilder();
         stackTrace.append("[Error starting ").append(config.getName()).append("]\n");
         Throwable current = e;
@@ -384,13 +393,8 @@ public abstract class ServerBase<T extends ServerConfigBase> extends BindEndpoin
             }
         }
 
-        // Send to trace collector
         try {
-            traceCollector.addTrace(
-                workspace.getNormalizedUri(),
-                contextId,
-                stackTrace.toString()
-            );
+            addTrace(stackTrace.toString());
         } catch (Exception traceEx) {
             LOG.errorf(traceEx, "Failed to add trace for error!");
         }
@@ -399,13 +403,11 @@ public abstract class ServerBase<T extends ServerConfigBase> extends BindEndpoin
     /**
      * Add error handler to a CompletableFuture that logs to trace collector.
      */
-    protected <T> CompletableFuture<T> withErrorLogging(CompletableFuture<T> future,
-                                                        com.redhat.mcp.languagetools.trace.TraceCollector traceCollector,
-                                                        String contextId) {
+    protected <T> CompletableFuture<T> withErrorLogging(CompletableFuture<T> future) {
         return future.whenComplete((result, throwable) -> {
             if (throwable != null) {
                 Exception e = throwable instanceof Exception ? (Exception) throwable : new Exception(throwable);
-                logErrorToTrace(e, traceCollector, contextId);
+                logErrorToTrace(e);
             }
         });
     }
@@ -429,7 +431,7 @@ public abstract class ServerBase<T extends ServerConfigBase> extends BindEndpoin
         tracing.traceResponse(method, result, error, durationMs, trace == ServerTrace.verbose);
     }
 
-    public TracingMessageConsumer.TraceCollectorAdd getTraceCollector() {
+    public TraceCollector getTraceCollector() {
         return traceCollector;
     }
 
@@ -439,5 +441,5 @@ public abstract class ServerBase<T extends ServerConfigBase> extends BindEndpoin
 
     public abstract ServerTrace getServerTrace();
 
-    protected abstract TracingMessageConsumer.TraceCollectorAdd initializeTraceCollector(Workspace workspace);
+    protected abstract TraceCollector initializeTraceCollector(Workspace workspace);
 }

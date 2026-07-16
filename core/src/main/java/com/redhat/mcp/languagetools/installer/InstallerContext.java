@@ -2,8 +2,12 @@ package com.redhat.mcp.languagetools.installer;
 
 import com.redhat.mcp.languagetools.progress.ProgressMonitor;
 import com.redhat.mcp.languagetools.server.ServerConfigBase;
+import com.redhat.mcp.languagetools.trace.TraceCollector;
 
 import java.nio.file.Path;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -24,6 +28,8 @@ public class InstallerContext {
     private boolean forceInstall;
 
     private static final Pattern VARIABLE_PATTERN = Pattern.compile("\\$\\{([^}]+)}|\\$([A-Z_]+)\\$");
+    private static final DateTimeFormatter TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss")
+            .withZone(ZoneId.systemDefault());
 
     public InstallerContext(ServerConfigBase config, ProgressMonitor progress) {
         this(config, progress, null);
@@ -36,13 +42,9 @@ public class InstallerContext {
         this.statusChangeCallback = statusChangeCallback;
         this.variables = new HashMap<>();
 
-        // Initialize standard variables
         variables.put("SERVER_HOME", installDir.toString());
         variables.put("SERVER_ID", config.getServerId());
         variables.put("SERVER_NAME", config.getName());
-
-        // USER_HOME and PROJECT_DIR can be set later via setVariable()
-        // They are workspace-specific and should be passed from the workspace/session
     }
 
     /**
@@ -128,5 +130,29 @@ public class InstallerContext {
      */
     public void checkCanceled() {
         progress.checkCancelled();
+    }
+
+    public void traceInfo(String message) {
+        traceInstallation(message, TraceCollector.MessageType.INFO);
+    }
+
+    public void traceError(String message) {
+        traceInstallation(message, TraceCollector.MessageType.ERROR);
+    }
+
+    public void traceUpdate(String message) {
+        TraceCollector tc = config.getTraceCollector();
+        if (tc != null) {
+            tc.addTrace(config.getServerId(), message, TraceCollector.MessageType.UPDATE);
+        }
+    }
+
+    private void traceInstallation(String message, TraceCollector.MessageType type) {
+        TraceCollector tc = config.getTraceCollector();
+        if (tc != null) {
+            String formatted = String.format("[Installation - %s] %s",
+                    TIME_FORMATTER.format(Instant.now()), message);
+            tc.addTrace(config.getServerId(), formatted, type);
+        }
     }
 }

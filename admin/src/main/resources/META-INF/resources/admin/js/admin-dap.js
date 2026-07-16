@@ -565,10 +565,15 @@ function renderDapTracesForSession(sessionId) {
 
     const container = document.getElementById(`dap-traces-container-${sessionId}`);
     if (!container) {
-        return; // Not in trace view
+        return;
     }
 
-    const traces = window.dapTracesBySession?.[sessionId] || [];
+    // Merge installation traces (by serverId) + protocol traces (by sessionId)
+    const serverId = window.currentDapServerId;
+    const serverTraces = (serverId && window.dapTracesByServer?.[serverId]) || [];
+    const sessionTraces = window.dapTracesBySession?.[sessionId] || [];
+    const traces = [...serverTraces, ...sessionTraces];
+
     container.innerHTML = traces.length > 0 ? renderDapTraces(traces, sessionId) : '<div style="color: #666;">No traces yet.</div>';
 
     // Auto-scroll to bottom
@@ -941,6 +946,9 @@ async function clearDapConsole(sessionId) {
     }
     if (window.dapTracesBySession) {
         window.dapTracesBySession[sessionId] = [];
+    }
+    if (window.dapTracesByServer && window.currentDapServerId) {
+        window.dapTracesByServer[window.currentDapServerId] = [];
     }
     renderDapTracesForSession(sessionId);
 }

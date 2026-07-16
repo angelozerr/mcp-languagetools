@@ -8,7 +8,6 @@ import com.redhat.mcp.languagetools.installer.task.InstallerTask;
 import com.redhat.mcp.languagetools.installer.task.InstallerTaskRegistry;
 import com.redhat.mcp.languagetools.progress.ProgressMonitor;
 import com.redhat.mcp.languagetools.server.ServerConfigBase;
-import com.redhat.mcp.languagetools.trace.TraceCollector;
 import org.jboss.logging.Logger;
 
 import java.util.concurrent.CompletableFuture;
@@ -57,23 +56,15 @@ public class TaskRegistryInstaller implements ServerInstaller {
 
                 JsonObject installerConfig = installerConfigJson.getAsJsonObject();
 
-                TraceCollector trace = config.getTraceCollector();
-                if (trace != null) {
-                    trace.info("Starting installation for: " + config.getName());
-                }
+                context.traceInfo("Starting installation for: " + config.getName());
 
                 // Check if already installed (skip when force install)
                 if (!context.isForceInstall() && installerConfig.has(FIELD_CHECK)) {
                     context.getProgress().beginStep(com.redhat.mcp.languagetools.progress.ProgressStep.CHECKING);
                     InstallerTask checkTask = parseTaskNode(installerConfig.get(FIELD_CHECK));
                     if (checkTask != null && checkTask.execute(context)) {
-                        // Already installed - extract command
                         String command = extractCommand(context);
-
-                        if (trace != null) {
-                            trace.info("Server already installed");
-                        }
-
+                        context.traceInfo("Server already installed");
                         setStatus(context, InstallationStatus.ALREADY_INSTALLED);
                         return new InstallResult(context.getInstallDir(), command, InstallationStatus.ALREADY_INSTALLED);
                     }
@@ -82,10 +73,7 @@ public class TaskRegistryInstaller implements ServerInstaller {
                 // Not installed - run installation
                 context.getProgress().beginStep(com.redhat.mcp.languagetools.progress.ProgressStep.INSTALLING);
                 setStatus(context, InstallationStatus.INSTALLING);
-
-                if (trace != null) {
-                    trace.info("Installing server...");
-                }
+                context.traceInfo("Installing server...");
 
                 if (!installerConfig.has(FIELD_RUN)) {
                     throw new IllegalStateException("No run task defined in installer.json");
@@ -108,32 +96,22 @@ public class TaskRegistryInstaller implements ServerInstaller {
                 String command = extractCommand(context);
 
                 setStatus(context, InstallationStatus.INSTALLED);
-
-                if (trace != null) {
-                    long elapsedMs = System.currentTimeMillis() - startTime;
-                    trace.info(String.format("Installation completed successfully in %d ms", elapsedMs));
-                }
+                long elapsedMs = System.currentTimeMillis() - startTime;
+                context.traceInfo(String.format("Installation completed successfully in %d ms", elapsedMs));
 
                 return new InstallResult(context.getInstallDir(), command, InstallationStatus.INSTALLED);
 
             } catch (java.util.concurrent.CancellationException e) {
                 setStatus(context, InstallationStatus.STOPPED);
-                TraceCollector trace = config.getTraceCollector();
-                if (trace != null) {
-                    trace.error("Installation cancelled by user");
-                }
+                context.traceError("Installation cancelled by user");
                 throw new InstallationException("Installation cancelled", e);
             } catch (Exception e) {
                 LOG.errorf(e, "Installation failed for %s", config.getServerId());
                 setStatus(context, InstallationStatus.FAILED);
-                TraceCollector trace = config.getTraceCollector();
-                if (trace != null) {
-                    trace.error("Installation failed: " + e.getMessage());
-                    // Also log the root cause if different
-                    Throwable cause = e.getCause();
-                    if (cause != null && cause != e) {
-                        trace.error("Cause: " + cause.getMessage());
-                    }
+                context.traceError("Installation failed: " + e.getMessage());
+                Throwable cause = e.getCause();
+                if (cause != null && cause != e) {
+                    context.traceError("Cause: " + cause.getMessage());
                 }
                 throw new InstallationException(e.getMessage(), e);
             }

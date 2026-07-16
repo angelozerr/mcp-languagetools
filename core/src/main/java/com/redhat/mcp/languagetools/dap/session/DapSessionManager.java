@@ -75,8 +75,7 @@ public class DapSessionManager {
         // Set trace collector for installation support
         String sessionId = UUID.randomUUID().toString();
         if (serverConfig.getTraceCollector() == null) {
-            // Create a TraceCollector wrapper around DapTraceCollector
-            serverConfig.setTraceCollector(new DapTraceCollectorWrapper(traceCollector, sessionId, dapServerId));
+            serverConfig.setTraceCollector(traceCollector);
         }
 
         // Determine language from server config (first supported language)

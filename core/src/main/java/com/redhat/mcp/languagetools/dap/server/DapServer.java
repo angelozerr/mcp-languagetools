@@ -1,13 +1,11 @@
 package com.redhat.mcp.languagetools.dap.server;
 
 import com.redhat.mcp.languagetools.dap.client.DapClient;
-import com.redhat.mcp.languagetools.dap.trace.DapTraceCollector;
 import com.redhat.mcp.languagetools.dap.transport.SocketTransportStreams;
 import com.redhat.mcp.languagetools.dap.transport.StdioTransportStreams;
 import com.redhat.mcp.languagetools.dap.transport.TransportStreams;
 import com.redhat.mcp.languagetools.progress.ProgressMonitor;
 import com.redhat.mcp.languagetools.trace.TraceCollector;
-import com.redhat.mcp.languagetools.trace.TracingMessageConsumer;
 import com.redhat.mcp.languagetools.server.ServerBase;
 import com.redhat.mcp.languagetools.server.ServerStatus;
 import com.redhat.mcp.languagetools.settings.ServerTrace;
@@ -37,7 +35,6 @@ import java.util.concurrent.TimeUnit;
 public class DapServer extends ServerBase<DapServerConfig> {
 
     private static final Logger LOG = Logger.getLogger(DapServer.class);
-    private final String sessionId;
 
     protected IDebugProtocolServer debugServer;
     protected DapClient dapClient;
@@ -45,12 +42,11 @@ public class DapServer extends ServerBase<DapServerConfig> {
     protected TransportStreams transportStreams; // Transport layer (stdio or socket)
 
     public DapServer(String sessionId, DapServerConfig config, Workspace workspace) {
-        super(config, workspace, sessionId); // Pass sessionId for tracing instead of serverId
-        this.sessionId = sessionId;
+        super(config, workspace, config.getServerId() + "#" + sessionId);
     }
 
     @Override
-    protected TracingMessageConsumer.TraceCollectorAdd initializeTraceCollector(Workspace workspace) {
+    protected TraceCollector initializeTraceCollector(Workspace workspace) {
         return workspace.getApplication().getDapTraceCollector();
     }
 
@@ -79,9 +75,7 @@ public class DapServer extends ServerBase<DapServerConfig> {
                     getWorkspace().getApplication().getPathManager(),
                     this::setStatus,
                     progressMonitor)
-                .thenCompose(v -> doStart()),
-            getTraceCollector(),
-            sessionId
+                .thenCompose(v -> doStart())
         );
     }
 
@@ -130,17 +124,8 @@ public class DapServer extends ServerBase<DapServerConfig> {
                 LOG.debugf("DAP command: %s", commandStr);
 
                 // Send startup traces
-                String workspaceRootUri = getWorkspace().getNormalizedUri();
-                getTraceCollector().addTrace(
-                    workspaceRootUri,
-                    sessionId,
-                    String.format("Starting %s...", config.getName())
-                );
-                getTraceCollector().addTrace(
-                    workspaceRootUri,
-                    sessionId,
-                    String.format("Command: %s", commandStr)
-                );
+                addTrace(String.format("Starting %s...", config.getName()));
+                addTrace(String.format("Command: %s", commandStr));
 
                 ProcessBuilder pb = new ProcessBuilder(command);
 
@@ -148,11 +133,7 @@ public class DapServer extends ServerBase<DapServerConfig> {
                 File workspaceDir = Paths.get(getWorkspace().getRootUri()).toFile();
                 pb.directory(workspaceDir);
 
-                getTraceCollector().addTrace(
-                    workspaceRootUri,
-                    sessionId,
-                    String.format("Working directory: %s", workspaceDir)
-                );
+                addTrace(String.format("Working directory: %s", workspaceDir));
 
                 // Set environment variables
                 if (config.getEnv() != null) {
@@ -164,17 +145,13 @@ public class DapServer extends ServerBase<DapServerConfig> {
                 LOG.infof("DAP server process started: %s (PID: %d)",
                         config.getServerId(), serverProcess.pid());
 
-                getTraceCollector().addTrace(
-                    workspaceRootUri,
-                    sessionId,
-                    String.format("DAP server process started (PID: %d)", serverProcess.pid())
-                );
+                addTrace(String.format("DAP server process started (PID: %d)", serverProcess.pid()));
 
                 // Create server ready tracker
-                DAPServerReadyTracker readyTracker = getServerReadyTracker(config, workspaceRootUri);
+                DAPServerReadyTracker readyTracker = getServerReadyTracker(config);
 
                 // Start monitoring stderr for errors
-                startStderrMonitoring(workspaceRootUri, sessionId);
+                startStderrMonitoring();
 
                 // Monitor process exit
                 executorService.submit(() -> {
@@ -186,14 +163,10 @@ public class DapServer extends ServerBase<DapServerConfig> {
                                 if (exitCode != 0) {
                                     setStatus(ServerStatus.START_FAILED);
                                     setStatusMessage("Process exited with code " + exitCode);
-                                    getTraceCollector().addTrace(
-                                        workspaceRootUri,
-                                        sessionId,
-                                        String.format("[Error - %s] %s process exited with code %d",
+                                    addTrace(String.format("[Error - %s] %s process exited with code %d",
                                             java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss")),
                                             config.getName(),
-                                            exitCode)
-                                    );
+                                            exitCode));
                                 }
                                 break;
                             }
@@ -215,7 +188,7 @@ public class DapServer extends ServerBase<DapServerConfig> {
         }, executorService);
     }
 
-    private DAPServerReadyTracker getServerReadyTracker(DapServerConfig config, String workspaceRootUri) {
+    private DAPServerReadyTracker getServerReadyTracker(DapServerConfig config) {
         ServerReadyConfig readyConfig = config.getServerReadyConfig();
         if (allocatedPort != null && readyConfig.getPort() == null) {
             readyConfig = new ServerReadyConfig("127.0.0.1", allocatedPort);
@@ -224,11 +197,7 @@ public class DapServer extends ServerBase<DapServerConfig> {
         return new DAPServerReadyTracker(
             readyConfig,
             serverProcess,
-            line -> getTraceCollector().addTrace(
-                    workspaceRootUri,
-                sessionId,
-                line
-            )
+                this::addTrace
         );
     }
 
@@ -246,13 +215,8 @@ public class DapServer extends ServerBase<DapServerConfig> {
             .thenApply(v -> {
                 LOG.infof("DAP server ready, creating launcher...");
 
-                String workspaceRootUri = getWorkspace().getNormalizedUri();
-                getTraceCollector().addTrace(
-                    workspaceRootUri,
-                    sessionId,
-                    String.format("DAP server ready (address=%s, port=%s)",
-                        readyTracker.getAddress(), readyTracker.getPort())
-                );
+                addTrace(String.format("DAP server ready (address=%s, port=%s)",
+                        readyTracker.getAddress(), readyTracker.getPort()));
 
                 // Prepare InitializeRequestArguments
                 InitializeRequestArguments initArgs = new InitializeRequestArguments();
@@ -408,24 +372,22 @@ public class DapServer extends ServerBase<DapServerConfig> {
 
         LOG.infof("Creating child launcher with new transport connection");
 
+        if (!(transportStreams instanceof SocketTransportStreams parentSocket)) {
+            throw new UnsupportedOperationException(
+                "Child sessions only supported for socket transport, not stdio");
+        }
+
+        String host = parentSocket.getSocket().getInetAddress().getHostAddress();
+        int port = parentSocket.getSocket().getPort();
+
+        LOG.infof("Creating new socket connection to %s:%d for child", host, port);
+        TransportStreams childTransportStreams;
         try {
-            // Create NEW transport streams (like lsp4ij: new Socket to same port)
-            TransportStreams childTransportStreams;
-
-            if (transportStreams instanceof SocketTransportStreams) {
-                // Extract host and port from parent socket
-                SocketTransportStreams parentSocket = (SocketTransportStreams) transportStreams;
-                String host = parentSocket.getSocket().getInetAddress().getHostAddress();
-                int port = parentSocket.getSocket().getPort();
-
-                LOG.infof("Creating new socket connection to %s:%d for child", host, port);
-                childTransportStreams = new SocketTransportStreams(host, port);
-            } else {
-                throw new UnsupportedOperationException(
-                    "Child sessions only supported for socket transport, not stdio");
-            }
-
-            // Create launcher with the NEW streams
+            childTransportStreams = new SocketTransportStreams(host, port);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to connect to child debug adapter at " + host + ":" + port, e);
+        }
+        try {
             Launcher<IDebugProtocolServer> launcher = DSPLauncher.createClientLauncher(
                     childClient,
                     childTransportStreams.getInputStream(),
@@ -442,12 +404,16 @@ public class DapServer extends ServerBase<DapServerConfig> {
                         consumer.consume(message);
                     });
 
-            // Start listening
             launcher.startListening();
 
             LOG.infof("Child launcher created and listening on new connection");
             return launcher.getRemoteProxy();
         } catch (Exception e) {
+            try {
+                childTransportStreams.close();
+            } catch (Exception closeEx) {
+                e.addSuppressed(closeEx);
+            }
             throw new RuntimeException("Failed to create child launcher", e);
         }
     }
@@ -585,9 +551,10 @@ public class DapServer extends ServerBase<DapServerConfig> {
 
     /**
      * Start monitoring stderr from the DAP server process.
-     * Errors are sent to the trace collector in real-time.
+     * Errors are sent to the trace collector with ERROR type so they appear in red.
      */
-    protected void startStderrMonitoring(String workspaceRootUri, String sessionId) {
+    @Override
+    protected void startStderrMonitoring() {
         if (serverProcess == null) {
             return;
         }
@@ -597,28 +564,10 @@ public class DapServer extends ServerBase<DapServerConfig> {
                     new java.io.InputStreamReader(serverProcess.getErrorStream()))) {
                 String line;
                 while ((line = reader.readLine()) != null) {
-                    String errorLine = line;
                     var config = super.getConfig();
-                    LOG.warnf("%s stderr: %s", config.getName(), errorLine);
+                    LOG.warnf("%s stderr: %s", config.getName(), line);
 
-                    // Send to trace collector with ERROR messageType so it appears in red
-                    if (getTraceCollector() instanceof DapTraceCollector) {
-                        ((DapTraceCollector) getTraceCollector()).addTrace(
-                            workspaceRootUri,
-                            sessionId,
-                            errorLine,
-                            TraceCollector.MessageType.ERROR
-                        );
-                    } else {
-                        getTraceCollector().addTrace(
-                            workspaceRootUri,
-                            sessionId,
-                            String.format("[Error - %s] %s stderr: %s",
-                                java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss")),
-                                config.getName(),
-                                errorLine)
-                        );
-                    }
+                    addTrace(line, TraceCollector.MessageType.ERROR);
                 }
             } catch (IOException e) {
                 if (serverProcess != null && serverProcess.isAlive()) {

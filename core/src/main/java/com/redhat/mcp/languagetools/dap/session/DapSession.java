@@ -61,6 +61,10 @@ public class DapSession implements DapEventListener {
     }
 
     private final String sessionId;
+    /**
+     * Composite context ID "serverId#sessionId" for trace messages.
+     */
+    private final String contextId;
     private final String language;
     private final String sessionName;
     private final SessionActor createdBy; // Who created the session
@@ -128,6 +132,7 @@ public class DapSession implements DapEventListener {
                       DapServerConfig serverConfig,
                       Workspace workspace) {
         this.sessionId = sessionId;
+        this.contextId = serverConfig.getServerId() + "#" + sessionId;
         this.language = language;
         this.sessionName = sessionName;
         this.createdBy = createdBy != null ? createdBy : SessionActor.UNKNOWN;
@@ -138,15 +143,6 @@ public class DapSession implements DapEventListener {
         this.traceCollector = workspace.getApplication().getDapTraceCollector();
         this.programOutput = new DapProgramOutput(); // Initialize program output buffer
 
-        // Update the trace collector wrapper with the correct sessionId for installation traces
-        if (serverConfig.getTraceCollector() instanceof DapTraceCollectorWrapper) {
-            // Replace with a new wrapper that uses the session's sessionId
-            serverConfig.setTraceCollector(new DapTraceCollectorWrapper(
-                    workspace.getApplication().getDapTraceCollector(),
-                    workspace.getNormalizedUri(),
-                    sessionId
-            ));
-        }
 
         // Create DAP server using factory (allows custom implementations like JavaDebugServer)
         this.dapServer = DapServerFactoryRegistry.getInstance().createServer(sessionId, serverConfig, workspace);
@@ -154,6 +150,13 @@ public class DapSession implements DapEventListener {
         // Note: setEventListener() must be called AFTER start() when dapClient is created
         // Listen to server status changes to update session state
         this.dapServer.addStatusChangeListener(this::onServerStatusChanged);
+    }
+
+    /**
+     * Returns the composite context ID "serverId#sessionId" for trace messages.
+     */
+    private String getContextId() {
+        return contextId;
     }
 
     /**
@@ -334,7 +337,7 @@ public class DapSession implements DapEventListener {
                     // Send error to traces
                     traceCollector.addTrace(
                             workspace.getNormalizedUri(),
-                            sessionId,
+                            getContextId(),
                             "❌ Failed to initialize: " + ex.getMessage()
                     );
 
@@ -562,7 +565,7 @@ public class DapSession implements DapEventListener {
                             // Add trace to console with full stack
                             dapServer.getTraceCollector().addTrace(
                                     workspace.getNormalizedUri(),
-                                    sessionId,
+                                    getContextId(),
                                     errorTrace.toString()
                             );
                         }
@@ -661,7 +664,7 @@ public class DapSession implements DapEventListener {
                         LOG.errorf(error, "Error during session termination: %s", sessionId);
                         traceCollector.addTrace(
                                 workspace.getNormalizedUri(),
-                                sessionId,
+                                getContextId(),
                                 "⚠️ Termination error: " + error.getMessage()
                         );
                     } else {
@@ -1203,21 +1206,12 @@ public class DapSession implements DapEventListener {
                 messageType = TraceCollector.MessageType.TRACE;
             }
 
-            // Use the DapTraceCollector's addTrace with messageType
-            if (traceCollector instanceof DapTraceCollector) {
-                ((DapTraceCollector) traceCollector).addTrace(
-                        workspace.getNormalizedUri(),
-                        sessionId,
-                        displayText,
-                        messageType
-                );
-            } else {
-                traceCollector.addTrace(
-                        workspace.getNormalizedUri(),
-                        sessionId,
-                        displayText
-                );
-            }
+            traceCollector.addTrace(
+                    workspace.getNormalizedUri(),
+                    getContextId(),
+                    displayText,
+                    messageType
+            );
         }
     }
 

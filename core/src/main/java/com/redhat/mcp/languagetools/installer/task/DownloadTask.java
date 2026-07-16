@@ -9,7 +9,7 @@ import com.redhat.mcp.languagetools.progress.ProgressMonitor;
 import com.redhat.mcp.languagetools.installer.download.AssetFetcher;
 import com.redhat.mcp.languagetools.installer.download.DecompressorUtils;
 import com.redhat.mcp.languagetools.installer.download.DownloadUtils;
-import com.redhat.mcp.languagetools.trace.TraceCollector;
+
 import org.jboss.logging.Logger;
 
 import java.io.*;
@@ -67,18 +67,13 @@ public class DownloadTask implements InstallerTask {
 
         String resolvedOutputDir = context.resolveVariables(outputInfo.outputDir());
 
-        TraceCollector trace = context.getConfig().getTraceCollector();
-        if (trace != null) {
-            trace.info("Downloading from: " + resolvedUrl);
-        }
-
+        context.traceInfo("Downloading from: " + resolvedUrl);
         context.getProgress().reportProgress("Downloading " + name);
 
         try {
             Path outputPath = Paths.get(resolvedOutputDir);
             Files.createDirectories(outputPath);
 
-            // Determine file extension from URL
             String fileName = resolvedUrl.substring(resolvedUrl.lastIndexOf('/') + 1);
             if (fileName.contains("?")) {
                 fileName = fileName.substring(0, fileName.indexOf('?'));
@@ -86,65 +81,39 @@ public class DownloadTask implements InstallerTask {
             Path downloadedFile = Files.createTempFile("download-", fileName);
 
             try {
-                // Download file with progress tracking
-                // Note: Don't enable sendProgressUpdates on TraceProgressMonitor because
-                // ProgressMonitorWrapper already sends its own UPDATE messages with MB/MB display
-                ProgressMonitorWrapper downloadProgress = new ProgressMonitorWrapper(context, trace, name);
-
-                // Download (contentLength will be set automatically via ContentLengthAware interface)
+                ProgressMonitorWrapper downloadProgress = new ProgressMonitorWrapper(context, name);
                 DownloadUtils.DownloadResult result = DownloadUtils.download(resolvedUrl, downloadedFile, downloadProgress);
 
-                // Decompress based on file extension, or simply copy if not an archive
                 DecompressorUtils.Decompressor decompressor = DecompressorUtils.getDecompressor(downloadedFile);
                 context.getProgress().beginStep(getExtractStepName(name));
                 if (decompressor != null) {
                     context.getProgress().reportProgress("Extracting " + name);
-                    if (trace != null) {
-                        trace.update("Extracting " + name);
-                    }
-
+                    context.traceUpdate("Extracting " + name);
                     Path rootDir = decompressor.decompress(downloadedFile, outputPath, context.getProgress());
                 } else {
                     context.getProgress().reportProgress("Installing " + name);
-                    if (trace != null) {
-                        trace.update("Installing " + name);
-                    }
+                    context.traceUpdate("Installing " + name);
 
-                    // Determine the target file name
                     String targetFileName = outputInfo.outputFileName() != null ? context.resolveVariables(outputInfo.outputFileName()) : fileName;
                     Path targetFile = outputPath.resolve(targetFileName);
-
-                    // Ensure parent directory exists
                     Files.createDirectories(targetFile.getParent());
-
-                    // Copy the downloaded file
                     Files.copy(downloadedFile, targetFile, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                    context.traceInfo("File copied to: " + targetFile);
 
-                    if (trace != null) {
-                        trace.info("File copied to: " + targetFile);
-                    }
-
-                    // Set executable permission if needed
                     if (outputInfo.executable()) {
-                        if (trace != null) {
-                            trace.info("Setting executable permission: " + targetFile);
-                        }
+                        context.traceInfo("Setting executable permission: " + targetFile);
                         targetFile.toFile().setExecutable(true, false);
                     }
                 }
 
-                // Store output dir and file name in context for onSuccess tasks
                 context.setVariable("output.dir", resolvedOutputDir);
                 if (outputInfo.outputFileName() != null) {
                     String resolvedFileName = context.resolveVariables(outputInfo.outputFileName());
                     context.setVariable("output.file.name", resolvedFileName);
                 }
 
-                if (trace != null) {
-                    trace.info("Downloaded and extracted to: " + resolvedOutputDir);
-                }
+                context.traceInfo("Downloaded and extracted to: " + resolvedOutputDir);
 
-                // Execute onSuccess task
                 if (onSuccessTask != null) {
                     return onSuccessTask.execute(context);
                 }
@@ -152,15 +121,12 @@ public class DownloadTask implements InstallerTask {
                 return true;
 
             } finally {
-                // Clean up temp file
                 Files.deleteIfExists(downloadedFile);
             }
 
         } catch (Exception e) {
             LOG.errorf(e, "Download failed: %s", resolvedUrl);
-            if (trace != null) {
-                trace.error("Download failed: " + e.getMessage());
-            }
+            context.traceError("Download failed: " + e.getMessage());
             throw new IllegalStateException("Download '" + name + "' failed: " + e.getMessage(), e);
         }
     }
@@ -185,10 +151,8 @@ public class DownloadTask implements InstallerTask {
      * Get download URL - try asset fetcher (GitHub/Maven) first, then fallback to direct URL.
      */
     private String getDownloadUrl(InstallerContext context) {
-        // Try asset fetcher first (GitHub or Maven)
         if (assetFetcherInfo != null) {
-            TraceCollector trace = context.getConfig().getTraceCollector();
-            AssetFetcherReporter reporter = new AssetFetcherReporter(trace);
+            AssetFetcherReporter reporter = new AssetFetcherReporter(context);
 
             String fetchedUrl = assetFetcherInfo.assetFetcher().getDownloadUrl(
                 assetFetcherInfo.releaseMatcher(),
@@ -200,12 +164,9 @@ public class DownloadTask implements InstallerTask {
                 return context.resolveVariables(fetchedUrl);
             }
 
-            if (trace != null) {
-                trace.info("Asset fetcher failed, falling back to direct URL");
-            }
+            context.traceInfo("Asset fetcher failed, falling back to direct URL");
         }
 
-        // Fallback to direct URL
         return url != null ? context.resolveVariables(url) : null;
     }
 
@@ -418,17 +379,15 @@ public class DownloadTask implements InstallerTask {
     }
 
     /**
-     * Wrapper for ProgressMonitor that tracks download progress with TraceCollector.
+     * Wrapper for ProgressMonitor that tracks download progress with trace updates.
      */
     private static class ProgressMonitorWrapper extends AbstractProgressMonitor implements ContentLengthAware {
         private final InstallerContext context;
-        private final TraceCollector trace;
         private final String name;
         private long contentLength = -1;
 
-        public ProgressMonitorWrapper(InstallerContext context, TraceCollector trace, String name) {
+        public ProgressMonitorWrapper(InstallerContext context, String name) {
             this.context = context;
-            this.trace = trace;
             this.name = name;
         }
 
@@ -438,7 +397,6 @@ public class DownloadTask implements InstallerTask {
 
         @Override
         public void reportProgress(double progress, String message) {
-            // Build a message that includes the download percentage
             String progressMessage;
             if (contentLength > 0) {
                 double fraction = progress / 100.0;
@@ -451,13 +409,8 @@ public class DownloadTask implements InstallerTask {
                 progressMessage = String.format("Downloading %s (%.0f%%)", name, progress);
             }
 
-            // Update the progress monitor (for badge display and MCP progress)
             context.getProgress().reportProgress(progress, progressMessage);
-
-            // Update trace console
-            if (trace != null) {
-                trace.update(progressMessage);
-            }
+            context.traceUpdate(progressMessage);
         }
 
         @Override
@@ -492,27 +445,23 @@ public class DownloadTask implements InstallerTask {
     }
 
     /**
-     * Reporter implementation for AssetFetcher that logs to TraceCollector.
+     * Reporter implementation for AssetFetcher that logs to InstallerContext traces.
      */
     private static class AssetFetcherReporter implements AssetFetcher.Reporter {
-        private final TraceCollector trace;
+        private final InstallerContext context;
 
-        public AssetFetcherReporter(TraceCollector trace) {
-            this.trace = trace;
+        public AssetFetcherReporter(InstallerContext context) {
+            this.context = context;
         }
 
         @Override
         public void setText(String text) {
-            if (trace != null) {
-                trace.info(text);
-            }
+            context.traceInfo(text);
         }
 
         @Override
         public void setText(String text, Exception e) {
-            if (trace != null) {
-                trace.error(text + ": " + e.getMessage());
-            }
+            context.traceError(text + ": " + e.getMessage());
         }
     }
 }

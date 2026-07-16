@@ -3,12 +3,7 @@ package com.redhat.mcp.languagetools.installer.task;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.redhat.mcp.languagetools.installer.InstallerContext;
-import com.redhat.mcp.languagetools.trace.TraceCollector;
 
-/**
- * Task that configures the server command.
- * This extracts the final command from installer.json.
- */
 public class ConfigureServerTask implements InstallerTask {
     private final String name;
     private final String command;
@@ -24,14 +19,8 @@ public class ConfigureServerTask implements InstallerTask {
         context.getProgress().beginStep(getName());
 
         String resolvedCommand = context.resolveVariables(command);
-
-        // Store the resolved command in context
         context.setVariable("SERVER_COMMAND", resolvedCommand);
-
-        TraceCollector trace = context.getConfig().getTraceCollector();
-        if (trace != null) {
-            trace.info("Server command configured: " + resolvedCommand);
-        }
+        context.traceInfo("Server command configured: " + resolvedCommand);
 
         return true;
     }
@@ -45,9 +34,6 @@ public class ConfigureServerTask implements InstallerTask {
         return command;
     }
 
-    /**
-     * Factory for ConfigureServerTask.
-     */
     public static class Factory implements InstallerTaskFactory {
         @Override
         public String getType() {

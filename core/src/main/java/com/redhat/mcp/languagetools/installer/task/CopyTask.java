@@ -3,7 +3,6 @@ package com.redhat.mcp.languagetools.installer.task;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.redhat.mcp.languagetools.installer.InstallerContext;
-import com.redhat.mcp.languagetools.trace.TraceCollector;
 import org.jboss.logging.Logger;
 
 import java.io.IOException;
@@ -13,9 +12,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 
-/**
- * Task that copies a file from resources to target directory.
- */
 public class CopyTask implements InstallerTask {
     private static final Logger LOG = Logger.getLogger(CopyTask.class);
 
@@ -39,18 +35,13 @@ public class CopyTask implements InstallerTask {
         String resolvedSource = context.resolveVariables(source);
         String resolvedDestination = context.resolveVariables(destination);
 
-        TraceCollector trace = context.getConfig().getTraceCollector();
-        if (trace != null) {
-            trace.info("Copying from: " + resolvedSource + " to: " + resolvedDestination);
-        }
-
+        context.traceInfo("Copying from: " + resolvedSource + " to: " + resolvedDestination);
         context.getProgress().reportProgress("Copying " + name);
 
         try {
             Path destPath = Paths.get(resolvedDestination);
             Files.createDirectories(destPath.getParent());
 
-            // Load resource from classpath using context ClassLoader to access all modules/extensions
             ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
             InputStream resourceStream = classLoader.getResourceAsStream(resolvedSource.startsWith("/") ? resolvedSource.substring(1) : resolvedSource);
             if (resourceStream == null) {
@@ -62,12 +53,8 @@ public class CopyTask implements InstallerTask {
             }
 
             context.getProgress().reportProgress(100, "Copy complete");
+            context.traceInfo("Copied to: " + resolvedDestination);
 
-            if (trace != null) {
-                trace.info("Copied to: " + resolvedDestination);
-            }
-
-            // Execute onSuccess task
             if (onSuccessTask != null) {
                 return onSuccessTask.execute(context);
             }
@@ -76,9 +63,7 @@ public class CopyTask implements InstallerTask {
 
         } catch (IOException e) {
             LOG.errorf(e, "Copy failed: %s -> %s", resolvedSource, resolvedDestination);
-            if (trace != null) {
-                trace.error("Copy failed: " + e.getMessage());
-            }
+            context.traceError("Copy failed: " + e.getMessage());
             throw new IllegalStateException("Copy '" + name + "' failed: " + e.getMessage(), e);
         }
     }
@@ -88,15 +73,10 @@ public class CopyTask implements InstallerTask {
         return name;
     }
 
-    /**
-     * Factory for CopyTask.
-     */
     public static class Factory implements InstallerTaskFactory {
-        // Lazy singleton registry to avoid circular initialization
         private static volatile InstallerTaskRegistry registry;
 
         public Factory() {
-            // Don't create registry in constructor - would cause infinite recursion
         }
 
         private static InstallerTaskRegistry getRegistry() {
@@ -122,7 +102,6 @@ public class CopyTask implements InstallerTask {
             String source = obj.get("source").getAsString();
             String destination = obj.get("destination").getAsString();
 
-            // Parse onSuccess tasks
             InstallerTask onSuccessTask = null;
             if (obj.has("onSuccess")) {
                 JsonElement onSuccess = obj.get("onSuccess");

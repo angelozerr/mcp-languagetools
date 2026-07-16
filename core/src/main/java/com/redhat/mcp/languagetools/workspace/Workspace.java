@@ -2,7 +2,6 @@ package com.redhat.mcp.languagetools.workspace;
 
 import com.redhat.mcp.languagetools.Application;
 import com.redhat.mcp.languagetools.dap.server.DapServerConfig;
-import com.redhat.mcp.languagetools.dap.session.DapTraceCollectorWrapper;
 import com.redhat.mcp.languagetools.installer.*;
 import com.redhat.mcp.languagetools.lsp.LspInstanceRegistry;
 import com.redhat.mcp.languagetools.lsp.server.*;
@@ -356,14 +355,8 @@ public class Workspace {
      * DAP servers are not started automatically - they are started on-demand during debug sessions.
      */
     public void addDapServer(DapServerConfig config) {
-        // Set trace collector for installation support
         if (config.getTraceCollector() == null) {
-            // Create a TraceCollector wrapper around DapTraceCollector
-            config.setTraceCollector(new DapTraceCollectorWrapper(
-                application.getDapTraceCollector(),
-                rootUri.toString(),
-                config.getServerId()
-            ));
+            config.setTraceCollector(application.getDapTraceCollector());
         }
         LOG.infof("Added DAP server to workspace %s: %s", rootUri, config.getServerId());
     }
@@ -474,8 +467,7 @@ public class Workspace {
     private LspServer createLspServer(LspServerConfig serverConfig) {
         // Set trace collector for installation and LSP communication support
         if (serverConfig.getTraceCollector() == null) {
-            // Create a TraceCollector wrapper around LspTraceCollector
-            serverConfig.setTraceCollector(new LspTraceCollectorWrapper(lspTraceCollector, rootUri.toString(), serverConfig.getServerId()));
+            serverConfig.setTraceCollector(lspTraceCollector);
         }
 
         // Create new server instance using factory

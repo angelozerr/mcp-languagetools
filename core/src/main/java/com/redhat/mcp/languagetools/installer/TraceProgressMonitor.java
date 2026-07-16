@@ -96,7 +96,7 @@ public class TraceProgressMonitor extends AbstractProgressMonitor {
     public void reportProgress(String message) {
         this.currentText = message;
         if (traceCollector != null) {
-            traceCollector.info(message);
+            traceCollector.addTrace(serverId, message, TraceCollector.MessageType.INFO);
         }
 
         // Broadcast to Admin UI if configured

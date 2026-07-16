@@ -6,10 +6,9 @@ import com.redhat.mcp.languagetools.admin.ws.*;
 import com.redhat.mcp.languagetools.dap.session.DapSessionEvent;
 import com.redhat.mcp.languagetools.dap.session.DapSessionManager;
 import com.redhat.mcp.languagetools.dap.trace.DapTraceCollector;
-import com.redhat.mcp.languagetools.dap.trace.DapTraceMessage;
 import com.redhat.mcp.languagetools.lsp.server.LspServerStatusChangeEvent;
 import com.redhat.mcp.languagetools.lsp.trace.LspTraceCollector;
-import com.redhat.mcp.languagetools.lsp.trace.LspTraceMessage;
+import com.redhat.mcp.languagetools.trace.TraceMessage;
 import com.redhat.mcp.languagetools.mcp.trace.McpTrace;
 import com.redhat.mcp.languagetools.mcp.trace.McpTraceCollector;
 import com.redhat.mcp.languagetools.progress.ProgressBroadcaster;
@@ -140,18 +139,13 @@ public class AdminWebSocketEndpoint {
             for (var workspace : application.getWorkspaces()) {
                 for (var server : workspace.getLspServers()) {
                     // Get last 200 traces for this server
-                    var traces = lspTraceCollector.getTracesForWorkspaceAndServer(
-                        workspace.getNormalizedUri(),
-                        server.getId(),
-                        200
-                    );
+                    var traces = lspTraceCollector.getTraces(workspace.getNormalizedUri(), server.getId(), 200);
 
-                    // Send each trace
                     for (var trace : traces) {
                         LspTraceWsMessage msg = new LspTraceWsMessage(
                             trace.workspaceUri(),
-                            trace.serverId(),
-                            trace.jsonContent(),
+                            trace.contextId(),
+                            trace.content(),
                             trace.messageType()
                         );
                         sendToSession(session, msg);
@@ -191,21 +185,40 @@ public class AdminWebSocketEndpoint {
      */
     private void sendDapTraceHistory(Session session) {
         try {
-            // Get all active DAP sessions
             var dapSessions = dapSessionManager.getAllSessions();
             LOG.infof("Sending DAP trace history: %d sessions", dapSessions.size());
 
-            // Send traces for each session (last 200 traces per session)
             for (var dapSession : dapSessions) {
-                var traces = dapTraceCollector.getTracesForSession(dapSession.getSessionId(), 200);
+                String serverId = dapSession.getDapServer() != null
+                        ? dapSession.getDapServer().getConfig().getServerId() : null;
+                if (serverId == null) {
+                    continue;
+                }
+
+                // Get both installation traces (contextId=serverId) and protocol traces (contextId=serverId#sessionId)
+                var traces = dapTraceCollector.getTracesForSession(serverId, dapSession.getSessionId(), 200);
+
                 LOG.infof("Session %s: sending %d traces", dapSession.getSessionId(), traces.size());
 
-                // Send each trace
                 for (var trace : traces) {
+                    // Parse composite contextId to extract serverId and sessionId
+                    String contextId = trace.contextId();
+                    String traceServerId;
+                    String traceSessionId;
+                    int hashIndex = contextId.indexOf('#');
+                    if (hashIndex >= 0) {
+                        traceServerId = contextId.substring(0, hashIndex);
+                        traceSessionId = contextId.substring(hashIndex + 1);
+                    } else {
+                        traceServerId = contextId;
+                        traceSessionId = null;
+                    }
+
                     DapTraceWsMessage msg = new DapTraceWsMessage(
                         trace.workspaceUri(),
-                        trace.sessionId(),
-                        trace.jsonContent(),
+                        traceServerId,
+                        traceSessionId,
+                        trace.content(),
                         trace.messageType()
                     );
                     sendToSession(session, msg);
@@ -280,16 +293,31 @@ public class AdminWebSocketEndpoint {
     }
 
     /**
-     * CDI observer for LSP trace events.
+     * CDI observer for LSP/DAP trace events.
      */
-    void onLspTrace(@Observes LspTraceMessage trace) {
-        LspTraceWsMessage msg = new LspTraceWsMessage(
-                trace.workspaceUri(),
-                trace.serverId(),
-                trace.jsonContent(),
-                trace.messageType()
-        );
-        broadcast(msg);
+    void onTrace(@Observes TraceMessage trace) {
+        switch (trace.kind()) {
+            case LSP -> broadcast(new LspTraceWsMessage(
+                    trace.workspaceUri(), trace.contextId(),
+                    trace.content(), trace.messageType()));
+            case DAP -> {
+                // Parse composite contextId: "serverId#sessionId" or just "serverId" (installation)
+                String contextId = trace.contextId();
+                String serverId;
+                String sessionId;
+                int hashIndex = contextId.indexOf('#');
+                if (hashIndex >= 0) {
+                    serverId = contextId.substring(0, hashIndex);
+                    sessionId = contextId.substring(hashIndex + 1);
+                } else {
+                    serverId = contextId;
+                    sessionId = null;
+                }
+                broadcast(new DapTraceWsMessage(
+                        trace.workspaceUri(), serverId, sessionId,
+                        trace.content(), trace.messageType()));
+            }
+        }
     }
 
     /**
@@ -299,19 +327,6 @@ public class AdminWebSocketEndpoint {
         McpTraceWsMessage msg = new McpTraceWsMessage(
                 trace.connectionId(),
                 trace.message()
-        );
-        broadcast(msg);
-    }
-
-    /**
-     * CDI observer for DAP trace events.
-     */
-    void onDapTrace(@Observes DapTraceMessage trace) {
-        var msg = new DapTraceWsMessage(
-                trace.workspaceUri(),
-                trace.sessionId(),
-                trace.jsonContent(),
-                trace.messageType()
         );
         broadcast(msg);
     }

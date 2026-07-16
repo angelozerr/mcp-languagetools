@@ -1128,9 +1128,11 @@
                 const lines = content.split('\n');
                 const headerLine = lines[0]; // [Trace - HH:mm:ss] ...
 
-                // Detect if this is an error trace
-                const isError = headerLine.startsWith('[Error');
-                const headerColor = isError ? '#ff6b6b' : '#cccccc';
+                // Detect trace type for coloring
+                const isError = headerLine.startsWith('[Error') || trace.messageType === 'ERROR';
+                const isInfo = trace.messageType === 'INFO';
+                const isUpdate = trace.messageType === 'UPDATE';
+                const headerColor = isError ? '#ff6b6b' : isInfo ? '#4fc1ff' : isUpdate ? '#dcdcaa' : '#cccccc';
 
                 // Messages mode: show only header line, no folding
                 if (currentTraceLevel === 'messages') {
