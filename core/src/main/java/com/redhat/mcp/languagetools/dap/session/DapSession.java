@@ -96,6 +96,8 @@ public class DapSession implements DapEventListener {
 
     public enum SessionState {
         CREATED,
+        LAUNCHING,
+        ATTACHING,
         RUNNING,
         PAUSED,
         TERMINATED,
@@ -206,6 +208,11 @@ public class DapSession implements DapEventListener {
             @Override
             public void onContinued(ContinuedEventArguments event) {
                 DapSession.this.onContinued(event);
+            }
+
+            @Override
+            public void onExited(ExitedEventArguments event) {
+                DapSession.this.onExited(event);
             }
 
             @Override
@@ -431,6 +438,12 @@ public class DapSession implements DapEventListener {
         // Record launch timestamp
         this.launchedAt = Instant.now();
 
+        // Reset tracking for this new launch
+        this.sentTerminateRequest = false;
+        SessionState previousState = this.state;
+        boolean isAttach = "attach".equals(launchConfig.get("request"));
+        setState(isAttach ? SessionState.ATTACHING : SessionState.LAUNCHING);
+
         // Report progress: Starting debug adapter
         if (progressMonitor != null) {
             progressMonitor.beginStep(ProgressStep.STARTING);
@@ -440,15 +453,15 @@ public class DapSession implements DapEventListener {
         // Restart server if not running (first launch or after crash)
         CompletableFuture<Void> initFuture;
         var serverStatus = dapServer.getStatus();
-        LOG.infof("Launch requested: sessionState=%s, serverStatus=%s", state, serverStatus);
+        LOG.infof("Launch requested: previousState=%s, serverStatus=%s", previousState, serverStatus);
 
         // If session was TERMINATED, stop server first to clear vscode-js-debug DI state
-        if (state == SessionState.TERMINATED && serverStatus == ServerStatus.RUNNING) {
+        if (previousState == SessionState.TERMINATED && serverStatus == ServerStatus.RUNNING) {
             LOG.infof("Session TERMINATED but server RUNNING - stopping server to clear state");
             initFuture = dapServer
                     .stop2()
                     .thenCompose(v -> initialize(progressMonitor));
-        } else if (state == SessionState.CREATED
+        } else if (previousState == SessionState.CREATED
                 || serverStatus == ServerStatus.NOT_STARTED
                 || serverStatus == ServerStatus.START_FAILED
                 || serverStatus == ServerStatus.ERROR
@@ -510,12 +523,16 @@ public class DapSession implements DapEventListener {
                                         debugMode ? this::sendAllBreakpoints : null  // Send breakpoints if debug mode
                                 )
                                 .thenApply(result -> {
-                                    setState(SessionState.RUNNING);
-                                    LOG.infof("Debug session fully initialized and running");
+                                    if (state != SessionState.TERMINATED) {
+                                        setState(SessionState.RUNNING);
+                                    }
+                                    LOG.infof("Debug session fully initialized (state=%s)", state);
                                     Map<String, Object> response = new HashMap<>();
-                                    response.put("success", true);
-                                    response.put("state", "running");
-                                    response.put("message", "Debugging started");
+                                    response.put("success", state != SessionState.TERMINATED);
+                                    response.put("state", state.name().toLowerCase());
+                                    response.put("message", state == SessionState.TERMINATED
+                                            ? "Program terminated during launch"
+                                            : "Debugging started");
                                     return response;
                                 });
                     })
@@ -562,6 +579,7 @@ public class DapSession implements DapEventListener {
     public CompletableFuture<Map<String, Object>> attach(int processId,
                                                          ProgressMonitor progressMonitor) {
         LOG.infof("Attaching debug session: %s to process: %d", sessionId, processId);
+        setState(SessionState.ATTACHING);
 
         Map<String, Object> attachArgs = new HashMap<>();
         attachArgs.put("processId", processId);
@@ -1123,6 +1141,12 @@ public class DapSession implements DapEventListener {
     public void onContinued(ContinuedEventArguments event) {
         LOG.infof("Session %s continued (thread %d)", sessionId, event.getThreadId());
         setState(SessionState.RUNNING);
+    }
+
+    @Override
+    public void onExited(ExitedEventArguments event) {
+        LOG.infof("Session %s exited with code: %d", sessionId, event.getExitCode());
+        setState(SessionState.TERMINATED);
     }
 
     @Override

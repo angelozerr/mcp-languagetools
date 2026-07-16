@@ -25,6 +25,11 @@ public interface DapEventListener {
     void onContinued(ContinuedEventArguments event);
 
     /**
+     * Called when the debuggee process exits.
+     */
+    void onExited(ExitedEventArguments event);
+
+    /**
      * Called when the debug session terminates.
      */
     void onTerminated(TerminatedEventArguments event);

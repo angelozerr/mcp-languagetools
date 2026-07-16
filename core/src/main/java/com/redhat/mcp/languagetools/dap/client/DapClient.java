@@ -110,7 +110,15 @@ public class DapClient implements IDebugProtocolClient {
     @Override
     public void exited(ExitedEventArguments args) {
         LOG.infof("Exited event: exitCode=%d", args.getExitCode());
-        // No listener callback - this is informational only
+
+        if (!initializedEventFuture.isDone()) {
+            LOG.warnf("Program exited before 'initialized' event - completing future to prevent hang");
+            initializedEventFuture.complete(null);
+        }
+
+        if (eventListener != null) {
+            eventListener.onExited(args);
+        }
     }
 
     @Override

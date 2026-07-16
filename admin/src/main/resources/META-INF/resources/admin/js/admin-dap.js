@@ -1233,6 +1233,18 @@ async function updateSessionInDOM(message) {
             statusText = 'Starting';
             statusClass = 'status-starting';
             stateIcon = '<span>⏳</span>';
+        } else if (message.newStatus === 'LAUNCHING') {
+            statusText = 'Launching';
+            statusClass = 'status-starting';
+            stateIcon = '<span>🚀</span>';
+        } else if (message.newStatus === 'ATTACHING') {
+            statusText = 'Attaching';
+            statusClass = 'status-starting';
+            stateIcon = '<span>🔗</span>';
+        } else if (message.newStatus === 'TERMINATED') {
+            statusText = 'Terminated';
+            statusClass = 'status-error';
+            stateIcon = '<span>⏹️</span>';
         } else if (message.newStatus === 'RUNNING') {
             statusText = 'Running';
             statusClass = 'status-running';
@@ -1284,7 +1296,7 @@ async function updateSessionInDOM(message) {
             // Determine button states based on status
             const isRunning = message.newStatus === 'RUNNING';
             const isPaused = message.newStatus === 'PAUSED';
-            const isStarting = message.newStatus === 'STARTING' || message.newStatus === 'INSTALLING';
+            const isStarting = message.newStatus === 'STARTING' || message.newStatus === 'INSTALLING' || message.newStatus === 'LAUNCHING' || message.newStatus === 'ATTACHING';
             const isStopped = message.newStatus === 'STOPPED' || message.newStatus === 'START_FAILED' || message.newStatus === 'ERROR' || message.newStatus === 'CREATED' || message.newStatus === 'TERMINATED';
 
             const canLaunch = isStopped;
@@ -1382,7 +1394,7 @@ function disableSessionButtons(sessionId) {
 function getSessionButtonStates(sessionState) {
     const isPaused = sessionState === 'PAUSED';
     const isRunning = sessionState === 'RUNNING';
-    const isStarting = sessionState === 'STARTING' || sessionState === 'INSTALLING';
+    const isStarting = sessionState === 'STARTING' || sessionState === 'INSTALLING' || sessionState === 'LAUNCHING' || sessionState === 'ATTACHING';
     const isStopped = sessionState === 'STOPPED' || sessionState === 'START_FAILED' || sessionState === 'ERROR' || sessionState === 'CREATED' || sessionState === 'TERMINATED';
 
     const canLaunch = isStopped;
@@ -1407,6 +1419,14 @@ function getSessionStateInfo(session) {
         stateIcon = '<span>⏳</span>';
         statusText = 'Starting';
         statusClass = 'status-starting';
+    } else if (session.state === 'LAUNCHING') {
+        stateIcon = '<span>🚀</span>';
+        statusText = 'Launching';
+        statusClass = 'status-starting';
+    } else if (session.state === 'ATTACHING') {
+        stateIcon = '<span>🔗</span>';
+        statusText = 'Attaching';
+        statusClass = 'status-starting';
     } else if (session.state === 'RUNNING') {
         // Check if it's debugging or just running
         const isDebugging = session.debugMode === true;
@@ -1420,7 +1440,7 @@ function getSessionStateInfo(session) {
     } else if (session.state === 'TERMINATED') {
         stateIcon = '<span>⏹️</span>';
         statusText = 'Terminated';
-        statusClass = 'status-stopped';
+        statusClass = 'status-error';
     } else if (session.state === 'ERROR' || session.state === 'START_FAILED') {
         stateIcon = '<span>❌</span>';
         statusText = 'Error';
