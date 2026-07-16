@@ -51,7 +51,7 @@ public class TraceResource {
     @DELETE
     @Path("/mcp")
     public void clearMcpTraces() {
-        mcpTraceCollector.clearTraces();
+        mcpTraceCollector.clear();
     }
 
     // ========== LSP Trace Level ==========

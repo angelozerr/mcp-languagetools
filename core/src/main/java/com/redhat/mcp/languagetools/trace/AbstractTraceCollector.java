@@ -39,6 +39,13 @@ public abstract class AbstractTraceCollector implements TraceCollector {
         traceEvent.fire(message);
     }
 
+    /**
+     * Get all traces regardless of context, limited to the most recent entries.
+     */
+    public List<TraceMessage> getTraces(int limit) {
+        return filterTraces(t -> true, limit);
+    }
+
     public List<TraceMessage> getTraces(String workspaceUri,
                                         String contextId,
                                         int limit) {

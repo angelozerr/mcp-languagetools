@@ -9,7 +9,6 @@ import com.redhat.mcp.languagetools.dap.trace.DapTraceCollector;
 import com.redhat.mcp.languagetools.lsp.server.LspServerStatusChangeEvent;
 import com.redhat.mcp.languagetools.lsp.trace.LspTraceCollector;
 import com.redhat.mcp.languagetools.trace.TraceMessage;
-import com.redhat.mcp.languagetools.mcp.trace.McpTrace;
 import com.redhat.mcp.languagetools.mcp.trace.McpTraceCollector;
 import com.redhat.mcp.languagetools.progress.ProgressBroadcaster;
 import com.redhat.mcp.languagetools.settings.Settings;
@@ -163,14 +162,12 @@ public class AdminWebSocketEndpoint {
      */
     private void sendMcpTraceHistory(Session session) {
         try {
-            // Get last 500 MCP traces
             var traces = mcpTraceCollector.getTraces(500);
 
-            // Send each trace
             for (var trace : traces) {
                 McpTraceWsMessage msg = new McpTraceWsMessage(
-                    trace.connectionId(),
-                    trace.message()
+                    trace.contextId(),
+                    trace.content()
                 );
                 sendToSession(session, msg);
             }
@@ -317,18 +314,9 @@ public class AdminWebSocketEndpoint {
                         trace.workspaceUri(), serverId, sessionId,
                         trace.content(), trace.messageType()));
             }
+            case MCP -> broadcast(new McpTraceWsMessage(
+                    trace.contextId(), trace.content()));
         }
-    }
-
-    /**
-     * CDI observer for MCP trace events.
-     */
-    void onMcpTrace(@Observes McpTrace trace) {
-        McpTraceWsMessage msg = new McpTraceWsMessage(
-                trace.connectionId(),
-                trace.message()
-        );
-        broadcast(msg);
     }
 
     /**
