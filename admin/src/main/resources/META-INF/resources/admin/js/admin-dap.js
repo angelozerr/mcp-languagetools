@@ -1051,16 +1051,31 @@ async function onDapSessionUpdate(message) {
             updateSessionDetailInDOM(message.sessionId, message);
             break;
 
-        case 'DELETED':
-            // Remove session from array and DOM
+        case 'DELETED': {
+            const wasDisplayed = window.currentDapSessionId === message.sessionId;
+            const deletedSession = window.dapSessions?.find(s => s.sessionId === message.sessionId);
+            const deletedServerId = deletedSession?.serverId || deletedSession?.dapServerId || window.currentDapServerId;
+
             if (window.dapSessions) {
                 window.dapSessions = window.dapSessions.filter(s => s.sessionId !== message.sessionId);
             }
-            const sessionElement = document.querySelector(`[data-session-id="${message.sessionId}"]`);
-            if (sessionElement) {
-                sessionElement.remove();
+            removeSessionFromDOM(message.sessionId);
+
+            if (wasDisplayed) {
+                const remainingSession = document.querySelector('.dap-session-item[data-session-id]');
+                if (remainingSession) {
+                    selectDapSession(remainingSession.getAttribute('data-session-id'));
+                } else if (deletedServerId && typeof window.selectDapSessionByServerId === 'function') {
+                    window.selectDapSessionByServerId(deletedServerId);
+                } else {
+                    const consoleArea = document.getElementById('console-area');
+                    if (consoleArea) {
+                        consoleArea.innerHTML = '<div class="placeholder">No active debug session</div>';
+                    }
+                }
             }
             break;
+        }
     }
 }
 
