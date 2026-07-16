@@ -37,7 +37,9 @@ public class ReferencesTools {
     @Inject
     LanguageRegistry languageRegistry;
 
-    @Tool(description = "Find all references to a symbol at a specific position in a file. " +
+    @Tool(
+            name="find_references",
+            description = "Find all references to a symbol at a specific position in a file. " +
                         "Returns all locations where the symbol is used across the workspace. " +
                         "Example: findReferences(cwd='/home/user/project', fileUri='file:///home/user/project/src/Main.java', line=10, character=5)" +
                         ToolArgDescriptions.OPEN_DOCUMENT_HINT)
