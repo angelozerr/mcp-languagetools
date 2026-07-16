@@ -3,7 +3,11 @@
   "name": "Python - Debugpy",
   "description": "Debug adapter for Python via debugpy",
   "launch": {
-    "default": "python -m debugpy --listen 127.0.0.1:${port} --wait-for-client"
+    "default": "python -m debugpy.adapter"
+  },
+  "attach": {
+    "address": "$connect.host",
+    "port": "$connect.port"
   },
   "documentSelector": [
     {

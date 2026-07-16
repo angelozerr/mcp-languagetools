@@ -76,6 +76,7 @@ public class DapSession implements DapEventListener {
     private final Instant createdAt; // When the session was created
 
     private SessionState state = SessionState.CREATED;
+    private boolean attachMode = false;
     private boolean debugMode = false; // Default to run mode (without debugging)
     private SessionActor launchedBy; // Who last launched the session
     private Instant launchedAt; // When the session was last launched
@@ -145,7 +146,7 @@ public class DapSession implements DapEventListener {
 
 
         // Create DAP server using factory (allows custom implementations like JavaDebugServer)
-        this.dapServer = DapServerFactoryRegistry.getInstance().createServer(sessionId, serverConfig, workspace);
+        this.dapServer = DapServerFactoryRegistry.getInstance().createServer(this, serverConfig, workspace);
 
         // Note: setEventListener() must be called AFTER start() when dapClient is created
         // Listen to server status changes to update session state
@@ -444,8 +445,8 @@ public class DapSession implements DapEventListener {
         // Reset tracking for this new launch
         this.sentTerminateRequest = false;
         SessionState previousState = this.state;
-        boolean isAttach = "attach".equals(launchConfig.get("request"));
-        setState(isAttach ? SessionState.ATTACHING : SessionState.LAUNCHING);
+        this.attachMode = "attach".equals(launchConfig.get("request"));
+        setState(isAttach() ? SessionState.ATTACHING : SessionState.LAUNCHING);
 
         // Report progress: Starting debug adapter
         if (progressMonitor != null) {
@@ -1393,6 +1394,10 @@ public class DapSession implements DapEventListener {
 
     public Map<String, Object> getLaunchConfiguration() {
         return launchConfiguration;
+    }
+
+    public boolean isAttach() {
+        return attachMode;
     }
 
     public boolean isDebugMode() {

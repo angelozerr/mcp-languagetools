@@ -1,6 +1,7 @@
 package com.redhat.mcp.languagetools.dap.server;
 
 import com.redhat.mcp.languagetools.dap.client.DapClient;
+import com.redhat.mcp.languagetools.dap.session.DapSession;
 import com.redhat.mcp.languagetools.dap.transport.SocketTransportStreams;
 import com.redhat.mcp.languagetools.dap.transport.StdioTransportStreams;
 import com.redhat.mcp.languagetools.dap.transport.TransportStreams;
@@ -40,9 +41,15 @@ public class DapServer extends ServerBase<DapServerConfig> {
     protected DapClient dapClient;
     protected Integer allocatedPort; // Port allocated via ${port} substitution
     protected TransportStreams transportStreams; // Transport layer (stdio or socket)
+    private final DapSession session;
 
-    public DapServer(String sessionId, DapServerConfig config, Workspace workspace) {
-        super(config, workspace, config.getServerId() + "#" + sessionId);
+    public DapServer(DapSession session, DapServerConfig config, Workspace workspace) {
+        super(config, workspace, config.getServerId() + "#" + session.getSessionId());
+        this.session = session;
+    }
+
+    public DapSession getSession() {
+        return session;
     }
 
     @Override
@@ -70,6 +77,10 @@ public class DapServer extends ServerBase<DapServerConfig> {
             return CompletableFuture.completedFuture(null);
         }
 
+        if (session.isAttach()) {
+            return withErrorLogging(doStart());
+        }
+
         return withErrorLogging(
             getConfig().ensureInstalled(
                     getWorkspace().getApplication().getPathManager(),
@@ -82,8 +93,16 @@ public class DapServer extends ServerBase<DapServerConfig> {
     /**
      * Subclass hook called after installation is ensured.
      * Standalone servers launch a process; embedded servers (e.g., java-debug) can just set RUNNING.
+     * For attach mode with a server.json "attach" block, skip process launch -
+     * the connection will be established in enrichLaunchConfiguration().
      */
     protected CompletableFuture<Void> doStart() {
+        if (session.isAttach() && getConfig().getAttach() != null) {
+            LOG.infof("Attach mode - skipping process launch");
+            setStatus(ServerStatus.RUNNING);
+            setReady(true);
+            return CompletableFuture.completedFuture(null);
+        }
         if (getConfig().getLaunchForCurrentOS() != null) {
             return startServerProcess()
                 .thenCompose(this::waitForServerReady)
@@ -97,6 +116,11 @@ public class DapServer extends ServerBase<DapServerConfig> {
      * Override this method in subclasses to add custom resolution logic.
      * For example, JavaDebugServer resolves classpath, java executable, etc.
      *
+     * <p>Default implementation handles attach mode for standalone DAP servers (e.g., debugpy):
+     * resolves {@code $connect.host} and {@code $connect.port} JSON path references
+     * from the server.json {@code attach} block against the launch configuration,
+     * then connects to the DAP server via socket.</p>
+     *
      * @param launchConfig The initial launch configuration
      * @param sessionId The session ID for tracing
      * @return CompletableFuture with enriched configuration
@@ -104,8 +128,89 @@ public class DapServer extends ServerBase<DapServerConfig> {
     public CompletableFuture<Map<String, Object>> enrichLaunchConfiguration(
             Map<String, Object> launchConfig,
             String sessionId) {
-        // Default implementation: return config as-is
+        // For attach mode with a server.json "attach" block, resolve address/port and connect
+        if (session.isAttach()) {
+            Map<String, Object> attachConfig = getConfig().getAttach();
+            if (attachConfig != null) {
+                String addressRef = attachConfig.get("address") instanceof String s ? s : null;
+                Object portRef = attachConfig.get("port");
+
+                String host = resolveJsonPath(addressRef, launchConfig);
+                int port = resolveJsonPathAsInt(portRef, launchConfig);
+
+                if (host != null && port > 0) {
+                    LOG.infof("Attach mode: connecting to DAP server at %s:%d", host, port);
+                    return connectToSocket(host, port)
+                            .thenApply(v -> launchConfig);
+                }
+            }
+        }
         return CompletableFuture.completedFuture(launchConfig);
+    }
+
+    /**
+     * Resolve a JSON path reference (e.g., {@code $connect.host}) against a configuration map.
+     * If the value doesn't start with {@code $}, it is returned as-is.
+     */
+    private static String resolveJsonPath(String ref, Map<String, Object> config) {
+        if (ref == null) {
+            return null;
+        }
+        if (!ref.startsWith("$")) {
+            return ref;
+        }
+        String path = ref.substring(1);
+        Object result = walkPath(path, config);
+        return result != null ? result.toString() : null;
+    }
+
+    /**
+     * Resolve a JSON path reference to an integer.
+     * Handles both {@code $} references and literal numeric values.
+     */
+    private static int resolveJsonPathAsInt(Object ref, Map<String, Object> config) {
+        if (ref == null) {
+            return -1;
+        }
+        if (ref instanceof Number n) {
+            return n.intValue();
+        }
+        if (ref instanceof String s) {
+            if (s.startsWith("$")) {
+                Object result = walkPath(s.substring(1), config);
+                if (result instanceof Number n) {
+                    return n.intValue();
+                }
+                if (result instanceof String str) {
+                    try {
+                        return Integer.parseInt(str);
+                    } catch (NumberFormatException e) {
+                        return -1;
+                    }
+                }
+            } else {
+                try {
+                    return Integer.parseInt(s);
+                } catch (NumberFormatException e) {
+                    return -1;
+                }
+            }
+        }
+        return -1;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Object walkPath(String path, Map<String, Object> map) {
+        String[] parts = path.split("\\.");
+        Object current = map;
+        for (String part : parts) {
+            if (current instanceof Map<?, ?> m) {
+                current = m.get(part);
+            } else {
+                return null;
+            }
+        }
+        return current;
     }
 
     /**

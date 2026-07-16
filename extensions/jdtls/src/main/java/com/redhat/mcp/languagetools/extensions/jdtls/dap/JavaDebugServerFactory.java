@@ -17,7 +17,7 @@ public class JavaDebugServerFactory implements DapServerFactory {
 
     @Override
     public DapServer createServer(DapServerCreateParams params) {
-        return new JavaDebugServer(params.getSessionId(), params.getConfig(), params.getWorkspace());
+        return new JavaDebugServer(params.getSession(), params.getConfig(), params.getWorkspace());
     }
 
 }

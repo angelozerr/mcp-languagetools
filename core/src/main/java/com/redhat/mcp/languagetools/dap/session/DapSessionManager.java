@@ -240,7 +240,7 @@ public class DapSessionManager {
 
         for (DapServerConfig config : application.getDapServerConfigs()) {
             // Check if this adapter supports the file's language
-            if (config.canHandle(null, language)) {
+            if (config.canHandle(fileUri.toString(), language)) {
                 adapters.add(buildAdapterInfo(config));
             }
         }

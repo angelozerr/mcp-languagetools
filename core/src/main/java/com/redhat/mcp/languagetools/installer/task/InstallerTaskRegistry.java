@@ -21,7 +21,8 @@ public class InstallerTaskRegistry {
     }
 
     private void loadFactories() {
-        ServiceLoader<InstallerTaskFactory> loader = ServiceLoader.load(InstallerTaskFactory.class);
+        ServiceLoader<InstallerTaskFactory> loader = ServiceLoader.load(
+                InstallerTaskFactory.class, InstallerTaskFactory.class.getClassLoader());
         for (InstallerTaskFactory factory : loader) {
             String type = factory.getType();
             factories.put(type, factory);

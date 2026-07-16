@@ -1,22 +1,23 @@
 package com.redhat.mcp.languagetools.dap.server;
 
+import com.redhat.mcp.languagetools.dap.session.DapSession;
 import com.redhat.mcp.languagetools.server.ServerCreateParams;
 import com.redhat.mcp.languagetools.workspace.Workspace;
 
 /**
  * Parameters for creating a DAP server instance.
- * Extends base parameters with DAP-specific sessionId.
+ * Extends base parameters with DAP-specific session reference.
  */
 public class DapServerCreateParams extends ServerCreateParams<DapServerConfig> {
 
-    private final String sessionId;
+    private final DapSession session;
 
-    public DapServerCreateParams(String sessionId, DapServerConfig config, Workspace workspace) {
+    public DapServerCreateParams(DapSession session, DapServerConfig config, Workspace workspace) {
         super(config, workspace);
-        this.sessionId = sessionId;
+        this.session = session;
     }
 
-    public String getSessionId() {
-        return sessionId;
+    public DapSession getSession() {
+        return session;
     }
 }

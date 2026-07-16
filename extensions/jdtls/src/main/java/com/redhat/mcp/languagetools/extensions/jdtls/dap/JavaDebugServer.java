@@ -3,6 +3,7 @@ package com.redhat.mcp.languagetools.extensions.jdtls.dap;
 import com.redhat.mcp.languagetools.dap.client.DapClient;
 import com.redhat.mcp.languagetools.dap.server.DapServer;
 import com.redhat.mcp.languagetools.dap.server.DapServerConfig;
+import com.redhat.mcp.languagetools.dap.session.DapSession;
 import com.redhat.mcp.languagetools.server.ServerStatus;
 import com.redhat.mcp.languagetools.workspace.Workspace;
 import org.jboss.logging.Logger;
@@ -33,8 +34,8 @@ public class JavaDebugServer extends DapServer {
     private static final String CMD_RESOLVE_JAVA_EXECUTABLE = "vscode.java.resolveJavaExecutable";
     private static final String CMD_START_DEBUG_SESSION = "vscode.java.startDebugSession";
 
-    public JavaDebugServer(String sessionId, DapServerConfig config, Workspace workspace) {
-        super(sessionId, config, workspace);
+    public JavaDebugServer(DapSession session, DapServerConfig config, Workspace workspace) {
+        super(session, config, workspace);
     }
 
     /**

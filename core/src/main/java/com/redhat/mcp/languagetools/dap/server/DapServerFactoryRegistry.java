@@ -1,12 +1,9 @@
 package com.redhat.mcp.languagetools.dap.server;
 
+import com.redhat.mcp.languagetools.dap.session.DapSession;
 import com.redhat.mcp.languagetools.server.ServerFactoryRegistryBase;
 import com.redhat.mcp.languagetools.workspace.Workspace;
-import jakarta.enterprise.context.ApplicationScoped;
 import org.jboss.logging.Logger;
-
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * Registry for DAP server factories.
@@ -30,15 +27,15 @@ public class DapServerFactoryRegistry extends ServerFactoryRegistryBase<DapServe
 
     /**
      * Create a DAP server instance based on the config.
-     * Convenience method that wraps sessionId, config and workspace in params.
+     * Convenience method that wraps session, config and workspace in params.
      *
-     * @param sessionId The session ID (for embedded servers like java-debug)
+     * @param session The DAP session
      * @param config The DAP server configuration
      * @param workspace The workspace
      * @return The created DAP server (never null - falls back to default)
      */
-    public DapServer createServer(String sessionId, DapServerConfig config, Workspace workspace) {
-        return createServer(new DapServerCreateParams(sessionId, config, workspace));
+    public DapServer createServer(DapSession session, DapServerConfig config, Workspace workspace) {
+        return createServer(new DapServerCreateParams(session, config, workspace));
     }
 
     @Override
