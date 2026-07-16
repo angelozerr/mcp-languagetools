@@ -24,4 +24,7 @@ public final class ToolArgDescriptions {
     public static final String POSITION_CHARACTER = "Character position in the line (0-based)";
 
     public static final String CANCELLATION = "Cancellation operation";
+
+    public static final String OPEN_DOCUMENT_HINT =
+        " For multiple operations on the same file, use open_document first to avoid repeated open/close cycles, then close_document when done.";
 }

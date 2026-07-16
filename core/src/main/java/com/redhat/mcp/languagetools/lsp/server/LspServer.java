@@ -52,6 +52,7 @@ public class LspServer extends ServerBase<LspServerConfig> {
     private GenericLanguageClient languageClient;
     private final Map<String, List<Diagnostic>> diagnosticsCache = new ConcurrentHashMap<>();
     private final Set<String> openedFiles = ConcurrentHashMap.newKeySet();
+    private final Set<String> explicitlyOpenedFiles = ConcurrentHashMap.newKeySet();
     private boolean isSocketConnection = false;
     private InstanceFileWatcher fileWatcher;
     private LspInstanceRegistry.InstanceInfo currentInstance;
@@ -714,6 +715,78 @@ public class LspServer extends ServerBase<LspServerConfig> {
      */
     public void markFileClosed(String uri) {
         openedFiles.remove(uri);
+    }
+
+    /**
+     * Open a file in this server via didOpen (if not already opened).
+     */
+    public void openFile(String uri, String languageId) {
+        if (!isFileOpened(uri)) {
+            ensureFileOpened(uri, languageId);
+        }
+    }
+
+    /**
+     * Close a file in this server via didClose.
+     */
+    public void closeFile(String uri) {
+        if (!isFileOpened(uri) || languageServer == null) {
+            return;
+        }
+        try {
+            DidCloseTextDocumentParams closeParams = new DidCloseTextDocumentParams();
+            closeParams.setTextDocument(new TextDocumentIdentifier(uri));
+            languageServer.getTextDocumentService().didClose(closeParams);
+            markFileClosed(uri);
+        } catch (Exception e) {
+            LOG.warnf(e, "Failed to send didClose for %s", uri);
+        }
+    }
+
+    /**
+     * Open a file explicitly (via open_document tool). File stays open until closeFileExplicitly is called.
+     */
+    public void openFileExplicitly(String uri, String languageId) {
+        openFile(uri, languageId);
+        explicitlyOpenedFiles.add(uri);
+    }
+
+    /**
+     * Close a file previously opened explicitly (via close_document tool).
+     */
+    public void closeFileExplicitly(String uri) {
+        explicitlyOpenedFiles.remove(uri);
+        closeFile(uri);
+    }
+
+    /**
+     * Check if a file was explicitly opened via open_document tool.
+     */
+    public boolean isExplicitlyOpened(String uri) {
+        return explicitlyOpenedFiles.contains(uri);
+    }
+
+    /**
+     * Execute a request with auto didOpen/didClose if needed.
+     * If the server's config has skipDidOpen for this capability, the request runs directly.
+     * Otherwise, the file is auto-opened before and auto-closed after (unless explicitly opened).
+     */
+    public <T> CompletableFuture<T> withAutoDidOpen(
+            LspCapability capability, String fileUri, String languageId,
+            java.util.function.Supplier<CompletableFuture<T>> request) {
+        if (getConfig().isSkipDidOpen(capability)) {
+            return request.get();
+        }
+        boolean wasAlreadyOpened = isFileOpened(fileUri);
+        if (!wasAlreadyOpened) {
+            openFile(fileUri, languageId);
+        }
+        return request.get()
+                .whenComplete((result, ex) -> {
+                    if (!wasAlreadyOpened && !isExplicitlyOpened(fileUri)) {
+                        closeFile(fileUri);
+                    }
+                });
     }
 
     /**

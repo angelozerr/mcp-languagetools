@@ -1,6 +1,7 @@
 package com.redhat.mcp.languagetools.lsp.server;
 
 import com.redhat.mcp.languagetools.Application;
+import com.redhat.mcp.languagetools.lsp.client.LspCapability;
 import com.redhat.mcp.languagetools.server.ServerConfigBase;
 import com.redhat.mcp.languagetools.utils.OSUtils;
 
@@ -37,10 +38,10 @@ public class LspServerConfig extends ServerConfigBase {
     private Map<String, Object> initializationOptions = new HashMap<>();
 
     /**
-     * Whether the server requires didOpen before position-based requests (references, definition, etc.).
-     * Defaults to true (standard LSP behavior). Set to false for servers that index the whole project (e.g. JDTLS).
+     * Whether to skip sending didOpen before position-based requests (references, definition, etc.).
+     * Defaults to false (didOpen is sent). Set to true for servers that index the whole project (e.g. JDTLS, pyright).
      */
-    private boolean requiresDidOpen = true;
+    private boolean skipDidOpen;
 
     public LspServerConfig(String serverId, Application application) {
         super(serverId, application.getPathManager().getLspServerHome(serverId), application);
@@ -135,6 +136,14 @@ public class LspServerConfig extends ServerConfigBase {
 
     public void setInitializationOptions(Map<String, Object> initializationOptions) {
         this.initializationOptions = initializationOptions;
+    }
+
+    public boolean isSkipDidOpen(LspCapability capability) {
+        return skipDidOpen;
+    }
+
+    public void setSkipDidOpen(boolean skipDidOpen) {
+        this.skipDidOpen = skipDidOpen;
     }
 
     @Override

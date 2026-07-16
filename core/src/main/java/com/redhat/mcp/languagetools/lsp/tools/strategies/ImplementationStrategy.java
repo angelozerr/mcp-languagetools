@@ -40,7 +40,7 @@ public class ImplementationStrategy extends FilePositionBasedStrategy<Implementa
     }
 
     @Override
-    public CompletableFuture<Either<List<? extends Location>, List<? extends LocationLink>>> executeRequest(
+    protected CompletableFuture<Either<List<? extends Location>, List<? extends LocationLink>>> doExecuteRequest(
             LspServer server, ImplementationParams lspParams) {
         return server.getLanguageServer()
                 .getTextDocumentService()

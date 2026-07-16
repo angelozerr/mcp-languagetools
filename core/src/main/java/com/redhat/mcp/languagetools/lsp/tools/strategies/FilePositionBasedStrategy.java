@@ -19,7 +19,9 @@ import com.redhat.mcp.languagetools.lsp.server.LspServerResolver;
 import com.redhat.mcp.languagetools.lsp.tools.LspRequestExecutor;
 import com.redhat.mcp.languagetools.lsp.tools.params.FilePositionRequestParams;
 import com.redhat.mcp.languagetools.progress.ProgressMonitor;
+import org.eclipse.lsp4j.TextDocumentPositionParams;
 
+import java.net.URI;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
@@ -69,6 +71,26 @@ public abstract class FilePositionBasedStrategy<TLspParams, TResult>
                 server -> server.isEnabled() && server.supportsCapability(getCapability(), document),
                 progressMonitor
         );
+    }
+
+    @Override
+    public final CompletableFuture<TResult> executeRequest(LspServer server, TLspParams lspParams) {
+        String fileUri = extractFileUri(lspParams);
+        if (fileUri == null) {
+            return doExecuteRequest(server, lspParams);
+        }
+        String languageId = languageRegistry.detectLanguage(URI.create(fileUri)).orElse("");
+        return server.withAutoDidOpen(capability, fileUri, languageId,
+                () -> doExecuteRequest(server, lspParams));
+    }
+
+    protected abstract CompletableFuture<TResult> doExecuteRequest(LspServer server, TLspParams lspParams);
+
+    protected String extractFileUri(TLspParams lspParams) {
+        if (lspParams instanceof TextDocumentPositionParams p) {
+            return p.getTextDocument().getUri();
+        }
+        return null;
     }
 
     @Override

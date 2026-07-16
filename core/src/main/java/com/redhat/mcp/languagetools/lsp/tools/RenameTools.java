@@ -25,7 +25,8 @@ public class RenameTools {
     @Tool(name = "rename",
           description = "Rename a symbol at a specific position across the entire workspace. " +
                         "Returns the list of file edits that would be applied. " +
-                        "Example: rename(cwd='/home/user/project', fileUri='file:///home/user/project/src/Main.java', line=10, character=5, newName='newMethodName')")
+                        "Example: rename(cwd='/home/user/project', fileUri='file:///home/user/project/src/Main.java', line=10, character=5, newName='newMethodName')" +
+                        ToolArgDescriptions.OPEN_DOCUMENT_HINT)
     public CompletableFuture<String> rename(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,

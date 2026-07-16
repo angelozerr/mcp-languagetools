@@ -46,7 +46,7 @@ public class ReferencesStrategy extends FilePositionBasedStrategy<ReferenceParam
     }
 
     @Override
-    public CompletableFuture<List<? extends Location>> executeRequest(LspServer server, ReferenceParams lspParams) {
+    protected CompletableFuture<List<? extends Location>> doExecuteRequest(LspServer server, ReferenceParams lspParams) {
         return server.getLanguageServer()
                 .getTextDocumentService()
                 .references(lspParams);

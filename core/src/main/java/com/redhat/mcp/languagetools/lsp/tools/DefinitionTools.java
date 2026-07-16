@@ -38,7 +38,8 @@ public class DefinitionTools {
 
     @Tool(description = "Go to the definition of a symbol at a specific position in a file. " +
                         "Returns the location where the symbol is defined. " +
-                        "Example: goToDefinition(cwd='/home/user/project', fileUri='file:///home/user/project/src/Main.java', line=10, character=5)")
+                        "Example: goToDefinition(cwd='/home/user/project', fileUri='file:///home/user/project/src/Main.java', line=10, character=5)" +
+                        ToolArgDescriptions.OPEN_DOCUMENT_HINT)
     public CompletableFuture<String> goToDefinition(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,

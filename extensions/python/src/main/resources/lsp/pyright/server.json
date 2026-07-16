@@ -2,6 +2,9 @@
   "id": "pyright",
   "name": "Pyright (Python Language Server)",
   "description": "Python language server based on Pyright",
+  "toolsRequest": {
+    "skipDidOpen": true
+  },
   "documentSelector": [
     {
       "language": "python"

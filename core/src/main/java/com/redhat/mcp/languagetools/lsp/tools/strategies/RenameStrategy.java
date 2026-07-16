@@ -11,6 +11,7 @@ import com.redhat.mcp.languagetools.progress.ProgressMonitor;
 import org.eclipse.lsp4j.*;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;
 
+import java.net.URI;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -58,9 +59,12 @@ public class RenameStrategy implements LspRequestExecutor.LspRequestStrategy<Ren
 
     @Override
     public CompletableFuture<WorkspaceEdit> executeRequest(LspServer server, RenameParams lspParams) {
-        return server.getLanguageServer()
-                .getTextDocumentService()
-                .rename(lspParams);
+        String fileUri = lspParams.getTextDocument().getUri();
+        String languageId = languageRegistry.detectLanguage(URI.create(fileUri)).orElse("");
+        return server.withAutoDidOpen(LspCapability.RENAME, fileUri, languageId,
+                () -> server.getLanguageServer()
+                        .getTextDocumentService()
+                        .rename(lspParams));
     }
 
     @Override

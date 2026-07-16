@@ -23,6 +23,8 @@ public class LspServerDescriptorLoader extends ServerDescriptorLoaderBase<LspSer
     private static final String FIELD_ENV = "env";
     private static final String FIELD_WORKING_DIRECTORY = "workingDirectory";
     private static final String FIELD_INITIALIZATION_OPTIONS = "initializationOptions";
+    private static final String FIELD_TOOLS_REQUEST = "toolsRequest";
+    private static final String FIELD_SKIP_DID_OPEN = "skipDidOpen";
 
     @Override
     public String getRoot() {
@@ -66,6 +68,15 @@ public class LspServerDescriptorLoader extends ServerDescriptorLoaderBase<LspSer
             );
             config.setInitializationOptions(initOptions);
         }
+
+        // Tools request settings
+        if (jsonObject.has(FIELD_TOOLS_REQUEST)) {
+            JsonObject toolsRequest = jsonObject.getAsJsonObject(FIELD_TOOLS_REQUEST);
+            if (toolsRequest.has(FIELD_SKIP_DID_OPEN)) {
+                config.setSkipDidOpen(toolsRequest.get(FIELD_SKIP_DID_OPEN).getAsBoolean());
+            }
+        }
+
         return jsonObject;
     }
 
