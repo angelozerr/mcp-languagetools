@@ -93,7 +93,9 @@ public class TaskRegistryInstaller implements ServerInstaller {
 
                 InstallerTask runTask = parseTaskNode(installerConfig.get(FIELD_RUN));
                 if (runTask == null) {
-                    throw new IllegalStateException("No run task defined in installer.json");
+                    JsonObject runObj = installerConfig.getAsJsonObject(FIELD_RUN);
+                    String taskType = runObj != null && runObj.size() > 0 ? runObj.keySet().iterator().next() : "unknown";
+                    throw new IllegalStateException("Failed to create run task of type '" + taskType + "' from installer.json (registered factories: " + registry.getRegisteredTypes() + ")");
                 }
 
                 boolean success = runTask.execute(context);

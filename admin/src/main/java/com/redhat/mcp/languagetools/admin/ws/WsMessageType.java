@@ -11,7 +11,8 @@ public enum WsMessageType {
     SERVER_STATUS_CHANGED("server-status-changed"),
     WORKSPACES_UPDATE("workspaces-update"),
     MCP_CLIENTS_UPDATE("mcp-clients-update"),
-    DAP_SESSION_UPDATE("dap-session-update");
+    DAP_SESSION_UPDATE("dap-session-update"),
+    TRACE_LEVEL_UPDATE("trace-level-update");
 
     private final String label;
 

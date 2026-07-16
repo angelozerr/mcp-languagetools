@@ -23,6 +23,10 @@
         let lspConfigs = {}; // Map<serverId, LspConfigDTO>
         let dapConfigs = {}; // Map<serverId, DapConfigDTO>
 
+        // Trace levels received via WebSocket: { "lsp.serverId": level, "dap.serverId": level, "mcp": level }
+        let traceLevels = {};
+        window.traceLevels = traceLevels;
+
         // Expose configs and merge function globally for admin-lsp.js and admin-dap.js
         window.lspConfigs = lspConfigs;
         window.dapConfigs = dapConfigs;
@@ -73,12 +77,17 @@
             const labels = {
                 'NOT_STARTED': 'Not Started',
                 'INSTALLING': 'Installing',
+                'INSTALL_FAILED': 'Install Failed',
                 'STARTING': 'Starting',
+                'START_FAILED': 'Start Failed',
                 'RUNNING': 'Running',
                 'STOPPING': 'Stopping',
                 'STOPPED': 'Stopped',
                 'ERROR': 'Error',
-                'CONNECTED_TO_IDE': 'Connected to IDE'
+                'SWITCHING': 'Switching',
+                'CONNECTING_TO_IDE': 'Connecting to IDE',
+                'CONNECTED_TO_IDE': 'Connected to IDE',
+                'DISCONNECTING': 'Disconnecting'
             };
 
             // If connected to IDE and we have client info, show it
@@ -299,6 +308,9 @@
                 case 'server-status-changed':
                     handleServerStatusChanged(message);
                     break;
+                case 'trace-level-update':
+                    handleTraceLevelUpdate(message);
+                    break;
                 default:
                     console.warn('Unknown WebSocket message type:', message.type);
             }
@@ -515,6 +527,41 @@
             if (JSON.stringify(newClients) !== JSON.stringify(mcpClients)) {
                 mcpClients = newClients;
                 renderMcpClients();
+            }
+        }
+
+        /**
+         * Handle trace level update from WebSocket.
+         */
+        function handleTraceLevelUpdate(message) {
+            const key = message.serverId
+                ? message.serverType + '.' + message.serverId
+                : message.serverType;
+            traceLevels[key] = message.traceLevel;
+            window.traceLevels = traceLevels;
+
+            if (message.serverType === 'lsp') {
+                // Update workspace LSP trace controls
+                if (window.currentServerId === message.serverId) {
+                    if (typeof currentTraceLevel !== 'undefined') {
+                        currentTraceLevel = message.traceLevel;
+                    }
+                    TraceRenderer.updateTraceControls('trace', message.traceLevel);
+                    if (typeof renderConsole === 'function') renderConsole();
+                }
+                // Update global LSP server detail combo
+                TraceRenderer.updateTraceControls('lsp-server-trace', message.traceLevel);
+            } else if (message.serverType === 'mcp') {
+                if (typeof mcpTraceLevel !== 'undefined') {
+                    mcpTraceLevel = message.traceLevel;
+                }
+                TraceRenderer.updateTraceControls('mcp-trace', message.traceLevel);
+                if (typeof renderMcpConsole === 'function') renderMcpConsole();
+            } else if (message.serverType === 'dap' && window.currentDapServerId === message.serverId) {
+                TraceRenderer.updateTraceControls('dap-trace', message.traceLevel);
+                if (window.currentDapSessionId && typeof renderDapTracesForSession === 'function') {
+                    renderDapTracesForSession(window.currentDapSessionId);
+                }
             }
         }
 

@@ -96,6 +96,16 @@ public class Settings {
         save();
     }
 
+    public Map<String, String> getTraceLevelEntries() {
+        Map<String, String> result = new LinkedHashMap<>();
+        for (Map.Entry<String, String> entry : settings.entrySet()) {
+            if (entry.getKey().endsWith(".trace")) {
+                result.put(entry.getKey(), entry.getValue());
+            }
+        }
+        return result;
+    }
+
     // ========== LSP trace ==========
 
     public ServerTrace getLspTraceLevel(String serverId) {

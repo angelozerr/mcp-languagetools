@@ -119,6 +119,8 @@ async function showServerDetails(serverId) {
         // Contributions tab content (use same function as workspace, pass allServers)
         const contributionsHTML = formatContributionsSection(details, allServers);
 
+        const lspTraceLevel = (window.traceLevels && window.traceLevels['lsp.' + serverId]) || 'off';
+
         const html = `
             <div class="console-header">
                 <div class="console-title">
@@ -129,6 +131,9 @@ async function showServerDetails(serverId) {
                     <button class="tab-button ${currentServerTab === 'overview' ? 'active' : ''}" onclick="switchServerTab('overview')">Overview</button>
                     <button class="tab-button ${currentServerTab === 'contributions' ? 'active' : ''}" onclick="switchServerTab('contributions')">Contributions</button>
                     <button class="tab-button ${currentServerTab === 'install' ? 'active' : ''}" onclick="switchServerTab('install')">Install</button>
+                </div>
+                <div class="console-controls">
+                    ${TraceRenderer.renderTraceControls('lsp-server-trace', lspTraceLevel, `changeLspServerTraceLevel('${serverId}', this.value)`)}
                 </div>
             </div>
             <div class="tab-content">
@@ -434,6 +439,21 @@ function formatContributeInfo(server, contributedByMap) {
 
 // renderServerDiagram() is defined in diagram.js - do not override it here
 
+async function changeLspServerTraceLevel(serverId, level) {
+    if (window.traceLevels) {
+        window.traceLevels['lsp.' + serverId] = level;
+    }
+    try {
+        await fetch(`/api/admin/traces/lsp/${serverId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ traceLevel: level })
+        });
+    } catch (e) {
+        console.error('Failed to save LSP trace level:', e);
+    }
+}
+
 // Expose functions globally
 window.loadAllLspServers = loadAllLspServers;
 window.showServerDetails = showServerDetails;
@@ -445,3 +465,4 @@ window.runInstaller = runInstaller;
 window.buildContributedByMap = buildContributedByMap;
 window.formatContributeInfo = formatContributeInfo;
 window.renderServerDiagram = renderServerDiagram;
+window.changeLspServerTraceLevel = changeLspServerTraceLevel;

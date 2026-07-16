@@ -51,4 +51,11 @@ public class InstallerTaskRegistry {
     public boolean hasFactory(String type) {
         return factories.containsKey(type);
     }
+
+    /**
+     * Returns the set of registered task type names (for diagnostics).
+     */
+    public java.util.Set<String> getRegisteredTypes() {
+        return factories.keySet();
+    }
 }

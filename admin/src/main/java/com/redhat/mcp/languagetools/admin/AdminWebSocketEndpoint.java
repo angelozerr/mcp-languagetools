@@ -13,6 +13,7 @@ import com.redhat.mcp.languagetools.lsp.trace.LspTraceMessage;
 import com.redhat.mcp.languagetools.mcp.trace.McpTrace;
 import com.redhat.mcp.languagetools.mcp.trace.McpTraceCollector;
 import com.redhat.mcp.languagetools.progress.ProgressBroadcaster;
+import com.redhat.mcp.languagetools.settings.Settings;
 import com.redhat.mcp.languagetools.workspace.Workspace;
 import com.redhat.mcp.languagetools.workspace.WorkspaceChangeEvent;
 import com.redhat.mcp.languagetools.Application;
@@ -64,6 +65,9 @@ public class AdminWebSocketEndpoint {
     @Inject
     AdminProgressBroadcaster progressBroadcaster;
 
+    @Inject
+    Settings settings;
+
     // Thread-safe set of active WebSocket sessions
     private final Set<Session> sessions = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
@@ -105,6 +109,9 @@ public class AdminWebSocketEndpoint {
                     getCurrentMcpClients()
             );
             sendToSession(session, clientsMsg);
+
+            // Send trace levels early so the UI has them before trace history
+            sendTraceLevels(session);
 
             // Send LSP trace history for all servers
             sendLspTraceHistory(session);
@@ -227,6 +234,49 @@ public class AdminWebSocketEndpoint {
         } catch (Exception e) {
             LOG.errorf(e, "Failed to send progress state to session: %s", session.getId());
         }
+    }
+
+    /**
+     * Send saved trace levels to a newly connected session.
+     * Parses settings keys like "lsp.serverId.trace", "dap.serverId.trace", "mcp.trace".
+     */
+    private void sendTraceLevels(Session session) {
+        try {
+            for (var entry : settings.getTraceLevelEntries().entrySet()) {
+                String key = entry.getKey();
+                String traceLevel = entry.getValue();
+                TraceLevelWsMessage msg = parseTraceLevelKey(key, traceLevel);
+                if (msg != null) {
+                    sendToSession(session, msg);
+                }
+            }
+            LOG.debugf("Trace levels sent to session: %s", session.getId());
+        } catch (Exception e) {
+            LOG.errorf(e, "Failed to send trace levels to session: %s", session.getId());
+        }
+    }
+
+    private TraceLevelWsMessage parseTraceLevelKey(String key, String traceLevel) {
+        // key format: "lsp.serverId.trace", "dap.serverId.trace", "mcp.trace"
+        if (key.equals("mcp.trace")) {
+            return new TraceLevelWsMessage("mcp", null, traceLevel);
+        }
+        if (key.startsWith("lsp.") && key.endsWith(".trace")) {
+            String serverId = key.substring(4, key.length() - 6);
+            return new TraceLevelWsMessage("lsp", serverId, traceLevel);
+        }
+        if (key.startsWith("dap.") && key.endsWith(".trace")) {
+            String serverId = key.substring(4, key.length() - 6);
+            return new TraceLevelWsMessage("dap", serverId, traceLevel);
+        }
+        return null;
+    }
+
+    /**
+     * CDI observer for trace level changes — broadcasts to all clients.
+     */
+    void onTraceLevelUpdate(@Observes TraceLevelWsMessage msg) {
+        broadcast(msg);
     }
 
     /**

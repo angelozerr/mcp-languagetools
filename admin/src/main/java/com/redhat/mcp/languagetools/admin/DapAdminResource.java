@@ -1,19 +1,16 @@
 package com.redhat.mcp.languagetools.admin;
 
 import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 import com.redhat.mcp.languagetools.PathManager;
 import com.redhat.mcp.languagetools.admin.dto.ContributionDTOBuilder;
 import com.redhat.mcp.languagetools.admin.dto.DapConfigDTO;
 import com.redhat.mcp.languagetools.admin.dto.ErrorResponse;
 import com.redhat.mcp.languagetools.admin.dto.StatusResponse;
-import com.redhat.mcp.languagetools.settings.Settings;
 import com.redhat.mcp.languagetools.dap.server.DapServerConfig;
 import com.redhat.mcp.languagetools.installer.TaskRegistryInstaller;
 import com.redhat.mcp.languagetools.installer.TraceProgressMonitor;
 import com.redhat.mcp.languagetools.Application;
 import com.redhat.mcp.languagetools.progress.ProgressBroadcaster;
-import com.redhat.mcp.languagetools.settings.ServerTrace;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
@@ -48,9 +45,6 @@ public class DapAdminResource {
 
     @Inject
     ProgressBroadcaster progressBroadcaster;
-
-    @Inject
-    Settings settings;
 
     // ========== DAP Configs ==========
 
@@ -195,39 +189,4 @@ public class DapAdminResource {
         return Response.ok(Map.of("serverId", serverId, "templates", templates)).build();
     }
 
-    // Note: DAP sessions endpoints are in DapSessionResource (moved there)
-
-    @GET
-    @Path("/configs/{serverId}/trace")
-    public Response getTraceLevel(@PathParam("serverId") String serverId) {
-        ServerTrace level = settings.getDapTraceLevel(serverId);
-        return Response.ok()
-                .entity("{\"serverId\": \"" + serverId + "\", \"trace\": \"" + level + "\"}")
-                .build();
-    }
-
-    @PUT
-    @Path("/configs/{serverId}/trace")
-    @Consumes(MediaType.APPLICATION_JSON)
-    public Response setTraceLevel(@PathParam("serverId") String serverId, String body) {
-        try {
-            String trace = JsonParser.parseString(body)
-                    .getAsJsonObject()
-                    .get("trace")
-                    .getAsString();
-
-            ServerTrace level = ServerTrace.fromValue(trace);
-
-            settings.setDapTraceLevel(serverId, level);
-
-            return Response.ok()
-                    .entity("{\"serverId\": \"" + serverId + "\", \"trace\": \"" + level + "\"}")
-                    .build();
-
-        } catch (Exception e) {
-            return Response.status(400)
-                    .entity("{\"error\": \"" + e.getMessage() + "\"}")
-                    .build();
-        }
-    }
 }

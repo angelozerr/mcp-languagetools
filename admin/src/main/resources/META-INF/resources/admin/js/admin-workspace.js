@@ -529,6 +529,7 @@
         }
 
         function selectDapSession(sessionId) {
+            selectedServer = null;
             // Forward to admin-dap.js
             if (typeof window.selectDapSession === 'function') {
                 window.selectDapSession(sessionId);
@@ -536,18 +537,12 @@
         }
 
         function selectDapServer(dapServer) {
-            // DAP server selection in workspace - show overview/contributions
-            const wasAlreadySelected = selectedServer && selectedServer.id === dapServer.id;
-            // Mark as DAP server for proper icon display
             selectedServer = {...dapServer, isDap: true};
+            // Sync local variable with global (may have been updated by DELETED handler)
+            dapSessions = window.dapSessions || [];
             const workspace = workspaces.find(w => w.rootUri === selectedWorkspace);
-            // Use global dapSessions, not workspace.dapSessions (doesn't exist anymore)
-            renderServers([], dapSessions || [], workspace);
-
-            // Load console for DAP server
-            if (!wasAlreadySelected) {
-                loadConsole({...dapServer, isDap: true});
-            }
+            renderServers([], dapSessions, workspace);
+            loadConsole({...dapServer, isDap: true});
         }
 
         function selectDapSessionByServerId(serverId) {
@@ -583,7 +578,8 @@
             const workspace = workspaces.find(w => w.rootUri === selectedWorkspace);
             // Use the correct data based on current tab
             if (currentWorkspaceTab === 'debuggers') {
-                renderServers([], dapSessions || [], workspace);
+                dapSessions = window.dapSessions || [];
+                renderServers([], dapSessions, workspace);
             } else {
                 renderServers(workspace?.lspServers || [], [], workspace);
             }
@@ -609,37 +605,30 @@
         // window.currentServerId is declared in admin.js and used globally
 
         async function changeTraceLevel(level) {
-            if (!window.currentServerId) {
-                console.error('No server selected');
-                return;
-            }
+            currentTraceLevel = level;
+            updateTracesButtonsState(level);
+            renderConsole();
 
-            try {
-                const response = await fetch(`/api/admin/lsp/configs/${window.currentServerId}/trace`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ trace: level })
-                });
-
-                if (!response.ok) {
-                    throw new Error('Failed to save trace level');
+            if (selectedServer && selectedServer.isDap) {
+                changeDapServerTraceLevel(selectedServer.id, level);
+            } else if (window.currentServerId) {
+                if (window.traceLevels) {
+                    window.traceLevels['lsp.' + window.currentServerId] = level;
                 }
-
-                currentTraceLevel = level;
-                console.log('Trace level changed to:', level, 'for server:', window.currentServerId);
-
-                // Show/hide fold button based on level
-                const foldButton = document.getElementById('fold-button');
-                if (foldButton) {
-                    foldButton.style.display = (level === 'messages') ? 'none' : 'inline-block';
+                try {
+                    await fetch(`/api/admin/traces/lsp/${window.currentServerId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ traceLevel: level })
+                    });
+                } catch (error) {
+                    console.error('Failed to change trace level:', error);
                 }
-
-                // Re-render console with new filter
-                renderConsole();
-            } catch (error) {
-                console.error('Failed to change trace level:', error);
-                alert('Failed to save trace level: ' + error.message);
             }
+        }
+
+        function updateTracesButtonsState(level) {
+            TraceRenderer.updateTraceControls('trace', level);
         }
 
         /**
@@ -698,17 +687,13 @@
                             ${hasContributions ? `<button class="tab-button ${currentConsoleTab === 'contributions' ? 'active' : ''}" onclick="switchConsoleTab('contributions')">Contributions</button>` : ''}
                             <button class="tab-button ${currentConsoleTab === 'install' ? 'active' : ''}" onclick="switchConsoleTab('install')">Install</button>
                         </div>
-                        <div class="console-controls" id="traces-controls">
-                            <label style="color: #cccccc; font-size: 0.85rem;">
-                                Trace Level:
-                                <select id="trace-level" onchange="changeTraceLevel(this.value)" style="margin-left: 0.5rem; background: #3e3e42; color: #cccccc; border: 1px solid #555; padding: 0.25rem 0.5rem; border-radius: 3px;">
-                                    <option value="off">Off</option>
-                                    <option value="messages">Messages</option>
-                                    <option value="verbose" selected>Verbose</option>
-                                </select>
-                            </label>
-                            <button onclick="toggleAllTraces()" id="fold-button">Unfold All</button>
-                            <button onclick="clearConsole()">Clear</button>
+                        <div class="console-controls">
+                            ${TraceRenderer.renderTraceControls('trace', currentTraceLevel, 'changeTraceLevel(this.value)', {
+                                onFold: 'toggleAllTraces()',
+                                onClear: 'clearConsole()',
+                                wrapperId: 'traces-controls',
+                                wrapperDisplay: currentConsoleTab === 'traces' ? 'contents' : 'none'
+                            })}
                         </div>
                     </div>
                     <div class="tab-content">
@@ -769,25 +754,15 @@
                 setTimeout(() => renderWorkspaceDiagram(allServers, server.id), 100);
             }
 
-            // Load and initialize trace level selector with saved value
-            try {
-                const traceLevelResponse = await fetch(`/api/admin/lsp/configs/${server.id}/trace`);
-                const traceLevelData = await traceLevelResponse.json();
-                currentTraceLevel = traceLevelData.trace || 'verbose';
-
-                const traceLevelSelect = document.getElementById('trace-level');
-                if (traceLevelSelect) {
-                    traceLevelSelect.value = currentTraceLevel;
-                }
-
-                // Show/hide fold button based on level
-                const foldButton = document.getElementById('fold-button');
-                if (foldButton) {
-                    foldButton.style.display = (currentTraceLevel === 'messages') ? 'none' : 'inline-block';
-                }
-            } catch (error) {
-                console.error('Failed to load trace level:', error);
+            // Initialize trace level selector from WebSocket-provided data
+            const traceKey = server.isDap ? 'dap.' + server.id : 'lsp.' + server.id;
+            const savedTraceLevel = window.traceLevels && window.traceLevels[traceKey];
+            currentTraceLevel = savedTraceLevel || 'off';
+            const traceLevelSelect = document.getElementById('trace-level');
+            if (traceLevelSelect) {
+                traceLevelSelect.value = currentTraceLevel;
             }
+            updateTracesButtonsState(currentTraceLevel);
 
             // Load traces for specific workspace + server
             try {
@@ -1084,7 +1059,7 @@
             // Show/hide controls
             const tracesControls = document.getElementById('traces-controls');
             if (tracesControls) {
-                tracesControls.style.display = tabName === 'traces' ? 'flex' : 'none';
+                tracesControls.style.display = tabName === 'traces' ? 'contents' : 'none';
             }
 
             // Show/hide search box (only visible in traces tab)
@@ -1282,7 +1257,7 @@
         }
 
         function toggleAllTraces() {
-            toggleAllTracesGeneric('console-output', 'trace-body', 'trace-toggle', 'fold-button', {
+            toggleAllTracesGeneric('console-output', 'trace-body', 'trace-toggle', 'trace-fold-button', {
                 get value() { return allFolded; },
                 set value(v) { allFolded = v; }
             });
@@ -1337,7 +1312,7 @@
 
         async function clearConsole() {
             try {
-                await fetch('/api/admin/lsp/traces', { method: 'DELETE' });
+                await fetch('/api/admin/traces/lsp', { method: 'DELETE' });
 
                 // Clear traces for current server only
                 if (window.currentServerId) {

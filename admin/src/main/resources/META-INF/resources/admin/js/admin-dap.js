@@ -116,8 +116,9 @@ function showLaunchConfigForm(session, dapServerId) {
     const consoleArea = document.getElementById('console-area');
     const sessionId = session.sessionId;
 
-    // Store session ID for later use
+    // Store session ID and server ID for later use
     window.currentDapSessionId = sessionId;
+    window.currentDapServerId = dapServerId || session.serverId || session.dapServerId;
 
     // Check if session div already exists
     let sessionDiv = document.getElementById(`dap-session-${sessionId}`);
@@ -204,16 +205,10 @@ function showLaunchConfigForm(session, dapServerId) {
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
                     <label style="font-weight: 500; color: #cccccc;">Console:</label>
                     <div class="console-controls">
-                        <label style="color: #cccccc; font-size: 0.85rem;">
-                            Trace Level:
-                            <select id="dap-trace-level" onchange="changeDapTraceLevel('${session.sessionId}', this.value)" style="margin-left: 0.5rem; background: #3e3e42; color: #cccccc; border: 1px solid #555; padding: 0.25rem 0.5rem; border-radius: 3px;">
-                                <option value="off">Off</option>
-                                <option value="messages">Messages</option>
-                                <option value="verbose" selected>Verbose</option>
-                            </select>
-                        </label>
-                        <button onclick="toggleAllDapTraces('${session.sessionId}')" id="dap-fold-button">Unfold All</button>
-                        <button onclick="clearDapConsole('${session.sessionId}')">Clear</button>
+                        ${TraceRenderer.renderTraceControls('dap-trace', 'off', `changeDapTraceLevel('${session.sessionId}', this.value)`, {
+                            onFold: `toggleAllDapTraces('${session.sessionId}')`,
+                            onClear: `clearDapConsole('${session.sessionId}')`
+                        })}
                     </div>
                 </div>
                 <div id="dap-traces-container-${sessionId}" style="flex: 1; overflow-y: auto; background: #1e1e1e; padding: 0.5rem; border-radius: 3px; font-family: 'Courier New', monospace; font-size: 0.85rem;">
@@ -241,22 +236,8 @@ function showLaunchConfigForm(session, dapServerId) {
     // Load existing traces for this session (renderDapTracesForSession will be called by WebSocket when traces arrive)
     renderDapTracesForSession(sessionId);
 
-    // Load saved trace level from settings
-    const traceServerId = session.serverId || session.dapServerId || dapServerId;
-    if (traceServerId) {
-        fetch(`/api/admin/dap/configs/${traceServerId}/trace`)
-            .then(r => r.json())
-            .then(data => {
-                const level = data.trace || 'verbose';
-                currentDapTraceLevel[sessionId] = level;
-                const select = document.getElementById('dap-trace-level');
-                if (select) {
-                    select.value = level;
-                }
-                renderDapTracesForSession(sessionId);
-            })
-            .catch(e => console.error('Failed to load DAP trace level:', e));
-    }
+    // Initialize trace level combo and buttons from WebSocket-provided data
+    TraceRenderer.updateTraceControls('dap-trace', getDapTraceLevel());
 
     // Initialize button states based on session state
     const debugBtn = document.getElementById(`dap-debug-btn-${sessionId}`);
@@ -446,6 +427,11 @@ async function deleteDapSession(sessionId) {
             throw new Error('Failed to delete session');
         }
 
+        // Remove session from cache immediately so STATE_CHANGED events are ignored
+        if (window.dapSessions) {
+            window.dapSessions = window.dapSessions.filter(s => s.sessionId !== sessionId);
+        }
+
         // Remove session from DOM (both workspace list and console area)
         removeSessionFromDOM(sessionId);
 
@@ -530,12 +516,20 @@ async function selectDapSession(sessionId) {
     }
 }
 
+function getDapTraceLevel() {
+    const serverId = window.currentDapServerId;
+    if (serverId && window.traceLevels) {
+        return window.traceLevels['dap.' + serverId] || 'off';
+    }
+    return 'off';
+}
+
 function renderDapTraces(traces, sessionId) {
-    const level = currentDapTraceLevel[sessionId] || 'verbose';
+    const level = getDapTraceLevel();
 
     const html = traces.map((trace, index) => {
         // Filter based on trace level
-        if (!shouldShowDapTrace(trace, sessionId)) {
+        if (!shouldShowDapTrace(trace)) {
             return ''; // Don't show if level is 'off'
         }
 
@@ -652,6 +646,7 @@ async function loadAllDapServers(serverIdToSelect) {
  */
 async function showDapServerDetails(serverId) {
     selectedDapServer = serverId;
+    window.currentDapServerId = serverId;
 
     // Clear current DAP session ID (we're viewing server config, not a session)
     window.currentDapSessionId = null;
@@ -744,6 +739,8 @@ async function showDapServerDetails(serverId) {
         </div>
     `;
 
+    const dapTraceLevel = getDapTraceLevel();
+
     const html = `
         <div class="console-header">
             <div class="console-title">
@@ -754,6 +751,9 @@ async function showDapServerDetails(serverId) {
                 <button class="tab-button ${currentDapServerTab === 'overview' ? 'active' : ''}" onclick="switchDapServerTab('overview')">Overview</button>
                 ${hasContributions ? `<button class="tab-button ${currentDapServerTab === 'contributions' ? 'active' : ''}" onclick="switchDapServerTab('contributions')">Contributions</button>` : ''}
                 <button class="tab-button ${currentDapServerTab === 'install' ? 'active' : ''}" onclick="switchDapServerTab('install')">Install</button>
+            </div>
+            <div class="console-controls">
+                ${TraceRenderer.renderTraceControls('dap-trace', dapTraceLevel, `changeDapServerTraceLevel('${serverId}', this.value)`)}
             </div>
         </div>
         <div class="tab-content">
@@ -915,7 +915,7 @@ let dapFoldedState = {};
 
 function toggleAllDapTraces(sessionId) {
     const container = document.getElementById(`dap-traces-container-${sessionId}`);
-    const foldButton = document.getElementById('dap-fold-button');
+    const foldButton = document.getElementById('dap-trace-fold-button');
     const isFolded = dapFoldedState[sessionId] || false;
 
     // Use TraceRenderer's toggleAllTraces
@@ -936,7 +936,7 @@ function toggleAllDapTraces(sessionId) {
  */
 async function clearDapConsole(sessionId) {
     try {
-        await fetch('/api/admin/dap/traces', { method: 'DELETE' });
+        await fetch('/api/admin/traces/dap', { method: 'DELETE' });
     } catch (e) {
         console.error('Failed to clear DAP traces on server:', e);
     }
@@ -946,43 +946,37 @@ async function clearDapConsole(sessionId) {
     renderDapTracesForSession(sessionId);
 }
 
-/**
- * Change trace level for DAP session.
- */
-let currentDapTraceLevel = {};
-
-async function changeDapTraceLevel(sessionId, level) {
-    currentDapTraceLevel[sessionId] = level;
-    renderDapTracesForSession(sessionId);
-
-    const session = window.dapSessions?.find(s => s.sessionId === sessionId);
-    const serverId = session?.serverId || session?.dapServerId;
-    if (serverId) {
-        try {
-            await fetch(`/api/admin/dap/configs/${serverId}/trace`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ trace: level })
-            });
-        } catch (e) {
-            console.error('Failed to save DAP trace level:', e);
-        }
+async function changeDapServerTraceLevel(serverId, level) {
+    if (window.traceLevels) {
+        window.traceLevels['dap.' + serverId] = level;
+    }
+    try {
+        await fetch(`/api/admin/traces/dap/${serverId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ traceLevel: level })
+        });
+    } catch (e) {
+        console.error('Failed to save DAP trace level:', e);
     }
 }
 
-function shouldShowDapTrace(trace, sessionId) {
-    // Always show program outputs (INFO/ERROR) regardless of trace level
-    // These are console/stdout/stderr outputs, not DAP protocol traces
+async function changeDapTraceLevel(sessionId, level) {
+    const session = window.dapSessions?.find(s => s.sessionId === sessionId);
+    const serverId = session?.serverId || session?.dapServerId || window.currentDapServerId;
+    if (serverId) {
+        changeDapServerTraceLevel(serverId, level);
+    }
+    TraceRenderer.updateTraceControls('dap-trace', level);
+    renderDapTracesForSession(sessionId);
+}
+
+function shouldShowDapTrace(trace) {
     if (trace.messageType === 'INFO' || trace.messageType === 'ERROR') {
         return true;
     }
-
-    // For TRACE messages, respect the trace level
-    const level = currentDapTraceLevel[sessionId] || 'verbose';
-    if (level === 'off') {
-        return false;
-    }
-    return true;
+    const level = getDapTraceLevel();
+    return level !== 'off';
 }
 
 /**
@@ -998,31 +992,26 @@ async function onDapSessionUpdate(message) {
     // Update only the affected session based on event type
     switch (message.eventType) {
         case 'CREATED':
-            // Add the new session incrementally without reloading everything
             if (message.workspaceUri === window.selectedWorkspace) {
+                // Skip if already in DOM (added by createNewTestSession)
+                if (document.querySelector(`[data-session-id="${message.sessionId}"]`)) {
+                    break;
+                }
                 try {
                     const response = await fetch(`/api/admin/dap/sessions`);
                     if (response.ok) {
                         const sessions = await response.json();
                         const newSession = sessions.find(s => s.sessionId === message.sessionId);
                         if (newSession) {
-                            // Add to dapSessions array
                             if (!window.dapSessions) window.dapSessions = [];
                             if (!window.dapSessions.find(s => s.sessionId === newSession.sessionId)) {
                                 window.dapSessions.push(newSession);
                             }
 
-                            // Find the DAP server container and add the session HTML
                             const serverElement = document.querySelector(`[data-dap-server="${newSession.serverId}"]`);
                             if (serverElement) {
-                                const sessionHTML = createSessionHTML(newSession);
-                                serverElement.insertAdjacentHTML('afterend', sessionHTML);
-                                console.log('[DAP] Session added to DOM:', newSession.sessionId);
-
-                                // Auto-select the newly created session
+                                serverElement.insertAdjacentHTML('afterend', createSessionHTML(newSession));
                                 selectDapSession(newSession.sessionId);
-                            } else {
-                                console.warn('[DAP] Server element not found for:', newSession.serverId);
                             }
                         }
                     }
@@ -1033,25 +1022,24 @@ async function onDapSessionUpdate(message) {
             break;
 
         case 'STATE_CHANGED':
-            // Initialize dapSessions array if needed
             if (!window.dapSessions) {
                 window.dapSessions = [];
             }
 
-            // Update session data in cache from the event
+            // Ignore events for sessions no longer tracked (already deleted)
             const session = window.dapSessions.find(s => s.sessionId === message.sessionId);
-            if (session) {
-                if (message.debugMode !== null && message.debugMode !== undefined) {
-                    session.debugMode = message.debugMode;
-                }
-                if (message.createdBy) session.createdBy = message.createdBy;
-                if (message.createdAt) session.createdAt = message.createdAt;
-                if (message.launchBy) session.launchedBy = message.launchBy;
-                if (message.launchedAt) session.launchedAt = message.launchedAt;
-                console.log('[DAP] Updated session data:', message.sessionId);
+            if (!session) {
+                break;
             }
 
-            // Update the DOM with new data
+            if (message.debugMode !== null && message.debugMode !== undefined) {
+                session.debugMode = message.debugMode;
+            }
+            if (message.createdBy) session.createdBy = message.createdBy;
+            if (message.createdAt) session.createdAt = message.createdAt;
+            if (message.launchBy) session.launchedBy = message.launchBy;
+            if (message.launchedAt) session.launchedAt = message.launchedAt;
+
             updateSessionStateInDOM(message.sessionId, message.newStatus, message.debugMode);
             updateSessionDetailInDOM(message.sessionId, message);
             break;
@@ -1200,45 +1188,28 @@ function updateSessionStateInDOM(sessionId, newStatus, debugMode) {
  */
 async function addSessionToDOM(message) {
     try {
-        // Fetch the session details
-        const response = await fetch(`/api/admin/workspaces`);
-        const workspaces = await response.json();
+        const response = await fetch('/api/admin/dap/sessions');
+        if (!response.ok) return;
+        const sessions = await response.json();
 
-        // Find the workspace
-        const workspace = workspaces.find(w => w.rootUri === message.workspaceUri);
-        if (!workspace) {
-            console.warn('[DAP] Workspace not found:', message.workspaceUri);
-            return;
-        }
-
-        // Find the session in the workspace data
-        const session = workspace.dapSessions.find(s => s.sessionId === message.sessionId);
+        const session = sessions.find(s => s.sessionId === message.sessionId);
         if (!session) {
-            console.warn('[DAP] Session not found in workspace:', message.sessionId);
+            console.warn('[DAP] Session not found:', message.sessionId);
             return;
         }
 
         // Check if session already exists in DOM
-        const existingSession = document.querySelector(`[data-session-id="${message.sessionId}"]`);
-        if (existingSession) {
-            console.log('[DAP] Session already in DOM, skipping:', message.sessionId);
+        if (document.querySelector(`[data-session-id="${message.sessionId}"]`)) {
             return;
         }
 
-        // Find the debugger container in the DOM (under the DAP server)
-        const debuggerContainer = document.querySelector(`[data-dap-server="${session.dapServerId}"]`);
+        // Find the debugger container in the DOM
+        const debuggerContainer = document.querySelector(`[data-dap-server="${session.serverId || session.dapServerId}"]`);
         if (!debuggerContainer) {
-            console.warn('[DAP] Debugger container not found for:', session.dapServerId);
             return;
         }
 
-        // Create session HTML
-        const sessionHTML = createSessionHTML(session);
-
-        // Insert after the debugger item
-        debuggerContainer.insertAdjacentHTML('afterend', sessionHTML);
-
-        console.log('[DAP] Session added to DOM:', message.sessionId);
+        debuggerContainer.insertAdjacentHTML('afterend', createSessionHTML(session));
     } catch (error) {
         console.error('[DAP] Error adding session to DOM:', error);
     }
@@ -1575,6 +1546,7 @@ window.switchDapServerTab = switchDapServerTab;
 window.toggleAllDapTraces = toggleAllDapTraces;
 window.clearDapConsole = clearDapConsole;
 window.changeDapTraceLevel = changeDapTraceLevel;
+window.changeDapServerTraceLevel = changeDapServerTraceLevel;
 window.onDapSessionUpdate = onDapSessionUpdate;
 window.loadLaunchConfigurationTemplates = loadLaunchConfigurationTemplates;
 window.applyLaunchTemplate = applyLaunchTemplate;

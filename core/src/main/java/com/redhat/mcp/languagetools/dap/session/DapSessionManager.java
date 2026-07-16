@@ -174,17 +174,6 @@ public class DapSessionManager {
     }
 
     /**
-     * Remove a session from the manager and fire DELETED event.
-     */
-    public void removeSession(String sessionId) {
-        DapSession session = sessions.remove(sessionId);
-        if (session != null) {
-            LOG.infof("Removed session: %s", sessionId);
-            fireDeletedEvent(session);
-        }
-    }
-
-    /**
      * Close and remove a debug session.
      */
     public CompletableFuture<Map<String, Object>> closeSession(String sessionId) {
@@ -201,6 +190,7 @@ public class DapSessionManager {
         return session.terminate()
                 .thenApply(v -> {
                     LOG.infof("Session closed: %s", sessionId);
+                    fireDeletedEvent(session);
                     Map<String, Object> result = new HashMap<>();
                     result.put("success", true);
                     result.put("sessionId", sessionId);
@@ -209,6 +199,7 @@ public class DapSessionManager {
                 })
                 .exceptionally(ex -> {
                     LOG.errorf(ex, "Error closing session %s", sessionId);
+                    fireDeletedEvent(session);
                     Map<String, Object> result = new HashMap<>();
                     result.put("success", false);
                     result.put("sessionId", sessionId);

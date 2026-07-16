@@ -383,6 +383,53 @@ const TraceRenderer = (function() {
         }
     }
 
+    /**
+     * Render trace controls HTML (trace level combo + optional fold/clear buttons).
+     *
+     * @param {string} id - Unique prefix for element IDs (e.g., 'trace', 'dap-trace', 'mcp-trace')
+     * @param {string} level - Current trace level ('off', 'messages', 'verbose')
+     * @param {string} onchange - JS expression for combo onchange (e.g., "changeTraceLevel(this.value)")
+     * @param {object} [buttons] - Optional fold/clear button config
+     * @param {string} buttons.onFold - JS expression for fold button onclick
+     * @param {string} buttons.onClear - JS expression for clear button onclick
+     * @returns {string} HTML string
+     */
+    function renderTraceControls(id, level, onchange, buttons) {
+        let html = `<label style="color: #cccccc; font-size: 0.85rem;">
+                Trace Level:
+                <select id="${id}-level" onchange="${onchange}" style="margin-left: 0.5rem; background: #3e3e42; color: #cccccc; border: 1px solid #555; padding: 0.25rem 0.5rem; border-radius: 3px;">
+                    <option value="off" ${level === 'off' ? 'selected' : ''}>Off</option>
+                    <option value="messages" ${level === 'messages' ? 'selected' : ''}>Messages</option>
+                    <option value="verbose" ${level === 'verbose' ? 'selected' : ''}>Verbose</option>
+                </select>
+            </label>`;
+        if (buttons) {
+            const buttonsHtml = `<button onclick="${buttons.onFold}" id="${id}-fold-button" ${level !== 'verbose' ? 'disabled' : ''}>Unfold All</button>`
+                + `<button onclick="${buttons.onClear}" id="${id}-clear-button" ${level === 'off' ? 'disabled' : ''}>Clear</button>`;
+            if (buttons.wrapperId) {
+                html += `<span id="${buttons.wrapperId}" style="display: ${buttons.wrapperDisplay || 'contents'}">${buttonsHtml}</span>`;
+            } else {
+                html += buttonsHtml;
+            }
+        }
+        return html;
+    }
+
+    /**
+     * Update trace controls state (combo value + button disabled).
+     *
+     * @param {string} id - Same prefix used in renderTraceControls
+     * @param {string} level - New trace level
+     */
+    function updateTraceControls(id, level) {
+        const select = document.getElementById(`${id}-level`);
+        if (select) select.value = level;
+        const foldButton = document.getElementById(`${id}-fold-button`);
+        if (foldButton) foldButton.disabled = level !== 'verbose';
+        const clearButton = document.getElementById(`${id}-clear-button`);
+        if (clearButton) clearButton.disabled = level === 'off';
+    }
+
     // Public API
     return {
         // Rendering
@@ -394,6 +441,10 @@ const TraceRenderer = (function() {
         highlightText,
         escapeHtml,
         escapeRegex,
+
+        // Trace controls
+        renderTraceControls,
+        updateTraceControls,
 
         // Search
         openSearch,

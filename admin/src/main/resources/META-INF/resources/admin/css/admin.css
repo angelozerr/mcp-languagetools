@@ -925,8 +925,13 @@ body {
     font-size: 0.8rem;
 }
 
-.console-controls button:hover {
+.console-controls button:hover:not(:disabled) {
     background: #005a9e;
+}
+
+.console-controls button:disabled {
+    opacity: 0.4;
+    cursor: default;
 }
 
 .console {

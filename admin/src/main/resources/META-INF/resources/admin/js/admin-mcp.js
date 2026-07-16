@@ -5,7 +5,7 @@
  */
 
 let mcpTraces = [];
-let mcpTraceLevel = 'verbose';
+let mcpTraceLevel = 'off';
 let mcpClients = [];
 let mcpAllFolded = true;
 let selectedMcpClient = null;
@@ -117,7 +117,10 @@ function loadInitialMcpTraces() {
     mcpTracesLoaded = true;
 }
 
-async function loadMcpTracesConsole() {
+function loadMcpTracesConsole() {
+    // Initialize trace level from WebSocket-provided data
+    const savedMcpLevel = window.traceLevels && window.traceLevels['mcp'];
+    mcpTraceLevel = savedMcpLevel || 'off';
     const consoleArea = document.getElementById('console-area');
 
     consoleArea.innerHTML = `
@@ -128,14 +131,7 @@ async function loadMcpTracesConsole() {
                     <button class="tab-button" onclick="switchMcpConsoleTab('tools')">Tools</button>
                 </div>
                 <div class="console-controls" id="mcp-traces-controls">
-                    <label style="color: #cccccc; font-size: 0.85rem;">
-                        Trace Level:
-                        <select id="mcp-trace-level" onchange="changeMcpTraceLevel(this.value)" style="margin-left: 0.5rem; background: #3e3e42; color: #cccccc; border: 1px solid #555; padding: 0.25rem 0.5rem; border-radius: 3px;">
-                            <option value="off" ${mcpTraceLevel === 'off' ? 'selected' : ''}>Off</option>
-                            <option value="messages" ${mcpTraceLevel === 'messages' ? 'selected' : ''}>Messages</option>
-                            <option value="verbose" ${mcpTraceLevel === 'verbose' ? 'selected' : ''}>Verbose</option>
-                        </select>
-                    </label>
+                    ${TraceRenderer.renderTraceControls('mcp-trace', mcpTraceLevel, 'changeMcpTraceLevel(this.value)')}
                 </div>
             </div>
             <div class="tab-content">
@@ -147,22 +143,13 @@ async function loadMcpTracesConsole() {
             </div>
         </div>
     `;
-
-    // Load saved trace level from settings
-    try {
-        const response = await fetch('/api/admin/mcp/config');
-        const data = await response.json();
-        mcpTraceLevel = data.trace || 'verbose';
-        const select = document.getElementById('mcp-trace-level');
-        if (select) {
-            select.value = mcpTraceLevel;
-        }
-    } catch (e) {
-        console.error('Failed to load MCP trace level:', e);
-    }
 }
 
-async function loadMcpConsole(clientId) {
+function loadMcpConsole(clientId) {
+    // Initialize trace level from WebSocket-provided data
+    const savedMcpLevel2 = window.traceLevels && window.traceLevels['mcp'];
+    mcpTraceLevel = savedMcpLevel2 || 'off';
+
     const consoleArea = document.getElementById('console-area');
 
     // Find client info
@@ -178,16 +165,10 @@ async function loadMcpConsole(clientId) {
                     <button class="tab-button" onclick="switchMcpConsoleTab('tools')">Tools</button>
                 </div>
                 <div class="console-controls" id="mcp-traces-controls">
-                    <label style="color: #cccccc; font-size: 0.85rem;">
-                        Trace Level:
-                        <select id="mcp-trace-level" onchange="changeMcpTraceLevel(this.value)" style="margin-left: 0.5rem; background: #3e3e42; color: #cccccc; border: 1px solid #555; padding: 0.25rem 0.5rem; border-radius: 3px;">
-                            <option value="off" ${mcpTraceLevel === 'off' ? 'selected' : ''}>Off</option>
-                            <option value="messages" ${mcpTraceLevel === 'messages' ? 'selected' : ''}>Messages</option>
-                            <option value="verbose" ${mcpTraceLevel === 'verbose' ? 'selected' : ''}>Verbose</option>
-                        </select>
-                    </label>
-                    <button onclick="toggleAllMcpTraces()" id="mcp-fold-button">Unfold All</button>
-                    <button onclick="clearMcpConsole()">Clear</button>
+                    ${TraceRenderer.renderTraceControls('mcp-trace', mcpTraceLevel, 'changeMcpTraceLevel(this.value)', {
+                        onFold: 'toggleAllMcpTraces()',
+                        onClear: 'clearMcpConsole()'
+                    })}
                 </div>
             </div>
             <div class="tab-content">
@@ -204,32 +185,22 @@ async function loadMcpConsole(clientId) {
     `;
 
     renderMcpConsole();
-
-    // Load saved trace level from settings
-    try {
-        const response = await fetch('/api/admin/mcp/config');
-        const data = await response.json();
-        mcpTraceLevel = data.trace || 'verbose';
-        const select = document.getElementById('mcp-trace-level');
-        if (select) {
-            select.value = mcpTraceLevel;
-        }
-        renderMcpConsole();
-    } catch (e) {
-        console.error('Failed to load MCP trace level:', e);
-    }
 }
 
 async function changeMcpTraceLevel(newLevel) {
+    mcpTraceLevel = newLevel;
+    if (window.traceLevels) {
+        window.traceLevels['mcp'] = newLevel;
+    }
+    TraceRenderer.updateTraceControls('mcp-trace', newLevel);
+    renderMcpConsole();
+
     try {
-        await fetch('/api/admin/mcp/config', {
+        await fetch('/api/admin/traces/mcp', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ trace: newLevel })
+            body: JSON.stringify({ traceLevel: newLevel })
         });
-
-        mcpTraceLevel = newLevel;
-        renderMcpConsole();
     } catch (err) {
         console.error('Failed to set MCP trace level:', err);
     }
@@ -358,7 +329,7 @@ function toggleAllMcpTraces() {
     mcpAllFolded = !mcpAllFolded;
 
     // Update button text
-    const foldButton = document.getElementById('mcp-fold-button');
+    const foldButton = document.getElementById('mcp-trace-fold-button');
     if (foldButton) {
         foldButton.textContent = mcpAllFolded ? 'Unfold All' : 'Fold All';
     }
@@ -366,7 +337,7 @@ function toggleAllMcpTraces() {
 
 async function clearMcpConsole() {
     try {
-        await fetch('/api/admin/mcp/traces', { method: 'DELETE' });
+        await fetch('/api/admin/traces/mcp', { method: 'DELETE' });
 
         // Clear traces for current client only
         if (selectedMcpClient) {

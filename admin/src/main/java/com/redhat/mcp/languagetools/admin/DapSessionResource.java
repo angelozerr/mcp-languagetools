@@ -195,8 +195,8 @@ public class DapSessionResource {
                         .build();
             }
 
-            // Remove session (fires DELETED event automatically)
-            sessionManager.removeSession(sessionId);
+            // Close session (terminate + remove + notify)
+            sessionManager.closeSession(sessionId);
 
             return Response.ok(Map.of(
                     "status", "deleted",

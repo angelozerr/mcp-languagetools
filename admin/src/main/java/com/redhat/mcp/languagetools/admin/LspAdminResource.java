@@ -8,8 +8,6 @@ import com.redhat.mcp.languagetools.admin.dto.ErrorResponse;
 import com.redhat.mcp.languagetools.admin.dto.LspConfigDTO;
 import com.redhat.mcp.languagetools.admin.dto.ServerDTOBuilder;
 import com.redhat.mcp.languagetools.admin.dto.StatusResponse;
-import com.redhat.mcp.languagetools.settings.Settings;
-import com.redhat.mcp.languagetools.settings.ServerTrace;
 import com.redhat.mcp.languagetools.installer.TaskRegistryInstaller;
 import com.redhat.mcp.languagetools.installer.TraceProgressMonitor;
 import com.redhat.mcp.languagetools.lsp.server.LspServer;
@@ -45,8 +43,6 @@ public class LspAdminResource {
     @Inject
     ServerDTOBuilder serverDTOBuilder;
 
-    @Inject
-    Settings settings;
 
     @Inject
     ProgressBroadcaster progressBroadcaster;
@@ -351,48 +347,6 @@ public class LspAdminResource {
             return Response.ok().entity(new StatusResponse("connected")).build();
         } catch (Exception e) {
             return Response.status(500).entity(new ErrorResponse(e.getMessage())).build();
-        }
-    }
-
-    // ========== LSP Trace Configuration ==========
-
-    /**
-     * Get trace level for an LSP server.
-     */
-    @GET
-    @Path("/configs/{serverId}/trace")
-    public Response getTraceLevel(@PathParam("serverId") String serverId) {
-        ServerTrace level = settings.getLspTraceLevel(serverId);
-        return Response.ok()
-                .entity("{\"serverId\": \"" + serverId + "\", \"trace\": \"" + level + "\"}")
-                .build();
-    }
-
-    /**
-     * Set trace level for an LSP server.
-     */
-    @PUT
-    @Path("/configs/{serverId}/trace")
-    @Consumes(MediaType.APPLICATION_JSON)
-    public Response setTraceLevel(@PathParam("serverId") String serverId, String body) {
-        try {
-            String trace = JsonParser.parseString(body)
-                    .getAsJsonObject()
-                    .get("trace")
-                    .getAsString();
-
-            ServerTrace level = ServerTrace.fromValue(trace);
-
-            settings.setLspTraceLevel(serverId, level);
-
-            return Response.ok()
-                    .entity("{\"serverId\": \"" + serverId + "\", \"trace\": \"" + level + "\"}")
-                    .build();
-
-        } catch (Exception e) {
-            return Response.status(400)
-                    .entity("{\"error\": \"" + e.getMessage() + "\"}")
-                    .build();
         }
     }
 
