@@ -1,0 +1,17 @@
+{
+  "id": "debugpy-installer",
+  "name": "debugpy",
+  "check": {
+    "exec": {
+      "name": "Check if debugpy is installed",
+      "command": "python -m debugpy --version",
+      "timeout": 2000
+    }
+  },
+  "run": {
+    "exec": {
+      "name": "Install debugpy",
+      "command": "pip install debugpy"
+    }
+  }
+}

@@ -21,6 +21,7 @@
         <module>extensions/qute</module>
         <module>extensions/jdtls</module>
         <module>extensions/typescript</module>
+        <module>extensions/python</module>
         <module>dev</module>
     </modules>
 

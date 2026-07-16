@@ -1,0 +1,7 @@
+{
+  "type": "debugpy",
+  "name": "Launch Python file",
+  "request": "launch",
+  "program": "${workspaceFolder}/main.py",
+  "cwd": "${workspaceFolder}"
+}

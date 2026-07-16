@@ -19,5 +19,12 @@
     "aliases": ["Properties"],
     "filenames": [],
     "filenamePatterns": []
+  },
+  {
+    "id": "python",
+    "extensions": [".py", ".pyw", ".pyi"],
+    "aliases": ["Python"],
+    "filenames": [],
+    "filenamePatterns": []
   }
 ]

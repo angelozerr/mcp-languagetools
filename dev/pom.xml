@@ -68,6 +68,12 @@
             <version>${project.version}</version>
             <scope>runtime</scope>
         </dependency>
+        <dependency>
+            <groupId>com.redhat.mcp</groupId>
+            <artifactId>python-extension</artifactId>
+            <version>${project.version}</version>
+            <scope>runtime</scope>
+        </dependency>
     </dependencies>
 
     <build>

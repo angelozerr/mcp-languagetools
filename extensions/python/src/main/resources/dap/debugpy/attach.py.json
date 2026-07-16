@@ -1,0 +1,9 @@
+{
+  "type": "debugpy",
+  "name": "Attach to Python process",
+  "request": "attach",
+  "connect": {
+    "host": "127.0.0.1",
+    "port": 5678
+  }
+}
