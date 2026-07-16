@@ -1,41 +1,49 @@
 package com.redhat.mcp.languagetools.installer.task;
 
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.redhat.mcp.languagetools.installer.InstallerContext;
+import com.redhat.mcp.languagetools.utils.OSUtils;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.concurrent.TimeUnit;
 
-public class ExecTask implements InstallerTask {
-    private final String name;
+public class ExecTask extends InstallerTask {
     private final String command;
     private final Integer timeout;
+    private final String workingDir;
 
-    public ExecTask(String name, String command, Integer timeout) {
-        this.name = name;
+    public ExecTask(String name, InstallerTask onSuccess, String command, Integer timeout, String workingDir) {
+        super(name, onSuccess);
         this.command = command;
         this.timeout = timeout;
+        this.workingDir = workingDir;
     }
 
     @Override
-    public boolean execute(InstallerContext context) {
-        context.checkCanceled();
-        context.getProgress().beginStep(getName());
-
+    protected boolean run(InstallerContext context) {
         String resolvedCommand = context.resolveVariables(command);
         context.traceInfo("Executing: " + resolvedCommand);
 
         try {
             ProcessBuilder pb;
-            String os = System.getProperty("os.name", "").toLowerCase();
-            if (os.contains("win")) {
+            if (OSUtils.isWindows()) {
                 pb = new ProcessBuilder("cmd", "/c", resolvedCommand);
             } else {
                 pb = new ProcessBuilder("sh", "-c", resolvedCommand);
             }
             pb.redirectErrorStream(false);
+
+            if (workingDir != null) {
+                String resolvedDir = context.resolveVariables(workingDir);
+                Path dirPath = Paths.get(resolvedDir);
+                Files.createDirectories(dirPath);
+                pb.directory(dirPath.toFile());
+                context.traceInfo("Working directory: " + resolvedDir);
+            }
 
             Process process = pb.start();
 
@@ -94,24 +102,23 @@ public class ExecTask implements InstallerTask {
         }
     }
 
-    @Override
-    public String getName() {
-        return name;
-    }
-
-    public static class Factory implements InstallerTaskFactory {
+    public static class Factory extends InstallerTaskFactoryBase {
         @Override
         public String getType() {
             return "exec";
         }
 
         @Override
-        public InstallerTask createTask(JsonElement config) {
-            JsonObject obj = config.getAsJsonObject();
-            String name = obj.has("name") ? obj.get("name").getAsString() : "Execute command";
-            String command = obj.get("command").getAsString();
-            Integer timeout = obj.has("timeout") ? obj.get("timeout").getAsInt() : null;
-            return new ExecTask(name, command, timeout);
+        protected String getDefaultName() {
+            return "Execute command";
+        }
+
+        @Override
+        protected InstallerTask create(String name, InstallerTask onSuccess, JsonObject json) {
+            String command = OSUtils.getStringFromOs(json, "command");
+            Integer timeout = json.has("timeout") ? json.get("timeout").getAsInt() : null;
+            String workingDir = json.has("workingDir") ? json.get("workingDir").getAsString() : null;
+            return new ExecTask(name, onSuccess, command, timeout, workingDir);
         }
     }
 }

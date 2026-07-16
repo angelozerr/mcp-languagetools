@@ -226,9 +226,11 @@ public class LspServer extends ServerBase<LspServerConfig> {
 
         // Set working directory
         if (config.getWorkingDirectory() != null) {
-            pb.directory(Paths.get(config.getWorkingDirectory()).toFile());
-            // Trace working directory (one line - no folding)
-            addTrace(String.format("Working directory: %s", config.getWorkingDirectory()));
+            String resolvedWorkingDir = config.getWorkingDirectory()
+                    .replace("${serverHome}", super.getServerHome().toString())
+                    .replace("$SERVER_HOME$", super.getServerHome().toString());
+            pb.directory(Paths.get(resolvedWorkingDir).toFile());
+            addTrace(String.format("Working directory: %s", resolvedWorkingDir));
         }
 
         // Don't redirect error stream - we want to capture it separately

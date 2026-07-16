@@ -3,19 +3,51 @@ package com.redhat.mcp.languagetools.installer.task;
 import com.redhat.mcp.languagetools.installer.InstallerContext;
 
 /**
- * Base interface for installer tasks.
+ * Base class for installer tasks.
+ * Uses template method pattern: {@link #execute} handles common logic
+ * (cancel check, progress step, onSuccess chaining), subclasses implement {@link #run}.
  */
-public interface InstallerTask {
-    /**
-     * Executes the task.
-     *
-     * @param context Installation context
-     * @return true if task succeeded, false otherwise
-     */
-    boolean execute(InstallerContext context);
+public abstract class InstallerTask {
+
+    private final String name;
+    private final InstallerTask onSuccess;
+
+    protected InstallerTask(String name, InstallerTask onSuccess) {
+        this.name = name;
+        this.onSuccess = onSuccess;
+    }
 
     /**
-     * Gets the task name (for logging).
+     * Executes the task with common logic: cancel check, progress step, onSuccess chaining.
+     *
+     * @param context Installation context
+     * @return true if task (and onSuccess chain) succeeded, false otherwise
      */
-    String getName();
+    public final boolean execute(InstallerContext context) {
+        context.checkCanceled();
+        context.getProgress().beginStep(getName());
+        if (run(context)) {
+            if (onSuccess != null) {
+                return onSuccess.execute(context);
+            }
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Task-specific logic. Subclasses implement this instead of {@link #execute}.
+     *
+     * @param context Installation context
+     * @return true if task succeeded
+     */
+    protected abstract boolean run(InstallerContext context);
+
+    public String getName() {
+        return name;
+    }
+
+    public InstallerTask getOnSuccess() {
+        return onSuccess;
+    }
 }

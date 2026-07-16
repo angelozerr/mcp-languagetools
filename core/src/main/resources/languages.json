@@ -26,5 +26,19 @@
     "aliases": ["Python"],
     "filenames": [],
     "filenamePatterns": []
+  },
+  {
+    "id": "typescript",
+    "extensions": [".ts", ".tsx", ".mts", ".cts"],
+    "aliases": ["TypeScript"],
+    "filenames": [],
+    "filenamePatterns": []
+  },
+  {
+    "id": "javascript",
+    "extensions": [".js", ".jsx", ".mjs", ".cjs"],
+    "aliases": ["JavaScript"],
+    "filenames": [],
+    "filenamePatterns": []
   }
 ]

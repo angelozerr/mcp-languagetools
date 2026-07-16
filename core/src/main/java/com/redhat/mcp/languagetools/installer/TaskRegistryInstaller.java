@@ -8,6 +8,7 @@ import com.redhat.mcp.languagetools.installer.task.InstallerTask;
 import com.redhat.mcp.languagetools.installer.task.InstallerTaskRegistry;
 import com.redhat.mcp.languagetools.progress.ProgressMonitor;
 import com.redhat.mcp.languagetools.server.ServerConfigBase;
+import com.redhat.mcp.languagetools.utils.OSUtils;
 import org.jboss.logging.Logger;
 
 import java.util.concurrent.CompletableFuture;
@@ -21,6 +22,7 @@ public class TaskRegistryInstaller implements ServerInstaller {
     private static final Logger LOG = Logger.getLogger(TaskRegistryInstaller.class);
 
     // JSON field names
+    private static final String FIELD_PROPERTIES = "properties";
     private static final String FIELD_CHECK = "check";
     private static final String FIELD_RUN = "run";
 
@@ -58,12 +60,15 @@ public class TaskRegistryInstaller implements ServerInstaller {
 
                 context.traceInfo("Starting installation for: " + config.getName());
 
+                // Load properties into context
+                loadProperties(installerConfig, context);
+
                 // Check if already installed (skip when force install)
                 if (!context.isForceInstall() && installerConfig.has(FIELD_CHECK)) {
                     context.getProgress().beginStep(com.redhat.mcp.languagetools.progress.ProgressStep.CHECKING);
                     InstallerTask checkTask = parseTaskNode(installerConfig.get(FIELD_CHECK));
                     if (checkTask != null && checkTask.execute(context)) {
-                        String command = extractCommand(context);
+                        String command = extractCommand(context, installerConfig);
                         context.traceInfo("Server already installed");
                         setStatus(context, InstallationStatus.ALREADY_INSTALLED);
                         return new InstallResult(context.getInstallDir(), command, InstallationStatus.ALREADY_INSTALLED);
@@ -93,7 +98,7 @@ public class TaskRegistryInstaller implements ServerInstaller {
                 }
 
                 // Extract command after installation
-                String command = extractCommand(context);
+                String command = extractCommand(context, installerConfig);
 
                 setStatus(context, InstallationStatus.INSTALLED);
                 long elapsedMs = System.currentTimeMillis() - startTime;
@@ -129,6 +134,24 @@ public class TaskRegistryInstaller implements ServerInstaller {
         status.set(InstallationStatus.STOPPED);
     }
 
+    private void loadProperties(JsonObject installerConfig, InstallerContext context) {
+        if (!installerConfig.has(FIELD_PROPERTIES)) {
+            return;
+        }
+        JsonElement propsElement = installerConfig.get(FIELD_PROPERTIES);
+        if (!propsElement.isJsonObject()) {
+            return;
+        }
+        JsonObject properties = propsElement.getAsJsonObject();
+        for (var entry : properties.entrySet()) {
+            JsonElement value = entry.getValue();
+            if (value.isJsonPrimitive()) {
+                String resolved = context.resolveVariables(value.getAsString());
+                context.setVariable(entry.getKey(), resolved);
+            }
+        }
+    }
+
     private InstallerTask parseTaskNode(JsonElement taskNode) {
         if (taskNode == null || !taskNode.isJsonObject()) {
             return null;
@@ -148,18 +171,59 @@ public class TaskRegistryInstaller implements ServerInstaller {
     }
 
     /**
-     * Extracts the server command from installer.json.
-     * The command comes from the configureServer task.
+     * Extracts the server command.
+     * First checks if ConfigureServerTask already set it in context,
+     * otherwise walks the run task tree to find a configureServer node
+     * and resolves its command (avoids duplicating configureServer in check and run).
      */
-    private String extractCommand(InstallerContext context) {
-        // The command was stored in context by ConfigureServerTask
+    private String extractCommand(InstallerContext context, JsonObject installerConfig) {
         String command = context.getVariable("SERVER_COMMAND");
+        if (command != null) {
+            return command;
+        }
+
+        if (installerConfig.has(FIELD_RUN)) {
+            command = findConfigureServerCommand(installerConfig.get(FIELD_RUN), context);
+        }
 
         if (command == null) {
             LOG.warnf("No command configured for %s", config.getServerId());
         }
 
         return command;
+    }
+
+    /**
+     * Walk the task tree to find a configureServer node and resolve its command.
+     */
+    private String findConfigureServerCommand(JsonElement taskNode, InstallerContext context) {
+        if (taskNode == null || !taskNode.isJsonObject()) {
+            return null;
+        }
+        JsonObject taskObj = taskNode.getAsJsonObject();
+        if (taskObj.isEmpty()) {
+            return null;
+        }
+
+        String taskType = taskObj.keySet().iterator().next();
+        JsonElement taskConfigElement = taskObj.get(taskType);
+        if (taskConfigElement == null || !taskConfigElement.isJsonObject()) {
+            return null;
+        }
+        JsonObject taskConfig = taskConfigElement.getAsJsonObject();
+
+        if ("configureServer".equals(taskType)) {
+            String cmd = OSUtils.getStringFromOs(taskConfig, "command");
+            if (cmd != null) {
+                return context.resolveVariables(cmd);
+            }
+        }
+
+        if (taskConfig.has("onSuccess")) {
+            return findConfigureServerCommand(taskConfig.get("onSuccess"), context);
+        }
+
+        return null;
     }
 
     /**

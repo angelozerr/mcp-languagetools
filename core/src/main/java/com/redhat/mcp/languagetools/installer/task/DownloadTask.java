@@ -9,6 +9,7 @@ import com.redhat.mcp.languagetools.progress.ProgressMonitor;
 import com.redhat.mcp.languagetools.installer.download.AssetFetcher;
 import com.redhat.mcp.languagetools.installer.download.DecompressorUtils;
 import com.redhat.mcp.languagetools.installer.download.DownloadUtils;
+import com.redhat.mcp.languagetools.utils.OSUtils;
 
 import org.jboss.logging.Logger;
 
@@ -22,22 +23,19 @@ import java.util.function.Function;
  * Task that downloads and extracts a file.
  * Supports direct URL, GitHub releases, and Maven artifacts.
  */
-public class DownloadTask implements InstallerTask {
+public class DownloadTask extends InstallerTask {
     private static final Logger LOG = Logger.getLogger(DownloadTask.class);
 
-    private final String name;
     private final String url;  // Fallback URL if asset fetcher fails
     private final AssetFetcherInfo assetFetcherInfo;  // GitHub or Maven fetcher
     private final OutputInfo outputInfo;
-    private final InstallerTask onSuccessTask;
 
-    public DownloadTask(String name, String url, AssetFetcherInfo assetFetcherInfo,
-                       OutputInfo outputInfo, InstallerTask onSuccessTask) {
-        this.name = name;
+    public DownloadTask(String name, InstallerTask onSuccess, String url,
+                       AssetFetcherInfo assetFetcherInfo, OutputInfo outputInfo) {
+        super(name, onSuccess);
         this.url = url;
         this.assetFetcherInfo = assetFetcherInfo;
         this.outputInfo = outputInfo;
-        this.onSuccessTask = onSuccessTask;
     }
 
     /**
@@ -55,20 +53,17 @@ public class DownloadTask implements InstallerTask {
     }
 
     @Override
-    public boolean execute(InstallerContext context) {
-        context.checkCanceled();
-        context.getProgress().beginStep(getName());
-
+    protected boolean run(InstallerContext context) {
         // Get download URL (try asset fetcher first, fallback to direct URL)
         String resolvedUrl = getDownloadUrl(context);
         if (resolvedUrl == null) {
-            throw new IllegalStateException("No download URL available for '" + name + "'");
+            throw new IllegalStateException("No download URL available for '" + getName() + "'");
         }
 
         String resolvedOutputDir = context.resolveVariables(outputInfo.outputDir());
 
         context.traceInfo("Downloading from: " + resolvedUrl);
-        context.getProgress().reportProgress("Downloading " + name);
+        context.getProgress().reportProgress("Downloading " + getName());
 
         try {
             Path outputPath = Paths.get(resolvedOutputDir);
@@ -81,18 +76,18 @@ public class DownloadTask implements InstallerTask {
             Path downloadedFile = Files.createTempFile("download-", fileName);
 
             try {
-                ProgressMonitorWrapper downloadProgress = new ProgressMonitorWrapper(context, name);
+                ProgressMonitorWrapper downloadProgress = new ProgressMonitorWrapper(context, getName());
                 DownloadUtils.DownloadResult result = DownloadUtils.download(resolvedUrl, downloadedFile, downloadProgress);
 
                 DecompressorUtils.Decompressor decompressor = DecompressorUtils.getDecompressor(downloadedFile);
-                context.getProgress().beginStep(getExtractStepName(name));
+                context.getProgress().beginStep(getExtractStepName(getName()));
                 if (decompressor != null) {
-                    context.getProgress().reportProgress("Extracting " + name);
-                    context.traceUpdate("Extracting " + name);
+                    context.getProgress().reportProgress("Extracting " + getName());
+                    context.traceUpdate("Extracting " + getName());
                     Path rootDir = decompressor.decompress(downloadedFile, outputPath, context.getProgress());
                 } else {
-                    context.getProgress().reportProgress("Installing " + name);
-                    context.traceUpdate("Installing " + name);
+                    context.getProgress().reportProgress("Installing " + getName());
+                    context.traceUpdate("Installing " + getName());
 
                     String targetFileName = outputInfo.outputFileName() != null ? context.resolveVariables(outputInfo.outputFileName()) : fileName;
                     Path targetFile = outputPath.resolve(targetFileName);
@@ -114,10 +109,6 @@ public class DownloadTask implements InstallerTask {
 
                 context.traceInfo("Downloaded and extracted to: " + resolvedOutputDir);
 
-                if (onSuccessTask != null) {
-                    return onSuccessTask.execute(context);
-                }
-
                 return true;
 
             } finally {
@@ -127,13 +118,8 @@ public class DownloadTask implements InstallerTask {
         } catch (Exception e) {
             LOG.errorf(e, "Download failed: %s", resolvedUrl);
             context.traceError("Download failed: " + e.getMessage());
-            throw new IllegalStateException("Download '" + name + "' failed: " + e.getMessage(), e);
+            throw new IllegalStateException("Download '" + getName() + "' failed: " + e.getMessage(), e);
         }
-    }
-
-    @Override
-    public String getName() {
-        return name;
     }
 
     /**
@@ -173,7 +159,7 @@ public class DownloadTask implements InstallerTask {
     /**
      * Factory for DownloadTask.
      */
-    public static class Factory implements InstallerTaskFactory {
+    public static class Factory extends InstallerTaskFactoryBase {
         private static final String URL_JSON_PROPERTY = "url";
         private static final String GITHUB_JSON_PROPERTY = "github";
         private static final String GITHUB_OWNER_JSON_PROPERTY = "owner";
@@ -192,69 +178,22 @@ public class DownloadTask implements InstallerTask {
         private static final String OUTPUT_FILE_NAME_JSON_PROPERTY = "name";
         private static final String OUTPUT_FILE_EXECUTABLE_JSON_PROPERTY = "executable";
 
-        // Lazy singleton registry to avoid circular initialization
-        private static volatile InstallerTaskRegistry registry;
-
-        public Factory() {
-        }
-
-        private static InstallerTaskRegistry getRegistry() {
-            if (registry == null) {
-                synchronized (Factory.class) {
-                    if (registry == null) {
-                        registry = new InstallerTaskRegistry();
-                    }
-                }
-            }
-            return registry;
-        }
-
         @Override
         public String getType() {
             return "download";
         }
 
         @Override
-        public InstallerTask createTask(JsonElement config) {
-            JsonObject obj = config.getAsJsonObject();
-            String name = obj.has("name") ? obj.get("name").getAsString() : "Download";
-
-            String url = getStringFromOs(obj, URL_JSON_PROPERTY);
-            AssetFetcherInfo assetFetcherInfo = getAssetFetcher(obj);
-            OutputInfo outputInfo = getOutputInfo(obj);
-
-            // Parse onSuccess tasks
-            InstallerTask onSuccessTask = null;
-            if (obj.has("onSuccess")) {
-                JsonElement onSuccess = obj.get("onSuccess");
-                onSuccessTask = parseTaskNode(onSuccess);
-            }
-
-            return new DownloadTask(name, url, assetFetcherInfo, outputInfo, onSuccessTask);
+        protected String getDefaultName() {
+            return "Download";
         }
 
-        private String getStringFromOs(JsonObject json, String property) {
-            if (!json.has(property)) {
-                return null;
-            }
-            JsonElement element = json.get(property);
-            if (element.isJsonPrimitive()) {
-                return element.getAsString();
-            }
-            if (element.isJsonObject()) {
-                JsonObject osMap = element.getAsJsonObject();
-                String os = System.getProperty("os.name").toLowerCase();
-                if (os.contains("win") && osMap.has("windows")) {
-                    return osMap.get("windows").getAsString();
-                } else if (os.contains("mac") && osMap.has("mac")) {
-                    return osMap.get("mac").getAsString();
-                } else if ((os.contains("nix") || os.contains("nux")) && osMap.has("linux")) {
-                    return osMap.get("linux").getAsString();
-                } else if (osMap.has("default")) {
-                    return osMap.get("default").getAsString();
-                }
-            }
-            return null;
+        @Override
+        protected InstallerTask create(String name, InstallerTask onSuccess, JsonObject obj) {
+            String url = OSUtils.getStringFromOs(obj, URL_JSON_PROPERTY);
+            AssetFetcherInfo assetFetcherInfo = getAssetFetcher(obj);
+            OutputInfo outputInfo = getOutputInfo(obj);
+            return new DownloadTask(name, onSuccess, url, assetFetcherInfo, outputInfo);
         }
 
         private AssetFetcherInfo getAssetFetcher(JsonObject json) {
@@ -283,7 +222,7 @@ public class DownloadTask implements InstallerTask {
             }
             String owner = githubObj.get(GITHUB_OWNER_JSON_PROPERTY).getAsString();
             String repository = githubObj.get(GITHUB_REPOSITORY_JSON_PROPERTY).getAsString();
-            String assetPattern = getStringFromOs(githubObj, GITHUB_ASSET_JSON_PROPERTY);
+            String assetPattern = OSUtils.getStringFromOs(githubObj, GITHUB_ASSET_JSON_PROPERTY);
             if (assetPattern == null) {
                 return null;
             }
@@ -346,7 +285,7 @@ public class DownloadTask implements InstallerTask {
                 return null;
             }
             JsonObject outputObj = outputElement.getAsJsonObject();
-            String dir = getStringFromOs(outputObj, OUTPUT_DIR_JSON_PROPERTY);
+            String dir = OSUtils.getStringFromOs(outputObj, OUTPUT_DIR_JSON_PROPERTY);
 
             String fileName = null;
             boolean executable = false;
@@ -354,28 +293,13 @@ public class DownloadTask implements InstallerTask {
                 JsonElement fileElement = outputObj.get(OUTPUT_FILE_JSON_PROPERTY);
                 if (fileElement.isJsonObject()) {
                     JsonObject fileObj = fileElement.getAsJsonObject();
-                    fileName = getStringFromOs(fileObj, OUTPUT_FILE_NAME_JSON_PROPERTY);
+                    fileName = OSUtils.getStringFromOs(fileObj, OUTPUT_FILE_NAME_JSON_PROPERTY);
                     executable = fileObj.has(OUTPUT_FILE_EXECUTABLE_JSON_PROPERTY) && fileObj.get(OUTPUT_FILE_EXECUTABLE_JSON_PROPERTY).getAsBoolean();
                 }
             }
             return new OutputInfo(dir, fileName, executable);
         }
 
-        private InstallerTask parseTaskNode(JsonElement taskNode) {
-            if (taskNode == null || !taskNode.isJsonObject()) {
-                return null;
-            }
-
-            JsonObject taskObj = taskNode.getAsJsonObject();
-            if (taskObj.size() == 0) {
-                return null;
-            }
-
-            String taskType = taskObj.keySet().iterator().next();
-            JsonElement taskConfig = taskObj.get(taskType);
-
-            return getRegistry().createTask(taskType, taskConfig);
-        }
     }
 
     /**

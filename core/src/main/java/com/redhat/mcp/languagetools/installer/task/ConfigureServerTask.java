@@ -1,51 +1,44 @@
 package com.redhat.mcp.languagetools.installer.task;
 
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.redhat.mcp.languagetools.installer.InstallerContext;
+import com.redhat.mcp.languagetools.utils.OSUtils;
 
-public class ConfigureServerTask implements InstallerTask {
-    private final String name;
+public class ConfigureServerTask extends InstallerTask {
     private final String command;
 
-    public ConfigureServerTask(String name, String command) {
-        this.name = name;
+    public ConfigureServerTask(String name, InstallerTask onSuccess, String command) {
+        super(name, onSuccess);
         this.command = command;
     }
 
     @Override
-    public boolean execute(InstallerContext context) {
-        context.checkCanceled();
-        context.getProgress().beginStep(getName());
-
+    protected boolean run(InstallerContext context) {
         String resolvedCommand = context.resolveVariables(command);
         context.setVariable("SERVER_COMMAND", resolvedCommand);
         context.traceInfo("Server command configured: " + resolvedCommand);
-
         return true;
-    }
-
-    @Override
-    public String getName() {
-        return name;
     }
 
     public String getCommand() {
         return command;
     }
 
-    public static class Factory implements InstallerTaskFactory {
+    public static class Factory extends InstallerTaskFactoryBase {
         @Override
         public String getType() {
             return "configureServer";
         }
 
         @Override
-        public InstallerTask createTask(JsonElement config) {
-            JsonObject obj = config.getAsJsonObject();
-            String name = obj.has("name") ? obj.get("name").getAsString() : "Configure server";
-            String command = obj.get("command").getAsString();
-            return new ConfigureServerTask(name, command);
+        protected String getDefaultName() {
+            return "Configure server";
+        }
+
+        @Override
+        protected InstallerTask create(String name, InstallerTask onSuccess, JsonObject json) {
+            String command = OSUtils.getStringFromOs(json, "command");
+            return new ConfigureServerTask(name, onSuccess, command);
         }
     }
 }

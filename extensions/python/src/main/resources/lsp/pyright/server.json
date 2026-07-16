@@ -1,0 +1,10 @@
+{
+  "id": "pyright",
+  "name": "Pyright (Python Language Server)",
+  "description": "Python language server based on Pyright",
+  "documentSelector": [
+    {
+      "language": "python"
+    }
+  ]
+}

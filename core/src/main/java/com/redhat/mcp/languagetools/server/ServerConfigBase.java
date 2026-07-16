@@ -216,6 +216,13 @@ public abstract class ServerConfigBase implements ServerConfig {
     }
 
     /**
+     * Called when installation (or check) resolves a server command.
+     * Subclasses can override to update their command field.
+     */
+    protected void onCommandInstalled(String command) {
+    }
+
+    /**
      * Ensure server is installed.
      * This method is thread-safe - only one installation will run even if called from multiple workspaces.
      * Returns a CompletableFuture that completes when installation is done.
@@ -302,6 +309,9 @@ public abstract class ServerConfigBase implements ServerConfig {
                                         installationFuture = null;
                                     }
                                 } else {
+                                    if (result != null && result.getCommand() != null) {
+                                        onCommandInstalled(result.getCommand());
+                                    }
                                     if (application != null) {
                                         application.fireOnInstalled(ServerConfigBase.this, result);
                                     }

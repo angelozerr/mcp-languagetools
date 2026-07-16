@@ -8,16 +8,10 @@
   "debugServerReadyPattern": "DAP server listening on port ${port}",
   "documentSelector": [
     {
-      "language": "javascript",
-      "pattern": "**/*.{js,mjs,cjs}"
+      "language": "javascript"
     },
     {
-      "language": "typescript",
-      "pattern": "**/*.{ts,tsx}"
-    },
-    {
-      "language": "json",
-      "pattern": "**/*.json"
+      "language": "typescript"
     }
   ]
 }

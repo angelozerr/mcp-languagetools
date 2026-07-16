@@ -1,6 +1,5 @@
 package com.redhat.mcp.languagetools.installer.task;
 
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.redhat.mcp.languagetools.installer.InstallerContext;
 
@@ -12,20 +11,16 @@ import java.nio.file.PathMatcher;
 import java.nio.file.Paths;
 import java.util.stream.Stream;
 
-public class FileExistsTask implements InstallerTask {
-    private final String name;
+public class FileExistsTask extends InstallerTask {
     private final String file;
 
-    public FileExistsTask(String name, String file) {
-        this.name = name;
+    public FileExistsTask(String name, InstallerTask onSuccess, String file) {
+        super(name, onSuccess);
         this.file = file;
     }
 
     @Override
-    public boolean execute(InstallerContext context) {
-        context.checkCanceled();
-        context.getProgress().beginStep(getName());
-
+    protected boolean run(InstallerContext context) {
         String resolvedPath = context.resolveVariables(file);
         boolean exists;
 
@@ -65,23 +60,21 @@ public class FileExistsTask implements InstallerTask {
         }
     }
 
-    @Override
-    public String getName() {
-        return name;
-    }
-
-    public static class Factory implements InstallerTaskFactory {
+    public static class Factory extends InstallerTaskFactoryBase {
         @Override
         public String getType() {
             return "fileExists";
         }
 
         @Override
-        public InstallerTask createTask(JsonElement config) {
-            JsonObject obj = config.getAsJsonObject();
-            String name = obj.has("name") ? obj.get("name").getAsString() : "Check file exists";
-            String file = obj.get("file").getAsString();
-            return new FileExistsTask(name, file);
+        protected String getDefaultName() {
+            return "Check file exists";
+        }
+
+        @Override
+        protected InstallerTask create(String name, InstallerTask onSuccess, JsonObject json) {
+            String file = json.get("file").getAsString();
+            return new FileExistsTask(name, onSuccess, file);
         }
     }
 }

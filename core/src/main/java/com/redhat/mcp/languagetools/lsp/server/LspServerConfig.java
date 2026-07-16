@@ -2,6 +2,7 @@ package com.redhat.mcp.languagetools.lsp.server;
 
 import com.redhat.mcp.languagetools.Application;
 import com.redhat.mcp.languagetools.server.ServerConfigBase;
+import com.redhat.mcp.languagetools.utils.OSUtils;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -34,6 +35,12 @@ public class LspServerConfig extends ServerConfigBase {
      * Server initialization options
      */
     private Map<String, Object> initializationOptions = new HashMap<>();
+
+    /**
+     * Whether the server requires didOpen before position-based requests (references, definition, etc.).
+     * Defaults to true (standard LSP behavior). Set to false for servers that index the whole project (e.g. JDTLS).
+     */
+    private boolean requiresDidOpen = true;
 
     public LspServerConfig(String serverId, Application application) {
         super(serverId, application.getPathManager().getLspServerHome(serverId), application);
@@ -75,6 +82,13 @@ public class LspServerConfig extends ServerConfigBase {
             .orElse(null);
     }
 
+    @Override
+    protected void onCommandInstalled(String command) {
+        if (this.command == null) {
+            this.command = command;
+        }
+    }
+
     // Getters and setters (id, name, description, installer inherited from ServerConfigBase)
 
     public Object getCommand() {
@@ -94,17 +108,7 @@ public class LspServerConfig extends ServerConfigBase {
             return (String) command;
         }
         if (command instanceof Map) {
-            Map<String, String> commandMap = (Map<String, String>) command;
-            String os = System.getProperty("os.name").toLowerCase();
-
-            if (os.contains("win")) {
-                return commandMap.getOrDefault("windows", commandMap.get("default"));
-            } else if (os.contains("mac")) {
-                return commandMap.getOrDefault("mac", commandMap.get("default"));
-            } else if (os.contains("linux")) {
-                return commandMap.getOrDefault("linux", commandMap.get("default"));
-            }
-            return commandMap.get("default");
+            return OSUtils.getStringFromOs((Map<String, String>) command);
         }
         return null;
     }

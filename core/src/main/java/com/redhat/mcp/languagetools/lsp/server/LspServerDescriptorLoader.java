@@ -39,31 +39,32 @@ public class LspServerDescriptorLoader extends ServerDescriptorLoaderBase<LspSer
         // server.json
         JsonObject jsonObject = super.loadServer(serverId, serverDir, config);
 
+        // Command
         if (jsonObject.has(FIELD_COMMAND)) {
-            // Command
             config.setCommand(jsonObject.get(FIELD_COMMAND).getAsString());
-            // Environment variables
-            if (jsonObject.has(FIELD_ENV)) {
-                Map<String, String> env = new HashMap<>();
-                jsonObject.getAsJsonObject(FIELD_ENV).entrySet().forEach(entry ->
-                        env.put(entry.getKey(), entry.getValue().getAsString())
-                );
-                config.setEnv(env);
-            }
+        }
 
-            // Working directory
-            if (jsonObject.has(FIELD_WORKING_DIRECTORY)) {
-                config.setWorkingDirectory(jsonObject.get(FIELD_WORKING_DIRECTORY).getAsString());
-            }
+        // Environment variables
+        if (jsonObject.has(FIELD_ENV)) {
+            Map<String, String> env = new HashMap<>();
+            jsonObject.getAsJsonObject(FIELD_ENV).entrySet().forEach(entry ->
+                    env.put(entry.getKey(), entry.getValue().getAsString())
+            );
+            config.setEnv(env);
+        }
 
-            // Initialization options
-            if (jsonObject.has(FIELD_INITIALIZATION_OPTIONS)) {
-                Map<String, Object> initOptions = gson.fromJson(
-                        jsonObject.get(FIELD_INITIALIZATION_OPTIONS),
-                        Map.class
-                );
-                config.setInitializationOptions(initOptions);
-            }
+        // Working directory
+        if (jsonObject.has(FIELD_WORKING_DIRECTORY)) {
+            config.setWorkingDirectory(jsonObject.get(FIELD_WORKING_DIRECTORY).getAsString());
+        }
+
+        // Initialization options
+        if (jsonObject.has(FIELD_INITIALIZATION_OPTIONS)) {
+            Map<String, Object> initOptions = gson.fromJson(
+                    jsonObject.get(FIELD_INITIALIZATION_OPTIONS),
+                    Map.class
+            );
+            config.setInitializationOptions(initOptions);
         }
         return jsonObject;
     }

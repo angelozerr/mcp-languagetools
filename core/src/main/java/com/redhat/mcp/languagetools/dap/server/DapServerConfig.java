@@ -6,6 +6,7 @@ import com.google.gson.JsonParser;
 import com.redhat.mcp.languagetools.Application;
 import com.redhat.mcp.languagetools.dap.transport.TransportType;
 import com.redhat.mcp.languagetools.server.ServerConfigBase;
+import com.redhat.mcp.languagetools.utils.OSUtils;
 import org.jboss.logging.Logger;
 
 import java.net.URI;
@@ -53,6 +54,14 @@ public class DapServerConfig extends ServerConfigBase {
         super(serverId, serverHome, application);
     }
 
+    @Override
+    protected void onCommandInstalled(String command) {
+        if (launch == null) {
+            launch = new HashMap<>();
+        }
+        launch.put(OSUtils.OS_KEY, command);
+    }
+
     // Getters and setters (id, name, description, installer, documentSelector, trace inherited from ServerConfigBase)
 
     public Map<String, String> getLaunch() {
@@ -71,15 +80,7 @@ public class DapServerConfig extends ServerConfigBase {
         if (launch == null) {
             return null;
         }
-        String os = System.getProperty("os.name").toLowerCase();
-        if (os.contains("win") && launch.containsKey("windows")) {
-            return launch.get("windows");
-        } else if (os.contains("mac") && launch.containsKey("mac")) {
-            return launch.get("mac");
-        } else if (launch.containsKey("default")) {
-            return launch.get("default");
-        }
-        return null;
+        return OSUtils.getStringFromOs(launch);
     }
 
     public Map<String, Object> getAttach() {
