@@ -196,7 +196,7 @@ function showLaunchConfigForm(session, dapServerId) {
                     </select>
                 </div>
                 <textarea
-                    id="launch-config-editor"
+                    id="launch-config-editor-${sessionId}"
                     style="width: 100%; padding: 0.75rem; background: #1e1e1e; color: #d4d4d4; border: 1px solid #3a3a3a; border-radius: 3px; font-family: 'Courier New', monospace; font-size: 0.9rem; resize: vertical; height: 150px;"
                 >${JSON.stringify(defaultConfig, null, 2)}</textarea>
             </div>
@@ -218,8 +218,8 @@ function showLaunchConfigForm(session, dapServerId) {
         </div>
     `;
 
-    // Clear console area completely and create session div
-    consoleArea.innerHTML = '';
+    // Hide all existing children (session divs, server details, placeholders)
+    Array.from(consoleArea.children).forEach(child => child.style.display = 'none');
 
     sessionDiv = document.createElement('div');
     sessionDiv.id = `dap-session-${sessionId}`;
@@ -288,9 +288,8 @@ function showSessionDiv(sessionId) {
         return;
     }
 
-    // Hide all session divs
-    const allSessions = consoleArea.querySelectorAll('[id^="dap-session-"]');
-    allSessions.forEach(div => div.style.display = 'none');
+    // Hide all children (session divs, server details, placeholders)
+    Array.from(consoleArea.children).forEach(child => child.style.display = 'none');
 
     // Show the selected session
     sessionDiv.style.display = 'block';
@@ -323,7 +322,7 @@ async function launchDapSessionInternal(sessionId, debugMode) {
 
     try {
         // Try to get config from editor (if in detail view), otherwise use stored config
-        const editor = document.getElementById('launch-config-editor');
+        const editor = document.getElementById(`launch-config-editor-${sessionId}`);
         let launchConfig;
 
         if (editor) {
@@ -1542,7 +1541,7 @@ function applyLaunchTemplate(sessionId, templateIndex) {
 
     // template.body is already an object (not a JSON string)
     try {
-        const editor = document.getElementById('launch-config-editor');
+        const editor = document.getElementById(`launch-config-editor-${sessionId}`);
         editor.value = JSON.stringify(template.body, null, 2);
 
         // Reset selector to "Select template..."
