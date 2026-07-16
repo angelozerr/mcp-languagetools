@@ -4,7 +4,6 @@ import com.redhat.mcp.languagetools.dap.client.DapClient;
 import com.redhat.mcp.languagetools.dap.server.DapServer;
 import com.redhat.mcp.languagetools.dap.server.DapServerConfig;
 import com.redhat.mcp.languagetools.server.ServerStatus;
-import com.redhat.mcp.languagetools.trace.TraceCollector;
 import com.redhat.mcp.languagetools.workspace.Workspace;
 import org.jboss.logging.Logger;
 
@@ -322,12 +321,6 @@ public class JavaDebugServer extends DapServer {
     public CompletableFuture<Integer> startDebugSession(String sessionId) {
         String workspaceRootUri = getWorkspace().getNormalizedUri();
 
-        getTraceCollector().addTrace(
-                workspaceRootUri,
-                sessionId,
-                String.format("Calling %s...", CMD_START_DEBUG_SESSION)
-        );
-
         // Call vscode.java.startDebugSession via bindRequest mechanism
         return request(CMD_START_DEBUG_SESSION, List.of())
                 .thenApply(result -> {
@@ -364,30 +357,14 @@ public class JavaDebugServer extends DapServer {
         args.add(projectName);
         args.add(false);
 
-        getTraceCollector().addTrace(
-                workspaceRootUri,
-                sessionId,
-                String.format("Calling %s...", CMD_VALIDATE_LAUNCH_CONFIG)
-        );
-
         return request(CMD_VALIDATE_LAUNCH_CONFIG, args)
                 .handle((result, ex) -> {
                     if (ex != null) {
                         String error = String.format("Error calling %s: %s", CMD_VALIDATE_LAUNCH_CONFIG, ex.getMessage());
                         LOG.error(error, ex);
-                        getTraceCollector().addTrace(
-                                workspaceRootUri,
-                                sessionId,
-                                String.format("ERROR %s: %s", CMD_VALIDATE_LAUNCH_CONFIG, ex.getMessage())
-                        );
                         throw new RuntimeException(error, ex);
                     }
                     LOG.debugf("Launch config validation result: %s", result);
-                    getTraceCollector().addTrace(
-                            workspaceRootUri,
-                            sessionId,
-                            String.format("%s: OK", CMD_VALIDATE_LAUNCH_CONFIG)
-                    );
                     return result;
                 });
     }
@@ -395,32 +372,15 @@ public class JavaDebugServer extends DapServer {
     private CompletableFuture<Object> buildWorkspace(String mainClass, String sessionId) {
         // Build workspace expects a JSON string (not a structured object)
         String buildArg = String.format("{\"mainClass\":\"%s\",\"isFullBuild\":false}", mainClass);
-        String workspaceRootUri = getWorkspace().getNormalizedUri();
-
-        getTraceCollector().addTrace(
-                workspaceRootUri,
-                sessionId,
-                String.format("Calling %s...", CMD_BUILD_WORKSPACE)
-        );
 
         return request(CMD_BUILD_WORKSPACE, List.of(buildArg))
                 .handle((result, ex) -> {
                     if (ex != null) {
                         String error = String.format("Error calling %s: %s", CMD_BUILD_WORKSPACE, ex.getMessage());
                         LOG.error(error, ex);
-                        getTraceCollector().addTrace(
-                                workspaceRootUri,
-                                sessionId,
-                                String.format("ERROR %s: %s", CMD_BUILD_WORKSPACE, ex.getMessage())
-                        );
                         throw new RuntimeException(error, ex);
                     }
                     LOG.debugf("Build workspace result: %s", result);
-                    getTraceCollector().addTrace(
-                            workspaceRootUri,
-                            sessionId,
-                            String.format("%s: OK", CMD_BUILD_WORKSPACE)
-                    );
                     return result;
                 });
     }
@@ -432,36 +392,18 @@ public class JavaDebugServer extends DapServer {
 
         // Use Arrays.asList instead of List.of because List.of doesn't allow null values
         List<Object> args = java.util.Arrays.asList(mainClass, projectName, null);
-        String workspaceRootUri = getWorkspace().getNormalizedUri();
-
-        getTraceCollector().addTrace(
-                workspaceRootUri,
-                sessionId,
-                String.format("Calling %s...", CMD_RESOLVE_CLASSPATH)
-        );
 
         return request(CMD_RESOLVE_CLASSPATH, args)
                 .handle((result, ex) -> {
                     if (ex != null) {
                         String error = String.format("Error calling %s: %s", CMD_RESOLVE_CLASSPATH, ex.getMessage());
                         LOG.error(error, ex);
-                        getTraceCollector().addTrace(
-                                workspaceRootUri,
-                                sessionId,
-                                String.format("ERROR %s: %s", CMD_RESOLVE_CLASSPATH, ex.getMessage())
-                        );
                         throw new RuntimeException(error, ex);
                     }
                     @SuppressWarnings("unchecked")
                     List<List<String>> classpaths = (List<List<String>>) result;
                     LOG.debugf("Resolved classpath: modulePaths=%d, classPaths=%d",
                             classpaths.get(0).size(), classpaths.get(1).size());
-                    getTraceCollector().addTrace(
-                            workspaceRootUri,
-                            sessionId,
-                            String.format("%s: %d modulePaths, %d classPaths",
-                                    CMD_RESOLVE_CLASSPATH, classpaths.get(0).size(), classpaths.get(1).size())
-                    );
                     return classpaths;
                 });
     }
@@ -473,33 +415,16 @@ public class JavaDebugServer extends DapServer {
 
         // Use Arrays.asList instead of List.of because List.of doesn't allow null values
         List<Object> args = Arrays.asList(mainClass, projectName);
-        String workspaceRootUri = getWorkspace().getNormalizedUri();
-
-        getTraceCollector().addTrace(
-                workspaceRootUri,
-                sessionId,
-                String.format("Calling %s...", CMD_RESOLVE_JAVA_EXECUTABLE)
-        );
 
         return request(CMD_RESOLVE_JAVA_EXECUTABLE, args)
                 .handle((result, ex) -> {
                     if (ex != null) {
                         String error = String.format("Error calling %s: %s", CMD_RESOLVE_JAVA_EXECUTABLE, ex.getMessage());
                         LOG.error(error, ex);
-                        getTraceCollector().addTrace(
-                                workspaceRootUri,
-                                sessionId,
-                                String.format("ERROR %s: %s", CMD_RESOLVE_JAVA_EXECUTABLE, ex.getMessage())
-                        );
                         throw new RuntimeException(error, ex);
                     }
                     String javaExec = (String) result;
                     LOG.debugf("Resolved java executable: %s", javaExec);
-                    getTraceCollector().addTrace(
-                            workspaceRootUri,
-                            sessionId,
-                            String.format("%s: %s", CMD_RESOLVE_JAVA_EXECUTABLE, javaExec)
-                    );
                     return javaExec;
                 });
     }

@@ -111,13 +111,22 @@ public class BindEndpointSupport {
                     .thenCompose(targetServer -> {
                         LOG.debugf("Server %s is ready, routing request %s", targetServerId, targetMethod);
 
+                        onBindRequestStart(method, params);
+                        long startTime = System.nanoTime();
+
+                        CompletableFuture<?> future;
                         if (BindMode.DIRECT == bindMode) {
                             // Direct JSON-RPC request
-                            return targetServer.sendRequest(targetMethod, params);
+                            future = targetServer.sendRequest(targetMethod, params);
                         } else {
                             // Default: workspace/executeCommand (for JDT.LS delegate handlers)
-                            return targetServer.sendCommandRequest(targetMethod, params);
+                            future = targetServer.sendCommandRequest(targetMethod, params);
                         }
+
+                        return future.whenComplete((result, error) -> {
+                            long durationMs = (System.nanoTime() - startTime) / 1_000_000;
+                            onBindRequestEnd(method, params, result, error, durationMs);
+                        });
                     });
         } else {
             LOG.warnf("[%s] No bindInfo found for method: %s (contributes=%s)",
@@ -253,6 +262,12 @@ public class BindEndpointSupport {
         }
 
         return null;
+    }
+
+    protected void onBindRequestStart(String method, Object params) {
+    }
+
+    protected void onBindRequestEnd(String method, Object params, Object result, Throwable error, long durationMs) {
     }
 
     /**

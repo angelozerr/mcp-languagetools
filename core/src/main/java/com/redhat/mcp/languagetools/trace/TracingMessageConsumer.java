@@ -135,6 +135,39 @@ public class TracingMessageConsumer {
         }
     }
 
+    /**
+     * Trace a programmatic request (e.g., bind request to a delegate command handler).
+     */
+    public void traceRequest(String method, Object params, boolean verbose) {
+        Instant now = clock.instant();
+        String date = dateTimeFormatter.format(now);
+        StringBuilder sb = new StringBuilder();
+        sb.append(String.format("[Trace - %s] Sending request '%s'.", date, method));
+        if (verbose) {
+            sb.append("\nParams: ").append(toJsonString(params));
+        }
+        sb.append("\n\n");
+        collector.addTrace(workspaceUri, serverId, sb.toString());
+    }
+
+    /**
+     * Trace a programmatic response (e.g., bind response from a delegate command handler).
+     */
+    public void traceResponse(String method, Object result, Throwable error, long durationMs, boolean verbose) {
+        Instant now = clock.instant();
+        String date = dateTimeFormatter.format(now);
+        StringBuilder sb = new StringBuilder();
+        sb.append(String.format("[Trace - %s] Received response '%s' in %dms.", date, method, durationMs));
+        if (error != null) {
+            sb.append("\nError: ").append(error.getMessage());
+        } else if (verbose) {
+            String resultJson = toJsonString(result);
+            sb.append("\n").append(getResultTrace(resultJson, null));
+        }
+        sb.append("\n\n");
+        collector.addTrace(workspaceUri, serverId, sb.toString());
+    }
+
     private static String toJsonString(Object object) {
         if (toStringInstance == null) {
             toStringInstance = new MessageJsonHandler(Collections.emptyMap(), gsonBuilder -> {

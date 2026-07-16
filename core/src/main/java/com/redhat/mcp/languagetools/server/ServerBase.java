@@ -411,6 +411,24 @@ public abstract class ServerBase<T extends ServerConfigBase> extends BindEndpoin
     }
 
 
+    @Override
+    protected void onBindRequestStart(String method, Object params) {
+        ServerTrace trace = getServerTrace();
+        if (trace == ServerTrace.off) {
+            return;
+        }
+        tracing.traceRequest(method, params, trace == ServerTrace.verbose);
+    }
+
+    @Override
+    protected void onBindRequestEnd(String method, Object params, Object result, Throwable error, long durationMs) {
+        ServerTrace trace = getServerTrace();
+        if (trace == ServerTrace.off) {
+            return;
+        }
+        tracing.traceResponse(method, result, error, durationMs, trace == ServerTrace.verbose);
+    }
+
     public TracingMessageConsumer.TraceCollectorAdd getTraceCollector() {
         return traceCollector;
     }
