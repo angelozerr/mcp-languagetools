@@ -1,6 +1,7 @@
 package com.redhat.mcp.languagetools.server;
 
 import com.google.gson.JsonElement;
+import com.redhat.mcp.languagetools.Application;
 import com.redhat.mcp.languagetools.PathManager;
 import com.redhat.mcp.languagetools.installer.*;
 import com.redhat.mcp.languagetools.lsp.Contributes;
@@ -50,9 +51,12 @@ public abstract class ServerConfigBase implements ServerConfig {
     // Installation state - shared across all workspaces
     private volatile CompletableFuture<InstallResult> installationFuture;
 
-    public ServerConfigBase(String serverId, Path serverHome) {
+    private final Application application;
+
+    public ServerConfigBase(String serverId, Path serverHome, Application application) {
         this.serverId = serverId;
         this.serverHome = serverHome;
+        this.application = application;
     }
 
     // Common getters
@@ -194,6 +198,10 @@ public abstract class ServerConfigBase implements ServerConfig {
         this.installProgress = installProgress;
     }
 
+    public Application getApplication() {
+        return application;
+    }
+
     /**
      * Reset installation state so the next ensureInstalled call starts fresh.
      * Called from admin UI endpoints when the user explicitly requests an install.
@@ -289,10 +297,13 @@ public abstract class ServerConfigBase implements ServerConfig {
                                 sharedInstallProgress.endTask(taskId);
                                 sharedInstallProgress = null;
 
-                                // Reset on failure to allow retry
                                 if (error != null) {
                                     synchronized (this) {
                                         installationFuture = null;
+                                    }
+                                } else {
+                                    if (application != null) {
+                                        application.fireOnInstalled(ServerConfigBase.this, result);
                                     }
                                 }
                             });

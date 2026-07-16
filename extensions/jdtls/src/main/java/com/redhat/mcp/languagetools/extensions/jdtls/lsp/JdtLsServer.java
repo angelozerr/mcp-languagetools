@@ -1,11 +1,17 @@
 package com.redhat.mcp.languagetools.extensions.jdtls.lsp;
 
+import com.redhat.mcp.languagetools.ContributionManager;
 import com.redhat.mcp.languagetools.lsp.server.LspServer;
 import com.redhat.mcp.languagetools.lsp.server.LspServerConfig;
+import com.redhat.mcp.languagetools.progress.ProgressMonitor;
+import com.redhat.mcp.languagetools.server.ServerConfigBase;
+import com.redhat.mcp.languagetools.server.ServerConfigInstalledEvent;
+import com.redhat.mcp.languagetools.server.ServerConfigListener;
 import com.redhat.mcp.languagetools.workspace.Workspace;
 import org.eclipse.lsp4j.services.LanguageClient;
 import org.jboss.logging.Logger;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -16,11 +22,14 @@ import java.util.concurrent.CompletableFuture;
  * Handles JDT.LS-specific startup logic and readiness detection.
  * Similar to vscode-java's javaServerStarter.ts
  */
-public class JdtLsServer extends LspServer {
+public class JdtLsServer extends LspServer implements ServerConfigListener {
 
     private static final Logger LOG = Logger.getLogger(JdtLsServer.class);
 
     private JdtLsLanguageClient jdtClient;
+
+    private CompletableFuture<Void> pendingBundleInstallations;
+    private List<ServerConfigBase> uninstalledContributors;
 
     public JdtLsServer(LspServerConfig config, Workspace workspace) {
         super(config, workspace);
@@ -56,24 +65,35 @@ public class JdtLsServer extends LspServer {
             options.put("extendedClientCapabilities", extendedCaps);
         }
 
-        // Collect bundles from all servers that contribute to jdtls
-        List<String> bundlePaths = collectBundles();
+        // Collect bundles and detect uninstalled contributors in a single pass
+        ContributionManager.ContributionResult result = getWorkspace()
+                .getApplication()
+                .getContributionManager()
+                .extractFilesFromContributionWithStatus(getId(), JdtLsContributes.BUNDLES);
+
+        List<String> bundlePaths = result.getResolvedFiles();
         if (!bundlePaths.isEmpty()) {
             options.put(JdtLsContributes.BUNDLES, bundlePaths);
             LOG.infof("Passing %d bundles to JDT.LS via initializationOptions", bundlePaths.size());
         }
 
-        return options.isEmpty() ? null : options;
-    }
+        // Start installing contributors whose bundles are not yet on disk
+        List<ServerConfigBase> contributors = result.getUninstalledContributors();
+        if (!contributors.isEmpty()) {
+            uninstalledContributors = contributors;
+            var application = getWorkspace().getApplication();
+            application.addServerConfigListener(this);
+            var pathManager = application.getPathManager();
+            CompletableFuture<?>[] futures = contributors.stream()
+                    .map(contributor -> {
+                        LOG.infof("Starting background installation of '%s' bundles for JDT.LS", contributor.getServerId());
+                        return contributor.ensureInstalled(pathManager, null, ProgressMonitor.none());
+                    })
+                    .toArray(CompletableFuture[]::new);
+            pendingBundleInstallations = CompletableFuture.allOf(futures);
+        }
 
-    /**
-     * Collect all bundles from contributes.jdtls across all server configs.
-     * Returns absolute paths to bundle JARs.
-     */
-    private List<String> collectBundles() {
-        return getWorkspace()
-                .getApplication()
-                .getContributionManager().extractFilesFromContribution(getId(), JdtLsContributes.BUNDLES);
+        return options.isEmpty() ? null : options;
     }
 
     /**
@@ -83,6 +103,70 @@ public class JdtLsServer extends LspServer {
     protected LanguageClient createLanguageClient() {
         jdtClient = new JdtLsLanguageClient(this);
         return jdtClient;
+    }
+
+    /**
+     * Called when JDT.LS reports ServiceReady.
+     * If bundle installations are pending, waits for them to complete
+     * before setting ready (reloadBundles is handled by the install listener).
+     */
+    void onServiceReady() {
+        if (pendingBundleInstallations == null) {
+            setReady(true);
+            return;
+        }
+        pendingBundleInstallations
+                .thenCompose(v -> reloadBundles())
+                .whenComplete((result, error) -> {
+                    if (error != null) {
+                        LOG.errorf(error, "Failed to install/reload contributor bundles for JDT.LS");
+                    }
+                    pendingBundleInstallations = null;
+                    uninstalledContributors = null;
+                    setReady(true);
+                });
+    }
+
+    @Override
+    public void onInstalled(ServerConfigInstalledEvent event) {
+        ServerConfigBase config = event.getConfig();
+        if (!hasJdtLsBundles(config)) {
+            return;
+        }
+        if (!isReady()) {
+            return;
+        }
+        LOG.infof("Contributor '%s' installed while JDT.LS is ready, reloading bundles", config.getServerId());
+        reloadBundles()
+                .exceptionally(error -> {
+                    LOG.errorf(error, "Failed to reload bundles into JDT.LS");
+                    return null;
+                });
+    }
+
+    private boolean hasJdtLsBundles(ServerConfigBase config) {
+        var contributes = config.getContributes();
+        if (contributes == null) {
+            return false;
+        }
+        var jdtls = contributes.getContribution(getId());
+        if (jdtls == null || !jdtls.isJsonObject()) {
+            return false;
+        }
+        return jdtls.getAsJsonObject().has(JdtLsContributes.BUNDLES);
+    }
+
+    private CompletableFuture<Object> reloadBundles() {
+        List<String> bundlePaths = getWorkspace()
+                .getApplication()
+                .getContributionManager()
+                .extractFilesFromContribution(getId(), JdtLsContributes.BUNDLES);
+        if (bundlePaths.isEmpty()) {
+            LOG.warn("No bundles found, skipping java.reloadBundles");
+            return CompletableFuture.completedFuture(null);
+        }
+        LOG.infof("Reloading %d bundles into JDT.LS via java.reloadBundles", bundlePaths.size());
+        return sendCommandRequest("java.reloadBundles", List.of(bundlePaths));
     }
 
     @Override

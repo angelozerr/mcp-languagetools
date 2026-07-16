@@ -3,7 +3,7 @@ package com.redhat.mcp.languagetools.server;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import com.redhat.mcp.languagetools.PathManager;
+import com.redhat.mcp.languagetools.Application;
 import com.redhat.mcp.languagetools.lsp.Contributes;
 import com.redhat.mcp.languagetools.lsp.DocumentSelector;
 import org.jboss.logging.Logger;
@@ -55,7 +55,7 @@ public abstract class ServerDescriptorLoaderBase<T extends ServerConfigBase> {
     /**
      * Create a new instance of the config.
      */
-    protected abstract T createConfig(String serverId, PathManager pathManager);
+    protected abstract T createConfig(String serverId, Application application);
 
     /**
      * Load a bundled server configuration from a directory.
@@ -64,10 +64,10 @@ public abstract class ServerDescriptorLoaderBase<T extends ServerConfigBase> {
      * @param serverDir Directory containing server.json and installer.json
      * @return Loaded server configuration
      */
-    public final T loadBundled(Path serverDir, PathManager pathManager) throws IOException {
+    public final T loadBundled(Path serverDir, Application application) throws IOException {
         String serverId = serverDir.getFileName().toString();
 
-        T config = createConfig(serverId, pathManager);
+        T config = createConfig(serverId, application);
         loadConfig(serverId, serverDir, config);
         return config;
     }

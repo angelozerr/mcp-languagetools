@@ -3,6 +3,7 @@ package com.redhat.mcp.languagetools.dap.server;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.redhat.mcp.languagetools.Application;
 import com.redhat.mcp.languagetools.dap.transport.TransportType;
 import com.redhat.mcp.languagetools.server.ServerConfigBase;
 import org.jboss.logging.Logger;
@@ -48,8 +49,8 @@ public class DapServerConfig extends ServerConfigBase {
     private Map<String, Object> env = new HashMap<>();
     private String workingDirectory;
 
-    public DapServerConfig(String serverId, Path serverHome) {
-        super(serverId, serverHome);
+    public DapServerConfig(String serverId, Path serverHome, Application application) {
+        super(serverId, serverHome, application);
     }
 
     // Getters and setters (id, name, description, installer, documentSelector, trace inherited from ServerConfigBase)

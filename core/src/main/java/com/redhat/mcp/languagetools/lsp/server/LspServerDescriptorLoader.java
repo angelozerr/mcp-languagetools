@@ -1,7 +1,7 @@
 package com.redhat.mcp.languagetools.lsp.server;
 
 import com.google.gson.JsonObject;
-import com.redhat.mcp.languagetools.PathManager;
+import com.redhat.mcp.languagetools.Application;
 import com.redhat.mcp.languagetools.settings.PathConfig;
 import com.redhat.mcp.languagetools.server.ServerDescriptorLoaderBase;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -30,8 +30,8 @@ public class LspServerDescriptorLoader extends ServerDescriptorLoaderBase<LspSer
     }
 
     @Override
-    protected LspServerConfig createConfig(String serverId, PathManager pathManager) {
-        return new LspServerConfig(serverId, pathManager);
+    protected LspServerConfig createConfig(String serverId, Application application) {
+        return new LspServerConfig(serverId, application);
     }
 
     @Override

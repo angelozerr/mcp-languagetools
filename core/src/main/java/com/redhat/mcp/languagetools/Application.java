@@ -3,6 +3,7 @@ package com.redhat.mcp.languagetools;
 import com.redhat.mcp.languagetools.mcp.McpClientChangeEvent;
 import com.redhat.mcp.languagetools.dap.server.DapServerConfig;
 import com.redhat.mcp.languagetools.dap.trace.DapTraceCollector;
+import com.redhat.mcp.languagetools.installer.InstallResult;
 import com.redhat.mcp.languagetools.installer.TraceProgressMonitor;
 import com.redhat.mcp.languagetools.language.LanguageRegistry;
 import com.redhat.mcp.languagetools.lsp.server.LspServer;
@@ -13,6 +14,9 @@ import com.redhat.mcp.languagetools.mcp.McpClientTracker;
 import com.redhat.mcp.languagetools.settings.Settings;
 import com.redhat.mcp.languagetools.progress.ProgressMonitor;
 import com.redhat.mcp.languagetools.progress.ProgressStep;
+import com.redhat.mcp.languagetools.server.ServerConfigBase;
+import com.redhat.mcp.languagetools.server.ServerConfigInstalledEvent;
+import com.redhat.mcp.languagetools.server.ServerConfigListener;
 import com.redhat.mcp.languagetools.server.ServerDescriptorRegistry;
 import com.redhat.mcp.languagetools.workspace.Workspace;
 import com.redhat.mcp.languagetools.workspace.WorkspaceChangeEvent;
@@ -87,20 +91,39 @@ public class Application {
     private final Map<String, DapServerConfig> dapServerConfigs = new ConcurrentHashMap<>();
 
     private final ContributionManager contributionManager;
+    private final List<ServerConfigListener> serverConfigListeners = new ArrayList<>();
 
     public Application() {
         this.contributionManager = new ContributionManager(this);
+    }
+
+    public void addServerConfigListener(ServerConfigListener listener) {
+        serverConfigListeners.add(listener);
+    }
+
+    public void removeServerConfigListener(ServerConfigListener listener) {
+        serverConfigListeners.remove(listener);
+    }
+
+    public void fireOnInstalled(ServerConfigBase config, InstallResult result) {
+        var event = new ServerConfigInstalledEvent(config, result);
+        for (ServerConfigListener listener : serverConfigListeners) {
+            try {
+                listener.onInstalled(event);
+            } catch (Exception e) {
+                LOG.warnf(e, "ServerConfigListener.onInstalled failed for '%s'", config.getServerId());
+            }
+        }
     }
 
     void onStart(@Observes StartupEvent ignoredEv) {
         LOG.info("ApplicationManager starting...");
 
         // Load all bundled LSP server descriptors
-        lspServerConfigs.putAll(serverDescriptorRegistry.loadAllLspServers());
+        lspServerConfigs.putAll(serverDescriptorRegistry.loadAllLspServers(this));
 
         // Load all bundled DAP server descriptors
-        dapServerConfigs.putAll(serverDescriptorRegistry.loadAllDapServers());
-
+        dapServerConfigs.putAll(serverDescriptorRegistry.loadAllDapServers(this));
 
         LOG.infof("Loaded %d LSP server descriptors", lspServerConfigs.size());
         LOG.infof("Loaded %d DAP server descriptors", dapServerConfigs.size());

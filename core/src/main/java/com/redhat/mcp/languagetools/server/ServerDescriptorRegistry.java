@@ -1,6 +1,6 @@
 package com.redhat.mcp.languagetools.server;
 
-import com.redhat.mcp.languagetools.PathManager;
+import com.redhat.mcp.languagetools.Application;
 import com.redhat.mcp.languagetools.dap.server.DapServerConfig;
 import com.redhat.mcp.languagetools.dap.server.DapServerDescriptorLoader;
 import com.redhat.mcp.languagetools.lsp.server.LspServerConfig;
@@ -29,9 +29,6 @@ public class ServerDescriptorRegistry {
     private final Map<String, ServerDescriptorLoaderBase<?>> loaders = new HashMap<>();
 
     @Inject
-    PathManager pathManager;
-
-    @Inject
     LspServerDescriptorLoader lspServerDescriptorLoader;
 
     @Inject
@@ -58,7 +55,7 @@ public class ServerDescriptorRegistry {
      * Load all bundled servers by scanning all registered roots.
      * Returns combined map of all server configs (LSP + DAP).
      */
-    public Map<String, ServerConfigBase> loadAllBundled() {
+    public Map<String, ServerConfigBase> loadAllBundled(Application application) {
         Map<String, ServerConfigBase> allConfigs = new HashMap<>();
 
         try {
@@ -75,7 +72,7 @@ public class ServerDescriptorRegistry {
                     URL dirUrl = resources.nextElement();
                     resourceCount++;
                     LOG.infof("Found resource #%d for root '%s': %s", resourceCount, root, dirUrl);
-                    scanDirectory(dirUrl, root, allConfigs);
+                    scanDirectory(dirUrl, root, allConfigs, application);
                 }
 
                 if (resourceCount == 0) {
@@ -94,9 +91,9 @@ public class ServerDescriptorRegistry {
     /**
      * Load LSP servers only.
      */
-    public Map<String, LspServerConfig> loadAllLspServers() {
+    public Map<String, LspServerConfig> loadAllLspServers(Application application) {
         Map<String, LspServerConfig> lspConfigs = new HashMap<>();
-        Map<String, ServerConfigBase> all = loadAllBundled();
+        Map<String, ServerConfigBase> all = loadAllBundled(application);
 
         for (Map.Entry<String, ServerConfigBase> entry : all.entrySet()) {
             if (entry.getValue() instanceof LspServerConfig) {
@@ -110,9 +107,9 @@ public class ServerDescriptorRegistry {
     /**
      * Load DAP servers only.
      */
-    public Map<String, DapServerConfig> loadAllDapServers() {
+    public Map<String, DapServerConfig> loadAllDapServers(Application application) {
         Map<String, DapServerConfig> dapConfigs = new HashMap<>();
-        Map<String, ServerConfigBase> all = loadAllBundled();
+        Map<String, ServerConfigBase> all = loadAllBundled(application);
 
         for (Map.Entry<String, ServerConfigBase> entry : all.entrySet()) {
             if (entry.getValue() instanceof DapServerConfig) {
@@ -123,7 +120,7 @@ public class ServerDescriptorRegistry {
         return dapConfigs;
     }
 
-    private void scanDirectory(URL dirUrl, String root, Map<String, ServerConfigBase> configs) {
+    private void scanDirectory(URL dirUrl, String root, Map<String, ServerConfigBase> configs, Application application) {
         try {
             LOG.infof("Scanning directory URL: %s for root: %s", dirUrl, root);
             URI dirUri = dirUrl.toURI();
@@ -163,7 +160,7 @@ public class ServerDescriptorRegistry {
                            ServerDescriptorLoaderBase<?> loader = loaders.get(root);
                            if (loader != null) {
                                try {
-                                   ServerConfigBase config = loader.loadBundled(serverDir, pathManager);
+                                   ServerConfigBase config = loader.loadBundled(serverDir, application);
                                    configs.put(serverId, config);
                                    LOG.infof("Loaded server: %s from %s", serverId, root);
                                } catch (Exception e) {

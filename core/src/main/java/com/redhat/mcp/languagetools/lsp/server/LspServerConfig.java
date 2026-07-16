@@ -1,6 +1,6 @@
 package com.redhat.mcp.languagetools.lsp.server;
 
-import com.redhat.mcp.languagetools.PathManager;
+import com.redhat.mcp.languagetools.Application;
 import com.redhat.mcp.languagetools.server.ServerConfigBase;
 
 import java.util.HashMap;
@@ -35,8 +35,8 @@ public class LspServerConfig extends ServerConfigBase {
      */
     private Map<String, Object> initializationOptions = new HashMap<>();
 
-    public LspServerConfig(String serverId, PathManager pathManager) {
-        super(serverId, pathManager.getLspServerHome(serverId));
+    public LspServerConfig(String serverId, Application application) {
+        super(serverId, application.getPathManager().getLspServerHome(serverId), application);
     }
 
     /**

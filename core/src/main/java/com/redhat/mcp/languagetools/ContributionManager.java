@@ -28,21 +28,45 @@ public class ContributionManager {
         this.pathManager = application.getPathManager();
     }
 
+    public static class ContributionResult {
+        private final List<String> resolvedFiles;
+        private final List<ServerConfigBase> uninstalledContributors;
+
+        ContributionResult(List<String> resolvedFiles, List<ServerConfigBase> uninstalledContributors) {
+            this.resolvedFiles = resolvedFiles;
+            this.uninstalledContributors = uninstalledContributors;
+        }
+
+        public List<String> getResolvedFiles() {
+            return resolvedFiles;
+        }
+
+        public List<ServerConfigBase> getUninstalledContributors() {
+            return uninstalledContributors;
+        }
+    }
+
     public List<String> extractFilesFromContribution(String contributeServerId, String contributionName) {
-        List<String> extractedFiles = new ArrayList<>();
+        return extractFilesFromContributionWithStatus(contributeServerId, contributionName).getResolvedFiles();
+    }
+
+    public ContributionResult extractFilesFromContributionWithStatus(String contributeServerId, String contributionName) {
+        List<String> resolvedFiles = new ArrayList<>();
+        List<ServerConfigBase> uninstalledContributors = new ArrayList<>();
         for (var serverConfig : application.getLspServerConfigs()) {
-            extractFilesFromContribution(contributeServerId, contributionName, serverConfig, extractedFiles);
+            extractFilesFromContribution(contributeServerId, contributionName, serverConfig, resolvedFiles, uninstalledContributors);
         }
         for (var serverConfig : application.getDapServerConfigs()) {
-            extractFilesFromContribution(contributeServerId, contributionName, serverConfig, extractedFiles);
+            extractFilesFromContribution(contributeServerId, contributionName, serverConfig, resolvedFiles, uninstalledContributors);
         }
-        return extractedFiles;
+        return new ContributionResult(resolvedFiles, uninstalledContributors);
     }
 
     private void extractFilesFromContribution(String contributeServerId,
                                               String contributionName,
                                               ServerConfigBase serverConfig,
-                                              List<String> extractedFiles) {
+                                              List<String> resolvedFiles,
+                                              List<ServerConfigBase> uninstalledContributors) {
         if (serverConfig.getContributes() == null) {
             return;
         }
@@ -59,12 +83,17 @@ public class ContributionManager {
 
         // Extract and resolve bundle paths in one step
         JsonArray bundles = contributeObj.getAsJsonArray(contributionName);
+        List<String> configResolvedFiles = new ArrayList<>();
         for (JsonElement bundleElem : bundles) {
             String bundlePattern = bundleElem.getAsString();
-
-            // Extract from resources + return absolute paths
             List<String> extractedPaths = extractAndResolve(serverConfig, bundlePattern);
-            extractedFiles.addAll(extractedPaths);
+            configResolvedFiles.addAll(extractedPaths);
+        }
+
+        if (!configResolvedFiles.isEmpty()) {
+            resolvedFiles.addAll(configResolvedFiles);
+        } else if (serverConfig.getInstaller() != null) {
+            uninstalledContributors.add(serverConfig);
         }
     }
 

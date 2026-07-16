@@ -1,7 +1,7 @@
 package com.redhat.mcp.languagetools.dap.server;
 
 import com.google.gson.JsonObject;
-import com.redhat.mcp.languagetools.PathManager;
+import com.redhat.mcp.languagetools.Application;
 import com.redhat.mcp.languagetools.settings.PathConfig;
 import com.redhat.mcp.languagetools.server.ServerDescriptorLoaderBase;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -28,9 +28,6 @@ public class DapServerDescriptorLoader extends ServerDescriptorLoaderBase<DapSer
     private static final String FIELD_ENV = "env";
     private static final String FIELD_WORKING_DIRECTORY = "workingDirectory";
 
-    @Inject
-    PathManager pathManager;
-
     public DapServerDescriptorLoader() {
         super();
     }
@@ -41,8 +38,8 @@ public class DapServerDescriptorLoader extends ServerDescriptorLoaderBase<DapSer
     }
 
     @Override
-    protected DapServerConfig createConfig(String serverId, PathManager pathManager) {
-        return new DapServerConfig(serverId, pathManager.getDapServerHome(serverId));
+    protected DapServerConfig createConfig(String serverId, Application application) {
+        return new DapServerConfig(serverId, application.getPathManager().getDapServerHome(serverId), application);
     }
 
     @Override
