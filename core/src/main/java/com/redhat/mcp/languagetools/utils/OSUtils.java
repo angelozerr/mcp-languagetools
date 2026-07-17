@@ -8,9 +8,11 @@ public class OSUtils {
     private static final String WINDOWS = "windows";
     private static final String MAC = "mac";
     private static final String LINUX = "linux";
+    private static final String UNIX = "unix";
     private static final String DEFAULT = "default";
 
     public static final String OS_KEY;
+    public static final String ARCH_KEY;
 
     static {
         String os = System.getProperty("os.name", "").toLowerCase();
@@ -20,6 +22,18 @@ public class OSUtils {
             OS_KEY = MAC;
         } else {
             OS_KEY = LINUX;
+        }
+
+        String arch = System.getProperty("os.arch", "").toLowerCase();
+        // Normalize JVM arch names to the keys used in installer.json
+        if ("amd64".equals(arch) || "x86_64".equals(arch)) {
+            ARCH_KEY = "x86_64";
+        } else if ("aarch64".equals(arch) || "arm64".equals(arch)) {
+            ARCH_KEY = "arm64";
+        } else if ("x86".equals(arch) || "i386".equals(arch) || "i686".equals(arch)) {
+            ARCH_KEY = "x86";
+        } else {
+            ARCH_KEY = arch;
         }
     }
 
@@ -36,11 +50,14 @@ public class OSUtils {
     }
 
     /**
-     * Resolve an OS-specific string from a JSON property.
-     * The property value can be either:
+     * Resolve an OS-and-architecture-specific string from a JSON property.
+     * <p>
+     * The property value can be:
      * <ul>
      *   <li>A simple string (returned as-is)</li>
-     *   <li>An object with OS keys: {@code {"windows": "...", "mac": "...", "linux": "...", "default": "..."}}</li>
+     *   <li>An object with OS keys: {@code {"windows": "...", "mac": "...", "unix": "...", "default": "..."}}</li>
+     *   <li>An object with OS keys whose values are arch objects:
+     *       {@code {"windows": {"x86_64": "...", "arm64": "..."}, ...}}</li>
      * </ul>
      *
      * @param json     the JSON object containing the property
@@ -56,20 +73,56 @@ public class OSUtils {
             return element.getAsString();
         }
         if (element.isJsonObject()) {
-            return getStringFromOs(element.getAsJsonObject());
+            return resolveOsAndArch(element.getAsJsonObject());
         }
         return null;
     }
 
-    private static String getStringFromOs(JsonObject osMap) {
+    private static String resolveOsAndArch(JsonObject osMap) {
+        JsonElement osValue = getOsValue(osMap);
+        if (osValue == null) {
+            return null;
+        }
+        if (osValue.isJsonPrimitive()) {
+            return osValue.getAsString();
+        }
+        if (osValue.isJsonObject()) {
+            return resolveArch(osValue.getAsJsonObject());
+        }
+        return null;
+    }
+
+    private static JsonElement getOsValue(JsonObject osMap) {
         if (osMap.has(OS_KEY)) {
-            JsonElement value = osMap.get(OS_KEY);
+            return osMap.get(OS_KEY);
+        }
+        // "unix" is an alias for "linux"
+        if (LINUX.equals(OS_KEY) && osMap.has(UNIX)) {
+            return osMap.get(UNIX);
+        }
+        if (osMap.has(DEFAULT)) {
+            return osMap.get(DEFAULT);
+        }
+        return null;
+    }
+
+    private static String resolveArch(JsonObject archMap) {
+        if (archMap.has(ARCH_KEY)) {
+            JsonElement value = archMap.get(ARCH_KEY);
             if (value.isJsonPrimitive()) {
                 return value.getAsString();
             }
         }
-        if (osMap.has(DEFAULT)) {
-            JsonElement value = osMap.get(DEFAULT);
+        // Try raw JVM os.arch as fallback
+        String rawArch = System.getProperty("os.arch", "").toLowerCase();
+        if (!rawArch.equals(ARCH_KEY) && archMap.has(rawArch)) {
+            JsonElement value = archMap.get(rawArch);
+            if (value.isJsonPrimitive()) {
+                return value.getAsString();
+            }
+        }
+        if (archMap.has(DEFAULT)) {
+            JsonElement value = archMap.get(DEFAULT);
             if (value.isJsonPrimitive()) {
                 return value.getAsString();
             }
