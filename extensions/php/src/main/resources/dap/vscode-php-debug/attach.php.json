@@ -1,0 +1,6 @@
+{
+  "type": "php",
+  "name": "Attach to Xdebug",
+  "request": "attach",
+  "port": 9003
+}

@@ -55,6 +55,25 @@
     "aliases": ["Dart"]
   },
   {
+    "id": "dockercompose",
+    "filenamePatterns": [
+      "compose.yml",
+      "compose.yaml",
+      "compose.*.yml",
+      "compose.*.yaml",
+      "*docker*compose*.yml",
+      "*docker*compose*.yaml"
+    ],
+    "aliases": ["Compose", "compose"]
+  },
+  {
+    "id": "dockerfile",
+    "extensions": [".dockerfile", ".containerfile"],
+    "filenames": ["Dockerfile", "Containerfile"],
+    "filenamePatterns": ["Dockerfile.*", "Containerfile.*"],
+    "aliases": ["Docker", "Dockerfile", "Containerfile"]
+  },
+  {
     "id": "fortran",
     "extensions": [".f", ".F", ".f77", ".F77", ".for", ".FOR", ".fpp", ".FPP"],
     "aliases": ["Fortran - Punchcard", "fortran"]
@@ -106,8 +125,13 @@
   },
   {
     "id": "kotlin",
-    "extensions": [".kt", ".kts"],
-    "aliases": ["Kotlin"]
+    "extensions": [".kt"],
+    "aliases": ["Kotlin", "kotlin"]
+  },
+  {
+    "id": "lua",
+    "extensions": [".lua"],
+    "aliases": ["Lua", "lua"]
   },
   {
     "id": "lldb.disassembly",
@@ -160,6 +184,11 @@
     "aliases": ["Properties"]
   },
   {
+    "id": "php",
+    "extensions": [".php", ".php4", ".php5", ".phtml", ".ctp"],
+    "aliases": ["PHP", "php"]
+  },
+  {
     "id": "python",
     "extensions": [".py", ".pyw", ".pyi"],
     "aliases": ["Python"]
@@ -183,6 +212,11 @@
     "id": "xml",
     "extensions": [".xml", ".xsd", ".xsl", ".xslt"],
     "aliases": ["XML"]
+  },
+  {
+    "id": "yaml",
+    "extensions": [".yaml", ".yml", ".eyaml", ".eyml", ".cff", ".yaml-tmlanguage", ".yaml-tmpreferences", ".yaml-tmtheme", ".winget"],
+    "aliases": ["YAML", "yaml"]
   },
   {
     "id": "zig",

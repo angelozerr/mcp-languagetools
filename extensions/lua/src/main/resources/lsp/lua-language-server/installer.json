@@ -1,0 +1,56 @@
+{
+  "id": "lua-language-server-installer",
+  "name": "lua-language-server",
+  "check": {
+    "fileExists": {
+      "name": "Check if lua-language-server is installed",
+      "file": {
+        "windows": "$SERVER_HOME$/bin/lua-language-server.exe",
+        "default": "$SERVER_HOME$/bin/lua-language-server"
+      }
+    }
+  },
+  "run": {
+    "download": {
+      "name": "Download lua-language-server",
+      "github": {
+        "owner": "LuaLS",
+        "repository": "lua-language-server",
+        "prerelease": false,
+        "asset": {
+          "windows": {
+            "x86_64": "lua-language-server-*-win32-x64.zip"
+          },
+          "unix": {
+            "x86_64": "lua-language-server-*-linux-x64.tar.gz",
+            "arm64": "lua-language-server-*-linux-arm64.tar.gz"
+          },
+          "mac": {
+            "x86_64": "lua-language-server-*-darwin-x64.tar.gz",
+            "arm64": "lua-language-server-*-darwin-arm64.tar.gz"
+          }
+        }
+      },
+      "output": {
+        "dir": "$SERVER_HOME$",
+        "file": {
+          "name": {
+            "windows": "bin/lua-language-server.exe",
+            "default": "bin/lua-language-server"
+          },
+          "executable": true
+        }
+      },
+      "onSuccess": {
+        "configureServer": {
+          "name": "Configure lua-language-server command",
+          "command": {
+            "windows": "$SERVER_HOME$/bin/lua-language-server.exe",
+            "default": "$SERVER_HOME$/bin/lua-language-server"
+          },
+          "update": true
+        }
+      }
+    }
+  }
+}

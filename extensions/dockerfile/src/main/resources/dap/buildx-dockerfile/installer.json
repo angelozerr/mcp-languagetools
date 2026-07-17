@@ -1,0 +1,14 @@
+{
+  "id": "buildx-dockerfile-installer",
+  "name": "Docker Buildx DAP",
+  "check": {
+    "exec": {
+      "name": "Check if Docker Buildx DAP is available",
+      "command": {
+        "windows": "docker.exe buildx version",
+        "default": "docker buildx version"
+      },
+      "timeout": 5000
+    }
+  }
+}

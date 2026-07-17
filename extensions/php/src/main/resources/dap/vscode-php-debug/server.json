@@ -1,0 +1,12 @@
+{
+  "id": "vscode-php-debug",
+  "name": "PHP Debug (Xdebug)",
+  "description": "Debug adapter for PHP via Xdebug",
+  "url": "https://github.com/xdebug/vscode-php-debug",
+  "launch": "node $SERVER_HOME$/extension/out/phpDebug.js",
+  "documentSelector": [
+    {
+      "language": "php"
+    }
+  ]
+}

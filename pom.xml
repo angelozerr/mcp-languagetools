@@ -26,6 +26,11 @@
         <module>extensions/clangd</module>
         <module>extensions/go</module>
         <module>extensions/dart</module>
+        <module>extensions/yaml</module>
+        <module>extensions/lua</module>
+        <module>extensions/php</module>
+        <module>extensions/kotlin</module>
+        <module>extensions/dockerfile</module>
         <module>dev</module>
     </modules>
 

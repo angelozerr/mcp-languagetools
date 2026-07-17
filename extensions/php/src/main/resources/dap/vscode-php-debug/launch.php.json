@@ -1,0 +1,8 @@
+{
+  "type": "php",
+  "name": "Launch PHP file",
+  "request": "launch",
+  "program": "${workspaceFolder}/${file}",
+  "cwd": "${workspaceFolder}",
+  "port": 9003
+}

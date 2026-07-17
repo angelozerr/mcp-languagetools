@@ -1,0 +1,11 @@
+{
+  "id": "lua-language-server",
+  "name": "Lua Language Server",
+  "description": "Lua language server by LuaLS",
+  "url": "https://github.com/LuaLS/lua-language-server",
+  "documentSelector": [
+    {
+      "language": "lua"
+    }
+  ]
+}

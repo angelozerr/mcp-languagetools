@@ -1,0 +1,11 @@
+{
+  "id": "yaml-language-server",
+  "name": "YAML Language Server",
+  "description": "YAML language server by Red Hat with JSON Schema validation",
+  "url": "https://github.com/redhat-developer/yaml-language-server",
+  "documentSelector": [
+    {
+      "language": "yaml"
+    }
+  ]
+}

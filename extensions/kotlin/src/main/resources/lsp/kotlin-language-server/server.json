@@ -1,0 +1,11 @@
+{
+  "id": "kotlin-language-server",
+  "name": "Kotlin Language Server",
+  "description": "Kotlin language server by fwcd",
+  "url": "https://github.com/fwcd/kotlin-language-server",
+  "documentSelector": [
+    {
+      "language": "kotlin"
+    }
+  ]
+}

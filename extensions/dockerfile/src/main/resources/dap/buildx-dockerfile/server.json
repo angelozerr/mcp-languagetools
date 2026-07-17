@@ -1,0 +1,21 @@
+{
+  "id": "buildx-dockerfile",
+  "name": "Docker: Dockerfile Build Debugging",
+  "description": "Debug adapter for Dockerfiles via Docker Buildx",
+  "url": "https://docs.docker.com/build/building/debugging/",
+  "launch": {
+    "windows": "docker.exe buildx dap build",
+    "default": "docker buildx dap build"
+  },
+  "env": {
+    "includeSystemEnvironmentVariables": true,
+    "variables": {
+      "BUILDX_EXPERIMENTAL": "1"
+    }
+  },
+  "documentSelector": [
+    {
+      "language": "dockerfile"
+    }
+  ]
+}

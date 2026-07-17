@@ -1,0 +1,29 @@
+{
+  "id": "intelephense",
+  "name": "Intelephense",
+  "check": {
+    "fileExists": {
+      "name": "Check if Intelephense is installed",
+      "file": "$SERVER_HOME$/node_modules/.bin/intelephense*"
+    }
+  },
+  "run": {
+    "exec": {
+      "name": "Install Intelephense",
+      "workingDir": "$SERVER_HOME$/node_modules",
+      "command": {
+        "windows": "npm.cmd install intelephense --force",
+        "default": "npm install intelephense --force"
+      },
+      "onSuccess": {
+        "configureServer": {
+          "name": "Configure Intelephense command",
+          "command": {
+            "windows": "$SERVER_HOME$/node_modules/.bin/intelephense.cmd --stdio",
+            "default": "$SERVER_HOME$/node_modules/.bin/intelephense --stdio"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "id": "vscode-php-debug-installer",
+  "name": "vscode-php-debug",
+  "check": {
+    "fileExists": {
+      "name": "Check if vscode-php-debug is installed",
+      "file": "$SERVER_HOME$/extension/out/phpDebug.js"
+    }
+  },
+  "run": {
+    "download": {
+      "name": "Download vscode-php-debug",
+      "github": {
+        "owner": "xdebug",
+        "repository": "vscode-php-debug",
+        "prerelease": false,
+        "asset": "php-debug-*.vsix"
+      },
+      "output": {
+        "dir": "$SERVER_HOME$"
+      },
+      "onSuccess": {
+        "configureServer": {
+          "name": "Configure vscode-php-debug command",
+          "command": "node $SERVER_HOME$/extension/out/phpDebug.js",
+          "update": true
+        }
+      }
+    }
+  }
+}
