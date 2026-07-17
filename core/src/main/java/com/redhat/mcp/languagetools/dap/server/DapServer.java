@@ -247,7 +247,7 @@ public class DapServer extends ServerBase<DapServerConfig> {
                     pb.environment().putAll(config.getEnv());
                 }
 
-                serverProcess = pb.start();
+                Process serverProcess = startProcess(pb);
                 LOG.infof("DAP server process started: %s (PID: %d)",
                         config.getServerId(), serverProcess.pid());
 
@@ -262,9 +262,10 @@ public class DapServer extends ServerBase<DapServerConfig> {
                 // Monitor process exit
                 executorService.submit(() -> {
                     try {
-                        while (serverProcess.isAlive()) {
-                            if (serverProcess.waitFor(1, TimeUnit.SECONDS)) {
-                                int exitCode = serverProcess.exitValue();
+                        Process process = getServerProcess();
+                        while (process != null && process.isAlive()) {
+                            if (process.waitFor(1, TimeUnit.SECONDS)) {
+                                int exitCode = process.exitValue();
                                 LOG.errorf("DAP server process exited with code %d: %s", exitCode, config.getName());
                                 if (exitCode != 0) {
                                     setStatus(ServerStatus.START_FAILED);
@@ -302,7 +303,7 @@ public class DapServer extends ServerBase<DapServerConfig> {
 
         return new DAPServerReadyTracker(
             readyConfig,
-            serverProcess,
+            getServerProcess(),
                 this::addTrace
         );
     }
@@ -366,8 +367,8 @@ public class DapServer extends ServerBase<DapServerConfig> {
                 } else {
                     // Stdio transport - use process stdin/stdout
                     LOG.infof("Creating stdio transport (using process stdin/stdout)");
-                    InputStream in = serverProcess.getInputStream();
-                    OutputStream out = serverProcess.getOutputStream();
+                    InputStream in = getServerProcess().getInputStream();
+                    OutputStream out = getServerProcess().getOutputStream();
                     transportStreams = new StdioTransportStreams(in, out);
                 }
 
@@ -545,20 +546,7 @@ public class DapServer extends ServerBase<DapServerConfig> {
                 }
 
                 // Kill the server process
-                if (serverProcess != null && serverProcess.isAlive()) {
-                    LOG.infof("Destroying DAP server process (PID: %d)", serverProcess.pid());
-                    serverProcess.destroy();
-                    if (!serverProcess.waitFor(5, TimeUnit.SECONDS)) {
-                        LOG.warnf("Server process did not terminate gracefully, forcing kill");
-                        serverProcess.destroyForcibly();
-                        if (!serverProcess.waitFor(2, TimeUnit.SECONDS)) {
-                            LOG.errorf("Server process did not terminate after forceful kill (PID: %d) - may be zombie", serverProcess.pid());
-                        }
-                    }
-                    LOG.infof("DAP server process terminated");
-                } else {
-                    LOG.debugf("No server process to stop (already stopped or never started)");
-                }
+                destroyProcess(5000, 2000);
 
                 setStatus(ServerStatus.STOPPED);
                 setReady(false);
@@ -650,24 +638,20 @@ public class DapServer extends ServerBase<DapServerConfig> {
         return dapClient;
     }
 
-    public Long getPid() {
-        return serverProcess != null && serverProcess.isAlive()
-                ? serverProcess.pid() : null;
-    }
-
     /**
      * Start monitoring stderr from the DAP server process.
      * Errors are sent to the trace collector with ERROR type so they appear in red.
      */
     @Override
     protected void startStderrMonitoring() {
-        if (serverProcess == null) {
+        Process process = getServerProcess();
+        if (process == null) {
             return;
         }
 
         executorService.submit(() -> {
             try (java.io.BufferedReader reader = new java.io.BufferedReader(
-                    new java.io.InputStreamReader(serverProcess.getErrorStream()))) {
+                    new java.io.InputStreamReader(process.getErrorStream()))) {
                 String line;
                 while ((line = reader.readLine()) != null) {
                     var config = super.getConfig();
@@ -676,7 +660,7 @@ public class DapServer extends ServerBase<DapServerConfig> {
                     addTrace(line, TraceCollector.MessageType.ERROR);
                 }
             } catch (IOException e) {
-                if (serverProcess != null && serverProcess.isAlive()) {
+                if (getServerProcess() != null && getServerProcess().isAlive()) {
                     var config = super.getConfig();
                     LOG.errorf(e, "Error reading stderr from %s", config.getName());
                 }

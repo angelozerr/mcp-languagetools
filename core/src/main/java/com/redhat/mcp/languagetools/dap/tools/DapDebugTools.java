@@ -55,9 +55,12 @@ public class DapDebugTools {
             name = "list_debug_adapters",
             description = "List available debug adapters with their IDs and supported languages. " +
                     "Optionally filter by file URI to get adapters suitable for that file. " +
-                    "Use the adapter ID with create_debug_session.")
-    public List<Map<String, Object>> getListDebugAdapters(
-            @ToolArg(description = "Optional file URI to filter adapters (e.g., 'file:///path/to/Main.java')") String fileUri) {
+                    "Without cwd: returns available debug adapter configurations. " +
+                    "With cwd: returns debug adapter configurations for the given workspace. " +
+                    "Use the adapter ID with start_debugging.")
+    public List<Map<String, Object>> listDebugAdapters(
+            @ToolArg(description = "Optional file URI to filter adapters (e.g., 'file:///path/to/Main.java')") String fileUri,
+            @ToolArg(description = ToolArgDescriptions.CWD) String cwd) {
         if (fileUri != null && !fileUri.isEmpty()) {
             return sessionManager.listDebugAdaptersForFile(URI.create(fileUri));
         }

@@ -44,7 +44,7 @@ public abstract class ServerBase<T extends ServerConfigBase> extends BindEndpoin
     private volatile String statusMessage = null;
     private final List<StatusChangeListener> statusChangeListeners = new CopyOnWriteArrayList<>();
 
-    protected Process serverProcess;
+    private Process serverProcess;
     private volatile boolean isReady;
     private CompletableFuture<Void> readyFuture;
 
@@ -76,6 +76,20 @@ public abstract class ServerBase<T extends ServerConfigBase> extends BindEndpoin
 
     public final String getContextId() {
         return contextId;
+    }
+
+    protected Process getServerProcess() {
+        return serverProcess;
+    }
+
+    protected Process startProcess(ProcessBuilder processBuilder) throws java.io.IOException {
+        this.serverProcess = processBuilder.start();
+        return this.serverProcess;
+    }
+
+    public Long getPid() {
+        Process process = this.serverProcess;
+        return process != null && process.isAlive() ? process.pid() : null;
     }
 
     /**
@@ -187,12 +201,13 @@ public abstract class ServerBase<T extends ServerConfigBase> extends BindEndpoin
         LOG.infof("Cleaning up resources for %s (status: %s)", config.getServerId(), status);
 
         // Kill the server process if still running
-        if (serverProcess != null) {
-            if (serverProcess.isAlive()) {
-                LOG.infof("Destroying server process (PID: %d)", serverProcess.pid());
-                serverProcess.destroyForcibly();
+        Process process = getServerProcess();
+        if (process != null) {
+            if (process.isAlive()) {
+                LOG.infof("Destroying server process (PID: %d)", process.pid());
+                process.destroyForcibly();
             }
-            serverProcess = null; // Always null it out
+            this.serverProcess = null;
         }
 
         // DON'T shutdown executor - it would reject future start() attempts
@@ -232,7 +247,7 @@ public abstract class ServerBase<T extends ServerConfigBase> extends BindEndpoin
      */
     protected void startStderrMonitoring() {
         executorService.submit(() -> {
-            try (var reader = new java.io.BufferedReader(new java.io.InputStreamReader(serverProcess.getErrorStream()))) {
+            try (var reader = new java.io.BufferedReader(new java.io.InputStreamReader(getServerProcess().getErrorStream()))) {
                 String line;
                 StringBuilder stackTraceBuffer = new StringBuilder();
                 String stackTraceTimestamp = null;
@@ -344,11 +359,45 @@ public abstract class ServerBase<T extends ServerConfigBase> extends BindEndpoin
      * Stop the server.
      */
     public void stop() {
-        if (serverProcess != null && serverProcess.isAlive()) {
+        Process process = getServerProcess();
+        if (process != null && process.isAlive()) {
             LOG.infof("Stopping server: %s", config.getServerId());
             setStatus(ServerStatus.STOPPING);
-            serverProcess.destroy();
+            process.destroy();
             setStatus(ServerStatus.STOPPED);
+        }
+    }
+
+    /**
+     * Destroy the server process gracefully, then forcibly if needed.
+     *
+     * @param gracefulTimeoutMs time to wait for graceful shutdown before forcing (0 = force immediately)
+     * @param forceTimeoutMs    time to wait after forcible kill
+     * @return true if the process was terminated
+     */
+    protected boolean destroyProcess(long gracefulTimeoutMs, long forceTimeoutMs) {
+        Process process = this.serverProcess;
+        if (process == null || !process.isAlive()) {
+            return true;
+        }
+        try {
+            if (gracefulTimeoutMs > 0) {
+                LOG.infof("Destroying server process (PID: %d)", process.pid());
+                process.destroy();
+                if (process.waitFor(gracefulTimeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS)) {
+                    return true;
+                }
+                LOG.warnf("Server process did not terminate gracefully, forcing kill");
+            }
+            process.destroyForcibly();
+            if (process.waitFor(forceTimeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS)) {
+                return true;
+            }
+            LOG.errorf("Server process did not terminate after forceful kill (PID: %d) - may be zombie", process.pid());
+            return false;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
         }
     }
 
@@ -369,9 +418,10 @@ public abstract class ServerBase<T extends ServerConfigBase> extends BindEndpoin
         }
 
         // If restarting, kill old process first
-        if (serverProcess != null && serverProcess.isAlive()) {
-            LOG.infof("Killing old server process before restart (PID: %d)", serverProcess.pid());
-            serverProcess.destroyForcibly();
+        Process process = getServerProcess();
+        if (process != null && process.isAlive()) {
+            LOG.infof("Killing old server process before restart (PID: %d)", process.pid());
+            process.destroyForcibly();
         }
 
         // Set status to STARTING

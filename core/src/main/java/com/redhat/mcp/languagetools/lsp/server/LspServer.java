@@ -235,11 +235,11 @@ public class LspServer extends ServerBase<LspServerConfig> {
         }
 
         // Don't redirect error stream - we want to capture it separately
-        serverProcess = pb.start();
+        Process serverProcess = startProcess(pb);
         isSocketConnection = false;
 
         // Trace server started (one line - no folding)
-        addTrace(String.format("LSP server process started (PID: %d)", serverProcess.pid()));
+        addTrace(String.format("LSP server process started (PID: %d)", getServerProcess().pid()));
 
         // Start monitoring stderr for errors (uses shared implementation from ServerBase)
         startStderrMonitoring();
@@ -256,8 +256,8 @@ public class LspServer extends ServerBase<LspServerConfig> {
         Launcher<LanguageServer> launcher = new Launcher.Builder<LanguageServer>()
                 .setLocalService(client)
                 .setRemoteInterface(LanguageServer.class)
-                .setInput(serverProcess.getInputStream())
-                .setOutput(serverProcess.getOutputStream())
+                .setInput(getServerProcess().getInputStream())
+                .setOutput(getServerProcess().getOutputStream())
                 .setExecutorService(executorService)
                 .configureGson(JsonUtils::configureGson)
                 .wrapMessages(consumer -> message -> {
@@ -539,7 +539,7 @@ public class LspServer extends ServerBase<LspServerConfig> {
         // Clear diagnostics cache
         diagnosticsCache.clear();
 
-        if (languageServer == null && serverProcess == null && socket == null) {
+        if (languageServer == null && getServerProcess() == null && socket == null) {
             return CompletableFuture.completedFuture(null);
         }
 
@@ -567,14 +567,8 @@ public class LspServer extends ServerBase<LspServerConfig> {
                 }
 
                 // Force kill process if still alive (only if we launched it)
-                if (!isSocketConnection && serverProcess != null && serverProcess.isAlive()) {
-                    LOG.infof("Force killing %s process", config.getServerId());
-                    serverProcess.destroyForcibly();
-
-                    // Wait a bit for process to die
-                    if (!serverProcess.waitFor(3, TimeUnit.SECONDS)) {
-                        LOG.errorf("Failed to kill %s process", config.getServerId());
-                    }
+                if (!isSocketConnection) {
+                    destroyProcess(0, 3000);
                 }
 
                 // Shutdown executor
@@ -673,16 +667,6 @@ public class LspServer extends ServerBase<LspServerConfig> {
         return languageClient;
     }
 
-
-    /**
-     * Get the process ID of the running server (if available).
-     */
-    public Long getPid() {
-        if (serverProcess != null && serverProcess.isAlive()) {
-            return serverProcess.pid();
-        }
-        return null;
-    }
 
     /**
      * Get the start command used to launch the server.
@@ -821,15 +805,15 @@ public class LspServer extends ServerBase<LspServerConfig> {
         LOG.infof("New instance detected (PID: %d, port: %d), switching connection...", newInstance.pid, newInstance.port);
 
         // If we launched our own server, stop it
-        if (!isSocketConnection && serverProcess != null && serverProcess.isAlive()) {
+        if (!isSocketConnection && getServerProcess() != null && getServerProcess().isAlive()) {
             LOG.infof("Stopping our own server process to switch to IDE instance");
             try {
                 languageServer.shutdown().get(2, TimeUnit.SECONDS);
                 languageServer.exit();
-                serverProcess.destroyForcibly();
             } catch (Exception e) {
                 LOG.warnf("Error stopping our server: %s", e.getMessage());
             }
+            destroyProcess(0, 2000);
         }
 
         // Close current socket if we're already connected
