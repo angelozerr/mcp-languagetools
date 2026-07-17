@@ -2,6 +2,7 @@
   "id": "clangd",
   "name": "Clangd",
   "description": "C/C++ language server based on clangd",
+  "url": "https://clangd.llvm.org/",
   "documentSelector": [
     {
       "language": "c"

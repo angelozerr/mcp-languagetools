@@ -2,6 +2,7 @@
   "id": "dart-debug",
   "name": "Dart Debug Adapter",
   "description": "Debug adapter for Dart from the Dart SDK",
+  "url": "https://dart.dev/tools/dart-tool",
   "launch": "dart debug_adapter",
   "documentSelector": [
     {

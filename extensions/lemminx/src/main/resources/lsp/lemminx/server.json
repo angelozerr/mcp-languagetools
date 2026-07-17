@@ -2,6 +2,7 @@
   "id": "lemminx",
   "name": "LemMinX (XML Language Server)",
   "description": "XML language server based on Eclipse LemMinX",
+  "url": "https://github.com/eclipse/lemminx",
   "documentSelector": [
     {
       "language": "xml"

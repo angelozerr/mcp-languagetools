@@ -2,6 +2,7 @@
   "id": "typescript-language-server",
   "name": "TypeScript Language Server",
   "description": "TypeScript/JavaScript language server",
+  "url": "https://github.com/typescript-language-server/typescript-language-server",
   "documentSelector": [
     {
       "language": "typescript"

@@ -247,6 +247,13 @@ function buildServerDetailsHTML(details, allServers) {
         </div>
         ` : ''}
 
+        ${details.url ? `
+        <div style="margin-bottom: 1.5rem;">
+            <strong style="color: #569cd6;">URL:</strong>
+            <p style="margin: 0.25rem 0;"><a href="${details.url}" target="_blank" style="color: #3794ff; text-decoration: none;">${details.url}</a></p>
+        </div>
+        ` : ''}
+
         <div style="margin-bottom: 1.5rem;">
             <strong style="color: #569cd6;">Command:</strong>
             <p style="margin: 0.25rem 0; color: #d4d4d4;">${commandHTML}</p>

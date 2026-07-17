@@ -2,6 +2,7 @@
   "id": "vscode-js-debug",
   "name": "VSCode JS Debug",
   "description": "Debug adapter for JavaScript and TypeScript",
+  "url": "https://github.com/microsoft/vscode-js-debug",
   "debugServerReadyPattern": "DAP server listening on port ${port}",
   "documentSelector": [
     {

@@ -68,6 +68,9 @@ public class WorkspaceTools {
                 server.put("id", config.getServerId());
                 server.put("name", config.getName());
                 server.put("description", config.getDescription() != null ? config.getDescription() : "");
+                if (config.getUrl() != null) {
+                    server.put("url", config.getUrl());
+                }
 
                 List<String> languages = new ArrayList<>();
                 if (config.getDocumentSelector() != null) {

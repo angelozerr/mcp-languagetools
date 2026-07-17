@@ -28,6 +28,7 @@ public abstract class ServerConfigBase implements ServerConfig {
     private final Path serverHome;
     protected String name;
     protected String description;
+    protected String url;
     protected JsonElement installerConfig;  // Raw JSON from installer.json
     protected List<DocumentSelector> documentSelector = new ArrayList<>();
     protected String command;
@@ -93,6 +94,14 @@ public abstract class ServerConfigBase implements ServerConfig {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public String getUrl() {
+        return url;
+    }
+
+    public void setUrl(String url) {
+        this.url = url;
     }
 
     @Override

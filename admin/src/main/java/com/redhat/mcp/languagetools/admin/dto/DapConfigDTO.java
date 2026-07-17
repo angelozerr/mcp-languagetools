@@ -13,6 +13,7 @@ public record DapConfigDTO(
     String id,
     String name,
     String description,
+    String url,
     List<DocumentSelector> documentSelector,
     Map<String, Map<String, List<?>>> contributions
 ) {

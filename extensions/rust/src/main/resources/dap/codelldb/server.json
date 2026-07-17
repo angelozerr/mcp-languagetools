@@ -2,6 +2,7 @@
   "id": "codelldb",
   "name": "CodeLLDB",
   "description": "Debug adapter for Rust and C/C++ via LLDB",
+  "url": "https://github.com/vadimcn/codelldb",
   "documentSelector": [
     {
       "language": "ada"

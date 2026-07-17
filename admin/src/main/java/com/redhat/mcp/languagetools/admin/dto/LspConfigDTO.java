@@ -13,6 +13,7 @@ public record LspConfigDTO(
     String id,
     String name,
     String description,
+    String url,
     List<DocumentSelector> documentSelector,
     String command,
     Map<String, String> env,

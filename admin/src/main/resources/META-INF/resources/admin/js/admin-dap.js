@@ -733,6 +733,13 @@ async function showDapServerDetails(serverId) {
         </div>
         ` : ''}
 
+        ${server.url ? `
+        <div style="margin-bottom: 1.5rem;">
+            <strong style="color: #569cd6;">URL:</strong>
+            <p style="margin: 0.25rem 0;"><a href="${server.url}" target="_blank" style="color: #3794ff; text-decoration: none;">${server.url}</a></p>
+        </div>
+        ` : ''}
+
         <div style="margin-bottom: 1.5rem;">
             <strong style="color: #569cd6;">Supported Languages/Files:</strong>
             ${docSelectorHTML}

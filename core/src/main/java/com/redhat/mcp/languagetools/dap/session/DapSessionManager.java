@@ -260,6 +260,9 @@ public class DapSessionManager {
         Map<String, Object> adapter = new HashMap<>();
         adapter.put("id", config.getServerId());
         adapter.put("name", config.getName());
+        if (config.getUrl() != null) {
+            adapter.put("url", config.getUrl());
+        }
         adapter.put("enabled", true);  // All configs from getDapServerConfigs are enabled
 
         // Extract supported languages

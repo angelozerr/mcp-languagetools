@@ -2,6 +2,7 @@
   "id": "jdtls",
   "name": "Eclipse JDT Language Server",
   "description": "Java language server based on Eclipse JDT",
+  "url": "https://github.com/eclipse-jdtls/eclipse.jdt.ls",
   "toolsRequest": {
     "skipDidOpen": true
   },

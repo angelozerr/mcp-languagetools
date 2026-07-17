@@ -2,6 +2,7 @@
 	"id": "java-debug",
 	"name": "Java Debug Server",
 	"description": "Java Debug Server for Visual Studio Code",
+	"url": "https://github.com/microsoft/java-debug",
 	"launchMethod": "vscode.java.startDebugSession",
 	"documentSelector": [
 		{

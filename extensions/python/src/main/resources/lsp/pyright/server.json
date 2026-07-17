@@ -2,6 +2,7 @@
   "id": "pyright",
   "name": "Pyright (Python Language Server)",
   "description": "Python language server based on Pyright",
+  "url": "https://github.com/microsoft/pyright",
   "toolsRequest": {
     "skipDidOpen": true
   },

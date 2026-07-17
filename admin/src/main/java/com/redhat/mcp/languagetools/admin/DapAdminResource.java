@@ -80,6 +80,7 @@ public class DapAdminResource {
             config.getServerId(),
             config.getName(),
             config.getDescription(),
+            config.getUrl(),
             config.getDocumentSelector(),
             contributionBuilder.buildContributions(config)
         );

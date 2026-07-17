@@ -38,6 +38,7 @@ public abstract class ServerDescriptorLoaderBase<T extends ServerConfigBase> {
     // JSON field names
     private static final String FIELD_NAME = "name";
     private static final String FIELD_DESCRIPTION = "description";
+    private static final String FIELD_URL = "url";
     private static final String FIELD_DOCUMENT_SELECTOR = "documentSelector";
     private static final String FIELD_LANGUAGE = "language";
     private static final String FIELD_SCHEME = "scheme";
@@ -116,6 +117,10 @@ public abstract class ServerDescriptorLoaderBase<T extends ServerConfigBase> {
 
         if (jsonObject.has(FIELD_DESCRIPTION)) {
             config.setDescription(jsonObject.get(FIELD_DESCRIPTION).getAsString());
+        }
+
+        if (jsonObject.has(FIELD_URL)) {
+            config.setUrl(jsonObject.get(FIELD_URL).getAsString());
         }
 
         // Document selector
