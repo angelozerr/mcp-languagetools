@@ -56,6 +56,7 @@ public abstract class ServerConfigBase implements ServerConfig {
 
     // Installation state - shared across all workspaces
     private volatile CompletableFuture<InstallResult> installationFuture;
+    private volatile String lastInstallError;
 
     private final Application application;
 
@@ -144,6 +145,23 @@ public abstract class ServerConfigBase implements ServerConfig {
             installer = createInstaller();
         }
         return installer;
+    }
+
+    public String getLastInstallError() {
+        return lastInstallError;
+    }
+
+    /**
+     * Add installation status and error info to a map (used by list_language_servers and list_debug_adapters).
+     */
+    public void addInstallationStatus(Map<String, Object> serverInfo) {
+        ServerInstaller inst = getInstaller();
+        if (inst != null) {
+            serverInfo.put("installationStatus", inst.getStatus().name());
+        }
+        if (lastInstallError != null) {
+            serverInfo.putIfAbsent("error", lastInstallError);
+        }
     }
 
     /**
@@ -351,7 +369,8 @@ public abstract class ServerConfigBase implements ServerConfig {
                     sharedInstallProgress.startTask(taskId);
 
                     // Add TraceProgressMonitor for Admin UI
-                    TraceProgressMonitor traceProgress = new TraceProgressMonitor(traceCollector);
+                    TraceProgressMonitor traceProgress = new TraceProgressMonitor(traceCollector, 100.0,
+                            null, null, serverId, null);
                     setInstallProgress(traceProgress);
                     sharedInstallProgress.addListener(traceProgress);
 
@@ -382,10 +401,13 @@ public abstract class ServerConfigBase implements ServerConfig {
                                 sharedInstallProgress = null;
 
                                 if (error != null) {
+                                    Throwable cause = error.getCause();
+                                    lastInstallError = cause != null ? cause.getMessage() : error.getMessage();
                                     synchronized (this) {
                                         installationFuture = null;
                                     }
                                 } else {
+                                    lastInstallError = null;
                                     if (result != null && result.getCommand() != null) {
                                         onCommandInstalled(result.getCommand());
                                     }

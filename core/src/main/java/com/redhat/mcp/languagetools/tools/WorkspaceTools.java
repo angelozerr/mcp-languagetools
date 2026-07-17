@@ -88,10 +88,15 @@ public class WorkspaceTools {
                         if (statusMessage != null) {
                             server.put("statusMessage", statusMessage);
                         }
+                        String errorMessage = lspServer.getErrorMessage();
+                        if (errorMessage != null) {
+                            server.put("error", errorMessage);
+                        }
                     } else {
                         server.put("status", ServerStatus.NOT_STARTED.name());
                         server.put("ready", false);
                     }
+                    config.addInstallationStatus(server);
                 }
 
                 result.add(server);

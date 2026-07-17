@@ -42,6 +42,7 @@ public abstract class ServerBase<T extends ServerConfigBase> extends BindEndpoin
     private final TracingMessageConsumer tracing;
     private volatile ServerStatus status = ServerStatus.NOT_STARTED;
     private volatile String statusMessage = null;
+    private volatile String errorMessage = null;
     private final List<StatusChangeListener> statusChangeListeners = new CopyOnWriteArrayList<>();
 
     private Process serverProcess;
@@ -161,8 +162,28 @@ public abstract class ServerBase<T extends ServerConfigBase> extends BindEndpoin
      * Update server status and notify all listeners.
      */
     public void setStatus(ServerStatus newStatus) {
+        setStatus(newStatus, null);
+    }
+
+    /**
+     * Update server status with an error message and notify all listeners.
+     * The error message is stored when the status is a failure state
+     * (ERROR, START_FAILED, INSTALL_FAILED) and cleared otherwise.
+     */
+    public void setStatus(ServerStatus newStatus, String errorMessage) {
         ServerStatus oldStatus = this.status;
         this.status = newStatus;
+
+        // Store or clear error message based on status
+        if (newStatus == ServerStatus.ERROR
+            || newStatus == ServerStatus.START_FAILED
+            || newStatus == ServerStatus.INSTALL_FAILED) {
+            if (errorMessage != null) {
+                this.errorMessage = errorMessage;
+            }
+        } else {
+            this.errorMessage = null;
+        }
 
         // Clear status message when stopping/stopped
         if (newStatus == ServerStatus.STOPPING || newStatus == ServerStatus.STOPPED) {
@@ -190,6 +211,10 @@ public abstract class ServerBase<T extends ServerConfigBase> extends BindEndpoin
             || newStatus == ServerStatus.STOPPED) {
             cleanupResources();
         }
+    }
+
+    public final String getErrorMessage() {
+        return errorMessage;
     }
 
     /**

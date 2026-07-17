@@ -95,7 +95,7 @@ public class TraceProgressMonitor extends AbstractProgressMonitor {
     @Override
     public void reportProgress(String message) {
         this.currentText = message;
-        if (traceCollector != null && traceCollector.isEnabled()) {
+        if (traceCollector != null && traceCollector.isEnabled() && serverId != null) {
             traceCollector.addTrace(serverId, message, TraceCollector.MessageType.INFO);
         }
 

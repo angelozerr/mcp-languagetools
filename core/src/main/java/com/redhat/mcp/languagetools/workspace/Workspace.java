@@ -225,7 +225,8 @@ public class Workspace {
                                 || ex instanceof InstallationException) {
                             newServer.setStatus(ServerStatus.INSTALL_FAILED);
                         } else {
-                            newServer.setStatus(ServerStatus.START_FAILED);
+                            String errorMsg = cause != null ? cause.getMessage() : ex.getMessage();
+                            newServer.setStatus(ServerStatus.START_FAILED, errorMsg);
                         }
 
                         throw new RuntimeException("Failed to start managed server: " + ex.getMessage(), ex);
