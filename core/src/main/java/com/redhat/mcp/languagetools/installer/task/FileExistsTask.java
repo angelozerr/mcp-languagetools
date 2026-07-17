@@ -2,6 +2,7 @@ package com.redhat.mcp.languagetools.installer.task;
 
 import com.google.gson.JsonObject;
 import com.redhat.mcp.languagetools.installer.InstallerContext;
+import com.redhat.mcp.languagetools.utils.OSUtils;
 
 import java.io.IOException;
 import java.nio.file.FileSystems;
@@ -73,7 +74,7 @@ public class FileExistsTask extends InstallerTask {
 
         @Override
         protected InstallerTask create(String name, InstallerTask onSuccess, JsonObject json) {
-            String file = json.get("file").getAsString();
+            String file = OSUtils.getStringFromOs(json, "file");
             return new FileExistsTask(name, onSuccess, file);
         }
     }

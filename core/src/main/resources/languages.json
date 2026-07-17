@@ -50,15 +50,15 @@
   },
   {
     "id": "c",
-    "extensions": [".c", ".h", ".i"],
-    "aliases": ["C"],
+    "extensions": [".c", ".i"],
+    "aliases": ["C", "c"],
     "filenames": [],
     "filenamePatterns": []
   },
   {
     "id": "cpp",
-    "extensions": [".cpp", ".cc", ".cxx", ".hpp", ".hh", ".hxx", ".ii", ".ino", ".inl", ".ipp", ".ixx", ".tpp", ".txx"],
-    "aliases": ["C++", "Cpp"],
+    "extensions": [".cpp", ".cppm", ".cc", ".ccm", ".cxx", ".cxxm", ".c++", ".c++m", ".hpp", ".hh", ".hxx", ".h++", ".h", ".ii", ".ino", ".inl", ".ipp", ".ixx", ".tpp", ".txx", ".hpp.in", ".h.in"],
+    "aliases": ["C++", "Cpp", "cpp"],
     "filenames": [],
     "filenamePatterns": []
   },
@@ -81,6 +81,27 @@
     "extensions": [],
     "aliases": ["Go Checksum File"],
     "filenames": ["go.sum"],
+    "filenamePatterns": []
+  },
+  {
+    "id": "cuda-cpp",
+    "extensions": [".cu", ".cuh"],
+    "aliases": ["CUDA C++"],
+    "filenames": [],
+    "filenamePatterns": []
+  },
+  {
+    "id": "objective-c",
+    "extensions": [".m"],
+    "aliases": ["Objective-C"],
+    "filenames": [],
+    "filenamePatterns": []
+  },
+  {
+    "id": "objective-cpp",
+    "extensions": [".mm"],
+    "aliases": ["Objective-C++"],
+    "filenames": [],
     "filenamePatterns": []
   },
   {

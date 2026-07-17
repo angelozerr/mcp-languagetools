@@ -49,7 +49,7 @@ public class DownloadTask extends InstallerTask {
     /**
      * Output information for download task.
      */
-    public record OutputInfo(String outputDir, String outputFileName, boolean executable) {
+    public record OutputInfo(String outputDir, String outputFileName, boolean executable, boolean stripRootDir) {
     }
 
     @Override
@@ -85,6 +85,9 @@ public class DownloadTask extends InstallerTask {
                     context.getProgress().reportProgress("Extracting " + getName());
                     context.traceUpdate("Extracting " + getName());
                     Path rootDir = decompressor.decompress(downloadedFile, outputPath, context.getProgress());
+                    if (rootDir != null && outputInfo.stripRootDir()) {
+                        stripRootDir(rootDir, outputPath, context);
+                    }
                 } else {
                     context.getProgress().reportProgress("Installing " + getName());
                     context.traceUpdate("Installing " + getName());
@@ -119,6 +122,26 @@ public class DownloadTask extends InstallerTask {
             LOG.errorf(e, "Download failed: %s", resolvedUrl);
             context.traceError("Download failed: " + e.getMessage());
             throw new IllegalStateException("Download '" + getName() + "' failed: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Moves all contents of rootDir into its parent (outputPath) and deletes rootDir.
+     * Used when an archive contains a single top-level directory with a dynamic name
+     * (e.g., clangd_snapshot_20260712/) that should be stripped.
+     */
+    private void stripRootDir(Path rootDir, Path outputPath, InstallerContext context) {
+        try {
+            context.traceInfo("Stripping root directory: " + rootDir.getFileName());
+            try (var children = Files.list(rootDir)) {
+                for (Path child : children.toList()) {
+                    Path target = outputPath.resolve(child.getFileName());
+                    Files.move(child, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                }
+            }
+            Files.deleteIfExists(rootDir);
+        } catch (IOException e) {
+            LOG.warnf(e, "Failed to strip root directory: %s", rootDir);
         }
     }
 
@@ -177,6 +200,7 @@ public class DownloadTask extends InstallerTask {
         private static final String OUTPUT_FILE_JSON_PROPERTY = "file";
         private static final String OUTPUT_FILE_NAME_JSON_PROPERTY = "name";
         private static final String OUTPUT_FILE_EXECUTABLE_JSON_PROPERTY = "executable";
+        private static final String OUTPUT_STRIP_ROOT_DIR_JSON_PROPERTY = "stripRootDir";
 
         @Override
         public String getType() {
@@ -297,7 +321,8 @@ public class DownloadTask extends InstallerTask {
                     executable = fileObj.has(OUTPUT_FILE_EXECUTABLE_JSON_PROPERTY) && fileObj.get(OUTPUT_FILE_EXECUTABLE_JSON_PROPERTY).getAsBoolean();
                 }
             }
-            return new OutputInfo(dir, fileName, executable);
+            boolean stripRootDir = outputObj.has(OUTPUT_STRIP_ROOT_DIR_JSON_PROPERTY) && outputObj.get(OUTPUT_STRIP_ROOT_DIR_JSON_PROPERTY).getAsBoolean();
+            return new OutputInfo(dir, fileName, executable, stripRootDir);
         }
 
     }

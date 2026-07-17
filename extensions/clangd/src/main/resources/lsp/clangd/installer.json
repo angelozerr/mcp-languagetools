@@ -2,10 +2,12 @@
   "id": "clangd-installer",
   "name": "clangd",
   "check": {
-    "exec": {
-      "name": "Check if clangd is available",
-      "command": "clangd --version",
-      "timeout": 2000
+    "fileExists": {
+      "name": "Check if Clangd is installed",
+      "file": {
+        "windows": "$SERVER_HOME$/bin/clangd.exe",
+        "default": "$SERVER_HOME$/bin/clangd"
+      }
     }
   },
   "run": {
@@ -23,6 +25,7 @@
       },
       "output": {
         "dir": "$SERVER_HOME$",
+        "stripRootDir": true,
         "file": {
           "name": {
             "windows": "bin/clangd.exe",
