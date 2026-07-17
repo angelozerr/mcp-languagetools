@@ -529,35 +529,32 @@ public class DapServer extends ServerBase<DapServerConfig> {
      * Closes transport, kills the process, and updates status.
      * Note: disconnect() should be called by the caller (DapSession) before this method.
      */
-    public CompletableFuture<Void> stop2() {
-        return CompletableFuture.runAsync(() -> {
-            var config = super.getConfig();
-            try {
-                LOG.infof("Stopping DAP server: %s", config.getName());
+    public void stop() {
+        var config = super.getConfig();
+        try {
+            LOG.infof("Stopping DAP server: %s", config.getName());
 
-                // Close transport streams first
-                if (transportStreams != null) {
-                    try {
-                        transportStreams.close();
-                    } catch (Exception e) {
-                        LOG.debugf("Error closing transport streams (expected if already closed): %s", e.getMessage());
-                    }
+            // Kill the server process FIRST to unblock the JSON-RPC message reader
+            destroyProcess(5000, 2000);
+
+            // Then close transport streams
+            if (transportStreams != null) {
+                try {
+                    transportStreams.close();
+                } catch (Exception e) {
+                    LOG.debugf("Error closing transport streams (expected if already closed): %s", e.getMessage());
                 }
-
-                // Kill the server process
-                destroyProcess(5000, 2000);
-
-                setStatus(ServerStatus.STOPPED);
-                setReady(false);
-                LOG.infof("DAP server stopped: %s", config.getName());
-
-            } catch (Exception e) {
-                LOG.errorf(e, "Error stopping DAP server: %s", config.getServerId());
-                // Still mark as stopped even if there was an error
-                setStatus(ServerStatus.STOPPED);
-                setReady(false);
             }
-        }, executorService);
+
+            setStatus(ServerStatus.STOPPED);
+            setReady(false);
+            LOG.infof("DAP server stopped: %s", config.getName());
+
+        } catch (Exception e) {
+            LOG.errorf(e, "Error stopping DAP server: %s", config.getServerId());
+            setStatus(ServerStatus.STOPPED);
+            setReady(false);
+        }
     }
 
     /**

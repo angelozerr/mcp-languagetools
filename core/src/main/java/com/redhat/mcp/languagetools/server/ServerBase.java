@@ -213,6 +213,11 @@ public abstract class ServerBase<T extends ServerConfigBase> extends BindEndpoin
         }
     }
 
+    /**
+     * Returns the server-level error message (e.g., server process crashed, failed to start).
+     * For DAP session-level errors (e.g., launch failed because program doesn't exist),
+     * see {@link com.redhat.mcp.languagetools.dap.session.DapSession#getErrorMessage()}.
+     */
     public final String getErrorMessage() {
         return errorMessage;
     }
@@ -377,19 +382,6 @@ public abstract class ServerBase<T extends ServerConfigBase> extends BindEndpoin
         // Reset the future when becoming not ready (for restarts)
         if (!ready && wasReady) {
             readyFuture = new CompletableFuture<>();
-        }
-    }
-
-    /**
-     * Stop the server.
-     */
-    public void stop() {
-        Process process = getServerProcess();
-        if (process != null && process.isAlive()) {
-            LOG.infof("Stopping server: %s", config.getServerId());
-            setStatus(ServerStatus.STOPPING);
-            process.destroy();
-            setStatus(ServerStatus.STOPPED);
         }
     }
 

@@ -75,6 +75,7 @@ public class DapSession implements DapEventListener {
     private final Instant createdAt; // When the session was created
 
     private SessionState state = SessionState.CREATED;
+    private volatile String errorMessage;
     private boolean attachMode = false;
     private boolean debugMode = false; // Default to run mode (without debugging)
     private SessionActor launchedBy; // Who last launched the session
@@ -105,6 +106,11 @@ public class DapSession implements DapEventListener {
         RUNNING,
         PAUSED,
         TERMINATED,
+        /** Launch request failed (e.g., program does not exist, invalid launch configuration). */
+        LAUNCH_FAILED,
+        /** Attach request failed (e.g., target process not found, permission denied). */
+        ATTACH_FAILED,
+        /** Generic error (e.g., DAP server process crashed). */
         ERROR
     }
 
@@ -462,8 +468,7 @@ public class DapSession implements DapEventListener {
         // If session was TERMINATED, stop server first to clear vscode-js-debug DI state
         if (previousState == SessionState.TERMINATED && serverStatus == ServerStatus.RUNNING) {
             LOG.infof("Session TERMINATED but server RUNNING - stopping server to clear state");
-            initFuture = dapServer
-                    .stop2()
+            initFuture = CompletableFuture.runAsync(() -> dapServer.stop())
                     .thenCompose(v -> initialize(progressMonitor));
         } else if (previousState == SessionState.CREATED
                 || serverStatus == ServerStatus.NOT_STARTED
@@ -542,6 +547,12 @@ public class DapSession implements DapEventListener {
                     })
                     .whenComplete((result, ex) -> {
                         if (ex != null) {
+                            if (state == SessionState.LAUNCHING || state == SessionState.ATTACHING) {
+                                Throwable cause = ex.getCause() != null ? ex.getCause() : ex;
+                                SessionState failedState = state == SessionState.LAUNCHING
+                                        ? SessionState.LAUNCH_FAILED : SessionState.ATTACH_FAILED;
+                                setState(failedState, cause.getMessage());
+                            }
                             String error = String.format("DAP session launch failed: %s", ex.getMessage());
                             LOG.error(error, ex);
 
@@ -655,7 +666,7 @@ public class DapSession implements DapEventListener {
                         }
                     }
 
-                    return dapServer.stop2();
+                    return CompletableFuture.runAsync(() -> dapServer.stop());
                 })
                 .handle((result, error) -> {
                     // Always mark as terminated and clean up
@@ -1418,15 +1429,42 @@ public class DapSession implements DapEventListener {
      * Update session state and notify listeners.
      */
     private void setState(SessionState newState) {
+        setState(newState, null);
+    }
+
+    private void setState(SessionState newState, String errorMessage) {
         if (this.state != newState) {
             LOG.infof("Session %s state change: %s -> %s", sessionId, this.state, newState);
             this.state = newState;
+            if (isErrorState(newState)) {
+                this.errorMessage = errorMessage;
+            } else {
+                this.errorMessage = null;
+            }
 
             // Notify callback
             if (stateChangeCallback != null) {
                 stateChangeCallback.run();
             }
         }
+    }
+
+    /**
+     * Returns the session-level error message (e.g., launch failed because program doesn't exist).
+     * For server-level errors (e.g., DAP server process crashed), see {@link ServerBase#getErrorMessage()}.
+     */
+    public String getErrorMessage() {
+        return errorMessage;
+    }
+
+    /**
+     * Returns true if the given state represents an error condition
+     * (ERROR, LAUNCH_FAILED, ATTACH_FAILED).
+     */
+    private static boolean isErrorState(SessionState state) {
+        return state == SessionState.ERROR
+                || state == SessionState.LAUNCH_FAILED
+                || state == SessionState.ATTACH_FAILED;
     }
 
     public DapServer getDapServer() {

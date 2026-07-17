@@ -481,7 +481,7 @@ public class DapClient implements IDebugProtocolClient {
                     return debugServer.launch(dapParameters);
                 }
             })
-            .handle((q, t) -> {
+            .whenComplete((q, t) -> {
                 if (t != null) {
                     LOG.errorf(t, "Error during initialize/%s", isAttach ? "attach" : "launch");
                     if (eventListener != null) {
@@ -491,7 +491,6 @@ public class DapClient implements IDebugProtocolClient {
                     }
                     initializedEventFuture.completeExceptionally(t);
                 }
-                return q;
             });
 
         // Step 2: Wait for initialized event, then send breakpoints (if debug mode), then configurationDone

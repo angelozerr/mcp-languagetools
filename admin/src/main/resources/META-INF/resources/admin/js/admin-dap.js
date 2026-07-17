@@ -1275,6 +1275,14 @@ async function updateSessionInDOM(message) {
             statusText = 'Paused';
             statusClass = 'status-running-not-ready';
             stateIcon = '<span>⏸️</span>';
+        } else if (message.newStatus === 'LAUNCH_FAILED') {
+            statusText = 'Launch Failed';
+            statusClass = 'status-error';
+            stateIcon = '<span>❌</span>';
+        } else if (message.newStatus === 'ATTACH_FAILED') {
+            statusText = 'Attach Failed';
+            statusClass = 'status-error';
+            stateIcon = '<span>❌</span>';
         } else if (message.newStatus === 'ERROR' || message.newStatus === 'START_FAILED') {
             statusText = 'Error';
             statusClass = 'status-error';
@@ -1319,7 +1327,7 @@ async function updateSessionInDOM(message) {
             const isRunning = message.newStatus === 'RUNNING';
             const isPaused = message.newStatus === 'PAUSED';
             const isStarting = message.newStatus === 'STARTING' || message.newStatus === 'INSTALLING' || message.newStatus === 'LAUNCHING' || message.newStatus === 'ATTACHING';
-            const isStopped = message.newStatus === 'STOPPED' || message.newStatus === 'START_FAILED' || message.newStatus === 'ERROR' || message.newStatus === 'CREATED' || message.newStatus === 'TERMINATED';
+            const isStopped = message.newStatus === 'STOPPED' || message.newStatus === 'START_FAILED' || message.newStatus === 'ERROR' || message.newStatus === 'LAUNCH_FAILED' || message.newStatus === 'ATTACH_FAILED' || message.newStatus === 'CREATED' || message.newStatus === 'TERMINATED';
 
             const canLaunch = isStopped;
             const canStop = isRunning || isStarting || isPaused;
@@ -1417,7 +1425,7 @@ function getSessionButtonStates(sessionState) {
     const isPaused = sessionState === 'PAUSED';
     const isRunning = sessionState === 'RUNNING';
     const isStarting = sessionState === 'STARTING' || sessionState === 'INSTALLING' || sessionState === 'LAUNCHING' || sessionState === 'ATTACHING';
-    const isStopped = sessionState === 'STOPPED' || sessionState === 'START_FAILED' || sessionState === 'ERROR' || sessionState === 'CREATED' || sessionState === 'TERMINATED';
+    const isStopped = sessionState === 'STOPPED' || sessionState === 'START_FAILED' || sessionState === 'ERROR' || sessionState === 'LAUNCH_FAILED' || sessionState === 'ATTACH_FAILED' || sessionState === 'CREATED' || sessionState === 'TERMINATED';
 
     const canLaunch = isStopped;
     const canStop = isRunning || isStarting || isPaused;
@@ -1462,6 +1470,14 @@ function getSessionStateInfo(session) {
     } else if (session.state === 'TERMINATED') {
         stateIcon = '<span>⏹️</span>';
         statusText = 'Terminated';
+        statusClass = 'status-error';
+    } else if (session.state === 'LAUNCH_FAILED') {
+        stateIcon = '<span>❌</span>';
+        statusText = 'Launch Failed';
+        statusClass = 'status-error';
+    } else if (session.state === 'ATTACH_FAILED') {
+        stateIcon = '<span>❌</span>';
+        statusText = 'Attach Failed';
         statusClass = 'status-error';
     } else if (session.state === 'ERROR' || session.state === 'START_FAILED') {
         stateIcon = '<span>❌</span>';

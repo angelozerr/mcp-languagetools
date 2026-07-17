@@ -272,13 +272,15 @@ public class DapDebugTools {
             result.put("sessionId", sessionId);
             result.put("language", session.getLanguage());
 
-            // IMPORTANT: Check if session terminated during launch (e.g., program crashed immediately)
-            // This can happen when the program has errors and exits before debugging starts
             if (session.getState() == DapSession.SessionState.TERMINATED) {
-                // Override success flag - session started but immediately terminated
                 result.put("success", false);
                 result.put("state", "terminated");
-                result.put("message", "Program terminated immediately after launch (check console output for errors)");
+                String consoleOutput = session.getProgramOutput().getAllWithCategories();
+                if (consoleOutput != null && !consoleOutput.isEmpty()) {
+                    result.put("message", consoleOutput);
+                } else {
+                    result.put("message", "Program terminated immediately after launch");
+                }
             }
 
             return result;

@@ -140,6 +140,12 @@ public class DapSessionManager {
                 sessionInfo.put("launchedAt", session.getLaunchedAt().toString());
             }
 
+            // Include error message if session is in ERROR state
+            String errorMessage = session.getErrorMessage();
+            if (errorMessage != null) {
+                sessionInfo.put("error", errorMessage);
+            }
+
             // Include launch configuration if available
             if (session.getLaunchConfiguration() != null) {
                 sessionInfo.put("launchConfiguration", session.getLaunchConfiguration());
