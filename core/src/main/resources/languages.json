@@ -1,114 +1,192 @@
 [
   {
-    "id": "java",
-    "extensions": [".java", ".class"],
-    "aliases": ["Java", "java"],
-    "filenames": [],
-    "filenamePatterns": []
+    "id": "ada",
+    "extensions": [".ada", ".adb", ".adc", ".ads"],
+    "aliases": ["Ada", "ada"]
   },
   {
-    "id": "xml",
-    "extensions": [".xml", ".xsd", ".xsl", ".xslt"],
-    "aliases": ["XML"],
-    "filenames": [],
-    "filenamePatterns": []
+    "id": "arm",
+    "extensions": [".s", ".S", ".asm", ".sx"],
+    "aliases": ["ARM", "arm", "Arm"]
   },
   {
-    "id": "properties",
-    "extensions": [".properties"],
-    "aliases": ["Properties"],
-    "filenames": [],
-    "filenamePatterns": []
+    "id": "arm64",
+    "extensions": [".s", ".S", ".asm"],
+    "aliases": ["ARM64", "arm64", "aarch64"]
   },
   {
-    "id": "python",
-    "extensions": [".py", ".pyw", ".pyi"],
-    "aliases": ["Python"],
-    "filenames": [],
-    "filenamePatterns": []
-  },
-  {
-    "id": "typescript",
-    "extensions": [".ts", ".tsx", ".mts", ".cts"],
-    "aliases": ["TypeScript"],
-    "filenames": [],
-    "filenamePatterns": []
-  },
-  {
-    "id": "javascript",
-    "extensions": [".js", ".jsx", ".mjs", ".cjs"],
-    "aliases": ["JavaScript"],
-    "filenames": [],
-    "filenamePatterns": []
-  },
-  {
-    "id": "rust",
-    "extensions": [".rs"],
-    "aliases": ["Rust"],
-    "filenames": [],
-    "filenamePatterns": []
+    "id": "asm",
+    "extensions": [".s", ".asm", ".6502"],
+    "aliases": ["Assembler", "assembler", "asm"]
   },
   {
     "id": "c",
     "extensions": [".c", ".i"],
-    "aliases": ["C", "c"],
-    "filenames": [],
-    "filenamePatterns": []
+    "aliases": ["C", "c"]
+  },
+  {
+    "id": "c3",
+    "extensions": [".c3", ".c3i", ".c3t"],
+    "aliases": ["C3", "c3"]
   },
   {
     "id": "cpp",
     "extensions": [".cpp", ".cppm", ".cc", ".ccm", ".cxx", ".cxxm", ".c++", ".c++m", ".hpp", ".hh", ".hxx", ".h++", ".h", ".ii", ".ino", ".inl", ".ipp", ".ixx", ".tpp", ".txx", ".hpp.in", ".h.in"],
-    "aliases": ["C++", "Cpp", "cpp"],
-    "filenames": [],
-    "filenamePatterns": []
+    "aliases": ["C++", "Cpp", "cpp"]
   },
   {
-    "id": "go",
-    "extensions": [".go"],
-    "aliases": ["Go"],
-    "filenames": [],
-    "filenamePatterns": []
-  },
-  {
-    "id": "go.mod",
-    "extensions": [],
-    "aliases": ["Go Module File"],
-    "filenames": ["go.mod"],
-    "filenamePatterns": []
-  },
-  {
-    "id": "go.sum",
-    "extensions": [],
-    "aliases": ["Go Checksum File"],
-    "filenames": ["go.sum"],
-    "filenamePatterns": []
+    "id": "crystal",
+    "extensions": [".cr"],
+    "aliases": ["Crystal", "crystal"]
   },
   {
     "id": "cuda-cpp",
     "extensions": [".cu", ".cuh"],
-    "aliases": ["CUDA C++"],
-    "filenames": [],
-    "filenamePatterns": []
+    "aliases": ["CUDA C++"]
   },
   {
-    "id": "objective-c",
-    "extensions": [".m"],
-    "aliases": ["Objective-C"],
-    "filenames": [],
-    "filenamePatterns": []
-  },
-  {
-    "id": "objective-cpp",
-    "extensions": [".mm"],
-    "aliases": ["Objective-C++"],
-    "filenames": [],
-    "filenamePatterns": []
+    "id": "d",
+    "extensions": [".d", ".di"],
+    "aliases": ["D", "Dlang"]
   },
   {
     "id": "dart",
     "extensions": [".dart"],
-    "aliases": ["Dart"],
-    "filenames": [],
-    "filenamePatterns": []
+    "aliases": ["Dart"]
+  },
+  {
+    "id": "fortran",
+    "extensions": [".f", ".F", ".f77", ".F77", ".for", ".FOR", ".fpp", ".FPP"],
+    "aliases": ["Fortran - Punchcard", "fortran"]
+  },
+  {
+    "id": "fortran-modern",
+    "extensions": [".f90", ".F90", ".f95", ".F95", ".f03", ".F03", ".f08", ".F08"],
+    "aliases": ["Fortran - Modern"]
+  },
+  {
+    "id": "go",
+    "extensions": [".go"],
+    "aliases": ["Go"]
+  },
+  {
+    "id": "go.mod",
+    "aliases": ["Go Module File"],
+    "filenames": ["go.mod"]
+  },
+  {
+    "id": "go.sum",
+    "aliases": ["Go Checksum File"],
+    "filenames": ["go.sum"]
+  },
+  {
+    "id": "haskell",
+    "extensions": [".hs"],
+    "aliases": ["Haskell", "haskell"]
+  },
+  {
+    "id": "jai",
+    "extensions": [".jai"],
+    "aliases": ["Jai", "jai"]
+  },
+  {
+    "id": "java",
+    "extensions": [".java", ".class"],
+    "aliases": ["Java", "java"]
+  },
+  {
+    "id": "javascript",
+    "extensions": [".js", ".jsx", ".mjs", ".cjs"],
+    "aliases": ["JavaScript"]
+  },
+  {
+    "id": "julia",
+    "extensions": [".jl"],
+    "aliases": ["Julia", "julia"]
+  },
+  {
+    "id": "kotlin",
+    "extensions": [".kt", ".kts"],
+    "aliases": ["Kotlin"]
+  },
+  {
+    "id": "lldb.disassembly",
+    "extensions": [".disasm"],
+    "aliases": ["Disassembly"]
+  },
+  {
+    "id": "nim",
+    "extensions": [".nim", ".nims", "nim.cfg", ".nim.cfg"],
+    "aliases": ["Nim", "nim"]
+  },
+  {
+    "id": "objective-c",
+    "extensions": [".m"],
+    "aliases": ["Objective-C"]
+  },
+  {
+    "id": "objective-cpp",
+    "extensions": [".mm"],
+    "aliases": ["Objective-C++"]
+  },
+  {
+    "id": "objectpascal",
+    "extensions": [".pas", ".dpr", ".pp", ".lpr", ".inc"],
+    "aliases": ["ObjectPascal", "pascal", "Delphi", "delphi"]
+  },
+  {
+    "id": "ocaml",
+    "extensions": [".ml", ".eliom", ".ocamlinit"],
+    "aliases": ["OCaml", "ocaml"]
+  },
+  {
+    "id": "odin",
+    "extensions": [".odin"],
+    "aliases": ["odin", "Odin"]
+  },
+  {
+    "id": "opencl",
+    "extensions": [".cl", ".ocl"],
+    "aliases": ["OpenCL", "opencl"]
+  },
+  {
+    "id": "pascal",
+    "extensions": [".pas", ".p", ".dfm", ".fmx", ".dpr", ".dpk", ".lfm", ".lpr", ".ppr"],
+    "aliases": ["Pascal", "pascal"]
+  },
+  {
+    "id": "properties",
+    "extensions": [".properties"],
+    "aliases": ["Properties"]
+  },
+  {
+    "id": "python",
+    "extensions": [".py", ".pyw", ".pyi"],
+    "aliases": ["Python"]
+  },
+  {
+    "id": "rust",
+    "extensions": [".rs"],
+    "aliases": ["Rust"]
+  },
+  {
+    "id": "swift",
+    "extensions": [".swift"],
+    "aliases": ["Swift", "swift"]
+  },
+  {
+    "id": "typescript",
+    "extensions": [".ts", ".tsx", ".mts", ".cts"],
+    "aliases": ["TypeScript"]
+  },
+  {
+    "id": "xml",
+    "extensions": [".xml", ".xsd", ".xsl", ".xslt"],
+    "aliases": ["XML"]
+  },
+  {
+    "id": "zig",
+    "extensions": [".zig", ".zon"],
+    "aliases": ["Zig"]
   }
 ]

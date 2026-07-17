@@ -7,7 +7,13 @@
       "language": "typescript"
     },
     {
+      "language": "typescriptreact"
+    },
+    {
       "language": "javascript"
+    },
+    {
+      "language": "javascriptreact"
     }
   ]
 }

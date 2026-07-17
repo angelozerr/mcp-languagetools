@@ -4,7 +4,88 @@
   "description": "Debug adapter for Rust and C/C++ via LLDB",
   "documentSelector": [
     {
+      "language": "ada"
+    },
+    {
+      "language": "arm"
+    },
+    {
+      "language": "arm64"
+    },
+    {
+      "language": "asm"
+    },
+    {
+      "language": "c"
+    },
+    {
+      "language": "c3"
+    },
+    {
+      "language": "cpp"
+    },
+    {
+      "language": "crystal"
+    },
+    {
+      "language": "d"
+    },
+    {
+      "language": "fortran"
+    },
+    {
+      "language": "fortran-modern"
+    },
+    {
+      "language": "haskell"
+    },
+    {
+      "language": "jai"
+    },
+    {
+      "language": "java"
+    },
+    {
+      "language": "julia"
+    },
+    {
+      "language": "kotlin"
+    },
+    {
+      "language": "lldb.disassembly"
+    },
+    {
+      "language": "nim"
+    },
+    {
+      "language": "objective-c"
+    },
+    {
+      "language": "objective-cpp"
+    },
+    {
+      "language": "objectpascal"
+    },
+    {
+      "language": "ocaml"
+    },
+    {
+      "language": "odin"
+    },
+    {
+      "language": "opencl"
+    },
+    {
+      "language": "pascal"
+    },
+    {
       "language": "rust"
+    },
+    {
+      "language": "swift"
+    },
+    {
+      "language": "zig"
     }
   ]
 }
