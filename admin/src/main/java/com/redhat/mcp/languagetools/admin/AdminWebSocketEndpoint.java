@@ -5,18 +5,15 @@ import com.redhat.mcp.languagetools.admin.dto.*;
 import com.redhat.mcp.languagetools.admin.ws.*;
 import com.redhat.mcp.languagetools.dap.session.DapSessionEvent;
 import com.redhat.mcp.languagetools.dap.session.DapSessionManager;
-import com.redhat.mcp.languagetools.dap.trace.DapTraceCollector;
 import com.redhat.mcp.languagetools.lsp.server.LspServerStatusChangeEvent;
-import com.redhat.mcp.languagetools.lsp.trace.LspTraceCollector;
 import com.redhat.mcp.languagetools.trace.TraceMessage;
-import com.redhat.mcp.languagetools.mcp.trace.McpTraceCollector;
-import com.redhat.mcp.languagetools.progress.ProgressBroadcaster;
 import com.redhat.mcp.languagetools.settings.Settings;
 import com.redhat.mcp.languagetools.workspace.Workspace;
 import com.redhat.mcp.languagetools.workspace.WorkspaceChangeEvent;
 import com.redhat.mcp.languagetools.Application;
 import io.quarkiverse.mcp.server.runtime.ConnectionManager;
 import io.quarkiverse.mcp.server.runtime.McpConnectionBase;
+import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
@@ -49,15 +46,6 @@ public class AdminWebSocketEndpoint {
     ObjectMapper objectMapper;
 
     @Inject
-    LspTraceCollector lspTraceCollector;
-
-    @Inject
-    McpTraceCollector mcpTraceCollector;
-
-    @Inject
-    DapTraceCollector dapTraceCollector;
-
-    @Inject
     DapSessionManager dapSessionManager;
 
     @Inject
@@ -68,6 +56,13 @@ public class AdminWebSocketEndpoint {
 
     // Thread-safe set of active WebSocket sessions
     private final Set<Session> sessions = Collections.newSetFromMap(new ConcurrentHashMap<>());
+
+    @PostConstruct
+    void init() {
+        application.getLspTraceCollector().addTraceListener(this::onTrace);
+        application.getDapTraceCollector().addTraceListener(this::onTrace);
+        application.getMcpTraceCollector().addTraceListener(this::onTrace);
+    }
 
     @OnOpen
     public void onOpen(Session session) {
@@ -138,7 +133,7 @@ public class AdminWebSocketEndpoint {
             for (var workspace : application.getWorkspaces()) {
                 for (var server : workspace.getLspServers()) {
                     // Get last 200 traces for this server
-                    var traces = lspTraceCollector.getTraces(workspace.getNormalizedUri(), server.getId(), 200);
+                    var traces = application.getLspTraceCollector().getTraces(workspace.getNormalizedUri(), server.getId(), 200);
 
                     for (var trace : traces) {
                         LspTraceWsMessage msg = new LspTraceWsMessage(
@@ -162,7 +157,7 @@ public class AdminWebSocketEndpoint {
      */
     private void sendMcpTraceHistory(Session session) {
         try {
-            var traces = mcpTraceCollector.getTraces(500);
+            var traces = application.getMcpTraceCollector().getTraces(500);
 
             for (var trace : traces) {
                 McpTraceWsMessage msg = new McpTraceWsMessage(
@@ -193,7 +188,7 @@ public class AdminWebSocketEndpoint {
                 }
 
                 // Get both installation traces (contextId=serverId) and protocol traces (contextId=serverId#sessionId)
-                var traces = dapTraceCollector.getTracesForSession(serverId, dapSession.getSessionId(), 200);
+                var traces = application.getDapTraceCollector().getTracesForSession(serverId, dapSession.getSessionId(), 200);
 
                 LOG.infof("Session %s: sending %d traces", dapSession.getSessionId(), traces.size());
 
@@ -290,9 +285,9 @@ public class AdminWebSocketEndpoint {
     }
 
     /**
-     * CDI observer for LSP/DAP trace events.
+     * Listener callback for LSP/DAP/MCP trace events (registered via addTraceListener).
      */
-    void onTrace(@Observes TraceMessage trace) {
+    private void onTrace(TraceMessage trace) {
         switch (trace.kind()) {
             case LSP -> broadcast(new LspTraceWsMessage(
                     trace.workspaceUri(), trace.contextId(),

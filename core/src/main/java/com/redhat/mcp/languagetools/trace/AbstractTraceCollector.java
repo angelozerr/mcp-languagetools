@@ -1,11 +1,10 @@
 package com.redhat.mcp.languagetools.trace;
 
-import jakarta.enterprise.event.Event;
-import jakarta.inject.Inject;
-
 import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 public abstract class AbstractTraceCollector implements TraceCollector {
@@ -13,11 +12,14 @@ public abstract class AbstractTraceCollector implements TraceCollector {
     private static final int MAX_TRACE_MESSAGES = 1000;
 
     private final ConcurrentLinkedDeque<TraceMessage> traces = new ConcurrentLinkedDeque<>();
-
-    @Inject
-    Event<TraceMessage> traceEvent;
+    private final List<Consumer<TraceMessage>> listeners = new CopyOnWriteArrayList<>();
 
     protected abstract TraceKind getTraceKind();
+
+    @Override
+    public boolean isEnabled() {
+        return true;
+    }
 
     @Override
     public void addTrace(String workspaceUri,
@@ -36,16 +38,22 @@ public abstract class AbstractTraceCollector implements TraceCollector {
         while (traces.size() > MAX_TRACE_MESSAGES) {
             traces.pollFirst();
         }
-        traceEvent.fire(message);
+        for (Consumer<TraceMessage> listener : listeners) {
+            listener.accept(message);
+        }
     }
 
-    /**
-     * Get all traces regardless of context, limited to the most recent entries.
-     */
+    @Override
+    public void addTraceListener(Consumer<TraceMessage> listener) {
+        listeners.add(listener);
+    }
+
+    @Override
     public List<TraceMessage> getTraces(int limit) {
         return filterTraces(t -> true, limit);
     }
 
+    @Override
     public List<TraceMessage> getTraces(String workspaceUri,
                                         String contextId,
                                         int limit) {
@@ -56,10 +64,7 @@ public abstract class AbstractTraceCollector implements TraceCollector {
         );
     }
 
-    /**
-     * Get traces for a DAP session: installation traces (contextId = serverId)
-     * + session protocol traces (contextId = serverId#sessionId).
-     */
+    @Override
     public List<TraceMessage> getTracesForSession(String serverId,
                                                   String sessionId,
                                                   int limit) {
@@ -76,6 +81,7 @@ public abstract class AbstractTraceCollector implements TraceCollector {
         return filtered.stream().skip(skip).toList();
     }
 
+    @Override
     public void clear() {
         traces.clear();
     }

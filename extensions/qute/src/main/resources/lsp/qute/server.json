@@ -2,7 +2,6 @@
   "id": "qute",
   "name": "Qute Language Server",
   "description": "Qute template engine support",
-  "command": "java -jar ${serverHome}/com.redhat.qute.ls-uber.jar",
   "documentSelector": [
     {
       "language": "qute-html"

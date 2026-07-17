@@ -2,7 +2,6 @@
 	"id": "quarkus",
 	"name": "Quarkus Extension",
 	"description": "Quarkus extensions for JDT.LS and MicroProfile LS",
-	"parentServerId": "microprofile",
 	"documentSelector": [
 		{
 			"language": "quarkus-properties"

@@ -61,13 +61,7 @@ public class OSUtils {
         return null;
     }
 
-    /**
-     * Resolve an OS-specific string from a JSON object with OS keys.
-     *
-     * @param osMap the JSON object with OS keys (windows, mac, linux, default)
-     * @return the resolved string for the current OS, or null
-     */
-    public static String getStringFromOs(JsonObject osMap) {
+    private static String getStringFromOs(JsonObject osMap) {
         if (osMap.has(OS_KEY)) {
             JsonElement value = osMap.get(OS_KEY);
             if (value.isJsonPrimitive()) {
@@ -81,24 +75,6 @@ public class OSUtils {
             }
         }
         return null;
-    }
-
-    /**
-     * Resolve an OS-specific string from a Map (used by server configs
-     * where JSON is already parsed to Map).
-     *
-     * @param map the map with OS keys
-     * @return the resolved string for the current OS, or null
-     */
-    public static String getStringFromOs(java.util.Map<String, String> map) {
-        if (map == null) {
-            return null;
-        }
-        String value = map.get(OS_KEY);
-        if (value != null) {
-            return value;
-        }
-        return map.get(DEFAULT);
     }
 
     private OSUtils() {

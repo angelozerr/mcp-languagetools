@@ -2,7 +2,7 @@ package com.redhat.mcp.languagetools.dap.session;
 
 import com.redhat.mcp.languagetools.Application;
 import com.redhat.mcp.languagetools.dap.server.DapServerConfig;
-import com.redhat.mcp.languagetools.dap.trace.DapTraceCollector;
+import com.redhat.mcp.languagetools.trace.TraceCollector;
 import com.redhat.mcp.languagetools.language.LanguageDocument;
 import com.redhat.mcp.languagetools.language.LanguageRegistry;
 import com.redhat.mcp.languagetools.workspace.Workspace;
@@ -33,8 +33,9 @@ public class DapSessionManager {
     @Inject
     Application application;
 
-    @Inject
-    DapTraceCollector traceCollector;
+    private TraceCollector getTraceCollector() {
+        return application.getDapTraceCollector();
+    }
 
     @Inject
     LanguageRegistry languageRegistry;
@@ -75,7 +76,7 @@ public class DapSessionManager {
         // Set trace collector for installation support
         String sessionId = UUID.randomUUID().toString();
         if (serverConfig.getTraceCollector() == null) {
-            serverConfig.setTraceCollector(traceCollector);
+            serverConfig.setTraceCollector(getTraceCollector());
         }
 
         // Determine language from server config (first supported language)

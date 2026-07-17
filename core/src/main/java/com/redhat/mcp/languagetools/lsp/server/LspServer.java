@@ -605,7 +605,7 @@ public class LspServer extends ServerBase<LspServerConfig> {
      */
     protected List<String> buildCommand() throws IOException {
         var config = super.getConfig();
-        String cmd = config.getCommandForCurrentOS();
+        String cmd = config.getCommand();
         if (cmd == null) {
             throw new IOException("No command configured for current OS");
         }
@@ -689,7 +689,7 @@ public class LspServer extends ServerBase<LspServerConfig> {
      */
     public String getStartCommand() {
         var config = super.getConfig();
-        return config.getCommandForCurrentOS();
+        return config.getCommand();
     }
 
     public LspInstanceRegistry.InstanceInfo getCurrentInstance() {

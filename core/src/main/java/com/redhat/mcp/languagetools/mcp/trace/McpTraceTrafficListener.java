@@ -1,5 +1,6 @@
 package com.redhat.mcp.languagetools.mcp.trace;
 
+import com.redhat.mcp.languagetools.Application;
 import com.redhat.mcp.languagetools.settings.Settings;
 import com.redhat.mcp.languagetools.settings.ServerTrace;
 import io.quarkiverse.mcp.server.McpConnection;
@@ -12,21 +13,23 @@ import jakarta.inject.Inject;
 public class McpTraceTrafficListener implements McpTrafficListener {
 
     @Inject
-    McpTraceCollector traceCollector;
+    Application application;
 
     @Inject
     Settings settings;
 
     @Override
     public void onMessageReceived(RawMessage message, McpConnection connection) {
-        if (settings.getMcpTraceLevel() != ServerTrace.off) {
+        McpTraceCollector traceCollector = application.getMcpTraceCollector();
+        if (traceCollector.isEnabled() && settings.getMcpTraceLevel() != ServerTrace.off) {
             traceCollector.addTrace(McpTraceDirection.RECEIVED, message, connection);
         }
     }
 
     @Override
     public void onMessageSent(RawMessage message, McpConnection connection) {
-        if (settings.getMcpTraceLevel() != ServerTrace.off) {
+        McpTraceCollector traceCollector = application.getMcpTraceCollector();
+        if (traceCollector.isEnabled() && settings.getMcpTraceLevel() != ServerTrace.off) {
             traceCollector.addTrace(McpTraceDirection.SENT, message, connection);
         }
     }

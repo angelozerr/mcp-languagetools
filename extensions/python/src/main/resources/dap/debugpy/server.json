@@ -2,9 +2,7 @@
   "id": "debugpy",
   "name": "Python - Debugpy",
   "description": "Debug adapter for Python via debugpy",
-  "launch": {
-    "default": "python -m debugpy.adapter"
-  },
+  "launch": "python -m debugpy.adapter",
   "attach": {
     "address": "$connect.host",
     "port": "$connect.port"

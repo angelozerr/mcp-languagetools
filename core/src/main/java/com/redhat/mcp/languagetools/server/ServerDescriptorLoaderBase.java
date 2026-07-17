@@ -6,6 +6,7 @@ import com.google.gson.JsonObject;
 import com.redhat.mcp.languagetools.Application;
 import com.redhat.mcp.languagetools.lsp.Contributes;
 import com.redhat.mcp.languagetools.lsp.DocumentSelector;
+import com.redhat.mcp.languagetools.utils.OSUtils;
 import org.jboss.logging.Logger;
 
 import java.io.IOException;
@@ -42,6 +43,8 @@ public abstract class ServerDescriptorLoaderBase<T extends ServerConfigBase> {
     private static final String FIELD_SCHEME = "scheme";
     private static final String FIELD_PATTERN = "pattern";
     private static final String FIELD_CONTRIBUTES = "contributes";
+    private static final String FIELD_ENV = "env";
+    private static final String FIELD_WORKING_DIRECTORY = "workingDirectory";
     protected final Gson gson = new Gson();
 
     protected ServerDescriptorLoaderBase() {
@@ -51,6 +54,11 @@ public abstract class ServerDescriptorLoaderBase<T extends ServerConfigBase> {
      * Get the root directory name for this server type (e.g., "lsp", "dap").
      */
     public abstract String getRoot();
+
+    /**
+     * Get the JSON field name for the command (e.g., "command" for LSP, "launch" for DAP).
+     */
+    protected abstract String getCommandFieldName();
 
     /**
      * Create a new instance of the config.
@@ -132,6 +140,26 @@ public abstract class ServerDescriptorLoaderBase<T extends ServerConfigBase> {
 
         // Contributions
         fillContributions(config, jsonObject);
+
+        // Environment variables
+        if (jsonObject.has(FIELD_ENV)) {
+            Map<String, String> env = new HashMap<>();
+            jsonObject.getAsJsonObject(FIELD_ENV).entrySet().forEach(entry ->
+                    env.put(entry.getKey(), entry.getValue().getAsString())
+            );
+            config.setEnv(env);
+        }
+
+        // Working directory
+        if (jsonObject.has(FIELD_WORKING_DIRECTORY)) {
+            config.setWorkingDirectory(jsonObject.get(FIELD_WORKING_DIRECTORY).getAsString());
+        }
+
+        // Command (resolved for current OS)
+        String command = OSUtils.getStringFromOs(jsonObject, getCommandFieldName());
+        if (command != null) {
+            config.setCommand(command);
+        }
 
         return jsonObject;
     }

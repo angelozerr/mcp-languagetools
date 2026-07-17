@@ -5,7 +5,6 @@ import com.redhat.mcp.languagetools.dap.client.DapEventListener;
 import com.redhat.mcp.languagetools.dap.server.DapServer;
 import com.redhat.mcp.languagetools.dap.server.DapServerConfig;
 import com.redhat.mcp.languagetools.dap.server.DapServerFactoryRegistry;
-import com.redhat.mcp.languagetools.dap.trace.DapTraceCollector;
 import com.redhat.mcp.languagetools.progress.ProgressMonitor;
 import com.redhat.mcp.languagetools.progress.ProgressStep;
 import com.redhat.mcp.languagetools.server.ServerStatus;
@@ -71,7 +70,7 @@ public class DapSession implements DapEventListener {
     private final DapServerConfig serverConfig;
     private final DapServer dapServer; // Not final - can be recreated after error
     private final Workspace workspace;
-    private final DapTraceCollector traceCollector;
+    private final TraceCollector traceCollector;
     private final DapProgramOutput programOutput; // Captures stdout/stderr from debugged program
     private final Instant createdAt; // When the session was created
 
@@ -335,12 +334,13 @@ public class DapSession implements DapEventListener {
                     LOG.errorf(ex, "Failed to initialize DAP session: %s", sessionId);
                     setState(SessionState.ERROR);
 
-                    // Send error to traces
-                    traceCollector.addTrace(
-                            workspace.getNormalizedUri(),
-                            getContextId(),
-                            "❌ Failed to initialize: " + ex.getMessage()
-                    );
+                    if (traceCollector.isEnabled()) {
+                        traceCollector.addTrace(
+                                workspace.getNormalizedUri(),
+                                getContextId(),
+                                "❌ Failed to initialize: " + ex.getMessage()
+                        );
+                    }
 
                     // Propagate exception instead of returning null
                     if (ex instanceof RuntimeException) {
@@ -563,12 +563,13 @@ public class DapSession implements DapEventListener {
                                 }
                             }
 
-                            // Add trace to console with full stack
-                            dapServer.getTraceCollector().addTrace(
-                                    workspace.getNormalizedUri(),
-                                    getContextId(),
-                                    errorTrace.toString()
-                            );
+                            if (dapServer.getTraceCollector().isEnabled()) {
+                                dapServer.getTraceCollector().addTrace(
+                                        workspace.getNormalizedUri(),
+                                        getContextId(),
+                                        errorTrace.toString()
+                                );
+                            }
                         }
                     });
         }), progressMonitor);
@@ -663,11 +664,13 @@ public class DapSession implements DapEventListener {
 
                     if (error != null) {
                         LOG.errorf(error, "Error during session termination: %s", sessionId);
-                        traceCollector.addTrace(
-                                workspace.getNormalizedUri(),
-                                getContextId(),
-                                "⚠️ Termination error: " + error.getMessage()
-                        );
+                        if (traceCollector.isEnabled()) {
+                            traceCollector.addTrace(
+                                    workspace.getNormalizedUri(),
+                                    getContextId(),
+                                    "⚠️ Termination error: " + error.getMessage()
+                            );
+                        }
                     } else {
                         LOG.infof("DAP session terminated: %s", sessionId);
                     }
@@ -1182,7 +1185,7 @@ public class DapSession implements DapEventListener {
         }
 
         // Send to trace collector for UI visibility
-        if (output != null && !output.isBlank()) {
+        if (traceCollector.isEnabled() && output != null && !output.isBlank()) {
             // Skip telemetry outputs - they're just internal DAP metrics
             if ("telemetry".equals(category)) {
                 return;

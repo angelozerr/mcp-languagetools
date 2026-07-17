@@ -4,9 +4,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.redhat.mcp.languagetools.Application;
-import com.redhat.mcp.languagetools.dap.transport.TransportType;
 import com.redhat.mcp.languagetools.server.ServerConfigBase;
-import com.redhat.mcp.languagetools.utils.OSUtils;
 import org.jboss.logging.Logger;
 
 import java.net.URI;
@@ -34,54 +32,18 @@ public class DapServerConfig extends ServerConfigBase {
     private static final Logger LOG = Logger.getLogger(DapServerConfig.class);
 
     /**
-     * OS-specific launch commands for standalone DAP servers.
-     * Example: {"default": "node debugAdapter.js ${port}"}
-     */
-    private Map<String, String> launch;
-
-    /**
      * Attach configuration for DAP servers.
      */
     private Map<String, Object> attach;
     private String debugServerReadyPattern;
     private DebugServerWaitStrategy debugServerWaitStrategy = DebugServerWaitStrategy.TIMEOUT;
     private Integer connectTimeout = 500; // Default 500ms
-    private TransportType transport = TransportType.STDIO; // Default to stdio
-    private Map<String, Object> env = new HashMap<>();
-    private String workingDirectory;
 
     public DapServerConfig(String serverId, Path serverHome, Application application) {
         super(serverId, serverHome, application);
     }
 
-    @Override
-    protected void onCommandInstalled(String command) {
-        if (launch == null) {
-            launch = new HashMap<>();
-        }
-        launch.put(OSUtils.OS_KEY, command);
-    }
-
-    // Getters and setters (id, name, description, installer, documentSelector, trace inherited from ServerConfigBase)
-
-    public Map<String, String> getLaunch() {
-        return launch;
-    }
-
-    public void setLaunch(Map<String, String> launch) {
-        this.launch = launch;
-    }
-
-
-    /**
-     * Get the launch command for the current OS.
-     */
-    public String getLaunchForCurrentOS() {
-        if (launch == null) {
-            return null;
-        }
-        return OSUtils.getStringFromOs(launch);
-    }
+    // Getters and setters (id, name, description, command, env, workingDirectory, installer, documentSelector, trace inherited from ServerConfigBase)
 
     public Map<String, Object> getAttach() {
         return attach;
@@ -91,24 +53,11 @@ public class DapServerConfig extends ServerConfigBase {
         this.attach = attach;
     }
 
-    public String getDebugServerReadyPattern() {
-        return debugServerReadyPattern;
-    }
-
     public void setDebugServerReadyPattern(String debugServerReadyPattern) {
         this.debugServerReadyPattern = debugServerReadyPattern;
-    }
-
-    public DebugServerWaitStrategy getDebugServerWaitStrategy() {
-        return debugServerWaitStrategy;
-    }
-
-    public void setDebugServerWaitStrategy(DebugServerWaitStrategy debugServerWaitStrategy) {
-        this.debugServerWaitStrategy = debugServerWaitStrategy;
-    }
-
-    public Integer getConnectTimeout() {
-        return connectTimeout;
+        if (debugServerReadyPattern != null && !debugServerReadyPattern.isEmpty()) {
+            this.debugServerWaitStrategy = DebugServerWaitStrategy.TRACE;
+        }
     }
 
     public void setConnectTimeout(Integer connectTimeout) {
@@ -125,30 +74,6 @@ public class DapServerConfig extends ServerConfigBase {
                 ? new ServerReadyConfig(debugServerReadyPattern)
                 : new ServerReadyConfig(500);
         };
-    }
-
-    public Map<String, Object> getEnv() {
-        return env;
-    }
-
-    public void setEnv(Map<String, Object> env) {
-        this.env = env;
-    }
-
-    public String getWorkingDirectory() {
-        return workingDirectory;
-    }
-
-    public void setWorkingDirectory(String workingDirectory) {
-        this.workingDirectory = workingDirectory;
-    }
-
-    public TransportType getTransport() {
-        return transport;
-    }
-
-    public void setTransport(TransportType transport) {
-        this.transport = transport;
     }
 
     /**

@@ -2,10 +2,6 @@
   "id": "codelldb",
   "name": "CodeLLDB",
   "description": "Debug adapter for Rust and C/C++ via LLDB",
-  "launch": {
-    "windows": "$SERVER_HOME$/extension/adapter/codelldb.exe",
-    "default": "$SERVER_HOME$/extension/adapter/codelldb"
-  },
   "documentSelector": [
     {
       "language": "rust"

@@ -14,7 +14,7 @@ public record LspConfigDTO(
     String name,
     String description,
     List<DocumentSelector> documentSelector,
-    Object command,
+    String command,
     Map<String, String> env,
     String workingDirectory,
     Map<String, Object> initializationOptions,

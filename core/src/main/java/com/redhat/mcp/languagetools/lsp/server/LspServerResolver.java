@@ -51,9 +51,12 @@ public class LspServerResolver {
                     // Get all LSP servers from workspace
                     var allServers = workspace.getLspServers();
 
-                    // Filter servers based on the predicate
+                    // Filter servers: must match document selector AND the caller's predicate
+                    String fileUri = document.getUri().toString();
+                    String languageId = document.getLanguageId();
                     return allServers
                             .stream()
+                            .filter(server -> server.getConfig().canHandle(fileUri, languageId))
                             .filter(filter)
                             .collect(Collectors.toList());
                 });

@@ -10,7 +10,7 @@ import org.jboss.logging.Logger;
 
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.*;
+import java.util.Map;
 
 /**
  * Loads DAP server descriptors from JSON files.
@@ -22,11 +22,9 @@ public class DapServerDescriptorLoader extends ServerDescriptorLoaderBase<DapSer
     private static final Logger LOG = Logger.getLogger(DapServerDescriptorLoader.class);
 
     // JSON field names
-    private static final String FIELD_LAUNCH = "launch";
     private static final String FIELD_ATTACH = "attach";
     private static final String FIELD_DEBUG_SERVER_READY_PATTERN = "debugServerReadyPattern";
-    private static final String FIELD_ENV = "env";
-    private static final String FIELD_WORKING_DIRECTORY = "workingDirectory";
+    private static final String FIELD_CONNECT_TIMEOUT = "connectTimeout";
 
     public DapServerDescriptorLoader() {
         super();
@@ -38,6 +36,11 @@ public class DapServerDescriptorLoader extends ServerDescriptorLoaderBase<DapSer
     }
 
     @Override
+    protected String getCommandFieldName() {
+        return "launch";
+    }
+
+    @Override
     protected DapServerConfig createConfig(String serverId, Application application) {
         return new DapServerConfig(serverId, application.getPathManager().getDapServerHome(serverId), application);
     }
@@ -45,15 +48,6 @@ public class DapServerDescriptorLoader extends ServerDescriptorLoaderBase<DapSer
     @Override
     protected JsonObject loadServer(String serverId, Path serverDir, DapServerConfig config) throws IOException {
         JsonObject jsonObject =  super.loadServer(serverId, serverDir, config);
-
-        // Launch commands (OS-specific)
-        if (jsonObject.has(FIELD_LAUNCH)) {
-            Map<String, String> launch = new HashMap<>();
-            jsonObject.getAsJsonObject(FIELD_LAUNCH).entrySet().forEach(entry ->
-                    launch.put(entry.getKey(), entry.getValue().getAsString())
-            );
-            config.setLaunch(launch);
-        }
 
         // Attach configuration
         if (jsonObject.has(FIELD_ATTACH)) {
@@ -69,18 +63,9 @@ public class DapServerDescriptorLoader extends ServerDescriptorLoaderBase<DapSer
             config.setDebugServerReadyPattern(jsonObject.get(FIELD_DEBUG_SERVER_READY_PATTERN).getAsString());
         }
 
-        // Environment variables
-        if (jsonObject.has(FIELD_ENV)) {
-            Map<String, Object> env = gson.fromJson(
-                    jsonObject.get(FIELD_ENV),
-                    Map.class
-            );
-            config.setEnv(env);
-        }
-
-        // Working directory
-        if (jsonObject.has(FIELD_WORKING_DIRECTORY)) {
-            config.setWorkingDirectory(jsonObject.get(FIELD_WORKING_DIRECTORY).getAsString());
+        // Connect timeout
+        if (jsonObject.has(FIELD_CONNECT_TIMEOUT)) {
+            config.setConnectTimeout(jsonObject.get(FIELD_CONNECT_TIMEOUT).getAsInt());
         }
 
         return jsonObject;

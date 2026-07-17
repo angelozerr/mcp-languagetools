@@ -30,6 +30,9 @@ public abstract class ServerConfigBase implements ServerConfig {
     protected String description;
     protected JsonElement installerConfig;  // Raw JSON from installer.json
     protected List<DocumentSelector> documentSelector = new ArrayList<>();
+    protected String command;
+    protected Map<String, String> env = new HashMap<>();
+    protected String workingDirectory;
 
     /**
      * Contributions (VS Code-like extension system)
@@ -41,6 +44,9 @@ public abstract class ServerConfigBase implements ServerConfig {
 
     // Lazy-loaded installer instance
     private ServerInstaller installer;
+
+    // Cached: whether the installer JSON contains a configureServer task
+    private boolean hasConfigureServer;
 
     // Install progress monitor (set when installation starts)
     private TraceProgressMonitor installProgress;
@@ -95,6 +101,38 @@ public abstract class ServerConfigBase implements ServerConfig {
 
     public void setInstallerConfig(JsonElement installerConfig) {
         this.installerConfig = installerConfig;
+        this.hasConfigureServer = detectConfigureServer(installerConfig);
+    }
+
+    public boolean hasConfigureServer() {
+        return hasConfigureServer;
+    }
+
+    private static boolean detectConfigureServer(JsonElement installerConfig) {
+        if (installerConfig == null || !installerConfig.isJsonObject()) {
+            return false;
+        }
+        return containsConfigureServer(installerConfig.getAsJsonObject().get("run"));
+    }
+
+    private static boolean containsConfigureServer(JsonElement taskNode) {
+        if (taskNode == null || !taskNode.isJsonObject()) {
+            return false;
+        }
+        var taskObj = taskNode.getAsJsonObject();
+        if (taskObj.has("configureServer")) {
+            return true;
+        }
+        for (String key : taskObj.keySet()) {
+            JsonElement child = taskObj.get(key);
+            if (child != null && child.isJsonObject()) {
+                var childObj = child.getAsJsonObject();
+                if (childObj.has("onSuccess") && containsConfigureServer(childObj.get("onSuccess"))) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /**
@@ -145,8 +183,44 @@ public abstract class ServerConfigBase implements ServerConfig {
         return contributes;
     }
 
+    public boolean hasContributions() {
+        return contributes != null;
+    }
+
+    public boolean isContributionOnly() {
+        return !hasCommand() && hasContributions() && !hasConfigureServer();
+    }
+
     public void setContributes(Contributes contributes) {
         this.contributes = contributes;
+    }
+
+    public String getCommand() {
+        return command;
+    }
+
+    public boolean hasCommand() {
+        return command != null;
+    }
+
+    public void setCommand(String command) {
+        this.command = command;
+    }
+
+    public Map<String, String> getEnv() {
+        return env;
+    }
+
+    public void setEnv(Map<String, String> env) {
+        this.env = env;
+    }
+
+    public String getWorkingDirectory() {
+        return workingDirectory;
+    }
+
+    public void setWorkingDirectory(String workingDirectory) {
+        this.workingDirectory = workingDirectory;
     }
 
     /**
@@ -220,6 +294,9 @@ public abstract class ServerConfigBase implements ServerConfig {
      * Subclasses can override to update their command field.
      */
     protected void onCommandInstalled(String command) {
+        if (this.command == null) {
+            this.command = command;
+        }
     }
 
     /**

@@ -2,15 +2,17 @@ package com.redhat.mcp.languagetools;
 
 import com.redhat.mcp.languagetools.mcp.McpClientChangeEvent;
 import com.redhat.mcp.languagetools.dap.server.DapServerConfig;
-import com.redhat.mcp.languagetools.dap.trace.DapTraceCollector;
 import com.redhat.mcp.languagetools.installer.InstallResult;
 import com.redhat.mcp.languagetools.installer.TraceProgressMonitor;
 import com.redhat.mcp.languagetools.language.LanguageRegistry;
 import com.redhat.mcp.languagetools.lsp.server.LspServer;
 import com.redhat.mcp.languagetools.lsp.server.LspServerConfig;
 import com.redhat.mcp.languagetools.lsp.server.LspServerStatusChangeEvent;
-import com.redhat.mcp.languagetools.lsp.trace.LspTraceCollector;
 import com.redhat.mcp.languagetools.mcp.McpClientTracker;
+import com.redhat.mcp.languagetools.mcp.trace.McpTraceCollector;
+import com.redhat.mcp.languagetools.trace.NoOpTraceCollectorFactory;
+import com.redhat.mcp.languagetools.trace.TraceCollector;
+import com.redhat.mcp.languagetools.trace.TraceCollectorFactory;
 import com.redhat.mcp.languagetools.settings.Settings;
 import com.redhat.mcp.languagetools.progress.ProgressMonitor;
 import com.redhat.mcp.languagetools.progress.ProgressStep;
@@ -27,6 +29,8 @@ import jakarta.enterprise.event.Event;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
+
+import java.util.ServiceLoader;
 
 import java.net.URI;
 import java.nio.file.Files;
@@ -65,15 +69,9 @@ public class Application {
     // ----------- LSP servers
 
     @Inject
-    LspTraceCollector lspTraceCollector;
-
-    @Inject
     Event<LspServerStatusChangeEvent> lspServerStatusChangeEvent;
 
     // ----------- DAP servers
-
-    @Inject
-    DapTraceCollector dapTraceCollector;
 
     // ----------- MCP servers
 
@@ -93,8 +91,20 @@ public class Application {
     private final ContributionManager contributionManager;
     private final List<ServerConfigListener> serverConfigListeners = new ArrayList<>();
 
+    // Trace collectors loaded via SPI
+    private final TraceCollector lspTraceCollector;
+    private final TraceCollector dapTraceCollector;
+    private final McpTraceCollector mcpTraceCollector;
+
     public Application() {
         this.contributionManager = new ContributionManager(this);
+        TraceCollectorFactory factory = ServiceLoader.load(TraceCollectorFactory.class)
+                .findFirst()
+                .orElse(new NoOpTraceCollectorFactory());
+        this.lspTraceCollector = factory.createLspTraceCollector();
+        this.dapTraceCollector = factory.createDapTraceCollector();
+        this.mcpTraceCollector = factory.createMcpTraceCollector();
+        LOG.infof("TraceCollectorFactory: %s (enabled=%s)", factory.getClass().getSimpleName(), lspTraceCollector.isEnabled());
     }
 
     public void addServerConfigListener(ServerConfigListener listener) {
@@ -496,7 +506,7 @@ public class Application {
         return lspServerConfigs.values();
     }
 
-    public LspTraceCollector getLspTraceCollector() {
+    public TraceCollector getLspTraceCollector() {
         return lspTraceCollector;
     }
 
@@ -515,8 +525,12 @@ public class Application {
         return dapServerConfigs.values();
     }
 
-    public DapTraceCollector getDapTraceCollector() {
+    public TraceCollector getDapTraceCollector() {
         return dapTraceCollector;
+    }
+
+    public McpTraceCollector getMcpTraceCollector() {
+        return mcpTraceCollector;
     }
 
     private void sendWorkspaceChangeEvent(WorkspaceChangeEvent.Type type, URI workspaceUri) {

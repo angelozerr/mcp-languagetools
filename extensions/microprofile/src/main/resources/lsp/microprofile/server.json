@@ -2,7 +2,6 @@
   "id": "microprofile",
   "name": "MicroProfile Language Server",
   "description": "Language server for MicroProfile properties files",
-  "command": "java -cp ${serverHome}/org.eclipse.lsp4mp.ls-uber.jar org.eclipse.lsp4mp.ls.MicroProfileServerLauncher",
   "documentSelector": [
     {
       "language": "java"

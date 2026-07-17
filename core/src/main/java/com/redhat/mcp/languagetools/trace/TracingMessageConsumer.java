@@ -55,6 +55,9 @@ public class TracingMessageConsumer {
      * Log a message and determine direction based on MessageConsumer type.
      */
     public void log(Message message, MessageConsumer messageConsumer) {
+        if (!collector.isEnabled()) {
+            return;
+        }
         final Instant now = clock.instant();
         final String date = dateTimeFormatter.format(now);
 
@@ -139,6 +142,9 @@ public class TracingMessageConsumer {
      * Trace a programmatic request (e.g., bind request to a delegate command handler).
      */
     public void traceRequest(String method, Object params, boolean verbose) {
+        if (!collector.isEnabled()) {
+            return;
+        }
         Instant now = clock.instant();
         String date = dateTimeFormatter.format(now);
         StringBuilder sb = new StringBuilder();
@@ -154,6 +160,9 @@ public class TracingMessageConsumer {
      * Trace a programmatic response (e.g., bind response from a delegate command handler).
      */
     public void traceResponse(String method, Object result, Throwable error, long durationMs, boolean verbose) {
+        if (!collector.isEnabled()) {
+            return;
+        }
         Instant now = clock.instant();
         String date = dateTimeFormatter.format(now);
         StringBuilder sb = new StringBuilder();

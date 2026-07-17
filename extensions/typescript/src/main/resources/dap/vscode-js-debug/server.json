@@ -2,9 +2,6 @@
   "id": "vscode-js-debug",
   "name": "VSCode JS Debug",
   "description": "Debug adapter for JavaScript and TypeScript",
-  "launch": {
-    "default": "node $SERVER_HOME$/js-debug/src/dapDebugServer.js ${port} 127.0.0.1"
-  },
   "debugServerReadyPattern": "DAP server listening on port ${port}",
   "documentSelector": [
     {

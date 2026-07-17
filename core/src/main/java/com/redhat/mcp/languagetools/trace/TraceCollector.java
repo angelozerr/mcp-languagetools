@@ -1,5 +1,8 @@
 package com.redhat.mcp.languagetools.trace;
 
+import java.util.List;
+import java.util.function.Consumer;
+
 /**
  * Collects trace messages from LSP/DAP servers.
  * <p>
@@ -29,6 +32,13 @@ public interface TraceCollector {
     }
 
     /**
+     * Returns whether this trace collector is enabled.
+     * When false, callers should skip trace message creation entirely
+     * to avoid unnecessary allocations.
+     */
+    boolean isEnabled();
+
+    /**
      * Add a trace message with full context.
      *
      * @param workspaceUri the workspace URI, or null for global traces
@@ -40,21 +50,13 @@ public interface TraceCollector {
 
     /**
      * Add a trace message with default type {@link MessageType#TRACE}.
-     *
-     * @param workspaceUri the workspace URI, or null for global traces
-     * @param contextId    the context identifier (see class javadoc)
-     * @param content      the trace content
      */
     default void addTrace(String workspaceUri, String contextId, String content) {
         addTrace(workspaceUri, contextId, content, MessageType.TRACE);
     }
 
     /**
-     * Add a trace message without workspace context (e.g. installation traces).
-     *
-     * @param contextId the context identifier (see class javadoc)
-     * @param content   the trace content
-     * @param type      the message type
+     * Add a trace message without workspace context.
      */
     default void addTrace(String contextId, String content, MessageType type) {
         addTrace(null, contextId, content, type);
@@ -62,11 +64,41 @@ public interface TraceCollector {
 
     /**
      * Add a trace message without workspace context, with default type {@link MessageType#TRACE}.
-     *
-     * @param contextId the context identifier (see class javadoc)
-     * @param content   the trace content
      */
     default void addTrace(String contextId, String content) {
         addTrace(null, contextId, content, MessageType.TRACE);
+    }
+
+    /**
+     * Register a listener notified on each new trace message.
+     */
+    default void addTraceListener(Consumer<TraceMessage> listener) {
+    }
+
+    /**
+     * Get the most recent traces, limited to the given count.
+     */
+    default List<TraceMessage> getTraces(int limit) {
+        return List.of();
+    }
+
+    /**
+     * Get traces filtered by workspace and context.
+     */
+    default List<TraceMessage> getTraces(String workspaceUri, String contextId, int limit) {
+        return List.of();
+    }
+
+    /**
+     * Get traces for a DAP session (installation + protocol traces).
+     */
+    default List<TraceMessage> getTracesForSession(String serverId, String sessionId, int limit) {
+        return List.of();
+    }
+
+    /**
+     * Clear all stored traces.
+     */
+    default void clear() {
     }
 }

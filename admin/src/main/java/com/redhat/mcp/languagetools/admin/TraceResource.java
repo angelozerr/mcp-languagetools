@@ -1,10 +1,8 @@
 package com.redhat.mcp.languagetools.admin;
 
 import com.google.gson.JsonParser;
+import com.redhat.mcp.languagetools.Application;
 import com.redhat.mcp.languagetools.admin.ws.TraceLevelWsMessage;
-import com.redhat.mcp.languagetools.dap.trace.DapTraceCollector;
-import com.redhat.mcp.languagetools.lsp.trace.LspTraceCollector;
-import com.redhat.mcp.languagetools.mcp.trace.McpTraceCollector;
 import com.redhat.mcp.languagetools.settings.ServerTrace;
 import com.redhat.mcp.languagetools.settings.Settings;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -20,13 +18,7 @@ import jakarta.ws.rs.core.Response;
 public class TraceResource {
 
     @Inject
-    LspTraceCollector lspTraceCollector;
-
-    @Inject
-    DapTraceCollector dapTraceCollector;
-
-    @Inject
-    McpTraceCollector mcpTraceCollector;
+    Application application;
 
     @Inject
     Settings settings;
@@ -39,19 +31,19 @@ public class TraceResource {
     @DELETE
     @Path("/lsp")
     public void clearLspTraces() {
-        lspTraceCollector.clear();
+        application.getLspTraceCollector().clear();
     }
 
     @DELETE
     @Path("/dap")
     public void clearDapTraces() {
-        dapTraceCollector.clear();
+        application.getDapTraceCollector().clear();
     }
 
     @DELETE
     @Path("/mcp")
     public void clearMcpTraces() {
-        mcpTraceCollector.clear();
+        application.getMcpTraceCollector().clear();
     }
 
     // ========== LSP Trace Level ==========

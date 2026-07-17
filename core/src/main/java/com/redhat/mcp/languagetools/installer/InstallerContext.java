@@ -142,14 +142,14 @@ public class InstallerContext {
 
     public void traceUpdate(String message) {
         TraceCollector tc = config.getTraceCollector();
-        if (tc != null) {
+        if (tc != null && tc.isEnabled()) {
             tc.addTrace(config.getServerId(), message, TraceCollector.MessageType.UPDATE);
         }
     }
 
     private void traceInstallation(String message, TraceCollector.MessageType type) {
         TraceCollector tc = config.getTraceCollector();
-        if (tc != null) {
+        if (tc != null && tc.isEnabled()) {
             String formatted = String.format("[Installation - %s] %s",
                     TIME_FORMATTER.format(Instant.now()), message);
             tc.addTrace(config.getServerId(), formatted, type);

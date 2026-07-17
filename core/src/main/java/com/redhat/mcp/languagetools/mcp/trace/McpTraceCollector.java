@@ -6,7 +6,6 @@ import com.redhat.mcp.languagetools.trace.TraceKind;
 import io.quarkiverse.mcp.server.McpConnection;
 import io.quarkiverse.mcp.server.RawMessage;
 import io.quarkus.logging.Log;
-import jakarta.enterprise.context.ApplicationScoped;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -20,7 +19,6 @@ import static com.redhat.mcp.languagetools.utils.JsonUtils.getPrettyPrintGson;
  * <p>
  * Uses connectionId as the contextId for trace messages.
  */
-@ApplicationScoped
 public class McpTraceCollector extends AbstractTraceCollector {
 
     private final Map<String, PendingRequest> pendingRequests = new ConcurrentHashMap<>();
@@ -41,6 +39,9 @@ public class McpTraceCollector extends AbstractTraceCollector {
      * @param connection the MCP connection (its ID is used as contextId)
      */
     public void addTrace(McpTraceDirection direction, RawMessage message, McpConnection connection) {
+        if (!isEnabled()) {
+            return;
+        }
         String connectionId = connection.id();
         String formattedMessage = formatMessage(direction, message, connectionId, Instant.now());
         addTrace(null, connectionId, formattedMessage);

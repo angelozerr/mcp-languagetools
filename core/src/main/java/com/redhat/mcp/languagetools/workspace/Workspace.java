@@ -5,7 +5,7 @@ import com.redhat.mcp.languagetools.dap.server.DapServerConfig;
 import com.redhat.mcp.languagetools.installer.*;
 import com.redhat.mcp.languagetools.lsp.LspInstanceRegistry;
 import com.redhat.mcp.languagetools.lsp.server.*;
-import com.redhat.mcp.languagetools.lsp.trace.LspTraceCollector;
+import com.redhat.mcp.languagetools.trace.TraceCollector;
 import com.redhat.mcp.languagetools.progress.ProgressMonitor;
 import com.redhat.mcp.languagetools.progress.ProgressStep;
 import com.redhat.mcp.languagetools.server.ServerBase;
@@ -39,7 +39,7 @@ public class Workspace {
     private final WorkspaceConfiguration configuration;
 
     // LSP
-    private final LspTraceCollector lspTraceCollector;
+    private final TraceCollector lspTraceCollector;
 
     private final Map<String, LspServer> lspServers = new ConcurrentHashMap<>();
     private final Map<String, McpClientInfo> mcpClientConnections = new ConcurrentHashMap<>();

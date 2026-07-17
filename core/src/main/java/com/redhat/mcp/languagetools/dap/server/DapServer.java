@@ -103,7 +103,7 @@ public class DapServer extends ServerBase<DapServerConfig> {
             setReady(true);
             return CompletableFuture.completedFuture(null);
         }
-        if (getConfig().getLaunchForCurrentOS() != null) {
+        if (getConfig().getCommand() != null) {
             return startServerProcess()
                 .thenCompose(this::waitForServerReady)
                 .thenCompose(this::createLauncher);
@@ -234,16 +234,17 @@ public class DapServer extends ServerBase<DapServerConfig> {
 
                 ProcessBuilder pb = new ProcessBuilder(command);
 
-                // Set working directory to workspace root
-                File workspaceDir = Paths.get(getWorkspace().getRootUri()).toFile();
+                // Set working directory (config override or workspace root)
+                File workspaceDir = config.getWorkingDirectory() != null
+                        ? new File(config.getWorkingDirectory())
+                        : Paths.get(getWorkspace().getRootUri()).toFile();
                 pb.directory(workspaceDir);
 
                 addTrace(String.format("Working directory: %s", workspaceDir));
 
                 // Set environment variables
-                if (config.getEnv() != null) {
-                    config.getEnv().forEach((key, value) ->
-                            pb.environment().put(key, value.toString()));
+                if (config.getEnv() != null && !config.getEnv().isEmpty()) {
+                    pb.environment().putAll(config.getEnv());
                 }
 
                 serverProcess = pb.start();
@@ -577,7 +578,7 @@ public class DapServer extends ServerBase<DapServerConfig> {
      */
     protected List<String> buildCommand() throws IOException {
         var config = super.getConfig();
-        String cmd = config.getLaunchForCurrentOS();
+        String cmd = config.getCommand();
         if (cmd == null) {
             throw new IOException("No launch command configured for current OS");
         }

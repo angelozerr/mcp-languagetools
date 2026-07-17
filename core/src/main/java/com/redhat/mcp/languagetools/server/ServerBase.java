@@ -82,6 +82,9 @@ public abstract class ServerBase<T extends ServerConfigBase> extends BindEndpoin
      * Add a trace message using the stored workspace URI and context ID.
      */
     protected void addTrace(String content) {
+        if (!traceCollector.isEnabled()) {
+            return;
+        }
         traceCollector.addTrace(workspace.getNormalizedUri(), contextId, content);
     }
 
@@ -89,6 +92,9 @@ public abstract class ServerBase<T extends ServerConfigBase> extends BindEndpoin
      * Add a trace message with a specific message type.
      */
     protected void addTrace(String content, TraceCollector.MessageType messageType) {
+        if (!traceCollector.isEnabled()) {
+            return;
+        }
         traceCollector.addTrace(workspace.getNormalizedUri(), contextId, content, messageType);
     }
 
