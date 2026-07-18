@@ -89,23 +89,4 @@ public class PathManager {
         return getMcpLangToolsRoot().resolve(SETTINGS_JSON);
     }
 
-    /**
-     * Get the workspace data directory (~/.mcp-languagetools/workspaces)
-     */
-    public Path getWorkspaceDataDir() {
-        return getMcpLangToolsRoot().resolve("workspaces");
-    }
-
-    /**
-     * Resolve variables in a template string.
-     * Supports: $USER_HOME$, $SERVER_HOME$
-     */
-    public String resolveVariables(String template, String serverId) {
-        if (template == null) {
-            return null;
-        }
-        return template
-            .replace("$USER_HOME$", pathConfig.getRootDir().toString())
-            .replace("$SERVER_HOME$", getLspServerHome(serverId).toString());
-    }
 }

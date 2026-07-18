@@ -17,12 +17,9 @@ import org.eclipse.lsp4j.debug.services.IDebugProtocolServer;
 import org.eclipse.lsp4j.jsonrpc.Launcher;
 import org.jboss.logging.Logger;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -223,35 +220,7 @@ public class DapServer extends ServerBase<DapServerConfig> {
                 setStatus(ServerStatus.STARTING);
                 LOG.infof("Starting DAP server: %s", config.getName());
 
-                // Build and launch process
-                List<String> command = buildCommand();
-                String commandStr = String.join(" ", command);
-                LOG.debugf("DAP command: %s", commandStr);
-
-                // Send startup traces
-                addTrace(String.format("Starting %s...", config.getName()));
-                addTrace(String.format("Command: %s", commandStr));
-
-                ProcessBuilder pb = new ProcessBuilder(command);
-
-                // Set working directory (config override or workspace root)
-                File workspaceDir = config.getWorkingDirectory() != null
-                        ? new File(config.getWorkingDirectory())
-                        : Paths.get(getWorkspace().getRootUri()).toFile();
-                pb.directory(workspaceDir);
-
-                addTrace(String.format("Working directory: %s", workspaceDir));
-
-                // Set environment variables
-                if (config.getEnv() != null && !config.getEnv().isEmpty()) {
-                    pb.environment().putAll(config.getEnv());
-                }
-
-                Process serverProcess = startProcess(pb);
-                LOG.infof("DAP server process started: %s (PID: %d)",
-                        config.getServerId(), serverProcess.pid());
-
-                addTrace(String.format("DAP server process started (PID: %d)", serverProcess.pid()));
+                final Process serverProcess = startProcess();
 
                 // Create server ready tracker
                 DAPServerReadyTracker readyTracker = getServerReadyTracker(config);
@@ -262,10 +231,9 @@ public class DapServer extends ServerBase<DapServerConfig> {
                 // Monitor process exit
                 executorService.submit(() -> {
                     try {
-                        Process process = getServerProcess();
-                        while (process != null && process.isAlive()) {
-                            if (process.waitFor(1, TimeUnit.SECONDS)) {
-                                int exitCode = process.exitValue();
+                        while (serverProcess != null && serverProcess.isAlive()) {
+                            if (serverProcess.waitFor(1, TimeUnit.SECONDS)) {
+                                int exitCode = serverProcess.exitValue();
                                 LOG.errorf("DAP server process exited with code %d: %s", exitCode, config.getName());
                                 if (exitCode != 0) {
                                     setStatus(ServerStatus.START_FAILED, "Process exited with code " + exitCode);
@@ -560,6 +528,7 @@ public class DapServer extends ServerBase<DapServerConfig> {
     /**
      * Build the command to launch the debug adapter.
      */
+    @Override
     protected List<String> buildCommand() throws IOException {
         var config = super.getConfig();
         String cmd = config.getCommand();
@@ -567,47 +536,13 @@ public class DapServer extends ServerBase<DapServerConfig> {
             throw new IOException("No launch command configured for current OS");
         }
 
-        // Substitute ${port} if present - allocate a free port (for TCP mode DAP servers)
-        Integer port;
         if (cmd.contains("${port}")) {
-            port = getAvailablePort();
+            int port = getAvailablePort();
             cmd = cmd.replace("${port}", String.valueOf(port));
-            LOG.infof("Allocated port %d for DAP server", port);
-
-            // Store the port for later use in server ready tracking
             allocatedPort = port;
         }
 
-        // Substitute variables
-        String resolved = cmd
-                .replace("$SERVER_HOME$", getServerHome().toString());
-                //.replace("${workspaceDataDir}", context.getWorkspaceDataDir().toString())
-                //.replace("${context.getDapServerHome()}", context.getDapServerHome().toString());
-
-        // Simple parsing (split by spaces, respecting quotes)
-        List<String> command = new ArrayList<>();
-        StringBuilder current = new StringBuilder();
-        boolean inQuotes = false;
-
-        for (char c : resolved.toCharArray()) {
-            if (c == '"') {
-                inQuotes = !inQuotes;
-            } else if (c == ' ' && !inQuotes) {
-                if (!current.isEmpty()) {
-                    command.add(current.toString());
-                    current.setLength(0);
-                }
-            } else {
-                current.append(c);
-            }
-        }
-
-        if (!current.isEmpty()) {
-            command.add(current.toString());
-        }
-
-        LOG.infof("DAP command: %s", String.join(" ", command));
-        return command;
+        return parseCommandLine(cmd);
     }
 
     /**

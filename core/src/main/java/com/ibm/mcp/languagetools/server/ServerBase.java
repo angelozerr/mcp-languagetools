@@ -8,7 +8,10 @@ import com.ibm.mcp.languagetools.trace.TracingMessageConsumer;
 import com.ibm.mcp.languagetools.workspace.Workspace;
 import org.jboss.logging.Logger;
 
+import java.io.IOException;
 import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
@@ -83,9 +86,64 @@ public abstract class ServerBase<T extends ServerConfigBase> extends BindEndpoin
         return serverProcess;
     }
 
-    protected Process startProcess(ProcessBuilder processBuilder) throws java.io.IOException {
-        this.serverProcess = processBuilder.start();
+    protected Process startProcess() throws IOException {
+        var config = getConfig();
+        List<String> command = buildCommand();
+        String commandStr = String.join(" ", command);
+
+        addTrace(String.format("Starting %s...", config.getName()));
+        addTrace(String.format("Command: %s", commandStr));
+
+        ProcessBuilder pb = new ProcessBuilder(command);
+
+        if (config.getEnv() != null && !config.getEnv().isEmpty()) {
+            pb.environment().putAll(config.getEnv());
+        }
+
+        if (config.getWorkingDirectory() != null) {
+            String resolvedWorkingDir = config.getWorkingDirectory()
+                    .replace("$SERVER_HOME$", getServerHome().toString());
+            pb.directory(Paths.get(resolvedWorkingDir).toFile());
+            addTrace(String.format("Working directory: %s", resolvedWorkingDir));
+        }
+
+        this.serverProcess = pb.start();
+        addTrace(String.format("Server process started (PID: %d)", serverProcess.pid()));
         return this.serverProcess;
+    }
+
+    protected List<String> buildCommand() throws IOException {
+        String cmd = getConfig().getCommand();
+        if (cmd == null) {
+            throw new IOException("No command configured for current OS");
+        }
+        return parseCommandLine(cmd);
+    }
+
+    protected List<String> parseCommandLine(String commandLine) {
+        List<String> args = new ArrayList<>();
+        StringBuilder current = new StringBuilder();
+        boolean inQuotes = false;
+
+        for (int i = 0; i < commandLine.length(); i++) {
+            char c = commandLine.charAt(i);
+            if (c == '"') {
+                inQuotes = !inQuotes;
+            } else if (c == ' ' && !inQuotes) {
+                if (!current.isEmpty()) {
+                    args.add(current.toString());
+                    current.setLength(0);
+                }
+            } else {
+                current.append(c);
+            }
+        }
+
+        if (!current.isEmpty()) {
+            args.add(current.toString());
+        }
+
+        return args;
     }
 
     public Long getPid() {

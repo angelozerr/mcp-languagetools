@@ -216,37 +216,8 @@ public class LspServer extends ServerBase<LspServerConfig> {
         var config = super.getConfig();
         LOG.infof("Launching new %s process for workspace: %s", config.getServerId(), workspaceRoot);
 
-        LOG.infof("Building command for %s...", config.getServerId());
-        List<String> command = buildCommand();
-        LOG.infof("Command built successfully for %s: %d args", config.getServerId(), command.size());
-        String commandStr = String.join(" ", command);
-        LOG.debugf("%s command: %s", config.getServerId(), commandStr);
-
-        // Send startup traces (visible in UI) - separate lines, no folding
-        addTrace(String.format("Starting %s...", config.getName()));
-        addTrace(String.format("Command: %s", commandStr));
-
-        ProcessBuilder pb = new ProcessBuilder(command);
-
-        // Set environment variables
-        if (config.getEnv() != null && !config.getEnv().isEmpty()) {
-            pb.environment().putAll(config.getEnv());
-        }
-
-        // Set working directory
-        if (config.getWorkingDirectory() != null) {
-            String resolvedWorkingDir = config.getWorkingDirectory()
-                    .replace("$SERVER_HOME$", super.getServerHome().toString());
-            pb.directory(Paths.get(resolvedWorkingDir).toFile());
-            addTrace(String.format("Working directory: %s", resolvedWorkingDir));
-        }
-
-        // Don't redirect error stream - we want to capture it separately
-        Process serverProcess = startProcess(pb);
+        Process serverProcess = startProcess();
         isSocketConnection = false;
-
-        // Trace server started (one line - no folding)
-        addTrace(String.format("LSP server process started (PID: %d)", serverProcess.pid()));
 
         // Start monitoring stderr for errors (uses shared implementation from ServerBase)
         startStderrMonitoring();
@@ -592,47 +563,6 @@ public class LspServer extends ServerBase<LspServerConfig> {
                 setStatus(ServerStatus.STOPPED);
             }
         }, executorService);
-    }
-
-    /**
-     * Build the command to launch the language server.
-     */
-    protected List<String> buildCommand() throws IOException {
-        String cmd = getConfig().getCommand();
-        if (cmd == null) {
-            throw new IOException("No command configured for current OS");
-        }
-        return parseCommandLine(cmd);
-    }
-
-    /**
-     * Simple command line parser that respects quotes.
-     */
-    private List<String> parseCommandLine(String commandLine) {
-        List<String> args = new ArrayList<>();
-        StringBuilder current = new StringBuilder();
-        boolean inQuotes = false;
-
-        for (int i = 0; i < commandLine.length(); i++) {
-            char c = commandLine.charAt(i);
-
-            if (c == '"') {
-                inQuotes = !inQuotes;
-            } else if (c == ' ' && !inQuotes) {
-                if (!current.isEmpty()) {
-                    args.add(current.toString());
-                    current.setLength(0);
-                }
-            } else {
-                current.append(c);
-            }
-        }
-
-        if (!current.isEmpty()) {
-            args.add(current.toString());
-        }
-
-        return args;
     }
 
     public LanguageServer getLanguageServer() {

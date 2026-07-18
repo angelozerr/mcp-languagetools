@@ -376,7 +376,7 @@ public class JdtLsServer extends LspServer implements ServerConfigListener {
     private Path getJdtlsDataDir() {
         URI rootUri = getWorkspace().getRootUri();
         String workspaceName = Path.of(rootUri).getFileName().toString();
-        Path baseDir = getWorkspace().getApplication().getPathManager().getWorkspaceDataDir();
+        Path baseDir = getWorkspace().getApplication().getPathManager().getMcpLangToolsRoot().resolve("jdtls-workspaces");
         Path dir = baseDir.resolve(workspaceName + "-" + Math.abs(rootUri.hashCode()));
         try {
             Files.createDirectories(dir);
