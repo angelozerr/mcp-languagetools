@@ -1,0 +1,30 @@
+package com.ibm.mcp.languagetools.admin.dto;
+
+import com.ibm.mcp.languagetools.server.ServerStatus;
+
+/**
+ * Runtime state of an LSP server in a specific workspace.
+ * This represents the dynamic state that changes during execution.
+ */
+public record LspServerDTO(
+    String serverId,
+    ServerStatus status,
+    String statusMessage,
+    boolean isReady,
+    Long pid,
+    String command,
+    ExternalInstanceInfo externalInstance,
+    String parentServerId,  // For extensions: the server they extend (null for normal servers)
+    Double installProgress  // Install progress (0.0-1.0) when status is INSTALLING, null otherwise
+) {
+    /**
+     * Information about an external LSP server instance (launched by an IDE).
+     */
+    public record ExternalInstanceInfo(
+        int port,
+        long pid,
+        boolean isAlive,
+        String clientName,
+        String clientVersion
+    ) {}
+}

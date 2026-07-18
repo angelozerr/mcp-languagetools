@@ -1,0 +1,89 @@
+/*******************************************************************************
+ * Copyright (c) 2026 Red Hat, Inc.
+ * Distributed under license by Red Hat, Inc. All rights reserved.
+ * This program is made available under the terms of the
+ * Eclipse Public License v2.0 which accompanies this distribution,
+ * and is available at http://www.eclipse.org/legal/epl-v20.html
+ *
+ * Contributors:
+ * Red Hat, Inc. - initial API and implementation
+ ******************************************************************************/
+package com.ibm.mcp.languagetools.lsp.server;
+
+import com.ibm.mcp.languagetools.Application;
+import com.ibm.mcp.languagetools.language.LanguageDocument;
+import com.ibm.mcp.languagetools.progress.ProgressMonitor;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
+
+/**
+ * Resolves LSP servers for a given file with optional filtering.
+ * Centralizes the logic for finding appropriate language servers.
+ */
+@ApplicationScoped
+public class LspServerResolver {
+
+    @Inject
+    Application application;
+
+    /**
+     * Get all LSP servers that can handle the given file and match the filter.
+     *
+     * @param document        the language document
+     * @param cwd             the current working directory (used for workspace detection)
+     * @param filter          predicate to filter servers (e.g., by capability, enabled status)
+     * @param progressMonitor
+     * @return completable future with list of matching servers
+     */
+    public CompletableFuture<List<LspServer>> getLspServersForFile(
+            LanguageDocument document,
+            String cwd,
+            Predicate<LspServer> filter,
+            ProgressMonitor progressMonitor) {
+
+        return application.getWorkspaceForFile(document.getUri(), progressMonitor)
+                .thenApply(workspace -> {
+                    // Get all LSP servers from workspace
+                    var allServers = workspace.getLspServers();
+
+                    // Filter servers: must match document selector AND the caller's predicate
+                    String fileUri = document.getUri().toString();
+                    String languageId = document.getLanguageId();
+                    return allServers
+                            .stream()
+                            .filter(server -> server.getConfig().canHandle(fileUri, languageId))
+                            .filter(filter)
+                            .collect(Collectors.toList());
+                });
+    }
+
+    /**
+     * Get all LSP servers for a workspace (without specific file).
+     * Used for workspace-level operations like workspace/symbol.
+     *
+     * @param cwd    the current working directory path (not URI)
+     * @param filter predicate to filter servers (e.g., by enabled status)
+     * @return completable future with list of matching servers
+     */
+    public CompletableFuture<List<LspServer>> getLspServersForWorkspace(
+            String cwd,
+            Predicate<LspServer> filter) {
+
+        return application.getWorkspaceForPath(cwd)
+                .thenApply(workspace -> {
+                    // Get all LSP servers from workspace
+                    var allServers = workspace.getLspServers();
+
+                    // Filter servers based on the predicate
+                    return allServers
+                            .stream()
+                            .filter(filter)
+                            .collect(Collectors.toList());
+                });
+    }
+}

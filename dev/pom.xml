@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>com.redhat.mcp</groupId>
+        <groupId>com.ibm.mcp</groupId>
         <artifactId>mcp-language-tools-parent</artifactId>
         <version>0.1.0-SNAPSHOT</version>
     </parent>
@@ -19,111 +19,111 @@
     <dependencies>
         <!-- Core -->
         <dependency>
-            <groupId>com.redhat.mcp</groupId>
+            <groupId>com.ibm.mcp</groupId>
             <artifactId>mcp-language-tools-core</artifactId>
             <version>${project.version}</version>
         </dependency>
 
         <!-- Admin UI -->
         <dependency>
-            <groupId>com.redhat.mcp</groupId>
+            <groupId>com.ibm.mcp</groupId>
             <artifactId>mcp-language-tools-admin</artifactId>
             <version>${project.version}</version>
         </dependency>
 
         <!-- All extensions (runtime) -->
         <dependency>
-            <groupId>com.redhat.mcp</groupId>
+            <groupId>com.ibm.mcp</groupId>
             <artifactId>lemminx-extension</artifactId>
             <version>${project.version}</version>
             <scope>runtime</scope>
         </dependency>
         <dependency>
-            <groupId>com.redhat.mcp</groupId>
+            <groupId>com.ibm.mcp</groupId>
             <artifactId>microprofile-extension</artifactId>
             <version>${project.version}</version>
             <scope>runtime</scope>
         </dependency>
         <dependency>
-            <groupId>com.redhat.mcp</groupId>
+            <groupId>com.ibm.mcp</groupId>
             <artifactId>quarkus-extension</artifactId>
             <version>${project.version}</version>
             <scope>runtime</scope>
         </dependency>
         <dependency>
-            <groupId>com.redhat.mcp</groupId>
+            <groupId>com.ibm.mcp</groupId>
             <artifactId>qute-extension</artifactId>
             <version>${project.version}</version>
             <scope>runtime</scope>
         </dependency>
         <dependency>
-            <groupId>com.redhat.mcp</groupId>
+            <groupId>com.ibm.mcp</groupId>
             <artifactId>jdtls-extension</artifactId>
             <version>${project.version}</version>
             <scope>runtime</scope>
         </dependency>
         <dependency>
-            <groupId>com.redhat.mcp</groupId>
+            <groupId>com.ibm.mcp</groupId>
             <artifactId>typescript-extension</artifactId>
             <version>${project.version}</version>
             <scope>runtime</scope>
         </dependency>
         <dependency>
-            <groupId>com.redhat.mcp</groupId>
+            <groupId>com.ibm.mcp</groupId>
             <artifactId>python-extension</artifactId>
             <version>${project.version}</version>
             <scope>runtime</scope>
         </dependency>
         <dependency>
-            <groupId>com.redhat.mcp</groupId>
+            <groupId>com.ibm.mcp</groupId>
             <artifactId>rust-extension</artifactId>
             <version>${project.version}</version>
             <scope>runtime</scope>
         </dependency>
         <dependency>
-            <groupId>com.redhat.mcp</groupId>
+            <groupId>com.ibm.mcp</groupId>
             <artifactId>clangd-extension</artifactId>
             <version>${project.version}</version>
             <scope>runtime</scope>
         </dependency>
         <dependency>
-            <groupId>com.redhat.mcp</groupId>
+            <groupId>com.ibm.mcp</groupId>
             <artifactId>go-extension</artifactId>
             <version>${project.version}</version>
             <scope>runtime</scope>
         </dependency>
         <dependency>
-            <groupId>com.redhat.mcp</groupId>
+            <groupId>com.ibm.mcp</groupId>
             <artifactId>dart-extension</artifactId>
             <version>${project.version}</version>
             <scope>runtime</scope>
         </dependency>
         <dependency>
-            <groupId>com.redhat.mcp</groupId>
+            <groupId>com.ibm.mcp</groupId>
             <artifactId>yaml-extension</artifactId>
             <version>${project.version}</version>
             <scope>runtime</scope>
         </dependency>
         <dependency>
-            <groupId>com.redhat.mcp</groupId>
+            <groupId>com.ibm.mcp</groupId>
             <artifactId>lua-extension</artifactId>
             <version>${project.version}</version>
             <scope>runtime</scope>
         </dependency>
         <dependency>
-            <groupId>com.redhat.mcp</groupId>
+            <groupId>com.ibm.mcp</groupId>
             <artifactId>php-extension</artifactId>
             <version>${project.version}</version>
             <scope>runtime</scope>
         </dependency>
         <dependency>
-            <groupId>com.redhat.mcp</groupId>
+            <groupId>com.ibm.mcp</groupId>
             <artifactId>kotlin-extension</artifactId>
             <version>${project.version}</version>
             <scope>runtime</scope>
         </dependency>
         <dependency>
-            <groupId>com.redhat.mcp</groupId>
+            <groupId>com.ibm.mcp</groupId>
             <artifactId>dockerfile-extension</artifactId>
             <version>${project.version}</version>
             <scope>runtime</scope>

@@ -1,0 +1,150 @@
+/*******************************************************************************
+ * Copyright (c) 2026 Red Hat Inc. and others.
+ * All rights reserved. This program and the accompanying materials
+ * which accompanies this distribution, and is available at
+ * http://www.eclipse.org/legal/epl-v20.html
+ *
+ * SPDX-License-Identifier: EPL-2.0
+ *
+ * Contributors:
+ *     Red Hat Inc. - initial API and implementation
+ *******************************************************************************/
+package com.ibm.mcp.languagetools.lsp.tools.strategies;
+
+import com.ibm.mcp.languagetools.lsp.client.LspCapability;
+import com.ibm.mcp.languagetools.lsp.server.LspServer;
+import com.ibm.mcp.languagetools.lsp.server.LspServerResolver;
+import com.ibm.mcp.languagetools.lsp.tools.LspRequestExecutor;
+import com.ibm.mcp.languagetools.lsp.tools.params.WorkspaceSymbolRequestParams;
+import com.ibm.mcp.languagetools.progress.ProgressMonitor;
+import org.eclipse.lsp4j.*;
+import org.eclipse.lsp4j.jsonrpc.messages.Either;
+
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
+
+/**
+ * Strategy for LSP workspace/symbol requests.
+ */
+public class WorkspaceSymbolStrategy implements LspRequestExecutor.LspRequestStrategy<WorkspaceSymbolRequestParams, WorkspaceSymbolParams, Either<List<? extends SymbolInformation>, List<? extends WorkspaceSymbol>>> {
+
+    @Override
+    public LspCapability getCapability() {
+        return LspCapability.WORKSPACE_SYMBOL;
+    }
+
+    @Override
+    public String getTitle() {
+        return "Workspace symbols";
+    }
+
+    @Override
+    public CompletableFuture<List<LspServer>> resolveServers(
+            LspServerResolver resolver,
+            WorkspaceSymbolRequestParams params, ProgressMonitor progressMonitor) {
+
+        return resolver.getLspServersForWorkspace(params.getCwd(), server -> server.isEnabled());
+    }
+
+    @Override
+    public WorkspaceSymbolParams buildLspParams(WorkspaceSymbolRequestParams params) {
+        WorkspaceSymbolParams lspParams = new WorkspaceSymbolParams();
+        lspParams.setQuery(params.getQuery());
+        return lspParams;
+    }
+
+    @Override
+    public CompletableFuture<Either<List<? extends SymbolInformation>, List<? extends WorkspaceSymbol>>> executeRequest(
+            LspServer server, WorkspaceSymbolParams lspParams) {
+        return server.getLanguageServer()
+                .getWorkspaceService()
+                .symbol(lspParams);
+    }
+
+    @Override
+    public Either<List<? extends SymbolInformation>, List<? extends WorkspaceSymbol>> getEmptyResult() {
+        return Either.forLeft(Collections.emptyList());
+    }
+
+    @Override
+    public boolean isValidResult(Either<List<? extends SymbolInformation>, List<? extends WorkspaceSymbol>> result) {
+        if (result == null) return false;
+        if (result.isLeft()) return !result.getLeft().isEmpty();
+        if (result.isRight()) return !result.getRight().isEmpty();
+        return false;
+    }
+
+    @Override
+    public String formatResults(WorkspaceSymbolRequestParams params, List<Either<List<? extends SymbolInformation>, List<? extends WorkspaceSymbol>>> results) {
+        // Merge all symbols from all results
+        List<SymbolInformation> allSymbols = results.stream()
+                .flatMap(either -> {
+                    if (either.isLeft()) {
+                        return either.getLeft().stream();
+                    } else {
+                        // Convert WorkspaceSymbol to SymbolInformation
+                        return either.getRight().stream()
+                                .map(ws -> {
+                                    SymbolInformation info = new SymbolInformation();
+                                    info.setName(ws.getName());
+                                    info.setKind(ws.getKind());
+                                    info.setContainerName(ws.getContainerName());
+
+                                    // Extract location from WorkspaceSymbol.location (Either<Location, LocationData>)
+                                    Either<Location, ?> location = ws.getLocation();
+                                    if (location != null && location.isLeft()) {
+                                        info.setLocation(location.getLeft());
+                                    }
+
+                                    return info;
+                                });
+                    }
+                })
+                .distinct()
+                .toList();
+
+        if (allSymbols.isEmpty()) {
+            return formatNoResultFound(params);
+        }
+
+        // Format results
+        StringBuilder result = new StringBuilder();
+        result.append(String.format("Found %d symbol(s) matching '%s'\n\n", allSymbols.size(), params.getQuery()));
+
+        // Group by file
+        Map<String, List<SymbolInformation>> byFile = allSymbols.stream()
+                .filter(s -> s.getLocation() != null)
+                .collect(Collectors.groupingBy(s -> s.getLocation().getUri()));
+
+        for (Map.Entry<String, List<SymbolInformation>> entry : byFile.entrySet()) {
+            String file = entry.getKey();
+            List<SymbolInformation> symbols = entry.getValue();
+
+            result.append(String.format("File: %s (%d symbol(s))\n", file, symbols.size()));
+
+            for (SymbolInformation symbol : symbols) {
+                Range range = symbol.getLocation().getRange();
+                String kind = symbol.getKind() != null ? symbol.getKind().name().toLowerCase() : "symbol";
+                String container = symbol.getContainerName() != null ? " in " + symbol.getContainerName() : "";
+
+                result.append(String.format("  %s %s%s - Line %d:%d\n",
+                        kind,
+                        symbol.getName(),
+                        container,
+                        range.getStart().getLine() + 1,
+                        range.getStart().getCharacter()));
+            }
+            result.append("\n");
+        }
+
+        return result.toString();
+    }
+
+    @Override
+    public String formatNoResultFound(WorkspaceSymbolRequestParams params) {
+        return String.format("No symbols found matching '%s'", params.getQuery());
+    }
+}
