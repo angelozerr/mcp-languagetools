@@ -531,6 +531,6 @@ public class AdminWebSocketEndpoint {
                 .toList();
 
         var uri = workspace.getNormalizedUri();
-        return new WorkspaceDTO(uri, workspace.isInitialized(), mcpClients);
+        return new WorkspaceDTO(uri, mcpClients);
     }
 }

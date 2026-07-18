@@ -12,6 +12,12 @@ import com.ibm.mcp.languagetools.workspace.Workspace;
 import org.eclipse.lsp4j.services.LanguageClient;
 import org.jboss.logging.Logger;
 
+import java.io.IOException;
+import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -192,13 +198,6 @@ public class JdtLsServer extends LspServer implements ServerConfigListener {
     }
 
     /**
-     * Get the JDT.LS-specific client.
-     */
-    public JdtLsLanguageClient getJdtClient() {
-        return jdtClient;
-    }
-
-    /**
      * Build the JDT.LS command with custom arguments.
      * Similar to vscode-java's prepareParams (javaServerStarter.ts).
      *
@@ -206,12 +205,12 @@ public class JdtLsServer extends LspServer implements ServerConfigListener {
      * java [jvm-args] -jar launcher.jar [osgi-args] -configuration [config-dir] -data [workspace]
      */
     @Override
-    protected java.util.List<String> buildCommand() throws java.io.IOException {
-        java.util.List<String> params = new java.util.ArrayList<>();
+    protected List<String> buildCommand() throws IOException {
+        List<String> params = new ArrayList<>();
 
         // 1. Java executable
         String javaHome = System.getProperty("java.home");
-        String javaBin = java.nio.file.Paths.get(javaHome, "bin", "java").toString();
+        String javaBin = Paths.get(javaHome, "bin", "java").toString();
         params.add(javaBin);
 
         // 2. Java module system arguments (required for Java 9+)
@@ -243,7 +242,7 @@ public class JdtLsServer extends LspServer implements ServerConfigListener {
 
         // 9. Workspace data directory
         params.add("-data");
-        params.add(workspaceDataDir.toString());
+        params.add(getJdtlsDataDir().toString());
 
         LOG.infof("JDT.LS command: %s", String.join(" ", params));
         return params;
@@ -267,7 +266,7 @@ public class JdtLsServer extends LspServer implements ServerConfigListener {
         }
 
         // Parse vmargs string - handle quoted arguments
-        java.util.List<String> parsedArgs = parseVMArgsString(vmargs);
+        List<String> parsedArgs = parseVMArgsString(vmargs);
         params.addAll(parsedArgs);
 
         LOG.infof("Added VM args from java.jdt.ls.vmargs: %s", vmargs);
@@ -277,8 +276,8 @@ public class JdtLsServer extends LspServer implements ServerConfigListener {
      * Parse VM arguments string into a list.
      * Handles quotes: "arg with spaces" or -Dfoo="bar baz"
      */
-    private java.util.List<String> parseVMArgsString(String vmargs) {
-        java.util.List<String> result = new java.util.ArrayList<>();
+    private List<String> parseVMArgsString(String vmargs) {
+        List<String> result = new ArrayList<>();
         StringBuilder current = new StringBuilder();
         boolean inQuotes = false;
 
@@ -337,11 +336,11 @@ public class JdtLsServer extends LspServer implements ServerConfigListener {
     /**
      * Find the Eclipse Equinox launcher JAR and add to params.
      */
-    private void addLauncherJar(java.util.List<String> params) throws java.io.IOException {
-        java.nio.file.Path pluginsDir = getServerHome().resolve("plugins");
+    private void addLauncherJar(List<String> params) throws IOException {
+        Path pluginsDir = getServerHome().resolve("plugins");
 
-        try (java.util.stream.Stream<java.nio.file.Path> files = java.nio.file.Files.walk(pluginsDir, 1)) {
-            java.util.Optional<java.nio.file.Path> launcher = files
+        try (var files = Files.walk(pluginsDir, 1)) {
+            var launcher = files
                 .filter(p -> p.getFileName().toString().startsWith("org.eclipse.equinox.launcher_"))
                 .filter(p -> p.getFileName().toString().endsWith(".jar"))
                 .findFirst();
@@ -350,7 +349,7 @@ public class JdtLsServer extends LspServer implements ServerConfigListener {
                 params.add("-jar");
                 params.add(launcher.get().toString());
             } else {
-                throw new java.io.IOException("Could not find Eclipse Equinox launcher JAR in " + pluginsDir);
+                throw new IOException("Could not find Eclipse Equinox launcher JAR in " + pluginsDir);
             }
         }
     }
@@ -372,5 +371,18 @@ public class JdtLsServer extends LspServer implements ServerConfigListener {
         }
 
         return getServerHome().resolve(configDir);
+    }
+
+    private Path getJdtlsDataDir() {
+        URI rootUri = getWorkspace().getRootUri();
+        String workspaceName = Path.of(rootUri).getFileName().toString();
+        Path baseDir = getWorkspace().getApplication().getPathManager().getWorkspaceDataDir();
+        Path dir = baseDir.resolve(workspaceName + "-" + Math.abs(rootUri.hashCode()));
+        try {
+            Files.createDirectories(dir);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to create JDT.LS data directory", e);
+        }
+        return dir;
     }
 }

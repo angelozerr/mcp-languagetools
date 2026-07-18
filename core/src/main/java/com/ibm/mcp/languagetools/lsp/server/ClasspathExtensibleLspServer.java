@@ -4,6 +4,7 @@ import com.ibm.mcp.languagetools.ContributionManager;
 import com.ibm.mcp.languagetools.progress.ProgressMonitor;
 import com.ibm.mcp.languagetools.server.ServerConfigBase;
 import com.ibm.mcp.languagetools.trace.TraceCollector;
+import com.ibm.mcp.languagetools.utils.OSUtils;
 import com.ibm.mcp.languagetools.workspace.Workspace;
 import org.jboss.logging.Logger;
 
@@ -25,6 +26,7 @@ import java.util.concurrent.CompletableFuture;
 public class ClasspathExtensibleLspServer extends LspServer {
 
     private static final Logger LOG = Logger.getLogger(ClasspathExtensibleLspServer.class);
+    private static final String CLASSPATH_SEPARATOR = OSUtils.isWindows() ? ";" : ":";
 
     public ClasspathExtensibleLspServer(LspServerConfig config, Workspace workspace) {
         super(config, workspace);
@@ -123,7 +125,7 @@ public class ClasspathExtensibleLspServer extends LspServer {
      */
     private List<String> injectClasspathExtensions(List<String> baseCommand, List<String> extensions) {
         List<String> newCommand = new ArrayList<>();
-        String separator = System.getProperty("os.name").toLowerCase().contains("win") ? ";" : ":";
+        String separator = CLASSPATH_SEPARATOR;
 
         boolean foundClasspath = false;
 

@@ -34,10 +34,9 @@ public class WorkspaceTools {
             }
 
             return workspaces.stream()
-                    .map(workspace -> String.format("- %s (%d language servers, initialized: %s)",
+                    .map(workspace -> String.format("- %s (%d language servers)",
                             workspace.getRootUri(),
-                            workspace.getLspServers().size(),
-                            workspace.isInitialized()))
+                            workspace.getLspServers().size()))
                     .collect(Collectors.joining("\n", "Active workspaces:\n", ""));
 
         } catch (Exception e) {

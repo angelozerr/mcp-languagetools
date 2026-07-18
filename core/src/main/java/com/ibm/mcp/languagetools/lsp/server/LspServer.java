@@ -44,7 +44,6 @@ public class LspServer extends ServerBase<LspServerConfig> {
     private static final Logger LOG = Logger.getLogger(LspServer.class);
 
     protected final URI workspaceRoot;
-    protected final Path workspaceDataDir;
     protected final PathManager pathManager;
 
     protected Socket socket;
@@ -61,7 +60,6 @@ public class LspServer extends ServerBase<LspServerConfig> {
     public LspServer(LspServerConfig config, Workspace workspace) {
         super(config, workspace);
         this.workspaceRoot = workspace.getRootUri();
-        this.workspaceDataDir = workspace.getWorkspaceDataDir();
         this.pathManager = workspace.getApplication().getPathManager();
 
         // Create client features for managing capabilities
@@ -238,7 +236,6 @@ public class LspServer extends ServerBase<LspServerConfig> {
         // Set working directory
         if (config.getWorkingDirectory() != null) {
             String resolvedWorkingDir = config.getWorkingDirectory()
-                    .replace("${serverHome}", super.getServerHome().toString())
                     .replace("$SERVER_HOME$", super.getServerHome().toString());
             pb.directory(Paths.get(resolvedWorkingDir).toFile());
             addTrace(String.format("Working directory: %s", resolvedWorkingDir));
@@ -249,7 +246,7 @@ public class LspServer extends ServerBase<LspServerConfig> {
         isSocketConnection = false;
 
         // Trace server started (one line - no folding)
-        addTrace(String.format("LSP server process started (PID: %d)", getServerProcess().pid()));
+        addTrace(String.format("LSP server process started (PID: %d)", serverProcess.pid()));
 
         // Start monitoring stderr for errors (uses shared implementation from ServerBase)
         startStderrMonitoring();
@@ -266,8 +263,8 @@ public class LspServer extends ServerBase<LspServerConfig> {
         Launcher<LanguageServer> launcher = new Launcher.Builder<LanguageServer>()
                 .setLocalService(client)
                 .setRemoteInterface(LanguageServer.class)
-                .setInput(getServerProcess().getInputStream())
-                .setOutput(getServerProcess().getOutputStream())
+                .setInput(serverProcess.getInputStream())
+                .setOutput(serverProcess.getOutputStream())
                 .setExecutorService(executorService)
                 .configureGson(JsonUtils::configureGson)
                 .wrapMessages(consumer -> message -> {
@@ -599,40 +596,13 @@ public class LspServer extends ServerBase<LspServerConfig> {
 
     /**
      * Build the command to launch the language server.
-     * Supports variable substitution:
-     * - ${workspace} → workspace root path
-     * - ${workspaceDataDir} → workspace data directory
-     * - ${serverHome} → language server installation directory
-     * - ${configuration} → OS-specific config directory
-     * - ${DATA_DIR} → workspace data directory
-     * - ${user.name} → system username
      */
     protected List<String> buildCommand() throws IOException {
-        var config = super.getConfig();
-        String cmd = config.getCommand();
+        String cmd = getConfig().getCommand();
         if (cmd == null) {
             throw new IOException("No command configured for current OS");
         }
-
-        var serverHome = super.getServerHome();
-        // Determine configuration directory based on OS
-        String os = System.getProperty("os.name").toLowerCase();
-        String configuration = serverHome.resolve(
-                os.contains("win") ? "config_win" :
-                        os.contains("mac") ? "config_mac" : "config_linux"
-        ).toString();
-
-        // Substitute variables in command
-        String resolved = cmd
-                .replace("${workspace}", workspaceRoot.getPath())
-                .replace("${workspaceDataDir}", workspaceDataDir.toString())
-                .replace("${serverHome}", serverHome.toString())
-                .replace("${configuration}", configuration)
-                .replace("${DATA_DIR}", workspaceDataDir.toString())
-                .replace("${user.name}", System.getProperty("user.name"));
-
-        // Parse command string into arguments (simple split by spaces, respecting quotes)
-        return parseCommandLine(resolved);
+        return parseCommandLine(cmd);
     }
 
     /**

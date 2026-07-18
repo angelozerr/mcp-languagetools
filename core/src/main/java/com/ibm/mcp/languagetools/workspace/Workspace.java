@@ -16,7 +16,6 @@ import com.ibm.mcp.languagetools.trace.TraceCollector;
 import org.jboss.logging.Logger;
 
 import java.net.URI;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Instant;
@@ -39,7 +38,6 @@ public class Workspace {
     private final URI rootUri;
     private final Path rootPath;
     private final String normalizedRootUriString; // Cached normalized URI string (no trailing slash)
-    private final Path workspaceDataDir;
     private final WorkspaceConfiguration configuration;
 
     // LSP
@@ -47,7 +45,6 @@ public class Workspace {
 
     private final Map<String, LspServer> lspServers = new ConcurrentHashMap<>();
     private final Map<String, McpClientInfo> mcpClientConnections = new ConcurrentHashMap<>();
-    private volatile boolean initialized = false;
     private Consumer<LspServerStatusChangeEvent> statusChangeCallback;
 
     public record McpClientInfo(
@@ -65,7 +62,6 @@ public class Workspace {
         // Cache normalized URI string (remove trailing slash for consistency across the app)
         this.normalizedRootUriString = rootUri.toString();
         this.application = application;
-        this.workspaceDataDir = createWorkspaceDataDir(application.getPathManager().getWorkspaceDataDir(), rootUri);
         this.lspTraceCollector = application.getLspTraceCollector();
         this.configuration = new WorkspaceConfiguration(rootPath);
     }
@@ -327,7 +323,6 @@ public class Workspace {
      */
     public CompletableFuture<Void> shutdown() {
         LOG.infof("Shutting down workspace: %s", rootUri);
-        initialized = false;
 
         List<CompletableFuture<Void>> futures = new ArrayList<>();
         for (LspServer server : lspServers.values()) {
@@ -404,13 +399,6 @@ public class Workspace {
         return normalizedRootUriString;
     }
 
-    public Path getWorkspaceDataDir() {
-        return workspaceDataDir;
-    }
-
-    public boolean isInitialized() {
-        return initialized;
-    }
 
     /**
      * Get workspace configuration (reads from .vscode/settings.json).
@@ -451,17 +439,6 @@ public class Workspace {
      */
     public Map<String, McpClientInfo> getMcpClientConnections() {
         return Collections.unmodifiableMap(mcpClientConnections);
-    }
-
-    private Path createWorkspaceDataDir(Path baseDir, URI rootUri) {
-        try {
-            String workspaceName = Path.of(rootUri).getFileName().toString();
-            Path dir = baseDir.resolve(workspaceName + "-" + Math.abs(rootUri.hashCode()));
-            Files.createDirectories(dir);
-            return dir;
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to create workspace data directory", e);
-        }
     }
 
     public Application getApplication() {

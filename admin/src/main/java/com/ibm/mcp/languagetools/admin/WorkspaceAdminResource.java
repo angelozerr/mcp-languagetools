@@ -150,6 +150,6 @@ public class WorkspaceAdminResource {
                 .toList();
 
         LOG.infof("Workspace %s - mcpClients: %s", uri, mcpClients);
-        return new WorkspaceDTO(uri, workspace.isInitialized(), mcpClients);
+        return new WorkspaceDTO(uri, mcpClients);
     }
 }
