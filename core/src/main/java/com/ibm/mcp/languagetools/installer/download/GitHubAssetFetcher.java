@@ -74,7 +74,7 @@ public class GitHubAssetFetcher implements AssetFetcher {
      */
     public static class AssetMatcher implements Function<JsonObject, Boolean> {
 
-        private final String assertPattern;
+        private final String assetPattern;
         private final Pattern globPattern;
 
         /**
@@ -82,14 +82,14 @@ public class GitHubAssetFetcher implements AssetFetcher {
          *
          * <p>If the pattern contains '*', it is treated as a glob pattern, otherwise as a substring.</p>
          *
-         * @param assertPattern the pattern to match asset names against (glob or substring)
+         * @param assetPattern the pattern to match asset names against (glob or substring)
          */
-        public AssetMatcher(String assertPattern) {
-            if (assertPattern.contains("*")) {
-                this.assertPattern = null;
-                this.globPattern = compileGlobToRegex(assertPattern);
+        public AssetMatcher(String assetPattern) {
+            if (assetPattern.contains("*")) {
+                this.assetPattern = null;
+                this.globPattern = compileGlobToRegex(assetPattern);
             } else {
-                this.assertPattern = assertPattern;
+                this.assetPattern = assetPattern;
                 this.globPattern = null;
             }
         }
@@ -106,8 +106,8 @@ public class GitHubAssetFetcher implements AssetFetcher {
             if (globPattern != null) {
                 return globPattern.matcher(name).matches();
             }
-            if (assertPattern != null) {
-                return name.toLowerCase().contains(assertPattern.toLowerCase());
+            if (assetPattern != null) {
+                return name.toLowerCase().contains(assetPattern.toLowerCase());
             }
             return false;
         }

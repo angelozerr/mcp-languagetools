@@ -13,7 +13,6 @@ public class JdtLsLanguageClient extends GenericLanguageClient {
     private static final Logger LOG = Logger.getLogger(JdtLsLanguageClient.class);
 
     private final JdtLsServer server;
-    private volatile String currentStatus = "Starting";
 
     public JdtLsLanguageClient(JdtLsServer server) {
         super(server);
@@ -23,7 +22,6 @@ public class JdtLsLanguageClient extends GenericLanguageClient {
     @JsonNotification("language/status")
     public void languageStatus(StatusReport status) {
         LOG.infof("JDT.LS status [%s]: %s", status.getType(), status.getMessage());
-        currentStatus = status.getMessage();
 
         server.setStatusMessage(status.getMessage());
 
@@ -32,10 +30,6 @@ public class JdtLsLanguageClient extends GenericLanguageClient {
             LOG.info("JDT.LS is ready!");
             server.onServiceReady();
         }
-    }
-
-    public String getCurrentStatus() {
-        return currentStatus;
     }
 
     /**

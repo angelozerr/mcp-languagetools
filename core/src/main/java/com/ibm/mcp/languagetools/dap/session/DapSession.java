@@ -375,13 +375,6 @@ public class DapSession implements DapEventListener {
      * @return the same future for chaining
      */
     private <T> CompletableFuture<T> trackFuture(CompletableFuture<T> future, ProgressMonitor progressMonitor) {
-        // TEMPORARY: Disable executeWithCancellation to isolate the blocking issue
-        // TODO: Re-enable once we fix the root cause
-        /*
-        CompletableFuture<T> trackedFuture = progressMonitor != null
-            ? progressMonitor.executeWithCancellation(future)
-            : future;
-        */
         CompletableFuture<T> trackedFuture = future;
 
         pendingRequests.add(trackedFuture);

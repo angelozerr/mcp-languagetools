@@ -32,8 +32,6 @@ public class JdtLsServer extends LspServer implements ServerConfigListener {
 
     private static final Logger LOG = Logger.getLogger(JdtLsServer.class);
 
-    private JdtLsLanguageClient jdtClient;
-
     public JdtLsServer(LspServerConfig config, Workspace workspace) {
         super(config, workspace);
     }
@@ -135,8 +133,7 @@ public class JdtLsServer extends LspServer implements ServerConfigListener {
      */
     @Override
     protected LanguageClient createLanguageClient() {
-        jdtClient = new JdtLsLanguageClient(this);
-        return jdtClient;
+        return new JdtLsLanguageClient(this);
     }
 
     void onServiceReady() {
@@ -306,7 +303,7 @@ public class JdtLsServer extends LspServer implements ServerConfigListener {
     /**
      * Add default VM arguments if not already present.
      */
-    private void addDefaultVMArgsIfMissing(java.util.List<String> params) {
+    private void addDefaultVMArgsIfMissing(List<String> params) {
         String paramsStr = String.join(" ", params);
 
         // Disable VM installations detection job
@@ -358,7 +355,7 @@ public class JdtLsServer extends LspServer implements ServerConfigListener {
      * Get the configuration directory based on OS.
      * Similar to vscode-java's configDir selection (no syntax server support).
      */
-    private java.nio.file.Path getConfigurationDirectory() {
+    private Path getConfigurationDirectory() {
         String os = System.getProperty("os.name").toLowerCase();
         String configDir;
 

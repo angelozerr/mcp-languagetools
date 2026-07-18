@@ -13,7 +13,7 @@ package com.ibm.mcp.languagetools.lsp.client.capabilities;
 import com.google.gson.JsonObject;
 import com.ibm.mcp.languagetools.language.LanguageDocument;
 import com.ibm.mcp.languagetools.lsp.client.LspClientFeatures;
-import com.ibm.mcp.languagetools.lsp.client.files.PathPatternMatcher;
+import com.ibm.mcp.languagetools.language.PathPatternMatcher;
 import org.eclipse.lsp4j.ServerCapabilities;
 import org.eclipse.lsp4j.TextDocumentRegistrationOptions;
 import org.eclipse.lsp4j.jsonrpc.messages.Either;

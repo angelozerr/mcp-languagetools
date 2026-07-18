@@ -307,9 +307,6 @@ public class DapSessionManager {
             return config;
         }
 
-        // Then check workspace-specific DAP servers
-        // Map<String, DapServerConfig> workspaceDapServers = workspace.getDapServerConfigs();
-        //return workspaceDapServers.get(dapServerId);
         return null;
     }
 

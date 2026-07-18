@@ -6,12 +6,15 @@ import com.ibm.mcp.languagetools.lsp.server.LspServer;
 import com.ibm.mcp.languagetools.progress.ProgressBroadcaster;
 import com.ibm.mcp.languagetools.progress.ProgressMonitor;
 import jakarta.enterprise.inject.spi.CDI;
+import org.jboss.logging.Logger;
 
 /**
  * Helper class for creating ProgressMonitor instances in Admin UI endpoints.
  * Ensures consistent progress monitoring across all Admin operations.
  */
 public class AdminProgressMonitorHelper {
+
+    private static final Logger LOG = Logger.getLogger(AdminProgressMonitorHelper.class);
 
     /**
      * Create a ProgressMonitor for an LSP server operation from Admin UI.
@@ -34,7 +37,7 @@ public class AdminProgressMonitorHelper {
         try {
             broadcaster = CDI.current().select(ProgressBroadcaster.class).get();
         } catch (Exception e) {
-            // CDI not available
+            LOG.debugf("CDI not available for ProgressBroadcaster lookup");
         }
 
         return new TraceProgressMonitor(
@@ -74,7 +77,7 @@ public class AdminProgressMonitorHelper {
         try {
             broadcaster = CDI.current().select(AdminProgressBroadcaster.class).get();
         } catch (Exception e) {
-            // CDI not available, will use trace-only
+            LOG.debugf("CDI not available for AdminProgressBroadcaster lookup");
         }
 
         return new TraceProgressMonitor(

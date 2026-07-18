@@ -23,7 +23,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class TracingMessageConsumer {
 
-    private static MessageJsonHandler toStringInstance;
+    private static volatile MessageJsonHandler toStringInstance;
 
     private final TraceCollector collector;
     private final String workspaceUri;
@@ -178,13 +178,20 @@ public class TracingMessageConsumer {
     }
 
     private static String toJsonString(Object object) {
-        if (toStringInstance == null) {
-            toStringInstance = new MessageJsonHandler(Collections.emptyMap(), gsonBuilder -> {
-                JsonUtils.configureGson(gsonBuilder);
-                gsonBuilder.setPrettyPrinting();
-            });
+        MessageJsonHandler instance = toStringInstance;
+        if (instance == null) {
+            synchronized (TracingMessageConsumer.class) {
+                instance = toStringInstance;
+                if (instance == null) {
+                    instance = new MessageJsonHandler(Collections.emptyMap(), gsonBuilder -> {
+                        JsonUtils.configureGson(gsonBuilder);
+                        gsonBuilder.setPrettyPrinting();
+                    });
+                    toStringInstance = instance;
+                }
+            }
         }
-        return toStringInstance.getGson().toJson(object);
+        return instance.getGson().toJson(object);
     }
 
     private static String getResultTrace(String resultJson, String errorJson) {

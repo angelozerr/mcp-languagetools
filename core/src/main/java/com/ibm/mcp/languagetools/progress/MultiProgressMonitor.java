@@ -1,5 +1,7 @@
 package com.ibm.mcp.languagetools.progress;
 
+import org.jboss.logging.Logger;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -23,6 +25,8 @@ import java.util.concurrent.CompletableFuture;
  * </pre>
  */
 public class MultiProgressMonitor implements ProgressMonitor {
+
+    private static final Logger LOG = Logger.getLogger(MultiProgressMonitor.class);
 
     private final List<ProgressMonitor> delegates;
     private final double total;
@@ -59,8 +63,7 @@ public class MultiProgressMonitor implements ProgressMonitor {
             try {
                 delegate.reportProgress(progress, message);
             } catch (Exception e) {
-                // Don't let one delegate's failure break others
-                // TODO: Log error
+                LOG.warnf(e, "Progress delegate failed");
             }
         }
     }
@@ -71,7 +74,7 @@ public class MultiProgressMonitor implements ProgressMonitor {
             try {
                 delegate.reportProgress(message);
             } catch (Exception e) {
-                // Don't let one delegate's failure break others
+                LOG.warnf(e, "Progress delegate failed");
             }
         }
     }
@@ -82,7 +85,7 @@ public class MultiProgressMonitor implements ProgressMonitor {
             try {
                 delegate.setComplete();
             } catch (Exception e) {
-                // Don't let one delegate's failure break others
+                LOG.warnf(e, "Progress delegate failed");
             }
         }
     }
@@ -142,7 +145,7 @@ public class MultiProgressMonitor implements ProgressMonitor {
             try {
                 delegate.addStep(stepId, weight);
             } catch (Exception e) {
-                // Don't let one delegate's failure break others
+                LOG.warnf(e, "Progress delegate failed");
             }
         }
         return this;
@@ -170,7 +173,7 @@ public class MultiProgressMonitor implements ProgressMonitor {
             try {
                 delegate.completeStep(stepId);
             } catch (Exception e) {
-                // Don't let one delegate's failure break others
+                LOG.warnf(e, "Progress delegate failed");
             }
         }
     }
@@ -181,7 +184,7 @@ public class MultiProgressMonitor implements ProgressMonitor {
             try {
                 delegate.startTask(taskId);
             } catch (Exception e) {
-                // Don't let one delegate's failure break others
+                LOG.warnf(e, "Progress delegate failed");
             }
         }
         return taskId;
@@ -193,7 +196,7 @@ public class MultiProgressMonitor implements ProgressMonitor {
             try {
                 delegate.endTask(taskId);
             } catch (Exception e) {
-                // Don't let one delegate's failure break others
+                LOG.warnf(e, "Progress delegate failed");
             }
         }
     }
@@ -204,7 +207,7 @@ public class MultiProgressMonitor implements ProgressMonitor {
             try {
                 delegate.cancel(taskId);
             } catch (Exception e) {
-                // Don't let one delegate's failure break others
+                LOG.warnf(e, "Progress delegate failed");
             }
         }
     }

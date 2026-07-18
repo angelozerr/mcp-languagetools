@@ -10,7 +10,7 @@
  ******************************************************************************/
 package com.ibm.mcp.languagetools.lsp.client.capabilities;
 
-import com.ibm.mcp.languagetools.lsp.client.files.PathPatternMatcher;
+import com.ibm.mcp.languagetools.language.PathPatternMatcher;
 import org.eclipse.lsp4j.DocumentFilter;
 
 import java.util.Collections;
