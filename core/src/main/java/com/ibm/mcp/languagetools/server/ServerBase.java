@@ -2,7 +2,7 @@ package com.ibm.mcp.languagetools.server;
 
 import com.ibm.mcp.languagetools.client.BindEndpointSupport;
 import com.ibm.mcp.languagetools.dap.session.DapSession;
-import com.ibm.mcp.languagetools.settings.ServerTrace;
+import com.ibm.mcp.languagetools.configuration.ServerTrace;
 import com.ibm.mcp.languagetools.trace.TraceCollector;
 import com.ibm.mcp.languagetools.trace.TracingMessageConsumer;
 import com.ibm.mcp.languagetools.workspace.Workspace;

@@ -10,7 +10,7 @@ import com.ibm.mcp.languagetools.lsp.client.LspClientFeatures;
 import com.ibm.mcp.languagetools.progress.ProgressMonitor;
 import com.ibm.mcp.languagetools.server.ServerBase;
 import com.ibm.mcp.languagetools.server.ServerStatus;
-import com.ibm.mcp.languagetools.settings.ServerTrace;
+import com.ibm.mcp.languagetools.configuration.ServerTrace;
 import com.ibm.mcp.languagetools.trace.TraceCollector;
 import com.ibm.mcp.languagetools.utils.JsonUtils;
 import com.ibm.mcp.languagetools.workspace.Workspace;
@@ -688,18 +688,14 @@ public class LspServer extends ServerBase<LspServerConfig> {
      */
     private void startFileWatcher(String workspacePath) {
         var config = super.getConfig();
-        try {
-            fileWatcher = new InstanceFileWatcher(
-                    workspacePath,
-                    config.getServerId(),
-                    this::handleInstanceChanged,
-                    this::handleInstanceRemoved
-            );
-            fileWatcher.start();
-            LOG.infof("Started instance file watcher for %s", config.getServerId());
-        } catch (IOException e) {
-            LOG.warnf("Failed to start instance file watcher: %s", e.getMessage());
-        }
+        fileWatcher = new InstanceFileWatcher(
+                workspacePath,
+                config.getServerId(),
+                this::handleInstanceChanged,
+                this::handleInstanceRemoved
+        );
+        fileWatcher.start();
+        LOG.infof("Started instance file watcher for %s", config.getServerId());
     }
 
     /**
@@ -810,7 +806,7 @@ public class LspServer extends ServerBase<LspServerConfig> {
 
     @Override
     public ServerTrace getServerTrace() {
-        return getWorkspace().getApplication().getApplicationConfiguration().getLspTraceLevel(getConfig().getServerId());
+        return getWorkspace().getApplication().getLspTraceLevel(getConfig().getServerId());
     }
 
     /**

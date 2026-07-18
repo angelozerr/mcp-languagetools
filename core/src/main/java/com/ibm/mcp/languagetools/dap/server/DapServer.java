@@ -8,7 +8,7 @@ import com.ibm.mcp.languagetools.dap.transport.TransportStreams;
 import com.ibm.mcp.languagetools.progress.ProgressMonitor;
 import com.ibm.mcp.languagetools.server.ServerBase;
 import com.ibm.mcp.languagetools.server.ServerStatus;
-import com.ibm.mcp.languagetools.settings.ServerTrace;
+import com.ibm.mcp.languagetools.configuration.ServerTrace;
 import com.ibm.mcp.languagetools.trace.TraceCollector;
 import com.ibm.mcp.languagetools.workspace.Workspace;
 import org.eclipse.lsp4j.debug.InitializeRequestArguments;
@@ -56,7 +56,7 @@ public class DapServer extends ServerBase<DapServerConfig> {
 
     @Override
     public ServerTrace getServerTrace() {
-        return getWorkspace().getApplication().getApplicationConfiguration().getDapTraceLevel(getConfig().getServerId());
+        return getWorkspace().getApplication().getDapTraceLevel(getConfig().getServerId());
     }
 
     /**

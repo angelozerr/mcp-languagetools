@@ -1,42 +1,107 @@
 package com.ibm.mcp.languagetools.workspace;
 
-import com.ibm.mcp.languagetools.settings.AbstractConfiguration;
+import com.ibm.mcp.languagetools.configuration.AbstractConfiguration;
+import com.ibm.mcp.languagetools.configuration.FileWatcher;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Workspace configuration reader.
- * Reads settings from .vscode/settings.json or .bob/settings.json (first found).
+ * Loads settings from provider-supplied files (e.g., .vscode/settings.json, .bob/settings.json)
+ * using a configurable strategy (first-found or merge).
  */
 public class WorkspaceConfiguration extends AbstractConfiguration {
 
-    private static final String SETTINGS_FILE = "settings.json";
-
     private final Path workspaceRoot;
+    private final List<WorkspaceConfigurationProvider> providers;
+    private final WorkspaceConfigurationStrategy strategy;
+    private final List<FileWatcher> fileWatchers = new ArrayList<>();
 
-    public WorkspaceConfiguration(Path workspaceRoot) {
+    /**
+     * Creates a workspace configuration with explicit providers and strategy.
+     */
+    public WorkspaceConfiguration(Path workspaceRoot,
+                                  List<WorkspaceConfigurationProvider> providers,
+                                  WorkspaceConfigurationStrategy strategy) {
         this.workspaceRoot = workspaceRoot;
+        this.providers = providers;
+        this.strategy = strategy;
         load();
+    }
+
+    /**
+     * Creates a workspace configuration with default providers (all SPI providers, FIRST_FOUND).
+     */
+    public WorkspaceConfiguration(Path workspaceRoot) {
+        this(workspaceRoot,
+                new ArrayList<>(WorkspaceConfigurationProviderRegistry.getInstance().getProviders()),
+                WorkspaceConfigurationStrategy.FIRST_FOUND);
+    }
+
+    @Override
+    protected void load() {
+        switch (strategy) {
+            case FIRST_FOUND -> loadFirstFound();
+            case MERGE -> loadMerge();
+        }
+    }
+
+    private void loadFirstFound() {
+        for (WorkspaceConfigurationProvider provider : providers) {
+            Path file = provider.getSettingsFile(workspaceRoot);
+            if (Files.exists(file)) {
+                Map<String, Object> loaded = loadFromFile(file);
+                getSettings().clear();
+                getSettings().putAll(loaded);
+                return;
+            }
+        }
+        getSettings().clear();
+    }
+
+    private void loadMerge() {
+        Map<String, Object> merged = new HashMap<>();
+        // Load in reverse order so that first provider's values win
+        for (int i = providers.size() - 1; i >= 0; i--) {
+            Path file = providers.get(i).getSettingsFile(workspaceRoot);
+            if (Files.exists(file)) {
+                Map<String, Object> loaded = loadFromFile(file);
+                merged.putAll(loaded);
+            }
+        }
+        getSettings().clear();
+        getSettings().putAll(merged);
     }
 
     @Override
     protected Path getSettingsFile() {
-        Path vscodeSettings = workspaceRoot.resolve(".vscode").resolve(SETTINGS_FILE);
-        if (Files.exists(vscodeSettings)) {
-            return vscodeSettings;
+        for (WorkspaceConfigurationProvider provider : providers) {
+            Path file = provider.getSettingsFile(workspaceRoot);
+            if (Files.exists(file)) {
+                return file;
+            }
         }
-        Path bobSettings = workspaceRoot.resolve(".bob").resolve(SETTINGS_FILE);
-        if (Files.exists(bobSettings)) {
-            return bobSettings;
-        }
-        return vscodeSettings;
+        return providers.isEmpty() ? null : providers.get(0).getSettingsFile(workspaceRoot);
     }
 
-    /**
-     * Reload settings from disk.
-     */
-    public void reload() {
-        load();
+    @Override
+    public void watch() {
+        for (WorkspaceConfigurationProvider provider : providers) {
+            Path file = provider.getSettingsFile(workspaceRoot);
+            FileWatcher watcher = new FileWatcher(file, this::reload);
+            watcher.start();
+            fileWatchers.add(watcher);
+        }
+    }
+
+    @Override
+    public void unwatch() {
+        fileWatchers.forEach(FileWatcher::stop);
+        fileWatchers.clear();
     }
 }

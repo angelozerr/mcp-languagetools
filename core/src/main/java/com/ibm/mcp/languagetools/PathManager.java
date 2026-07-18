@@ -1,6 +1,6 @@
 package com.ibm.mcp.languagetools;
 
-import com.ibm.mcp.languagetools.settings.PathConfig;
+import com.ibm.mcp.languagetools.configuration.PathConfig;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 

@@ -9,7 +9,7 @@ import com.ibm.mcp.languagetools.dap.session.DapSessionEvent;
 import com.ibm.mcp.languagetools.dap.session.DapSessionManager;
 import com.ibm.mcp.languagetools.lsp.server.LspServerStatusChangeEvent;
 import com.ibm.mcp.languagetools.server.ServerStatus;
-import com.ibm.mcp.languagetools.settings.ApplicationConfiguration;
+import com.ibm.mcp.languagetools.configuration.ApplicationConfiguration;
 import com.ibm.mcp.languagetools.trace.TraceMessage;
 import com.ibm.mcp.languagetools.workspace.Workspace;
 import com.ibm.mcp.languagetools.workspace.WorkspaceChangeEvent;

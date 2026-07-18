@@ -2,6 +2,7 @@ package com.ibm.mcp.languagetools.workspace;
 
 import com.ibm.mcp.languagetools.Application;
 import com.ibm.mcp.languagetools.dap.server.DapServerConfig;
+import com.ibm.mcp.languagetools.configuration.Configuration;
 import com.ibm.mcp.languagetools.installer.InstallationException;
 import com.ibm.mcp.languagetools.lsp.LspInstanceRegistry;
 import com.ibm.mcp.languagetools.lsp.server.LspServer;
@@ -63,7 +64,10 @@ public class Workspace {
         this.normalizedRootUriString = rootUri.toString();
         this.application = application;
         this.lspTraceCollector = application.getLspTraceCollector();
-        this.configuration = new WorkspaceConfiguration(rootPath);
+        this.configuration = new WorkspaceConfiguration(rootPath,
+                application.getWorkspaceConfigurationProviders(),
+                application.getWorkspaceConfigurationStrategy());
+        this.configuration.watch();
     }
 
     /**
@@ -333,6 +337,7 @@ public class Workspace {
                 .allOf(futures.toArray(new CompletableFuture[0]))
                 .thenRun(() -> {
                     lspServers.clear();
+                    configuration.unwatch();
                     LOG.infof("Workspace shut down: %s", rootUri);
                 });
     }
@@ -401,9 +406,9 @@ public class Workspace {
 
 
     /**
-     * Get workspace configuration (reads from .vscode/settings.json).
+     * Get workspace configuration.
      */
-    public WorkspaceConfiguration getConfiguration() {
+    public Configuration getConfiguration() {
         return configuration;
     }
 

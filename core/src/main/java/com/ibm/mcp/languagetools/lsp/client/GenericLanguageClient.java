@@ -92,9 +92,7 @@ public class GenericLanguageClient extends BindEndpointSupport implements Langua
 
     @Override
     public CompletableFuture<List<Object>> configuration(ConfigurationParams configurationParams) {
-        List<Object> settings = configurationParams.getItems().stream()
-                .map(item -> (Object) null)
-                .toList();
-        return CompletableFuture.completedFuture(settings);
+        var workspaceConfig = lspServer.getWorkspace().getConfiguration();
+        return CompletableFuture.completedFuture(workspaceConfig.find(configurationParams.getItems()));
     }
 }

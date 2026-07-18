@@ -17,12 +17,17 @@ import com.ibm.mcp.languagetools.server.ServerConfigBase;
 import com.ibm.mcp.languagetools.server.ServerConfigInstalledEvent;
 import com.ibm.mcp.languagetools.server.ServerConfigListener;
 import com.ibm.mcp.languagetools.server.ServerDescriptorRegistry;
-import com.ibm.mcp.languagetools.settings.ApplicationConfiguration;
+import com.ibm.mcp.languagetools.configuration.ApplicationConfiguration;
+import com.ibm.mcp.languagetools.configuration.Configuration;
+import com.ibm.mcp.languagetools.configuration.ServerTrace;
 import com.ibm.mcp.languagetools.trace.NoOpTraceCollectorFactory;
 import com.ibm.mcp.languagetools.trace.TraceCollector;
 import com.ibm.mcp.languagetools.trace.TraceCollectorFactory;
 import com.ibm.mcp.languagetools.workspace.Workspace;
 import com.ibm.mcp.languagetools.workspace.WorkspaceChangeEvent;
+import com.ibm.mcp.languagetools.workspace.WorkspaceConfigurationProvider;
+import com.ibm.mcp.languagetools.workspace.WorkspaceConfigurationProviderRegistry;
+import com.ibm.mcp.languagetools.workspace.WorkspaceConfigurationStrategy;
 import io.quarkus.runtime.ShutdownEvent;
 import io.quarkus.runtime.StartupEvent;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -469,8 +474,33 @@ public class Application {
         return pathManager;
     }
 
-    public ApplicationConfiguration getApplicationConfiguration() {
+    public Configuration getConfiguration() {
         return applicationConfiguration;
+    }
+
+    public List<WorkspaceConfigurationProvider> getWorkspaceConfigurationProviders() {
+        List<String> ids = applicationConfiguration.getWorkspaceConfigurationProviderIds();
+        WorkspaceConfigurationProviderRegistry registry = WorkspaceConfigurationProviderRegistry.getInstance();
+        List<WorkspaceConfigurationProvider> providers = new ArrayList<>();
+        for (String id : ids) {
+            WorkspaceConfigurationProvider provider = registry.getProvider(id);
+            if (provider != null) {
+                providers.add(provider);
+            }
+        }
+        return providers;
+    }
+
+    public WorkspaceConfigurationStrategy getWorkspaceConfigurationStrategy() {
+        return applicationConfiguration.getWorkspaceConfigurationStrategy();
+    }
+
+    public ServerTrace getLspTraceLevel(String serverId) {
+        return applicationConfiguration.getLspTraceLevel(serverId);
+    }
+
+    public ServerTrace getDapTraceLevel(String serverId) {
+        return applicationConfiguration.getDapTraceLevel(serverId);
     }
 
     // LSP servers

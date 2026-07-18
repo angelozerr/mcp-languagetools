@@ -1,8 +1,8 @@
 package com.ibm.mcp.languagetools.mcp.trace;
 
 import com.ibm.mcp.languagetools.Application;
-import com.ibm.mcp.languagetools.settings.ApplicationConfiguration;
-import com.ibm.mcp.languagetools.settings.ServerTrace;
+import com.ibm.mcp.languagetools.configuration.ApplicationConfiguration;
+import com.ibm.mcp.languagetools.configuration.ServerTrace;
 import io.quarkiverse.mcp.server.McpConnection;
 import io.quarkiverse.mcp.server.McpTrafficListener;
 import io.quarkiverse.mcp.server.RawMessage;

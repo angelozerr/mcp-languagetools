@@ -1,4 +1,4 @@
-package com.ibm.mcp.languagetools.settings;
+package com.ibm.mcp.languagetools.configuration;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -8,10 +8,15 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
 
+import com.ibm.mcp.languagetools.workspace.WorkspaceConfigurationProviderRegistry;
+import com.ibm.mcp.languagetools.workspace.WorkspaceConfigurationStrategy;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -35,6 +40,7 @@ public class ApplicationConfiguration extends AbstractConfiguration {
     @PostConstruct
     void init() {
         load();
+        watch();
     }
 
     @Override
@@ -70,6 +76,29 @@ public class ApplicationConfiguration extends AbstractConfiguration {
             }
         }
         return result;
+    }
+
+    // ========== Workspace configuration providers ==========
+
+    @SuppressWarnings("unchecked")
+    public List<String> getWorkspaceConfigurationProviderIds() {
+        Object value = get("workspace.configuration.providers");
+        if (value instanceof List) {
+            return (List<String>) value;
+        }
+        return WorkspaceConfigurationProviderRegistry.getInstance().getProviderIds();
+    }
+
+    public WorkspaceConfigurationStrategy getWorkspaceConfigurationStrategy() {
+        String value = getString("workspace.configuration.strategy");
+        if (value != null) {
+            try {
+                return WorkspaceConfigurationStrategy.valueOf(value.toUpperCase().replace('-', '_'));
+            } catch (IllegalArgumentException e) {
+                LOG.warnf("Unknown workspace configuration strategy: %s, using FIRST_FOUND", value);
+            }
+        }
+        return WorkspaceConfigurationStrategy.FIRST_FOUND;
     }
 
     // ========== LSP trace ==========

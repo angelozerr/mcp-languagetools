@@ -1,4 +1,4 @@
-package com.ibm.mcp.languagetools.settings;
+package com.ibm.mcp.languagetools.configuration;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import org.eclipse.microprofile.config.inject.ConfigProperty;

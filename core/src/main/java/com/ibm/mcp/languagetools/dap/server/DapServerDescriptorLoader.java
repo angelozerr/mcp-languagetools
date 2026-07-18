@@ -3,7 +3,7 @@ package com.ibm.mcp.languagetools.dap.server;
 import com.google.gson.JsonObject;
 import com.ibm.mcp.languagetools.Application;
 import com.ibm.mcp.languagetools.server.ServerDescriptorLoaderBase;
-import com.ibm.mcp.languagetools.settings.PathConfig;
+import com.ibm.mcp.languagetools.configuration.PathConfig;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.jboss.logging.Logger;
 

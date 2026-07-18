@@ -1,4 +1,4 @@
-package com.ibm.mcp.languagetools.settings;
+package com.ibm.mcp.languagetools.configuration;
 
 /**
  * Server trace level (like VS Code trace setting).
