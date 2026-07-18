@@ -2,7 +2,6 @@ package com.ibm.mcp.languagetools.settings;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.google.gson.reflect.TypeToken;
 import com.ibm.mcp.languagetools.PathManager;
 import jakarta.annotation.PostConstruct;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -21,15 +20,13 @@ import java.util.concurrent.ConcurrentHashMap;
  * with a flat key-value format (e.g. "lsp.microprofile.trace": "messages").
  */
 @ApplicationScoped
-public class Settings {
+public class ApplicationConfiguration extends AbstractConfiguration {
 
-    private static final Logger LOG = Logger.getLogger(Settings.class);
-    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
+    private static final Logger LOG = Logger.getLogger(ApplicationConfiguration.class);
+    private static final Gson PRETTY_GSON = new GsonBuilder().setPrettyPrinting().create();
 
     @Inject
     PathManager pathManager;
-
-    private Map<String, String> settings;
 
     private final Map<String, ServerTrace> lspTraceLevels = new ConcurrentHashMap<>();
     private final Map<String, ServerTrace> dapTraceLevels = new ConcurrentHashMap<>();
@@ -40,40 +37,22 @@ public class Settings {
         load();
     }
 
-    private Path getSettingsFile() {
+    @Override
+    protected Path getSettingsFile() {
         return pathManager.getSettingsFile();
     }
 
-    private void load() {
-        Path settingsFile = getSettingsFile();
-        if (Files.exists(settingsFile)) {
-            loadFromFile(settingsFile);
-            return;
-        }
+    // ========== Write support ==========
 
-        LOG.infof("No settings found at %s, using defaults", settingsFile);
-        settings = new LinkedHashMap<>();
-    }
-
-    private void loadFromFile(Path file) {
-        try {
-            String json = Files.readString(file);
-            TypeToken<Map<String, String>> typeToken = new TypeToken<>() {};
-            settings = GSON.fromJson(json, typeToken.getType());
-            if (settings == null) {
-                settings = new LinkedHashMap<>();
-            }
-            LOG.infof("Loaded settings from %s", file);
-        } catch (IOException e) {
-            LOG.warnf(e, "Failed to load settings from %s", file);
-            settings = new LinkedHashMap<>();
-        }
+    public synchronized void set(String key, String value) {
+        getSettings().put(key, value);
+        save();
     }
 
     private synchronized void save() {
         try {
             Files.createDirectories(getSettingsFile().getParent());
-            String json = GSON.toJson(settings);
+            String json = PRETTY_GSON.toJson(getSettings());
             Files.writeString(getSettingsFile(), json);
             LOG.infof("Saved settings to %s", getSettingsFile());
         } catch (IOException e) {
@@ -81,26 +60,13 @@ public class Settings {
         }
     }
 
-    // ========== Generic get/set ==========
-
-    public String get(String key) {
-        return settings.get(key);
-    }
-
-    public String get(String key, String defaultValue) {
-        return settings.getOrDefault(key, defaultValue);
-    }
-
-    public synchronized void set(String key, String value) {
-        settings.put(key, value);
-        save();
-    }
+    // ========== Trace entries ==========
 
     public Map<String, String> getTraceLevelEntries() {
         Map<String, String> result = new LinkedHashMap<>();
-        for (Map.Entry<String, String> entry : settings.entrySet()) {
+        for (Map.Entry<String, Object> entry : getSettings().entrySet()) {
             if (entry.getKey().endsWith(".trace")) {
-                result.put(entry.getKey(), entry.getValue());
+                result.put(entry.getKey(), String.valueOf(entry.getValue()));
             }
         }
         return result;
@@ -110,7 +76,7 @@ public class Settings {
 
     public ServerTrace getLspTraceLevel(String serverId) {
         return lspTraceLevels.computeIfAbsent(serverId,
-                id -> ServerTrace.fromValue(settings.get("lsp." + id + ".trace")));
+                id -> ServerTrace.fromValue(getString("lsp." + id + ".trace")));
     }
 
     public void setLspTraceLevel(String serverId, ServerTrace level) {
@@ -125,7 +91,7 @@ public class Settings {
         if (cached != null) {
             return cached;
         }
-        cached = ServerTrace.fromValue(settings.get("mcp.trace"));
+        cached = ServerTrace.fromValue(getString("mcp.trace"));
         mcpTraceLevel = cached;
         return cached;
     }
@@ -139,7 +105,7 @@ public class Settings {
 
     public ServerTrace getDapTraceLevel(String serverId) {
         return dapTraceLevels.computeIfAbsent(serverId,
-                id -> ServerTrace.fromValue(settings.get("dap." + id + ".trace")));
+                id -> ServerTrace.fromValue(getString("dap." + id + ".trace")));
     }
 
     public void setDapTraceLevel(String serverId, ServerTrace level) {

@@ -3,8 +3,8 @@ package com.ibm.mcp.languagetools.admin;
 import com.google.gson.JsonParser;
 import com.ibm.mcp.languagetools.Application;
 import com.ibm.mcp.languagetools.admin.ws.TraceLevelWsMessage;
+import com.ibm.mcp.languagetools.settings.ApplicationConfiguration;
 import com.ibm.mcp.languagetools.settings.ServerTrace;
-import com.ibm.mcp.languagetools.settings.Settings;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Event;
 import jakarta.inject.Inject;
@@ -21,7 +21,7 @@ public class TraceResource {
     Application application;
 
     @Inject
-    Settings settings;
+    ApplicationConfiguration applicationConfiguration;
 
     @Inject
     Event<TraceLevelWsMessage> traceLevelEvent;
@@ -54,7 +54,7 @@ public class TraceResource {
     public Response setLspTraceLevel(@PathParam("serverId") String serverId, String body) {
         try {
             ServerTrace level = parseTraceLevel(body);
-            settings.setLspTraceLevel(serverId, level);
+            applicationConfiguration.setLspTraceLevel(serverId, level);
             traceLevelEvent.fire(new TraceLevelWsMessage("lsp", serverId, level.toString()));
             return Response.noContent().build();
         } catch (Exception e) {
@@ -72,7 +72,7 @@ public class TraceResource {
     public Response setDapTraceLevel(@PathParam("serverId") String serverId, String body) {
         try {
             ServerTrace level = parseTraceLevel(body);
-            settings.setDapTraceLevel(serverId, level);
+            applicationConfiguration.setDapTraceLevel(serverId, level);
             traceLevelEvent.fire(new TraceLevelWsMessage("dap", serverId, level.toString()));
             return Response.noContent().build();
         } catch (Exception e) {
@@ -90,7 +90,7 @@ public class TraceResource {
     public Response setMcpTraceLevel(String body) {
         try {
             ServerTrace level = parseTraceLevel(body);
-            settings.setMcpTraceLevel(level);
+            applicationConfiguration.setMcpTraceLevel(level);
             traceLevelEvent.fire(new TraceLevelWsMessage("mcp", null, level.toString()));
             return Response.noContent().build();
         } catch (Exception e) {

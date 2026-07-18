@@ -17,7 +17,7 @@ import com.ibm.mcp.languagetools.server.ServerConfigBase;
 import com.ibm.mcp.languagetools.server.ServerConfigInstalledEvent;
 import com.ibm.mcp.languagetools.server.ServerConfigListener;
 import com.ibm.mcp.languagetools.server.ServerDescriptorRegistry;
-import com.ibm.mcp.languagetools.settings.Settings;
+import com.ibm.mcp.languagetools.settings.ApplicationConfiguration;
 import com.ibm.mcp.languagetools.trace.NoOpTraceCollectorFactory;
 import com.ibm.mcp.languagetools.trace.TraceCollector;
 import com.ibm.mcp.languagetools.trace.TraceCollectorFactory;
@@ -56,7 +56,7 @@ public class Application {
     PathManager pathManager;
 
     @Inject
-    Settings settings;
+    ApplicationConfiguration applicationConfiguration;
 
     @Inject
     ServerDescriptorRegistry serverDescriptorRegistry;
@@ -469,8 +469,8 @@ public class Application {
         return pathManager;
     }
 
-    public Settings getSettings() {
-        return settings;
+    public ApplicationConfiguration getApplicationConfiguration() {
+        return applicationConfiguration;
     }
 
     // LSP servers

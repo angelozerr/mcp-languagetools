@@ -1,8 +1,8 @@
 package com.ibm.mcp.languagetools.mcp.trace;
 
 import com.ibm.mcp.languagetools.Application;
+import com.ibm.mcp.languagetools.settings.ApplicationConfiguration;
 import com.ibm.mcp.languagetools.settings.ServerTrace;
-import com.ibm.mcp.languagetools.settings.Settings;
 import io.quarkiverse.mcp.server.McpConnection;
 import io.quarkiverse.mcp.server.McpTrafficListener;
 import io.quarkiverse.mcp.server.RawMessage;
@@ -16,12 +16,12 @@ public class McpTraceTrafficListener implements McpTrafficListener {
     Application application;
 
     @Inject
-    Settings settings;
+    ApplicationConfiguration applicationConfiguration;
 
     @Override
     public void onMessageReceived(RawMessage message, McpConnection connection) {
         McpTraceCollector traceCollector = application.getMcpTraceCollector();
-        if (traceCollector.isEnabled() && settings.getMcpTraceLevel() != ServerTrace.off) {
+        if (traceCollector.isEnabled() && applicationConfiguration.getMcpTraceLevel() != ServerTrace.off) {
             traceCollector.addTrace(McpTraceDirection.RECEIVED, message, connection);
         }
     }
@@ -29,7 +29,7 @@ public class McpTraceTrafficListener implements McpTrafficListener {
     @Override
     public void onMessageSent(RawMessage message, McpConnection connection) {
         McpTraceCollector traceCollector = application.getMcpTraceCollector();
-        if (traceCollector.isEnabled() && settings.getMcpTraceLevel() != ServerTrace.off) {
+        if (traceCollector.isEnabled() && applicationConfiguration.getMcpTraceLevel() != ServerTrace.off) {
             traceCollector.addTrace(McpTraceDirection.SENT, message, connection);
         }
     }

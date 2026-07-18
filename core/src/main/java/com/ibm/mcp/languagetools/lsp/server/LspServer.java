@@ -810,7 +810,7 @@ public class LspServer extends ServerBase<LspServerConfig> {
 
     @Override
     public ServerTrace getServerTrace() {
-        return getWorkspace().getApplication().getSettings().getLspTraceLevel(getConfig().getServerId());
+        return getWorkspace().getApplication().getApplicationConfiguration().getLspTraceLevel(getConfig().getServerId());
     }
 
     /**

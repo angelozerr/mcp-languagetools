@@ -9,7 +9,7 @@ import com.ibm.mcp.languagetools.dap.session.DapSessionEvent;
 import com.ibm.mcp.languagetools.dap.session.DapSessionManager;
 import com.ibm.mcp.languagetools.lsp.server.LspServerStatusChangeEvent;
 import com.ibm.mcp.languagetools.server.ServerStatus;
-import com.ibm.mcp.languagetools.settings.Settings;
+import com.ibm.mcp.languagetools.settings.ApplicationConfiguration;
 import com.ibm.mcp.languagetools.trace.TraceMessage;
 import com.ibm.mcp.languagetools.workspace.Workspace;
 import com.ibm.mcp.languagetools.workspace.WorkspaceChangeEvent;
@@ -57,7 +57,7 @@ public class AdminWebSocketEndpoint {
     AdminProgressBroadcaster progressBroadcaster;
 
     @Inject
-    Settings settings;
+    ApplicationConfiguration applicationConfiguration;
 
     // Thread-safe set of active WebSocket sessions
     private final Set<Session> sessions = Collections.newSetFromMap(new ConcurrentHashMap<>());
@@ -252,7 +252,7 @@ public class AdminWebSocketEndpoint {
      */
     private void sendTraceLevels(Session session) {
         try {
-            for (var entry : settings.getTraceLevelEntries().entrySet()) {
+            for (var entry : applicationConfiguration.getTraceLevelEntries().entrySet()) {
                 String key = entry.getKey();
                 String traceLevel = entry.getValue();
                 TraceLevelWsMessage msg = parseTraceLevelKey(key, traceLevel);
