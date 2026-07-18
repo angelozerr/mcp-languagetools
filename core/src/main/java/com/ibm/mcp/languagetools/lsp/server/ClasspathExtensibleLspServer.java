@@ -1,11 +1,16 @@
 package com.ibm.mcp.languagetools.lsp.server;
 
+import com.ibm.mcp.languagetools.ContributionManager;
+import com.ibm.mcp.languagetools.progress.ProgressMonitor;
+import com.ibm.mcp.languagetools.server.ServerConfigBase;
+import com.ibm.mcp.languagetools.trace.TraceCollector;
 import com.ibm.mcp.languagetools.workspace.Workspace;
 import org.jboss.logging.Logger;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Generic LSP server that supports classpath extensions.
@@ -23,6 +28,56 @@ public class ClasspathExtensibleLspServer extends LspServer {
 
     public ClasspathExtensibleLspServer(LspServerConfig config, Workspace workspace) {
         super(config, workspace);
+    }
+
+    @Override
+    protected CompletableFuture<Void> ensureContributorsInstalled(ProgressMonitor progressMonitor) {
+        LOG.infof("ensureContributorsInstalled() called for %s", getId());
+        ContributionManager.ContributionResult result = getWorkspace()
+                .getApplication()
+                .getContributionManager()
+                .extractFilesFromContributionWithStatus(getId(), ClasspathExtensibleContributes.CLASSPATH);
+
+        List<ServerConfigBase> contributors = result.getUninstalledContributors();
+        if (contributors.isEmpty()) {
+            LOG.infof("No uninstalled contributors found for %s", getId());
+            return CompletableFuture.completedFuture(null);
+        }
+
+        LOG.infof("Installing %d contributor(s) for %s", contributors.size(), getId());
+        var application = getWorkspace().getApplication();
+        var pathManager = application.getPathManager();
+        var traceCollector = getConfig().getTraceCollector();
+        if (traceCollector != null && traceCollector.isEnabled()) {
+            traceCollector.addTrace(getId(),
+                    String.format("Installing %d contributor(s)...", contributors.size()),
+                    TraceCollector.MessageType.INFO);
+        }
+        CompletableFuture<?>[] futures = contributors.stream()
+                .map(contributor -> {
+                    LOG.infof("Installing contributor '%s' classpath extensions for %s",
+                            contributor.getServerId(), getId());
+                    if (contributor.isContributionOnly() && contributor.getTraceCollector() == null && traceCollector != null) {
+                        contributor.setTraceCollector(traceCollector);
+                    }
+                    return contributor.ensureInstalled(pathManager, null, progressMonitor)
+                            .exceptionally(error -> {
+                                LOG.warnf(error, "Failed to install contributor '%s' for %s, continuing without it",
+                                        contributor.getServerId(), getId());
+                                return null;
+                            });
+                })
+                .toArray(CompletableFuture[]::new);
+
+        return CompletableFuture.allOf(futures)
+                .thenRun(() -> {
+                    LOG.infof("All %d contributor(s) installed for %s", contributors.size(), getId());
+                    if (traceCollector != null && traceCollector.isEnabled()) {
+                        traceCollector.addTrace(getId(),
+                                String.format("All %d contributor(s) installed.", contributors.size()),
+                                TraceCollector.MessageType.INFO);
+                    }
+                });
     }
 
     /**

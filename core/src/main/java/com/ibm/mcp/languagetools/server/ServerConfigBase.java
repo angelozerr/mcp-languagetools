@@ -44,6 +44,11 @@ public abstract class ServerConfigBase implements ServerConfig {
      */
     private Contributes contributes;
 
+    /**
+     * Contribution types this server accepts from other servers (e.g. ["classpath"], ["bundles"]).
+     */
+    private List<String> acceptContributions;
+
     // Trace collector (set by workspace/session when server is added)
     protected TraceCollector traceCollector;
 
@@ -224,6 +229,18 @@ public abstract class ServerConfigBase implements ServerConfig {
 
     public void setContributes(Contributes contributes) {
         this.contributes = contributes;
+    }
+
+    public List<String> getAcceptContributions() {
+        return acceptContributions;
+    }
+
+    public void setAcceptContributions(List<String> acceptContributions) {
+        this.acceptContributions = acceptContributions;
+    }
+
+    public boolean acceptsContribution(String contributionType) {
+        return acceptContributions != null && acceptContributions.contains(contributionType);
     }
 
     public String getCommand() {

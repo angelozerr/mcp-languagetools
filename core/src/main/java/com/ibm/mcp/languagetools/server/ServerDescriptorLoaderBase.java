@@ -45,6 +45,7 @@ public abstract class ServerDescriptorLoaderBase<T extends ServerConfigBase> {
     private static final String FIELD_SCHEME = "scheme";
     private static final String FIELD_PATTERN = "pattern";
     private static final String FIELD_CONTRIBUTES = "contributes";
+    private static final String FIELD_ACCEPT_CONTRIBUTIONS = "acceptContributions";
     private static final String FIELD_ENV = "env";
     private static final String FIELD_WORKING_DIRECTORY = "workingDirectory";
     protected final Gson gson = new Gson();
@@ -146,6 +147,15 @@ public abstract class ServerDescriptorLoaderBase<T extends ServerConfigBase> {
 
         // Contributions
         fillContributions(config, jsonObject);
+
+        // Accept contributions
+        if (jsonObject.has(FIELD_ACCEPT_CONTRIBUTIONS)) {
+            List<String> acceptContributions = new ArrayList<>();
+            jsonObject.getAsJsonArray(FIELD_ACCEPT_CONTRIBUTIONS).forEach(el ->
+                    acceptContributions.add(el.getAsString())
+            );
+            config.setAcceptContributions(acceptContributions);
+        }
 
         // Environment variables
         if (jsonObject.has(FIELD_ENV)) {

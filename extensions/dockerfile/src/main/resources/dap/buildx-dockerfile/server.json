@@ -8,10 +8,7 @@
     "default": "docker buildx dap build"
   },
   "env": {
-    "includeSystemEnvironmentVariables": true,
-    "variables": {
-      "BUILDX_EXPERIMENTAL": "1"
-    }
+    "BUILDX_EXPERIMENTAL": "1"
   },
   "documentSelector": [
     {

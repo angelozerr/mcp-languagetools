@@ -5,7 +5,7 @@ import org.jboss.logging.Logger;
 
 /**
  * Factory for creating ClasspathExtensibleLspServer instances.
- * Handles servers that have contributions with classpath extensions.
+ * Handles servers that declare "acceptContributions": ["classpath"] in their server.json.
  */
 public class ClasspathExtensibleLspServerFactory implements LspServerFactory {
 
@@ -13,31 +13,10 @@ public class ClasspathExtensibleLspServerFactory implements LspServerFactory {
 
     @Override
     public boolean canHandle(LspServerConfig config, Workspace workspace) {
-        // This factory handles servers that receive classpath contributions
-        if (config == null || config.isContributionOnly() || config.getCommand() == null) {
+        if (config == null || config.isContributionOnly()) {
             return false;
         }
-
-        String serverId = config.getServerId();
-
-        // Check all LSP server configs to see if any contributes classpath to this serverId
-        return workspace.getApplication().getLspServerConfigs().stream()
-            .filter(otherConfig -> !otherConfig.getServerId().equals(serverId))
-            .anyMatch(otherConfig -> {
-                var contributes = otherConfig.getContributes();
-                if (contributes == null || contributes.getContributions() == null) {
-                    return false;
-                }
-
-                var contribution = contributes.getContribution(serverId);
-                if (contribution == null || !contribution.isJsonObject()) {
-                    return false;
-                }
-
-                var obj = contribution.getAsJsonObject();
-                return obj.has(ClasspathExtensibleContributes.CLASSPATH)
-                    && obj.get(ClasspathExtensibleContributes.CLASSPATH).isJsonArray();
-            });
+        return config.acceptsContribution(ClasspathExtensibleContributes.CLASSPATH);
     }
 
     @Override

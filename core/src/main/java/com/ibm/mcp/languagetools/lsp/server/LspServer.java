@@ -90,9 +90,10 @@ public class LspServer extends ServerBase<LspServerConfig> {
 
         var config = super.getConfig();
 
-        // Ensure server is installed first
+        // Ensure server and its contributors are installed first
         return withErrorLogging(
                 config.ensureInstalled(getWorkspace().getApplication().getPathManager(), this::setStatus, progressMonitor)
+                        .thenCompose(v -> ensureContributorsInstalled(progressMonitor))
                         .thenCompose(v -> CompletableFuture.runAsync(() -> {
                             // Try to find existing instance first
                             String workspacePath = Paths.get(workspaceRoot).toString();
@@ -137,9 +138,10 @@ public class LspServer extends ServerBase<LspServerConfig> {
         LOG.infof("=== startManagedOnly() called for %s ===", config.getServerId());
         setStatus(ServerStatus.STARTING);
 
-        // Ensure server is installed first
+        // Ensure server and its contributors are installed first
         return withErrorLogging(
                 config.ensureInstalled(getWorkspace().getApplication().getPathManager(), this::setStatus, progressMonitor)
+                        .thenCompose(v -> ensureContributorsInstalled(progressMonitor))
                         .thenCompose(v -> CompletableFuture.runAsync(() -> {
                             LOG.infof("=== Inside CompletableFuture.runAsync for %s ===", config.getServerId());
                             String workspacePath = Paths.get(workspaceRoot).toString();
@@ -156,6 +158,14 @@ public class LspServer extends ServerBase<LspServerConfig> {
                             }
                         }, executorService))
         );
+    }
+
+    /**
+     * Hook for subclasses to install contributors before the server process is launched.
+     * Default implementation does nothing.
+     */
+    protected CompletableFuture<Void> ensureContributorsInstalled(ProgressMonitor progressMonitor) {
+        return CompletableFuture.completedFuture(null);
     }
 
     /**

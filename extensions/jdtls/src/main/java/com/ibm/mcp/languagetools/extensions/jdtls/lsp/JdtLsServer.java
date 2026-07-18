@@ -6,6 +6,7 @@ import com.ibm.mcp.languagetools.lsp.server.LspServerConfig;
 import com.ibm.mcp.languagetools.progress.ProgressMonitor;
 import com.ibm.mcp.languagetools.server.ServerConfigBase;
 import com.ibm.mcp.languagetools.server.ServerConfigInstalledEvent;
+import com.ibm.mcp.languagetools.trace.TraceCollector;
 import com.ibm.mcp.languagetools.server.ServerConfigListener;
 import com.ibm.mcp.languagetools.workspace.Workspace;
 import org.eclipse.lsp4j.services.LanguageClient;
@@ -27,11 +28,56 @@ public class JdtLsServer extends LspServer implements ServerConfigListener {
 
     private JdtLsLanguageClient jdtClient;
 
-    private CompletableFuture<Void> pendingBundleInstallations;
-    private List<ServerConfigBase> uninstalledContributors;
-
     public JdtLsServer(LspServerConfig config, Workspace workspace) {
         super(config, workspace);
+    }
+
+    @Override
+    protected CompletableFuture<Void> ensureContributorsInstalled(ProgressMonitor progressMonitor) {
+        var application = getWorkspace().getApplication();
+        application.addServerConfigListener(this);
+
+        ContributionManager.ContributionResult result = application
+                .getContributionManager()
+                .extractFilesFromContributionWithStatus(getId(), JdtLsContributes.BUNDLES);
+
+        List<ServerConfigBase> contributors = result.getUninstalledContributors();
+        if (contributors.isEmpty()) {
+            return CompletableFuture.completedFuture(null);
+        }
+
+        LOG.infof("Installing %d contributor(s) for JDT.LS", contributors.size());
+        var pathManager = application.getPathManager();
+        var traceCollector = getConfig().getTraceCollector();
+        if (traceCollector != null && traceCollector.isEnabled()) {
+            traceCollector.addTrace(getId(),
+                    String.format("Installing %d contributor(s)...", contributors.size()),
+                    TraceCollector.MessageType.INFO);
+        }
+        CompletableFuture<?>[] futures = contributors.stream()
+                .map(contributor -> {
+                    LOG.infof("Installing contributor '%s' bundles for JDT.LS", contributor.getServerId());
+                    if (contributor.isContributionOnly() && contributor.getTraceCollector() == null && traceCollector != null) {
+                        contributor.setTraceCollector(traceCollector);
+                    }
+                    return contributor.ensureInstalled(pathManager, null, progressMonitor)
+                            .exceptionally(error -> {
+                                LOG.warnf(error, "Failed to install contributor '%s' for JDT.LS, continuing without it",
+                                        contributor.getServerId());
+                                return null;
+                            });
+                })
+                .toArray(CompletableFuture[]::new);
+
+        return CompletableFuture.allOf(futures)
+                .thenRun(() -> {
+                    LOG.infof("All %d contributor(s) installed for JDT.LS", contributors.size());
+                    if (traceCollector != null && traceCollector.isEnabled()) {
+                        traceCollector.addTrace(getId(),
+                                String.format("All %d contributor(s) installed.", contributors.size()),
+                                TraceCollector.MessageType.INFO);
+                    }
+                });
     }
 
     /**
@@ -64,32 +110,15 @@ public class JdtLsServer extends LspServer implements ServerConfigListener {
             options.put("extendedClientCapabilities", extendedCaps);
         }
 
-        // Collect bundles and detect uninstalled contributors in a single pass
-        ContributionManager.ContributionResult result = getWorkspace()
+        // Contributors are already installed by ensureContributorsInstalled()
+        List<String> bundlePaths = getWorkspace()
                 .getApplication()
                 .getContributionManager()
-                .extractFilesFromContributionWithStatus(getId(), JdtLsContributes.BUNDLES);
+                .extractFilesFromContribution(getId(), JdtLsContributes.BUNDLES);
 
-        List<String> bundlePaths = result.getResolvedFiles();
         if (!bundlePaths.isEmpty()) {
             options.put(JdtLsContributes.BUNDLES, bundlePaths);
             LOG.infof("Passing %d bundles to JDT.LS via initializationOptions", bundlePaths.size());
-        }
-
-        // Start installing contributors whose bundles are not yet on disk
-        List<ServerConfigBase> contributors = result.getUninstalledContributors();
-        if (!contributors.isEmpty()) {
-            uninstalledContributors = contributors;
-            var application = getWorkspace().getApplication();
-            application.addServerConfigListener(this);
-            var pathManager = application.getPathManager();
-            CompletableFuture<?>[] futures = contributors.stream()
-                    .map(contributor -> {
-                        LOG.infof("Starting background installation of '%s' bundles for JDT.LS", contributor.getServerId());
-                        return contributor.ensureInstalled(pathManager, null, ProgressMonitor.none());
-                    })
-                    .toArray(CompletableFuture[]::new);
-            pendingBundleInstallations = CompletableFuture.allOf(futures);
         }
 
         return options.isEmpty() ? null : options;
@@ -104,26 +133,8 @@ public class JdtLsServer extends LspServer implements ServerConfigListener {
         return jdtClient;
     }
 
-    /**
-     * Called when JDT.LS reports ServiceReady.
-     * If bundle installations are pending, waits for them to complete
-     * before setting ready (reloadBundles is handled by the install listener).
-     */
     void onServiceReady() {
-        if (pendingBundleInstallations == null) {
-            setReady(true);
-            return;
-        }
-        pendingBundleInstallations
-                .thenCompose(v -> reloadBundles())
-                .whenComplete((result, error) -> {
-                    if (error != null) {
-                        LOG.errorf(error, "Failed to install/reload contributor bundles for JDT.LS");
-                    }
-                    pendingBundleInstallations = null;
-                    uninstalledContributors = null;
-                    setReady(true);
-                });
+        setReady(true);
     }
 
     @Override
