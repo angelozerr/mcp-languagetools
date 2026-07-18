@@ -73,11 +73,7 @@ public class WorkspaceTools {
 
                 List<String> languages = new ArrayList<>();
                 if (config.getDocumentSelector() != null) {
-                    config.getDocumentSelector().forEach(selector -> {
-                        if (selector.getLanguage() != null && !languages.contains(selector.getLanguage())) {
-                            languages.add(selector.getLanguage());
-                        }
-                    });
+                    languages.addAll(config.getDocumentSelector().getLanguages());
                 }
                 server.put("languages", languages);
 

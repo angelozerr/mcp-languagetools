@@ -37,6 +37,7 @@ public class Workspace {
 
     // Workspace
     private final URI rootUri;
+    private final Path rootPath;
     private final String normalizedRootUriString; // Cached normalized URI string (no trailing slash)
     private final Path workspaceDataDir;
     private final WorkspaceConfiguration configuration;
@@ -60,12 +61,13 @@ public class Workspace {
     public Workspace(URI rootUri,
                      Application application) {
         this.rootUri = rootUri;
+        this.rootPath = Paths.get(rootUri);
         // Cache normalized URI string (remove trailing slash for consistency across the app)
         this.normalizedRootUriString = rootUri.toString();
         this.application = application;
         this.workspaceDataDir = createWorkspaceDataDir(application.getPathManager().getWorkspaceDataDir(), rootUri);
         this.lspTraceCollector = application.getLspTraceCollector();
-        this.configuration = new WorkspaceConfiguration(Paths.get(rootUri));
+        this.configuration = new WorkspaceConfiguration(rootPath);
     }
 
     /**
@@ -388,6 +390,10 @@ public class Workspace {
 
     public URI getRootUri() {
         return rootUri;
+    }
+
+    public Path getRootPath() {
+        return rootPath;
     }
 
     /**

@@ -16,6 +16,7 @@ import com.ibm.mcp.languagetools.progress.ProgressMonitor;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
+import java.net.URI;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Predicate;
@@ -52,11 +53,12 @@ public class LspServerResolver {
                     var allServers = workspace.getLspServers();
 
                     // Filter servers: must match document selector AND the caller's predicate
-                    String fileUri = document.getUri().toString();
+                    URI fileUri = document.getUri();
                     String languageId = document.getLanguageId();
+                    java.nio.file.Path basePath = workspace.getRootPath();
                     return allServers
                             .stream()
-                            .filter(server -> server.getConfig().canHandle(fileUri, languageId))
+                            .filter(server -> server.getConfig().canHandle(fileUri, languageId, basePath))
                             .filter(filter)
                             .collect(Collectors.toList());
                 });

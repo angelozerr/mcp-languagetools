@@ -211,12 +211,13 @@ public class Application {
         LOG.debugf("Detected language '%s' for: %s", language, fileUri);
 
         // Collect configs that need starting
+        Path basePath = workspace.getRootPath();
         List<LspServerConfig> configsToStart = new ArrayList<>();
         for (LspServerConfig config : lspServerConfigs.values()) {
             if (config.isContributionOnly()) {
                 continue;
             }
-            if (config.canHandle(fileUri.toString(), language)) {
+            if (config.canHandle(fileUri, language, basePath)) {
                 if (!workspace.hasLspServer(config.getServerId())) {
                     configsToStart.add(config);
                 }
@@ -264,28 +265,10 @@ public class Application {
      * DAP servers are NOT started - they are added to the workspace configuration only.
      */
     private void ensureDapServersForFile(Workspace workspace, URI fileUri, String language) {
+        Path basePath = workspace.getRootPath();
         for (DapServerConfig config : dapServerConfigs.values()) {
-            // Check if this DAP server can handle the file's language
-            if (config.getDocumentSelector() != null) {
-                boolean canHandle = config.getDocumentSelector().stream()
-                        .anyMatch(selector -> {
-                            if (selector.getLanguage() != null && selector.getLanguage().equals(language)) {
-                                return true;
-                            }
-                            if (selector.getPattern() != null) {
-                                // Simple pattern matching (could be improved with glob matching)
-                                String path = fileUri.getPath();
-                                String pattern = selector.getPattern();
-                                // Convert glob to simple contains check for now
-                                if (pattern.contains("*")) {
-                                    String ext = pattern.substring(pattern.lastIndexOf('.'));
-                                    return path.endsWith(ext.replace("*", "").replace("}", ""));
-                                }
-                            }
-                            return false;
-                        });
-
-                if (canHandle && workspace.getApplication().getDapServerConfig(config.getServerId()) == null) {
+            if (config.canHandle(fileUri, language, basePath)) {
+                if (workspace.getApplication().getDapServerConfig(config.getServerId()) == null) {
                     workspace.addDapServer(config);
                     LOG.infof("Added DAP server %s for language '%s' in workspace: %s",
                             config.getName(), language, workspace.getNormalizedUri());

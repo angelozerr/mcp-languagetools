@@ -5,7 +5,8 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.ibm.mcp.languagetools.Application;
 import com.ibm.mcp.languagetools.lsp.Contributes;
-import com.ibm.mcp.languagetools.lsp.DocumentSelector;
+import com.ibm.mcp.languagetools.language.DocumentFilter;
+import com.ibm.mcp.languagetools.language.DocumentSelector;
 import com.ibm.mcp.languagetools.utils.OSUtils;
 import org.jboss.logging.Logger;
 
@@ -125,22 +126,22 @@ public abstract class ServerDescriptorLoaderBase<T extends ServerConfigBase> {
 
         // Document selector
         if (jsonObject.has(FIELD_DOCUMENT_SELECTOR)) {
-            List<DocumentSelector> selectors = new ArrayList<>();
+            List<DocumentFilter> filters = new ArrayList<>();
             jsonObject.getAsJsonArray(FIELD_DOCUMENT_SELECTOR).forEach(el -> {
-                JsonObject selectorObj = el.getAsJsonObject();
-                DocumentSelector selector = new DocumentSelector();
-                if (selectorObj.has(FIELD_LANGUAGE)) {
-                    selector.setLanguage(selectorObj.get(FIELD_LANGUAGE).getAsString());
+                JsonObject filterObj = el.getAsJsonObject();
+                DocumentFilter filter = new DocumentFilter();
+                if (filterObj.has(FIELD_LANGUAGE)) {
+                    filter.setLanguage(filterObj.get(FIELD_LANGUAGE).getAsString());
                 }
-                if (selectorObj.has(FIELD_SCHEME)) {
-                    selector.setScheme(selectorObj.get(FIELD_SCHEME).getAsString());
+                if (filterObj.has(FIELD_SCHEME)) {
+                    filter.setScheme(filterObj.get(FIELD_SCHEME).getAsString());
                 }
-                if (selectorObj.has(FIELD_PATTERN)) {
-                    selector.setPattern(selectorObj.get(FIELD_PATTERN).getAsString());
+                if (filterObj.has(FIELD_PATTERN)) {
+                    filter.setPattern(filterObj.get(FIELD_PATTERN).getAsString());
                 }
-                selectors.add(selector);
+                filters.add(filter);
             });
-            config.setDocumentSelector(selectors);
+            config.setDocumentSelector(new DocumentSelector(filters));
         }
 
         // Contributions

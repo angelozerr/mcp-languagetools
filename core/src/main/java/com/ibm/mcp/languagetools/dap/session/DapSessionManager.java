@@ -13,6 +13,7 @@ import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
 
 import java.net.URI;
+import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -233,7 +234,7 @@ public class DapSessionManager {
      * List debug adapters suitable for a specific file.
      * Uses LanguageRegistry to detect the language automatically.
      */
-    public List<Map<String, Object>> listDebugAdaptersForFile(URI fileUri) {
+    public List<Map<String, Object>> listDebugAdaptersForFile(URI fileUri, Path basePath) {
         List<Map<String, Object>> adapters = new ArrayList<>();
 
         // Create language document (detects language using LanguageRegistry)
@@ -248,7 +249,7 @@ public class DapSessionManager {
 
         for (DapServerConfig config : application.getDapServerConfigs()) {
             // Check if this adapter supports the file's language
-            if (config.canHandle(fileUri.toString(), language)) {
+            if (config.canHandle(fileUri, language, basePath)) {
                 adapters.add(buildAdapterInfo(config));
             }
         }
@@ -269,11 +270,7 @@ public class DapSessionManager {
         // Extract supported languages
         List<String> languages = new ArrayList<>();
         if (config.getDocumentSelector() != null) {
-            config.getDocumentSelector().forEach(selector -> {
-                if (selector.getLanguage() != null && !languages.contains(selector.getLanguage())) {
-                    languages.add(selector.getLanguage());
-                }
-            });
+            languages.addAll(config.getDocumentSelector().getLanguages());
         }
         adapter.put("languages", languages);
 
@@ -321,40 +318,14 @@ public class DapSessionManager {
      */
     private String extractLanguageFromConfig(DapServerConfig config) {
         if (config.getDocumentSelector() != null && !config.getDocumentSelector().isEmpty()) {
-            String lang = config.getDocumentSelector().get(0).getLanguage();
+            List<String> langs = config.getDocumentSelector().getLanguages();
+            String lang = langs.isEmpty() ? null : langs.get(0);
             if (lang != null) {
                 return lang;
             }
         }
         // Fallback: derive from server ID
         return config.getServerId();
-    }
-
-    /**
-     * Find the appropriate DAP server for a language.
-     */
-    /**
-     * @deprecated Use findDapServerById instead
-     */
-    @Deprecated
-    private DapServerConfig findDapServerForLanguage(Workspace workspace, String language) {
-        // First check workspace-specific DAP servers
-        var workspaceDapServers = workspace.getApplication().getDapServerConfigs();
-        for (DapServerConfig config : workspaceDapServers) {
-            if (config.canHandle(null, language)) {
-                return config;
-            }
-        }
-
-        // Fallback to global DAP servers
-        /*Map<String, DapServerConfig> globalDapServers = application.getDapServerConfigs();
-        for (DapServerConfig config : globalDapServers.values()) {
-            if (config.canHandle(null, language)) {
-                return config;
-            }
-        }*/
-
-        return null;
     }
 
     // ========== Helper Methods ==========

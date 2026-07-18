@@ -1,6 +1,6 @@
 package com.ibm.mcp.languagetools.admin.dto;
 
-import com.ibm.mcp.languagetools.lsp.DocumentSelector;
+import com.ibm.mcp.languagetools.language.DocumentSelector;
 
 import java.util.List;
 import java.util.Map;
@@ -14,7 +14,7 @@ public record LspConfigDTO(
     String name,
     String description,
     String url,
-    List<DocumentSelector> documentSelector,
+    DocumentSelector documentSelector,
     String command,
     Map<String, String> env,
     String workingDirectory,

@@ -64,11 +64,12 @@ public class DapDebugTools {
                     "and error details to help diagnose adapter issues. " +
                     "Use the adapter ID with start_debugging.")
     public List<Map<String, Object>> listDebugAdapters(
-            @ToolArg(description = "Optional file URI to filter adapters (e.g., 'file:///path/to/Main.java')") String fileUri,
-            @ToolArg(description = ToolArgDescriptions.CWD) String cwd) {
+            @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
+            @ToolArg(description = "Optional file URI to filter adapters (e.g., 'file:///path/to/Main.java')") String fileUri) {
         List<Map<String, Object>> adapters;
         if (fileUri != null && !fileUri.isEmpty()) {
-            adapters = sessionManager.listDebugAdaptersForFile(URI.create(fileUri));
+            Path basePath = (cwd != null && !cwd.isEmpty()) ? Paths.get(cwd) : null;
+            adapters = sessionManager.listDebugAdaptersForFile(URI.create(fileUri), basePath);
         } else {
             adapters = sessionManager.listDebugAdapters();
         }

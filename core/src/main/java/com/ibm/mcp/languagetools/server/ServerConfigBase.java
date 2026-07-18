@@ -5,7 +5,8 @@ import com.ibm.mcp.languagetools.Application;
 import com.ibm.mcp.languagetools.PathManager;
 import com.ibm.mcp.languagetools.installer.*;
 import com.ibm.mcp.languagetools.lsp.Contributes;
-import com.ibm.mcp.languagetools.lsp.DocumentSelector;
+import com.ibm.mcp.languagetools.language.DocumentSelector;
+import java.net.URI;
 import com.ibm.mcp.languagetools.progress.ProgressMonitor;
 import com.ibm.mcp.languagetools.progress.SharedProgressMonitor;
 import com.ibm.mcp.languagetools.trace.TraceCollector;
@@ -33,7 +34,7 @@ public abstract class ServerConfigBase implements ServerConfig {
     protected String description;
     protected String url;
     protected JsonElement installerConfig;  // Raw JSON from installer.json
-    protected List<DocumentSelector> documentSelector = new ArrayList<>();
+    protected DocumentSelector documentSelector;
     protected String command;
     protected Map<String, String> env = new HashMap<>();
     protected String workingDirectory;
@@ -201,11 +202,11 @@ public abstract class ServerConfigBase implements ServerConfig {
         this.traceCollector = traceCollector;
     }
 
-    public List<DocumentSelector> getDocumentSelector() {
+    public DocumentSelector getDocumentSelector() {
         return documentSelector;
     }
 
-    public void setDocumentSelector(List<DocumentSelector> documentSelector) {
+    public void setDocumentSelector(DocumentSelector documentSelector) {
         this.documentSelector = documentSelector;
     }
 
@@ -254,11 +255,10 @@ public abstract class ServerConfigBase implements ServerConfig {
     }
 
     /**
-     * Check if this server can handle the given file.
+     * Check if this server can handle the given file within a workspace.
      */
-    public boolean canHandle(String uri, String language) {
-        return getDocumentSelector().stream()
-                .anyMatch(selector -> selector.matches(uri, language));
+    public boolean canHandle(URI uri, String language, Path basePath) {
+        return documentSelector != null && documentSelector.matches(uri, language, basePath);
     }
 
     /**
