@@ -4,16 +4,15 @@ import com.google.gson.JsonElement;
 import com.ibm.mcp.languagetools.Application;
 import com.ibm.mcp.languagetools.PathManager;
 import com.ibm.mcp.languagetools.installer.*;
-import com.ibm.mcp.languagetools.lsp.Contributes;
 import com.ibm.mcp.languagetools.language.DocumentSelector;
-import java.net.URI;
+import com.ibm.mcp.languagetools.lsp.Contributes;
 import com.ibm.mcp.languagetools.progress.ProgressMonitor;
 import com.ibm.mcp.languagetools.progress.SharedProgressMonitor;
 import com.ibm.mcp.languagetools.trace.TraceCollector;
 import org.jboss.logging.Logger;
 
+import java.net.URI;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -24,7 +23,7 @@ import java.util.function.Consumer;
  * Base class for server configurations (LSP and DAP).
  * Contains common fields: id, name, description, installer, documentSelector.
  */
-public abstract class ServerConfigBase implements ServerConfig {
+public class ServerConfigBase implements ServerConfig {
 
     private static final Logger LOG = Logger.getLogger(ServerConfigBase.class);
 
@@ -165,10 +164,6 @@ public abstract class ServerConfigBase implements ServerConfig {
         return installer;
     }
 
-    public String getLastInstallError() {
-        return lastInstallError;
-    }
-
     /**
      * Add installation status and error info to a map (used by list_language_servers and list_debug_adapters).
      */
@@ -229,10 +224,6 @@ public abstract class ServerConfigBase implements ServerConfig {
 
     public void setContributes(Contributes contributes) {
         this.contributes = contributes;
-    }
-
-    public List<String> getAcceptContributions() {
-        return acceptContributions;
     }
 
     public void setAcceptContributions(List<String> acceptContributions) {
@@ -352,9 +343,9 @@ public abstract class ServerConfigBase implements ServerConfig {
      * Returns a CompletableFuture that completes when installation is done.
      * If installation fails, the future is reset to null to allow retry.
      *
-     * @param pathManager Path manager
+     * @param pathManager          Path manager
      * @param serverStatusCallback Status callback
-     * @param progressMonitor Progress monitor (never null, use ProgressMonitor.none() if not available)
+     * @param progressMonitor      Progress monitor (never null, use ProgressMonitor.none() if not available)
      */
     public CompletableFuture<InstallResult> ensureInstalled(PathManager pathManager,
                                                             Consumer<ServerStatus> serverStatusCallback,
@@ -409,20 +400,7 @@ public abstract class ServerConfigBase implements ServerConfig {
                     }
 
                     // Map InstallationStatus to ServerStatus
-                    Consumer<InstallationStatus> installStatusCallback = installStatus -> {
-                        ServerStatus serverStatus = switch (installStatus) {
-                            case INSTALLING -> ServerStatus.INSTALLING;
-                            case FAILED -> ServerStatus.INSTALL_FAILED;
-                            default -> null;
-                        };
-                        if (serverStatus != null && serverStatusCallback != null) {
-                            serverStatusCallback.accept(serverStatus);
-                        }
-                    };
-
-                    InstallerContext context = new InstallerContext(this, sharedInstallProgress, installStatusCallback);
-                    context.setVariable("USER_HOME", pathManager.getMcpLangToolsRoot().toString());
-                    context.setForceInstall(force);
+                    InstallerContext context = createInstallerContext(pathManager, serverStatusCallback, force);
 
                     future = installer.ensureInstalled(context)
                             .whenComplete((result, error) -> {
@@ -455,6 +433,24 @@ public abstract class ServerConfigBase implements ServerConfig {
             }
         }
         return future;
+    }
+
+    private InstallerContext createInstallerContext(PathManager pathManager, Consumer<ServerStatus> serverStatusCallback, boolean force) {
+        Consumer<InstallationStatus> installStatusCallback = installStatus -> {
+            ServerStatus serverStatus = switch (installStatus) {
+                case INSTALLING -> ServerStatus.INSTALLING;
+                case FAILED -> ServerStatus.INSTALL_FAILED;
+                default -> null;
+            };
+            if (serverStatus != null && serverStatusCallback != null) {
+                serverStatusCallback.accept(serverStatus);
+            }
+        };
+
+        InstallerContext context = new InstallerContext(this, sharedInstallProgress, installStatusCallback);
+        context.setVariable("USER_HOME", pathManager.getMcpLangToolsRoot().toString());
+        context.setForceInstall(force);
+        return context;
     }
 
 }

@@ -101,8 +101,7 @@ public abstract class ServerBase<T extends ServerConfigBase> extends BindEndpoin
         }
 
         if (config.getWorkingDirectory() != null) {
-            String resolvedWorkingDir = config.getWorkingDirectory()
-                    .replace("$SERVER_HOME$", getServerHome().toString());
+            String resolvedWorkingDir = ServerVariables.resolve(config.getWorkingDirectory(), config);
             pb.directory(Paths.get(resolvedWorkingDir).toFile());
             addTrace(String.format("Working directory: %s", resolvedWorkingDir));
         }

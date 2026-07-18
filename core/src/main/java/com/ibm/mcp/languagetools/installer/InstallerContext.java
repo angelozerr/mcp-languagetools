@@ -2,6 +2,7 @@ package com.ibm.mcp.languagetools.installer;
 
 import com.ibm.mcp.languagetools.progress.ProgressMonitor;
 import com.ibm.mcp.languagetools.server.ServerConfigBase;
+import com.ibm.mcp.languagetools.server.ServerVariables;
 import com.ibm.mcp.languagetools.trace.TraceCollector;
 
 import java.nio.file.Path;
@@ -42,9 +43,7 @@ public class InstallerContext {
         this.statusChangeCallback = statusChangeCallback;
         this.variables = new HashMap<>();
 
-        variables.put("SERVER_HOME", installDir.toString());
-        variables.put("SERVER_ID", config.getServerId());
-        variables.put("SERVER_NAME", config.getName());
+        ServerVariables.populate(config, variables);
     }
 
     /**
