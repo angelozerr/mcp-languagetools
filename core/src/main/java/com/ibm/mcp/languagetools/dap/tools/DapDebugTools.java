@@ -14,7 +14,9 @@
 package com.ibm.mcp.languagetools.dap.tools;
 
 import com.ibm.mcp.languagetools.Application;
+import com.ibm.mcp.languagetools.dap.server.DapServerConfig;
 import com.ibm.mcp.languagetools.dap.server.DapConfigurationTemplate;
+import com.ibm.mcp.languagetools.extension.ExtensionRegistry;
 import com.ibm.mcp.languagetools.dap.session.DapSession;
 import com.ibm.mcp.languagetools.dap.session.DapSessionManager;
 import com.ibm.mcp.languagetools.progress.ProgressContext;
@@ -87,11 +89,20 @@ public class DapDebugTools {
             adapters = sessionManager.listDebugAdapters();
         }
 
-        if (cwd != null && !cwd.isEmpty()) {
-            for (Map<String, Object> adapter : adapters) {
-                String id = (String) adapter.get("id");
-                var config = application.getDapServerConfig(id);
-                if (config != null) {
+        ExtensionRegistry extRegistry = application.getExtensionRegistry();
+        for (Map<String, Object> adapter : adapters) {
+            String id = (String) adapter.get("id");
+            DapServerConfig config = application.getDapServerConfig(id);
+            if (config != null) {
+                String extensionId = config.getExtensionId();
+                if (extensionId != null) {
+                    adapter.put("extensionId", extensionId);
+                }
+                boolean enabled = extRegistry.isExtensionEnabled(extensionId != null ? extensionId : id)
+                        && extRegistry.isServerEnabled(id);
+                adapter.put("enabled", enabled);
+
+                if (cwd != null && !cwd.isEmpty()) {
                     config.addInstallationStatus(adapter);
                 }
             }

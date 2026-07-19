@@ -16,6 +16,7 @@ package com.ibm.mcp.languagetools.server;
 import com.ibm.mcp.languagetools.Application;
 import com.ibm.mcp.languagetools.dap.server.DapServerConfig;
 import com.ibm.mcp.languagetools.dap.server.DapServerDescriptorLoader;
+import com.ibm.mcp.languagetools.extension.Extension;
 import com.ibm.mcp.languagetools.lsp.server.LspServerConfig;
 import com.ibm.mcp.languagetools.lsp.server.LspServerDescriptorLoader;
 import io.quarkus.runtime.StartupEvent;
@@ -136,6 +137,57 @@ public class ServerDescriptorRegistry {
         return dapConfigs;
     }
 
+    /**
+     * Load all servers from an extension directory on the filesystem.
+     * Scans lsp/ and dap/ subdirectories within the extension dir.
+     *
+     * @param extensionDir the extension directory (e.g., extensions/jdtls/)
+     * @param extension    the Extension object
+     * @return map of serverId → config
+     */
+    public Map<String, ServerConfigBase> loadFromExtensionDir(Path extensionDir, Extension extension) {
+        Map<String, ServerConfigBase> configs = new HashMap<>();
+
+        for (Map.Entry<String, ServerDescriptorLoaderBase<?>> entry : loaders.entrySet()) {
+            String root = entry.getKey();
+            ServerDescriptorLoaderBase<?> loader = entry.getValue();
+
+            Path typeDir = extensionDir.resolve(root);
+            if (!java.nio.file.Files.isDirectory(typeDir)) {
+                continue;
+            }
+
+            try (var entries = java.nio.file.Files.list(typeDir)) {
+                entries.filter(java.nio.file.Files::isDirectory)
+                       .forEach(serverDir -> {
+                           String serverId = serverDir.getFileName().toString();
+                           if (configs.containsKey(serverId)) {
+                               LOG.debugf("Skipping duplicate server: %s", serverId);
+                               return;
+                           }
+                           try {
+                               ServerConfigBase config = loader.load(serverDir, extension);
+                               configs.put(serverId, config);
+                               LOG.infof("Loaded server: %s from extension %s/%s", serverId, extension.getId(), root);
+                           } catch (Exception e) {
+                               LOG.errorf(e, "Failed to load server %s from extension %s", serverId, extension.getId());
+                           }
+                       });
+            } catch (Exception e) {
+                LOG.warnf(e, "Failed to scan %s directory in extension %s", root, extension.getId());
+            }
+        }
+
+        return configs;
+    }
+
+    /**
+     * Get the loader for a given root type ("lsp" or "dap").
+     */
+    public ServerDescriptorLoaderBase<?> getLoader(String root) {
+        return loaders.get(root);
+    }
+
     private void scanDirectory(URL dirUrl, String root, Map<String, ServerConfigBase> configs, Application application) {
         try {
             LOG.infof("Scanning directory URL: %s for root: %s", dirUrl, root);
@@ -172,11 +224,11 @@ public class ServerDescriptorRegistry {
                                return;
                            }
 
-                           // Load using appropriate loader
+                           // Load using appropriate loader — legacy path (will be removed)
                            ServerDescriptorLoaderBase<?> loader = loaders.get(root);
                            if (loader != null) {
                                try {
-                                   ServerConfigBase config = loader.loadBundled(serverDir, application);
+                                   ServerConfigBase config = loader.load(serverDir, null);
                                    configs.put(serverId, config);
                                    LOG.infof("Loaded server: %s from %s", serverId, root);
                                } catch (Exception e) {

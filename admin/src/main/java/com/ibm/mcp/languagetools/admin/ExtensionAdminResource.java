@@ -1,0 +1,199 @@
+/*******************************************************************************
+ * Copyright (c) 2026 IBM Corporation and others.
+ *
+ * This program and the accompanying materials
+ * are made available under the terms of the Eclipse Public License 2.0
+ * which accompanies this distribution, and is available at
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
+ *
+ * Contributors:
+ *     Angelo ZERR - initial API and implementation
+ *******************************************************************************/
+package com.ibm.mcp.languagetools.admin;
+
+import com.ibm.mcp.languagetools.Application;
+import com.ibm.mcp.languagetools.dap.server.DapServerConfig;
+import com.ibm.mcp.languagetools.extension.Extension;
+import com.ibm.mcp.languagetools.extension.ExtensionRegistry;
+import com.ibm.mcp.languagetools.lsp.server.LspServerConfig;
+import jakarta.inject.Inject;
+import jakarta.ws.rs.*;
+import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
+import org.jboss.logging.Logger;
+
+import java.nio.file.Paths;
+import java.util.*;
+import java.util.stream.Collectors;
+
+/**
+ * REST endpoints for extension management.
+ */
+@Path("/api/admin/extensions")
+@Produces(MediaType.APPLICATION_JSON)
+public class ExtensionAdminResource {
+
+    private static final Logger LOG = Logger.getLogger(ExtensionAdminResource.class);
+
+    @Inject
+    Application application;
+
+    @GET
+    public List<Map<String, Object>> listExtensions() {
+        ExtensionRegistry registry = application.getExtensionRegistry();
+        List<Map<String, Object>> result = new ArrayList<>();
+
+        for (Extension ext : registry.getExtensions()) {
+            result.add(toMap(ext, registry));
+        }
+
+        return result;
+    }
+
+    @GET
+    @Path("/{id}")
+    public Response getExtension(@PathParam("id") String id) {
+        ExtensionRegistry registry = application.getExtensionRegistry();
+        Extension ext = registry.getExtension(id);
+        if (ext == null) {
+            return Response.status(Response.Status.NOT_FOUND)
+                    .entity(Map.of("error", "Extension '" + id + "' not found"))
+                    .build();
+        }
+        return Response.ok(toMap(ext, registry)).build();
+    }
+
+    @POST
+    @Consumes(MediaType.APPLICATION_JSON)
+    public Response addExtension(Map<String, String> body) {
+        String extensionId = body.get("extensionId");
+        String source = body.get("source");
+
+        if (extensionId == null || source == null) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(Map.of("error", "extensionId and source are required"))
+                    .build();
+        }
+
+        try {
+            ExtensionRegistry registry = application.getExtensionRegistry();
+            Extension ext = registry.addExtension(extensionId, Paths.get(source), application);
+
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("success", true);
+            result.put("extension", toMap(ext, registry));
+            return Response.status(Response.Status.CREATED).entity(result).build();
+        } catch (Exception e) {
+            LOG.error("Failed to add extension", e);
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(Map.of("error", e.getMessage()))
+                    .build();
+        }
+    }
+
+    @DELETE
+    @Path("/{id}")
+    public Response removeExtension(@PathParam("id") String id) {
+        try {
+            application.getExtensionRegistry().removeExtension(id);
+            return Response.ok(Map.of("success", true, "message", "Extension '" + id + "' removed")).build();
+        } catch (IllegalStateException e) {
+            return Response.status(Response.Status.FORBIDDEN)
+                    .entity(Map.of("error", e.getMessage()))
+                    .build();
+        } catch (IllegalArgumentException e) {
+            return Response.status(Response.Status.NOT_FOUND)
+                    .entity(Map.of("error", e.getMessage()))
+                    .build();
+        }
+    }
+
+    @POST
+    @Path("/{id}/enable")
+    public Response enableExtension(@PathParam("id") String id) {
+        try {
+            application.getExtensionRegistry().enableExtension(id);
+            return Response.ok(Map.of("success", true, "message", "Extension '" + id + "' enabled")).build();
+        } catch (IllegalArgumentException e) {
+            return Response.status(Response.Status.NOT_FOUND)
+                    .entity(Map.of("error", e.getMessage()))
+                    .build();
+        }
+    }
+
+    @POST
+    @Path("/{id}/disable")
+    public Response disableExtension(@PathParam("id") String id) {
+        try {
+            application.getExtensionRegistry().disableExtension(id);
+            return Response.ok(Map.of("success", true, "message", "Extension '" + id + "' disabled")).build();
+        } catch (IllegalArgumentException e) {
+            return Response.status(Response.Status.NOT_FOUND)
+                    .entity(Map.of("error", e.getMessage()))
+                    .build();
+        }
+    }
+
+    // ========== Individual server enable/disable ==========
+
+    @POST
+    @Path("/lsp/servers/{serverId}/enable")
+    public Response enableLspServer(@PathParam("serverId") String serverId) {
+        application.getExtensionRegistry().enableLspServer(serverId);
+        return Response.ok(Map.of("success", true, "message", "LSP server '" + serverId + "' enabled")).build();
+    }
+
+    @POST
+    @Path("/lsp/servers/{serverId}/disable")
+    public Response disableLspServer(@PathParam("serverId") String serverId) {
+        application.getExtensionRegistry().disableLspServer(serverId);
+        return Response.ok(Map.of("success", true, "message", "LSP server '" + serverId + "' disabled")).build();
+    }
+
+    @POST
+    @Path("/dap/servers/{serverId}/enable")
+    public Response enableDapServer(@PathParam("serverId") String serverId) {
+        application.getExtensionRegistry().enableDapServer(serverId);
+        return Response.ok(Map.of("success", true, "message", "DAP server '" + serverId + "' enabled")).build();
+    }
+
+    @POST
+    @Path("/dap/servers/{serverId}/disable")
+    public Response disableDapServer(@PathParam("serverId") String serverId) {
+        application.getExtensionRegistry().disableDapServer(serverId);
+        return Response.ok(Map.of("success", true, "message", "DAP server '" + serverId + "' disabled")).build();
+    }
+
+    // ========== Helpers ==========
+
+    private Map<String, Object> toMap(Extension ext, ExtensionRegistry registry) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("id", ext.getId());
+        map.put("source", ext.getSource().name());
+        map.put("enabled", registry.isExtensionEnabled(ext.getId()));
+
+        map.put("lspServers", ext.getLspServerConfigs().stream()
+                .map(c -> {
+                    Map<String, Object> s = new LinkedHashMap<>();
+                    s.put("id", c.getServerId());
+                    s.put("name", c.getName());
+                    s.put("enabled", registry.isServerEnabled(c.getServerId()));
+                    return s;
+                })
+                .collect(Collectors.toList()));
+
+        map.put("dapServers", ext.getDapServerConfigs().stream()
+                .map(c -> {
+                    Map<String, Object> s = new LinkedHashMap<>();
+                    s.put("id", c.getServerId());
+                    s.put("name", c.getName());
+                    s.put("enabled", registry.isServerEnabled(c.getServerId()));
+                    return s;
+                })
+                .collect(Collectors.toList()));
+
+        return map;
+    }
+}

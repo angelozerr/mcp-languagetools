@@ -16,6 +16,8 @@ package com.ibm.mcp.languagetools.server;
 import com.google.gson.JsonElement;
 import com.ibm.mcp.languagetools.Application;
 import com.ibm.mcp.languagetools.PathManager;
+import com.ibm.mcp.languagetools.extension.Extension;
+import com.ibm.mcp.languagetools.extension.ServerConfigSource;
 import com.ibm.mcp.languagetools.installer.*;
 import com.ibm.mcp.languagetools.language.DocumentSelector;
 import com.ibm.mcp.languagetools.lsp.Contributes;
@@ -42,6 +44,7 @@ public class ServerConfigBase implements ServerConfig {
 
     private final String serverId;
     private final Path serverHome;
+    private final Extension extension;
     protected String name;
     protected String description;
     protected String url;
@@ -80,12 +83,10 @@ public class ServerConfigBase implements ServerConfig {
     private volatile CompletableFuture<InstallResult> installationFuture;
     private volatile String lastInstallError;
 
-    private final Application application;
-
-    public ServerConfigBase(String serverId, Path serverHome, Application application) {
+    public ServerConfigBase(String serverId, Path serverHome, Extension extension) {
         this.serverId = serverId;
         this.serverHome = serverHome;
-        this.application = application;
+        this.extension = extension;
     }
 
     // Common getters
@@ -323,8 +324,20 @@ public class ServerConfigBase implements ServerConfig {
         this.installProgress = installProgress;
     }
 
+    public Extension getExtension() {
+        return extension;
+    }
+
+    public String getExtensionId() {
+        return extension != null ? extension.getId() : null;
+    }
+
+    public ServerConfigSource getSource() {
+        return extension != null ? extension.getSource() : null;
+    }
+
     public Application getApplication() {
-        return application;
+        return extension != null ? extension.getApplication() : null;
     }
 
     /**
@@ -431,8 +444,8 @@ public class ServerConfigBase implements ServerConfig {
                                     if (result != null && result.getCommand() != null) {
                                         onCommandInstalled(result.getCommand());
                                     }
-                                    if (application != null) {
-                                        application.fireOnInstalled(ServerConfigBase.this, result);
+                                    if (getApplication() != null) {
+                                        getApplication().fireOnInstalled(ServerConfigBase.this, result);
                                     }
                                 }
                             });
