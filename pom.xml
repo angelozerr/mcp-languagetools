@@ -22,7 +22,7 @@
         <module>extensions/javascript</module>
         <module>extensions/python</module>
         <module>extensions/rust</module>
-        <module>extensions/clangd</module>
+        <module>extensions/c</module>
         <module>extensions/go</module>
         <module>extensions/dart</module>
         <module>extensions/yaml</module>

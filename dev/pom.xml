@@ -76,7 +76,7 @@
         </dependency>
         <dependency>
             <groupId>com.ibm.mcp</groupId>
-            <artifactId>clangd-extension</artifactId>
+            <artifactId>c-extension</artifactId>
             <version>${project.version}</version>
             <scope>runtime</scope>
         </dependency>

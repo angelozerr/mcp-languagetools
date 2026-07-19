@@ -11,11 +11,11 @@
         <relativePath>../../pom.xml</relativePath>
     </parent>
 
-    <artifactId>clangd-extension</artifactId>
+    <artifactId>c-extension</artifactId>
     <packaging>jar</packaging>
 
-    <name>Clangd Extension</name>
-    <description>C/C++ language support via clangd (LSP) for MCP Language Tools</description>
+    <name>C/C++ Extension</name>
+    <description>C/C++ language server (clangd) and debug adapter (codelldb) extension for MCP Language Tools</description>
 
     <build>
         <plugins>
