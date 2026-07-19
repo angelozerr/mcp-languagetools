@@ -34,7 +34,7 @@
         <!-- All extensions (runtime) -->
         <dependency>
             <groupId>com.ibm.mcp</groupId>
-            <artifactId>lemminx-extension</artifactId>
+            <artifactId>xml-extension</artifactId>
             <version>${project.version}</version>
             <scope>runtime</scope>
         </dependency>
@@ -52,19 +52,13 @@
         </dependency>
         <dependency>
             <groupId>com.ibm.mcp</groupId>
-            <artifactId>qute-extension</artifactId>
+            <artifactId>java-extension</artifactId>
             <version>${project.version}</version>
             <scope>runtime</scope>
         </dependency>
         <dependency>
             <groupId>com.ibm.mcp</groupId>
-            <artifactId>jdtls-extension</artifactId>
-            <version>${project.version}</version>
-            <scope>runtime</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.ibm.mcp</groupId>
-            <artifactId>typescript-extension</artifactId>
+            <artifactId>javascript-extension</artifactId>
             <version>${project.version}</version>
             <scope>runtime</scope>
         </dependency>

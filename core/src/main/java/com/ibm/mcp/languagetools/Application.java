@@ -14,7 +14,9 @@
 package com.ibm.mcp.languagetools;
 
 import com.ibm.mcp.languagetools.dap.server.DapServerConfig;
+import com.ibm.mcp.languagetools.extension.ExtensionRegistry;
 import com.ibm.mcp.languagetools.installer.InstallResult;
+import com.ibm.mcp.languagetools.installer.InstallerListener;
 import com.ibm.mcp.languagetools.installer.TraceProgressMonitor;
 import com.ibm.mcp.languagetools.language.LanguageRegistry;
 import com.ibm.mcp.languagetools.lsp.server.LspServer;
@@ -27,9 +29,7 @@ import com.ibm.mcp.languagetools.progress.ProgressBroadcaster;
 import com.ibm.mcp.languagetools.progress.ProgressMonitor;
 import com.ibm.mcp.languagetools.progress.ProgressStep;
 import com.ibm.mcp.languagetools.server.ServerConfigBase;
-import com.ibm.mcp.languagetools.server.ServerConfigInstalledEvent;
-import com.ibm.mcp.languagetools.server.ServerConfigListener;
-import com.ibm.mcp.languagetools.server.ServerDescriptorRegistry;
+import com.ibm.mcp.languagetools.server.ServerStatus;
 import com.ibm.mcp.languagetools.configuration.ApplicationConfiguration;
 import com.ibm.mcp.languagetools.configuration.Configuration;
 import com.ibm.mcp.languagetools.configuration.ServerTrace;
@@ -77,7 +77,7 @@ public class Application {
     ApplicationConfiguration applicationConfiguration;
 
     @Inject
-    ServerDescriptorRegistry serverDescriptorRegistry;
+    ExtensionRegistry extensionRegistry;
 
     // Workspace
     @Inject
@@ -102,11 +102,8 @@ public class Application {
     jakarta.enterprise.inject.Instance<ProgressBroadcaster> progressBroadcasterInstance;
 
     private final Map<URI, Workspace> workspaces = new ConcurrentHashMap<>();
-    private final Map<String, LspServerConfig> lspServerConfigs = new ConcurrentHashMap<>();
-    private final Map<String, DapServerConfig> dapServerConfigs = new ConcurrentHashMap<>();
 
     private final ContributionManager contributionManager;
-    private final List<ServerConfigListener> serverConfigListeners = new ArrayList<>();
 
     // Trace collectors loaded via SPI
     private final TraceCollector lspTraceCollector;
@@ -124,36 +121,41 @@ public class Application {
         LOG.infof("TraceCollectorFactory: %s (enabled=%s)", factory.getClass().getSimpleName(), lspTraceCollector.isEnabled());
     }
 
-    public void addServerConfigListener(ServerConfigListener listener) {
-        serverConfigListeners.add(listener);
+    public void addInstallerListener(InstallerListener listener) {
+        extensionRegistry.addInstallerListener(listener);
     }
 
-    public void removeServerConfigListener(ServerConfigListener listener) {
-        serverConfigListeners.remove(listener);
+    public void removeInstallerListener(InstallerListener listener) {
+        extensionRegistry.removeInstallerListener(listener);
     }
 
     public void fireOnInstalled(ServerConfigBase config, InstallResult result) {
-        var event = new ServerConfigInstalledEvent(config, result);
-        for (ServerConfigListener listener : serverConfigListeners) {
-            try {
-                listener.onInstalled(event);
-            } catch (Exception e) {
-                LOG.warnf(e, "ServerConfigListener.onInstalled failed for '%s'", config.getServerId());
-            }
-        }
+        extensionRegistry.fireOnInstalled(config, result);
     }
 
     void onStart(@Observes StartupEvent ignoredEv) {
         LOG.info("ApplicationManager starting...");
 
-        // Load all bundled LSP server descriptors
-        lspServerConfigs.putAll(serverDescriptorRegistry.loadAllLspServers(this));
+        // Load disabled state from settings.json
+        loadDisabledState();
 
-        // Load all bundled DAP server descriptors
-        dapServerConfigs.putAll(serverDescriptorRegistry.loadAllDapServers(this));
+        // Initialize extension registry: deploy bundled configs + scan extensions/
+        extensionRegistry.initialize(this);
 
-        LOG.infof("Loaded %d LSP server descriptors", lspServerConfigs.size());
-        LOG.infof("Loaded %d DAP server descriptors", dapServerConfigs.size());
+        LOG.infof("Loaded %d LSP server descriptors", getLspServerConfigs().size());
+        LOG.infof("Loaded %d DAP server descriptors", getDapServerConfigs().size());
+    }
+
+    @SuppressWarnings("unchecked")
+    private void loadDisabledState() {
+        Object extDisabled = applicationConfiguration.get("extensions.disabled");
+        if (extDisabled instanceof List) {
+            extensionRegistry.setDisabledExtensions((List<String>) extDisabled);
+        }
+        Object srvDisabled = applicationConfiguration.get("servers.disabled");
+        if (srvDisabled instanceof List) {
+            extensionRegistry.setDisabledServers((List<String>) srvDisabled);
+        }
     }
 
     void onShutdown(@Observes ShutdownEvent ev) {
@@ -228,15 +230,18 @@ public class Application {
         String language = languageId.get();
         LOG.debugf("Detected language '%s' for: %s", language, fileUri);
 
-        // Collect configs that need starting
+        // Collect configs that need starting (only enabled ones)
         Path basePath = workspace.getRootPath();
         List<LspServerConfig> configsToStart = new ArrayList<>();
-        for (LspServerConfig config : lspServerConfigs.values()) {
+        for (LspServerConfig config : extensionRegistry.getEnabledLspServerConfigs()) {
             if (config.isContributionOnly()) {
                 continue;
             }
             if (config.canHandle(fileUri, language, basePath)) {
-                if (!workspace.hasLspServer(config.getServerId())) {
+                LspServer existingServer = workspace.getLspServer(config.getServerId());
+                if (existingServer == null) {
+                    configsToStart.add(config);
+                } else if (existingServer.getStatus() == ServerStatus.STOPPED) {
                     configsToStart.add(config);
                 }
             }
@@ -284,7 +289,7 @@ public class Application {
      */
     private void ensureDapServersForFile(Workspace workspace, URI fileUri, String language) {
         Path basePath = workspace.getRootPath();
-        for (DapServerConfig config : dapServerConfigs.values()) {
+        for (DapServerConfig config : extensionRegistry.getEnabledDapServerConfigs()) {
             if (config.canHandle(fileUri, language, basePath)) {
                 if (workspace.getApplication().getDapServerConfig(config.getServerId()) == null) {
                     workspace.addDapServer(config);
@@ -519,16 +524,16 @@ public class Application {
     // LSP servers
 
     public LspServerConfig getLspServerConfig(String serverId) {
-        return lspServerConfigs.get(serverId);
+        return extensionRegistry.getLspServerConfig(serverId);
     }
 
     /**
-     * Get all LSP server configuration
+     * Get all LSP server configurations.
      *
-     * @return all LSP server configuration
+     * @return all LSP server configurations
      */
     public Collection<LspServerConfig> getLspServerConfigs() {
-        return lspServerConfigs.values();
+        return extensionRegistry.getAllLspServerConfigs();
     }
 
     public TraceCollector getLspTraceCollector() {
@@ -538,16 +543,20 @@ public class Application {
     // DAP servers
 
     public DapServerConfig getDapServerConfig(String serverId) {
-        return dapServerConfigs.get(serverId);
+        return extensionRegistry.getDapServerConfig(serverId);
     }
 
     /**
-     * Get all LSP server configuration
+     * Get all DAP server configurations.
      *
-     * @return all LSP server configuration
+     * @return all DAP server configurations
      */
     public Collection<DapServerConfig> getDapServerConfigs() {
-        return dapServerConfigs.values();
+        return extensionRegistry.getAllDapServerConfigs();
+    }
+
+    public ExtensionRegistry getExtensionRegistry() {
+        return extensionRegistry;
     }
 
     public TraceCollector getDapTraceCollector() {

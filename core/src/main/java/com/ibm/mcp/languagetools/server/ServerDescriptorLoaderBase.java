@@ -16,7 +16,7 @@ package com.ibm.mcp.languagetools.server;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import com.ibm.mcp.languagetools.Application;
+import com.ibm.mcp.languagetools.extension.Extension;
 import com.ibm.mcp.languagetools.lsp.Contributes;
 import com.ibm.mcp.languagetools.language.DocumentFilter;
 import com.ibm.mcp.languagetools.language.DocumentSelector;
@@ -79,19 +79,20 @@ public abstract class ServerDescriptorLoaderBase<T extends ServerConfigBase> {
     /**
      * Create a new instance of the config.
      */
-    protected abstract T createConfig(String serverId, Application application);
+    protected abstract T createConfig(String serverId, Extension extension);
 
     /**
-     * Load a bundled server configuration from a directory.
+     * Load a server configuration from a directory.
      * The directory can be a JAR entry or filesystem path.
      *
      * @param serverDir Directory containing server.json and installer.json
+     * @param extension The extension this server belongs to
      * @return Loaded server configuration
      */
-    public final T loadBundled(Path serverDir, Application application) throws IOException {
+    public final T load(Path serverDir, Extension extension) throws IOException {
         String serverId = serverDir.getFileName().toString();
 
-        T config = createConfig(serverId, application);
+        T config = createConfig(serverId, extension);
         loadConfig(serverId, serverDir, config);
         return config;
     }

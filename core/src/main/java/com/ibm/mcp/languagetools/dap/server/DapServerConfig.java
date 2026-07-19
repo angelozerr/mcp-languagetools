@@ -16,7 +16,7 @@ package com.ibm.mcp.languagetools.dap.server;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import com.ibm.mcp.languagetools.Application;
+import com.ibm.mcp.languagetools.extension.Extension;
 import com.ibm.mcp.languagetools.server.ServerConfigBase;
 import org.jboss.logging.Logger;
 
@@ -51,8 +51,17 @@ public class DapServerConfig extends ServerConfigBase {
     private DebugServerWaitStrategy debugServerWaitStrategy = DebugServerWaitStrategy.TIMEOUT;
     private Integer connectTimeout = 500; // Default 500ms
 
-    public DapServerConfig(String serverId, Path serverHome, Application application) {
-        super(serverId, serverHome, application);
+    public DapServerConfig(String serverId, Extension extension) {
+        super(serverId, computeServerHome(serverId, extension), extension);
+    }
+
+    protected DapServerConfig(String serverId, Path serverHome, Extension extension) {
+        super(serverId, serverHome, extension);
+    }
+
+    private static Path computeServerHome(String serverId, Extension extension) {
+        return extension.getApplication().getPathManager()
+                .getExtensionServerHome(extension.getId(), "dap", serverId);
     }
 
     // Getters and setters (id, name, description, command, env, workingDirectory, installer, documentSelector, trace inherited from ServerConfigBase)

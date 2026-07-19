@@ -14,7 +14,7 @@
 package com.ibm.mcp.languagetools.dap.server;
 
 import com.google.gson.JsonObject;
-import com.ibm.mcp.languagetools.Application;
+import com.ibm.mcp.languagetools.extension.Extension;
 import com.ibm.mcp.languagetools.server.ServerDescriptorLoaderBase;
 import com.ibm.mcp.languagetools.configuration.PathConfig;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -53,8 +53,8 @@ public class DapServerDescriptorLoader extends ServerDescriptorLoaderBase<DapSer
     }
 
     @Override
-    protected DapServerConfig createConfig(String serverId, Application application) {
-        return new DapServerConfig(serverId, application.getPathManager().getDapServerHome(serverId), application);
+    protected DapServerConfig createConfig(String serverId, Extension extension) {
+        return new DapServerConfig(serverId, extension);
     }
 
     @Override

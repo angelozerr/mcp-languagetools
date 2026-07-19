@@ -13,10 +13,11 @@
  *******************************************************************************/
 package com.ibm.mcp.languagetools.lsp.server;
 
-import com.ibm.mcp.languagetools.Application;
+import com.ibm.mcp.languagetools.extension.Extension;
 import com.ibm.mcp.languagetools.lsp.client.LspCapability;
 import com.ibm.mcp.languagetools.server.ServerConfigBase;
 
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -37,8 +38,17 @@ public class LspServerConfig extends ServerConfigBase {
      */
     private boolean skipDidOpen;
 
-    public LspServerConfig(String serverId, Application application) {
-        super(serverId, application.getPathManager().getLspServerHome(serverId), application);
+    public LspServerConfig(String serverId, Extension extension) {
+        super(serverId, computeServerHome(serverId, extension), extension);
+    }
+
+    protected LspServerConfig(String serverId, Path serverHome, Extension extension) {
+        super(serverId, serverHome, extension);
+    }
+
+    private static Path computeServerHome(String serverId, Extension extension) {
+        return extension.getApplication().getPathManager()
+                .getExtensionServerHome(extension.getId(), "lsp", serverId);
     }
 
     /**

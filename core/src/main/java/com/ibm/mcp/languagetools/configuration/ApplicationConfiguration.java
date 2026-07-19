@@ -79,6 +79,50 @@ public class ApplicationConfiguration extends AbstractConfiguration {
         }
     }
 
+    // ========== Extensions disabled state ==========
+
+    @SuppressWarnings("unchecked")
+    public List<String> getDisabledExtensionIds() {
+        Object value = get("extensions.disabled");
+        if (value instanceof List) {
+            return (List<String>) value;
+        }
+        return new ArrayList<>();
+    }
+
+    @SuppressWarnings("unchecked")
+    public List<String> getDisabledServerIds() {
+        Object value = get("servers.disabled");
+        if (value instanceof List) {
+            return (List<String>) value;
+        }
+        return new ArrayList<>();
+    }
+
+    public synchronized void setDisabledExtensionIds(List<String> ids) {
+        setNestedValue("extensions", "disabled", ids);
+        save();
+    }
+
+    public synchronized void setDisabledServerIds(List<String> ids) {
+        setNestedValue("servers", "disabled", ids);
+        save();
+    }
+
+    @SuppressWarnings("unchecked")
+    private void setNestedValue(String section, String key, Object value) {
+        Map<String, Object> settings = getSettings();
+        Object sectionObj = settings.get(section);
+        Map<String, Object> sectionMap;
+        if (sectionObj instanceof Map) {
+            sectionMap = (Map<String, Object>) sectionObj;
+        } else {
+            sectionMap = new LinkedHashMap<>();
+            settings.put(section, sectionMap);
+        }
+        sectionMap.put(key, value);
+    }
+
     // ========== Trace entries ==========
 
     public Map<String, String> getTraceLevelEntries() {

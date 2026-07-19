@@ -1,0 +1,745 @@
+/*******************************************************************************
+ * Copyright (c) 2026 IBM Corporation and others.
+ *
+ * This program and the accompanying materials
+ * are made available under the terms of the Eclipse Public License 2.0
+ * which accompanies this distribution, and is available at
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
+ *
+ * Contributors:
+ *     Angelo ZERR - initial API and implementation
+ *******************************************************************************/
+package com.ibm.mcp.languagetools.extension;
+
+import com.ibm.mcp.languagetools.Application;
+import com.ibm.mcp.languagetools.PathManager;
+import com.ibm.mcp.languagetools.configuration.ApplicationConfiguration;
+import com.ibm.mcp.languagetools.dap.server.DapServerConfig;
+import com.ibm.mcp.languagetools.installer.InstallerEvent;
+import com.ibm.mcp.languagetools.installer.InstallerListener;
+import com.ibm.mcp.languagetools.installer.InstallResult;
+import com.ibm.mcp.languagetools.lsp.server.LspServerConfig;
+import com.ibm.mcp.languagetools.server.ServerConfigBase;
+import com.ibm.mcp.languagetools.server.ServerDescriptorRegistry;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import org.jboss.logging.Logger;
+
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.URI;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.FileSystem;
+import java.nio.file.FileSystems;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+/**
+ * Central registry for all extensions. Manages the lifecycle of extensions
+ * and their LSP/DAP server configs: add, remove, enable, disable.
+ */
+@ApplicationScoped
+public class ExtensionRegistry {
+
+    private static final Logger LOG = Logger.getLogger(ExtensionRegistry.class);
+
+    @Inject
+    PathManager pathManager;
+
+    @Inject
+    ServerDescriptorRegistry serverDescriptorRegistry;
+
+    @Inject
+    ApplicationConfiguration applicationConfiguration;
+
+    private final Map<String, Extension> extensions = new ConcurrentHashMap<>();
+    private final Set<String> disabledExtensions = ConcurrentHashMap.newKeySet();
+    private final Set<String> disabledServers = ConcurrentHashMap.newKeySet();
+
+    private final List<ExtensionListener> extensionListeners = new ArrayList<>();
+    private final List<InstallerListener> installerListeners = new ArrayList<>();
+
+    // ========== Listeners ==========
+
+    public void addExtensionListener(ExtensionListener listener) {
+        extensionListeners.add(listener);
+    }
+
+    public void removeExtensionListener(ExtensionListener listener) {
+        extensionListeners.remove(listener);
+    }
+
+    public void addInstallerListener(InstallerListener listener) {
+        installerListeners.add(listener);
+    }
+
+    public void removeInstallerListener(InstallerListener listener) {
+        installerListeners.remove(listener);
+    }
+
+    public void fireOnInstalled(ServerConfigBase config, InstallResult result) {
+        var event = new InstallerEvent(config, result);
+        for (InstallerListener listener : installerListeners) {
+            try {
+                listener.onInstalled(event);
+            } catch (Exception e) {
+                LOG.warnf(e, "InstallerListener.onInstalled failed for '%s'", config.getServerId());
+            }
+        }
+    }
+
+    // ========== Startup: deploy bundled + scan ==========
+
+    /**
+     * Deploy bundled server configs from classpath to extensions/ directory,
+     * then scan extensions/ to load all configs.
+     */
+    public void initialize(Application application) {
+        deployBundledConfigs(application);
+        scanExtensions(application);
+        LOG.infof("ExtensionRegistry initialized: %d extensions, %d LSP servers, %d DAP servers",
+                extensions.size(),
+                getAllLspServerConfigs().size(),
+                getAllDapServerConfigs().size());
+    }
+
+    private static final String MCP_EXTENSION_JSON = "mcp-extension.json";
+
+    /**
+     * Deploy bundled configs from classpath to extensions/ directory.
+     * Discovers extensions via mcp-extension.json descriptors, then scans
+     * their lsp/ and dap/ subdirectories for server configs.
+     * Overwrites configs but NOT binaries (bin/ directories).
+     */
+    private void deployBundledConfigs(Application application) {
+        try {
+            ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+            Enumeration<URL> descriptors = classLoader.getResources(MCP_EXTENSION_JSON);
+
+            while (descriptors.hasMoreElements()) {
+                URL descriptorUrl = descriptors.nextElement();
+                deployBundledExtension(descriptorUrl);
+            }
+        } catch (Exception e) {
+            LOG.errorf(e, "Failed to deploy bundled configs");
+        }
+    }
+
+    private void deployBundledExtension(URL descriptorUrl) {
+        try {
+            String extensionId = readExtensionId(descriptorUrl);
+            if (extensionId == null || extensionId.isBlank()) {
+                LOG.warnf("mcp-extension.json has no 'id' field: %s", descriptorUrl);
+                return;
+            }
+
+            Path basePath = resolveBasePath(descriptorUrl);
+
+            for (String root : List.of("lsp", "dap")) {
+                Path rootPath = basePath.resolve(root);
+                if (!Files.isDirectory(rootPath)) {
+                    continue;
+                }
+                try (Stream<Path> entries = Files.list(rootPath)) {
+                    entries.filter(Files::isDirectory)
+                           .forEach(serverDir -> {
+                               String serverId = serverDir.getFileName().toString();
+                               Path targetDir = pathManager.getExtensionServerHome(extensionId, root, serverId);
+                               deployServerDir(serverDir, targetDir);
+                           });
+                }
+            }
+
+            LOG.debugf("Deployed bundled extension '%s' from %s", extensionId, descriptorUrl);
+        } catch (Exception e) {
+            LOG.warnf(e, "Failed to deploy bundled extension from %s", descriptorUrl);
+        }
+    }
+
+    private String readExtensionId(URL descriptorUrl) throws IOException {
+        try (InputStream is = descriptorUrl.openStream();
+             InputStreamReader reader = new InputStreamReader(is, StandardCharsets.UTF_8)) {
+            JsonObject json = JsonParser.parseReader(reader).getAsJsonObject();
+            return json.has("id") ? json.get("id").getAsString() : null;
+        }
+    }
+
+    private Path resolveBasePath(URL descriptorUrl) throws Exception {
+        URI uri = descriptorUrl.toURI();
+        if ("jar".equals(uri.getScheme())) {
+            FileSystem fs;
+            try {
+                fs = FileSystems.newFileSystem(uri, Collections.emptyMap());
+            } catch (java.nio.file.FileSystemAlreadyExistsException e) {
+                fs = FileSystems.getFileSystem(uri);
+            }
+            Path descriptorPath = fs.getPath("/" + MCP_EXTENSION_JSON);
+            return descriptorPath.getParent();
+        } else {
+            Path descriptorPath = Paths.get(uri);
+            return descriptorPath.getParent();
+        }
+    }
+
+    private void deployServerDir(Path sourceDir, Path targetDir) {
+        try {
+            Files.createDirectories(targetDir);
+            try (Stream<Path> files = Files.list(sourceDir)) {
+                files.forEach(source -> {
+                    try {
+                        String fileName = source.getFileName().toString();
+                        Path target = targetDir.resolve(fileName);
+                        if (Files.isDirectory(source)) {
+                            copyDirectoryRecursively(source, target);
+                        } else {
+                            Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING);
+                        }
+                    } catch (IOException e) {
+                        LOG.warnf(e, "Failed to deploy file %s", source);
+                    }
+                });
+            }
+        } catch (Exception e) {
+            LOG.warnf(e, "Failed to deploy config from %s to %s", sourceDir, targetDir);
+        }
+    }
+
+    private void copyDirectoryRecursively(Path source, Path target) throws IOException {
+        Files.createDirectories(target);
+        try (Stream<Path> entries = Files.list(source)) {
+            entries.forEach(entry -> {
+                try {
+                    Path dest = target.resolve(entry.getFileName().toString());
+                    if (Files.isDirectory(entry)) {
+                        copyDirectoryRecursively(entry, dest);
+                    } else {
+                        Files.copy(entry, dest, StandardCopyOption.REPLACE_EXISTING);
+                    }
+                } catch (IOException e) {
+                    LOG.warnf(e, "Failed to copy %s", entry);
+                }
+            });
+        }
+    }
+
+    /**
+     * Scan extensions/ directory and load all extension configs.
+     */
+    private void scanExtensions(Application application) {
+        Path extensionsDir = pathManager.getExtensionsDir();
+        if (!Files.isDirectory(extensionsDir)) {
+            LOG.infof("Extensions directory does not exist: %s", extensionsDir);
+            return;
+        }
+
+        try (var extensionDirs = Files.list(extensionsDir)) {
+            extensionDirs.filter(Files::isDirectory)
+                    .forEach(extDir -> {
+                        String extensionId = extDir.getFileName().toString();
+                        try {
+                            loadExtension(extensionId, ServerConfigSource.BUNDLED, application);
+                        } catch (Exception e) {
+                            LOG.errorf(e, "Failed to load extension: %s", extensionId);
+                        }
+                    });
+        } catch (Exception e) {
+            LOG.errorf(e, "Failed to scan extensions directory: %s", extensionsDir);
+        }
+    }
+
+    /**
+     * Load an extension from its directory on the filesystem.
+     */
+    private Extension loadExtension(String extensionId, ServerConfigSource source, Application application) {
+        Extension extension = new Extension(extensionId, source, application);
+        Path extensionDir = pathManager.getExtensionDir(extensionId);
+
+        Map<String, ServerConfigBase> configs = serverDescriptorRegistry.loadFromExtensionDir(extensionDir, extension);
+
+        for (ServerConfigBase config : configs.values()) {
+            if (config instanceof LspServerConfig lspConfig) {
+                extension.addLspServerConfig(lspConfig);
+            } else if (config instanceof DapServerConfig dapConfig) {
+                extension.addDapServerConfig(dapConfig);
+            }
+        }
+
+        extensions.put(extensionId, extension);
+
+        if (isExtensionEnabled(extensionId)) {
+            fireOnAdded(extension);
+        }
+
+        return extension;
+    }
+
+    // ========== Add extension ==========
+
+    /**
+     * Add an extension from a source path (folder, ZIP, or JAR).
+     */
+    public Extension addExtension(String extensionId, Path source, Application application) throws IOException {
+        if (extensions.containsKey(extensionId)) {
+            throw new IllegalStateException("Extension '" + extensionId + "' is already deployed");
+        }
+
+        Path targetDir = pathManager.getExtensionDir(extensionId);
+        ExtensionExtractor.extract(source, targetDir);
+
+        Extension extension = loadExtension(extensionId, ServerConfigSource.USER, application);
+
+        // Validate no duplicate serverIds
+        for (LspServerConfig config : extension.getLspServerConfigs()) {
+            checkServerIdUnique(config.getServerId(), extensionId);
+        }
+        for (DapServerConfig config : extension.getDapServerConfigs()) {
+            checkServerIdUnique(config.getServerId(), extensionId);
+        }
+
+        return extension;
+    }
+
+    // ========== Add individual servers ==========
+
+    /**
+     * Add an LSP server from a source path. extensionId defaults to serverId from the config.
+     */
+    public LspServerConfig addLspServer(Path source, Application application) throws IOException {
+        return addLspServer(source, null, application);
+    }
+
+    /**
+     * Add an LSP server from a source path into the given extension.
+     */
+    public LspServerConfig addLspServer(Path source, String extensionId, Application application) throws IOException {
+        // Extract to temp to read server.json and get serverId
+        Path tempDir = Files.createTempDirectory("mcp-lsp-");
+        try {
+            ExtensionExtractor.extract(source, tempDir);
+            // The serverId is the directory name in the source, or the temp dir itself for flat sources
+            String serverId = detectServerId(tempDir);
+
+            if (extensionId == null) {
+                extensionId = serverId;
+            }
+
+            checkServerIdUnique(serverId, extensionId);
+
+            Path targetDir = pathManager.getExtensionServerHome(extensionId, "lsp", serverId);
+            Files.createDirectories(targetDir.getParent());
+            ExtensionExtractor.extract(source, targetDir);
+
+            Extension extension = getOrCreateExtension(extensionId, ServerConfigSource.USER, application);
+            var loader = serverDescriptorRegistry.getLoader("lsp");
+            LspServerConfig config = (LspServerConfig) loader.load(targetDir, extension);
+            extension.addLspServerConfig(config);
+
+            fireOnAdded(extension);
+            return config;
+        } finally {
+            deleteRecursively(tempDir);
+        }
+    }
+
+    /**
+     * Add an LSP server from a pre-loaded config. extensionId defaults to config.serverId.
+     */
+    public void addLspServer(LspServerConfig config) {
+        addLspServer(config, config.getServerId());
+    }
+
+    /**
+     * Add an LSP server from a pre-loaded config into the given extension.
+     */
+    public void addLspServer(LspServerConfig config, String extensionId) {
+        checkServerIdUnique(config.getServerId(), extensionId);
+        Extension extension = getOrCreateExtension(extensionId, ServerConfigSource.USER, config.getApplication());
+        extension.addLspServerConfig(config);
+        fireOnAdded(extension);
+    }
+
+    /**
+     * Add a DAP server from a source path. extensionId defaults to serverId from the config.
+     */
+    public DapServerConfig addDapServer(Path source, Application application) throws IOException {
+        return addDapServer(source, null, application);
+    }
+
+    /**
+     * Add a DAP server from a source path into the given extension.
+     */
+    public DapServerConfig addDapServer(Path source, String extensionId, Application application) throws IOException {
+        Path tempDir = Files.createTempDirectory("mcp-dap-");
+        try {
+            ExtensionExtractor.extract(source, tempDir);
+            String serverId = detectServerId(tempDir);
+
+            if (extensionId == null) {
+                extensionId = serverId;
+            }
+
+            checkServerIdUnique(serverId, extensionId);
+
+            Path targetDir = pathManager.getExtensionServerHome(extensionId, "dap", serverId);
+            Files.createDirectories(targetDir.getParent());
+            ExtensionExtractor.extract(source, targetDir);
+
+            Extension extension = getOrCreateExtension(extensionId, ServerConfigSource.USER, application);
+            var loader = serverDescriptorRegistry.getLoader("dap");
+            DapServerConfig config = (DapServerConfig) loader.load(targetDir, extension);
+            extension.addDapServerConfig(config);
+
+            fireOnAdded(extension);
+            return config;
+        } finally {
+            deleteRecursively(tempDir);
+        }
+    }
+
+    /**
+     * Add a DAP server from a pre-loaded config. extensionId defaults to config.serverId.
+     */
+    public void addDapServer(DapServerConfig config) {
+        addDapServer(config, config.getServerId());
+    }
+
+    /**
+     * Add a DAP server from a pre-loaded config into the given extension.
+     */
+    public void addDapServer(DapServerConfig config, String extensionId) {
+        checkServerIdUnique(config.getServerId(), extensionId);
+        Extension extension = getOrCreateExtension(extensionId, ServerConfigSource.USER, config.getApplication());
+        extension.addDapServerConfig(config);
+        fireOnAdded(extension);
+    }
+
+    // ========== Remove ==========
+
+    /**
+     * Remove an entire extension (all its servers).
+     */
+    public void removeExtension(String extensionId) {
+        Extension extension = extensions.get(extensionId);
+        if (extension == null) {
+            throw new IllegalArgumentException("Extension '" + extensionId + "' not found");
+        }
+        if (extension.getSource() == ServerConfigSource.BUNDLED) {
+            throw new IllegalStateException("Cannot remove bundled extension '" + extensionId + "', use disable instead");
+        }
+
+        extensions.remove(extensionId);
+        fireOnRemoved(extension);
+
+        Path extensionDir = pathManager.getExtensionDir(extensionId);
+        deleteRecursively(extensionDir);
+    }
+
+    /**
+     * Remove an individual LSP server from its extension.
+     */
+    public void removeLspServer(String serverId) {
+        Extension extension = findExtensionForLspServer(serverId);
+        if (extension == null) {
+            throw new IllegalArgumentException("LSP server '" + serverId + "' not found");
+        }
+        if (extension.getSource() == ServerConfigSource.BUNDLED) {
+            throw new IllegalStateException("Cannot remove bundled server '" + serverId + "', use disable instead");
+        }
+
+        extension.removeLspServerConfig(serverId);
+
+        Path serverDir = pathManager.getExtensionServerHome(extension.getId(), "lsp", serverId);
+        deleteRecursively(serverDir);
+
+        if (extension.isEmpty()) {
+            extensions.remove(extension.getId());
+            fireOnRemoved(extension);
+            deleteRecursively(pathManager.getExtensionDir(extension.getId()));
+        }
+    }
+
+    /**
+     * Remove an individual DAP server from its extension.
+     */
+    public void removeDapServer(String serverId) {
+        Extension extension = findExtensionForDapServer(serverId);
+        if (extension == null) {
+            throw new IllegalArgumentException("DAP server '" + serverId + "' not found");
+        }
+        if (extension.getSource() == ServerConfigSource.BUNDLED) {
+            throw new IllegalStateException("Cannot remove bundled server '" + serverId + "', use disable instead");
+        }
+
+        extension.removeDapServerConfig(serverId);
+
+        Path serverDir = pathManager.getExtensionServerHome(extension.getId(), "dap", serverId);
+        deleteRecursively(serverDir);
+
+        if (extension.isEmpty()) {
+            extensions.remove(extension.getId());
+            fireOnRemoved(extension);
+            deleteRecursively(pathManager.getExtensionDir(extension.getId()));
+        }
+    }
+
+    // ========== Enable / Disable ==========
+
+    public void enableExtension(String extensionId) {
+        if (!extensions.containsKey(extensionId)) {
+            throw new IllegalArgumentException("Extension '" + extensionId + "' not found");
+        }
+        disabledExtensions.remove(extensionId);
+        persistDisabledExtensions();
+        fireOnAdded(extensions.get(extensionId));
+    }
+
+    public void disableExtension(String extensionId) {
+        Extension extension = extensions.get(extensionId);
+        if (extension == null) {
+            throw new IllegalArgumentException("Extension '" + extensionId + "' not found");
+        }
+        disabledExtensions.add(extensionId);
+        persistDisabledExtensions();
+        fireOnRemoved(extension);
+    }
+
+    public boolean isExtensionEnabled(String extensionId) {
+        return !disabledExtensions.contains(extensionId);
+    }
+
+    public void enableLspServer(String serverId) {
+        disabledServers.remove(serverId);
+        persistDisabledServers();
+    }
+
+    public void disableLspServer(String serverId) {
+        disabledServers.add(serverId);
+        persistDisabledServers();
+    }
+
+    public void enableDapServer(String serverId) {
+        disabledServers.remove(serverId);
+        persistDisabledServers();
+    }
+
+    public void disableDapServer(String serverId) {
+        disabledServers.add(serverId);
+        persistDisabledServers();
+    }
+
+    public boolean isServerEnabled(String serverId) {
+        return !disabledServers.contains(serverId);
+    }
+
+    // ========== Disabled state persistence ==========
+
+    public Set<String> getDisabledExtensions() {
+        return Collections.unmodifiableSet(disabledExtensions);
+    }
+
+    public Set<String> getDisabledServers() {
+        return Collections.unmodifiableSet(disabledServers);
+    }
+
+    public void setDisabledExtensions(Collection<String> disabled) {
+        disabledExtensions.clear();
+        disabledExtensions.addAll(disabled);
+    }
+
+    public void setDisabledServers(Collection<String> disabled) {
+        disabledServers.clear();
+        disabledServers.addAll(disabled);
+    }
+
+    // ========== Queries ==========
+
+    public Extension getExtension(String extensionId) {
+        return extensions.get(extensionId);
+    }
+
+    public Collection<Extension> getExtensions() {
+        return Collections.unmodifiableCollection(extensions.values());
+    }
+
+    /**
+     * All LSP server configs (enabled + disabled) — for admin, listing.
+     */
+    public Collection<LspServerConfig> getAllLspServerConfigs() {
+        return extensions.values().stream()
+                .flatMap(ext -> ext.getLspServerConfigs().stream())
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Only enabled LSP server configs — for ensureServerForFile().
+     */
+    public Collection<LspServerConfig> getEnabledLspServerConfigs() {
+        return extensions.entrySet().stream()
+                .filter(e -> isExtensionEnabled(e.getKey()))
+                .flatMap(e -> e.getValue().getLspServerConfigs().stream())
+                .filter(c -> isServerEnabled(c.getServerId()))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * All DAP server configs (enabled + disabled) — for admin, listing.
+     */
+    public Collection<DapServerConfig> getAllDapServerConfigs() {
+        return extensions.values().stream()
+                .flatMap(ext -> ext.getDapServerConfigs().stream())
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Only enabled DAP server configs — for workspace matching.
+     */
+    public Collection<DapServerConfig> getEnabledDapServerConfigs() {
+        return extensions.entrySet().stream()
+                .filter(e -> isExtensionEnabled(e.getKey()))
+                .flatMap(e -> e.getValue().getDapServerConfigs().stream())
+                .filter(c -> isServerEnabled(c.getServerId()))
+                .collect(Collectors.toList());
+    }
+
+    public LspServerConfig getLspServerConfig(String serverId) {
+        for (Extension ext : extensions.values()) {
+            LspServerConfig config = ext.getLspServerConfig(serverId);
+            if (config != null) {
+                return config;
+            }
+        }
+        return null;
+    }
+
+    public DapServerConfig getDapServerConfig(String serverId) {
+        for (Extension ext : extensions.values()) {
+            DapServerConfig config = ext.getDapServerConfig(serverId);
+            if (config != null) {
+                return config;
+            }
+        }
+        return null;
+    }
+
+    // ========== Internal helpers ==========
+
+    private Extension getOrCreateExtension(String extensionId, ServerConfigSource source, Application application) {
+        return extensions.computeIfAbsent(extensionId, id -> new Extension(id, source, application));
+    }
+
+    private Extension findExtensionForLspServer(String serverId) {
+        for (Extension ext : extensions.values()) {
+            if (ext.getLspServerConfig(serverId) != null) {
+                return ext;
+            }
+        }
+        return null;
+    }
+
+    private Extension findExtensionForDapServer(String serverId) {
+        for (Extension ext : extensions.values()) {
+            if (ext.getDapServerConfig(serverId) != null) {
+                return ext;
+            }
+        }
+        return null;
+    }
+
+    private void checkServerIdUnique(String serverId, String extensionId) {
+        for (Extension ext : extensions.values()) {
+            LspServerConfig lsp = ext.getLspServerConfig(serverId);
+            if (lsp != null) {
+                throw new IllegalStateException(
+                        "Server '" + serverId + "' is already deployed in extension '" + ext.getId() + "'");
+            }
+            DapServerConfig dap = ext.getDapServerConfig(serverId);
+            if (dap != null) {
+                throw new IllegalStateException(
+                        "Server '" + serverId + "' is already deployed in extension '" + ext.getId() + "'");
+            }
+        }
+    }
+
+    private String detectServerId(Path dir) throws IOException {
+        // If the directory contains server.json directly, the serverId is the directory name
+        if (Files.exists(dir.resolve("server.json"))) {
+            return dir.getFileName().toString();
+        }
+        // Otherwise look for a single subdirectory containing server.json
+        try (var entries = Files.list(dir)) {
+            Optional<Path> subDir = entries.filter(Files::isDirectory)
+                    .filter(d -> Files.exists(d.resolve("server.json")))
+                    .findFirst();
+            if (subDir.isPresent()) {
+                return subDir.get().getFileName().toString();
+            }
+        }
+        throw new IOException("Cannot detect serverId: no server.json found in " + dir);
+    }
+
+    private void fireOnAdded(Extension extension) {
+        var event = new ExtensionAddedEvent(extension);
+        for (ExtensionListener listener : extensionListeners) {
+            try {
+                listener.onAdded(event);
+            } catch (Exception e) {
+                LOG.warnf(e, "ExtensionListener.onAdded failed for '%s'", extension.getId());
+            }
+        }
+    }
+
+    private void fireOnRemoved(Extension extension) {
+        var event = new ExtensionRemovedEvent(extension);
+        for (ExtensionListener listener : extensionListeners) {
+            try {
+                listener.onRemoved(event);
+            } catch (Exception e) {
+                LOG.warnf(e, "ExtensionListener.onRemoved failed for '%s'", extension.getId());
+            }
+        }
+    }
+
+    private void persistDisabledExtensions() {
+        applicationConfiguration.setDisabledExtensionIds(new ArrayList<>(disabledExtensions));
+    }
+
+    private void persistDisabledServers() {
+        applicationConfiguration.setDisabledServerIds(new ArrayList<>(disabledServers));
+    }
+
+    private static void deleteRecursively(Path path) {
+        if (path == null || !Files.exists(path)) {
+            return;
+        }
+        try {
+            Files.walkFileTree(path, new java.nio.file.SimpleFileVisitor<Path>() {
+                @Override
+                public java.nio.file.FileVisitResult visitFile(Path file, java.nio.file.attribute.BasicFileAttributes attrs) throws IOException {
+                    Files.delete(file);
+                    return java.nio.file.FileVisitResult.CONTINUE;
+                }
+
+                @Override
+                public java.nio.file.FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+                    Files.delete(dir);
+                    return java.nio.file.FileVisitResult.CONTINUE;
+                }
+            });
+        } catch (IOException e) {
+            LOG.warnf(e, "Failed to delete: %s", path);
+        }
+    }
+}

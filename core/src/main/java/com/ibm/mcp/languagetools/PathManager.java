@@ -86,6 +86,36 @@ public class PathManager {
         return getDapServersDir().resolve(serverId);
     }
 
+    // ----------------------- Extensions
+
+    private static final String DIR_EXTENSIONS = "extensions";
+
+    /**
+     * Get the extensions directory (~/.mcp-languagetools/extensions)
+     */
+    public Path getExtensionsDir() {
+        return getMcpLangToolsRoot().resolve(DIR_EXTENSIONS);
+    }
+
+    /**
+     * Get the directory for a specific extension (~/.mcp-languagetools/extensions/{extensionId})
+     */
+    public Path getExtensionDir(String extensionId) {
+        return getExtensionsDir().resolve(extensionId);
+    }
+
+    /**
+     * Get the server home within an extension.
+     * (~/.mcp-languagetools/extensions/{extensionId}/{type}/{serverId})
+     *
+     * @param extensionId the extension id
+     * @param type        "lsp" or "dap"
+     * @param serverId    the server id
+     */
+    public Path getExtensionServerHome(String extensionId, String type, String serverId) {
+        return getExtensionDir(extensionId).resolve(type).resolve(serverId);
+    }
+
     // Workspace configuration
 
     /**
