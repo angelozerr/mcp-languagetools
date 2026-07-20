@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "mcp-extension.json",
+  "description": "Root descriptor for an mcp-languagetools extension. Must be placed at the root of the extension directory.",
+  "type": "object",
+  "required": ["id"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique extension identifier (e.g. 'csharp', 'rust', 'python')"
+    }
+  },
+  "extensionStructure": {
+    "description": "Expected directory layout for an mcp-languagetools extension",
+    "layout": [
+      "mcp-extension.json",
+      "lsp/<server-id>/server.json",
+      "lsp/<server-id>/installer.json",
+      "dap/<server-id>/server.json",
+      "dap/<server-id>/installer.json"
+    ],
+    "notes": [
+      "An extension can have multiple LSP and/or DAP servers",
+      "lsp/ and dap/ directories are optional — an extension can have only LSP, only DAP, or both",
+      "Use the add_extension tool with the extension folder path to register it"
+    ]
+  }
+}

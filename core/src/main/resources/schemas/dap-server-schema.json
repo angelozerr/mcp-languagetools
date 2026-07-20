@@ -1,0 +1,136 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DAP server.json",
+  "description": "Configuration for a DAP debug adapter in mcp-languagetools",
+  "type": "object",
+  "required": ["id", "name", "documentSelector"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique debug adapter identifier (e.g. 'netcoredbg')"
+    },
+    "name": {
+      "type": "string",
+      "description": "Human-readable display name"
+    },
+    "description": {
+      "type": "string",
+      "description": "One-line description of the debug adapter"
+    },
+    "url": {
+      "type": "string",
+      "description": "Project homepage or repository URL"
+    },
+    "launch": {
+      "$ref": "#/$defs/platformString",
+      "description": "Command to launch the debug adapter in stdio mode"
+    },
+    "launchMethod": {
+      "type": "string",
+      "description": "For embedded mode: LSP request method to start the debug session (e.g. 'vscode.java.startDebugSession')"
+    },
+    "documentSelector": {
+      "$ref": "#/$defs/documentSelector"
+    },
+    "attach": {
+      "type": "object",
+      "description": "Socket-based attach configuration for connecting to a running debug adapter",
+      "properties": {
+        "address": {
+          "type": "string",
+          "description": "Host address (use $connect.host variable)"
+        },
+        "port": {
+          "type": "string",
+          "description": "Port (use $connect.port or $port variable)"
+        }
+      }
+    },
+    "debugServerReadyPattern": {
+      "type": "string",
+      "description": "Regex pattern to detect when DAP server is ready. Use ${address} and ${port} capture groups. Example: 'DAP server listening at: ${address}:${port}'"
+    },
+    "connectTimeout": {
+      "type": "integer",
+      "description": "Connection timeout in milliseconds (default: 500)"
+    },
+    "env": {
+      "type": "object",
+      "description": "Environment variables for the debug adapter process",
+      "additionalProperties": { "type": "string" }
+    },
+    "contributes": {
+      "$ref": "#/$defs/contributes"
+    }
+  },
+  "$defs": {
+    "platformString": {
+      "description": "A plain string or a platform-discriminated object. Platform keys: windows, unix, mac, default. Each can be a string or an arch-discriminated object with keys: x86_64, x86, arm64.",
+      "oneOf": [
+        { "type": "string" },
+        {
+          "type": "object",
+          "properties": {
+            "windows": { "$ref": "#/$defs/platformOrArchValue" },
+            "unix": { "$ref": "#/$defs/platformOrArchValue" },
+            "mac": { "$ref": "#/$defs/platformOrArchValue" },
+            "default": { "$ref": "#/$defs/platformOrArchValue" }
+          }
+        }
+      ]
+    },
+    "platformOrArchValue": {
+      "oneOf": [
+        { "type": "string" },
+        {
+          "type": "object",
+          "properties": {
+            "x86_64": { "type": "string" },
+            "x86": { "type": "string" },
+            "arm64": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "documentSelector": {
+      "type": "array",
+      "description": "Array of document filters to match files to this server",
+      "items": {
+        "type": "object",
+        "properties": {
+          "language": {
+            "type": "string",
+            "description": "Language identifier (e.g. 'csharp', 'python', 'java')"
+          },
+          "scheme": {
+            "type": "string",
+            "description": "URI scheme (e.g. 'file')"
+          },
+          "pattern": {
+            "type": "string",
+            "description": "Glob pattern (e.g. '**/Dockerfile')"
+          }
+        }
+      }
+    },
+    "contributes": {
+      "type": "object",
+      "description": "Contributions to other servers. Keys are target server IDs.",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "bundles": {
+            "type": "array",
+            "description": "Glob patterns for bundle JARs",
+            "items": { "type": "string" }
+          },
+          "bindRequest": {
+            "type": "array",
+            "description": "Request method names to delegate to target server",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}

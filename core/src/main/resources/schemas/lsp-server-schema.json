@@ -1,0 +1,146 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "LSP server.json",
+  "description": "Configuration for an LSP language server in mcp-languagetools",
+  "type": "object",
+  "required": ["id", "name", "documentSelector"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique server identifier (e.g. 'omnisharp')"
+    },
+    "name": {
+      "type": "string",
+      "description": "Human-readable display name"
+    },
+    "description": {
+      "type": "string",
+      "description": "One-line description of the server"
+    },
+    "url": {
+      "type": "string",
+      "description": "Project homepage or repository URL"
+    },
+    "command": {
+      "$ref": "#/$defs/platformString",
+      "description": "Launch command in stdio mode"
+    },
+    "documentSelector": {
+      "$ref": "#/$defs/documentSelector"
+    },
+    "initializationOptions": {
+      "type": "object",
+      "description": "LSP initialization options sent on startup (e.g. {\"ui.semanticTokens\": true})"
+    },
+    "toolsRequest": {
+      "type": "object",
+      "description": "MCP tool behavior options",
+      "properties": {
+        "skipDidOpen": {
+          "type": "boolean",
+          "description": "Skip sending textDocument/didOpen for tool requests"
+        }
+      }
+    },
+    "env": {
+      "type": "object",
+      "description": "Environment variables for the server process",
+      "additionalProperties": { "type": "string" }
+    },
+    "workingDirectory": {
+      "type": "string",
+      "description": "Working directory for the server process"
+    },
+    "acceptContributions": {
+      "type": "array",
+      "description": "Contribution types this server accepts from other extensions",
+      "items": {
+        "type": "string",
+        "enum": ["classpath", "bundles"]
+      }
+    },
+    "contributes": {
+      "$ref": "#/$defs/contributes"
+    }
+  },
+  "$defs": {
+    "platformString": {
+      "description": "A plain string or a platform-discriminated object. Platform keys: windows, unix, mac, default. Each can be a string or an arch-discriminated object with keys: x86_64, x86, arm64.",
+      "oneOf": [
+        { "type": "string" },
+        {
+          "type": "object",
+          "properties": {
+            "windows": { "$ref": "#/$defs/platformOrArchValue" },
+            "unix": { "$ref": "#/$defs/platformOrArchValue" },
+            "mac": { "$ref": "#/$defs/platformOrArchValue" },
+            "default": { "$ref": "#/$defs/platformOrArchValue" }
+          }
+        }
+      ]
+    },
+    "platformOrArchValue": {
+      "oneOf": [
+        { "type": "string" },
+        {
+          "type": "object",
+          "properties": {
+            "x86_64": { "type": "string" },
+            "x86": { "type": "string" },
+            "arm64": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "documentSelector": {
+      "type": "array",
+      "description": "Array of document filters to match files to this server",
+      "items": {
+        "type": "object",
+        "properties": {
+          "language": {
+            "type": "string",
+            "description": "Language identifier (e.g. 'csharp', 'python', 'java')"
+          },
+          "scheme": {
+            "type": "string",
+            "description": "URI scheme (e.g. 'file')"
+          },
+          "pattern": {
+            "type": "string",
+            "description": "Glob pattern (e.g. '**/bootstrap.properties')"
+          }
+        }
+      }
+    },
+    "contributes": {
+      "type": "object",
+      "description": "Contributions to other language servers. Keys are target server IDs.",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "classpath": {
+            "type": "array",
+            "description": "Glob patterns for JAR files to add to target classpath",
+            "items": { "type": "string" }
+          },
+          "bundles": {
+            "type": "array",
+            "description": "Glob patterns for OSGi bundle JARs",
+            "items": { "type": "string" }
+          },
+          "bindRequest": {
+            "type": "array",
+            "description": "LSP request method names to delegate to target server",
+            "items": { "type": "string" }
+          },
+          "bindNotification": {
+            "type": "array",
+            "description": "LSP notification method names to delegate to target server",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}

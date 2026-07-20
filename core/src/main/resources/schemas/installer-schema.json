@@ -1,0 +1,259 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "installer.json",
+  "description": "Installation configuration for an LSP or DAP server in mcp-languagetools. Used for both lsp/<server-id>/installer.json and dap/<server-id>/installer.json.",
+  "type": "object",
+  "required": ["id", "name", "check"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Installer identifier (e.g. 'omnisharp-installer')"
+    },
+    "name": {
+      "type": "string",
+      "description": "Display name"
+    },
+    "properties": {
+      "type": "object",
+      "description": "Key-value properties with variable interpolation (e.g. {\"serverJar\": \"$SERVER_HOME$/server.jar\"})",
+      "additionalProperties": { "type": "string" }
+    },
+    "check": {
+      "type": "object",
+      "description": "How to verify the server is already installed. Use ONE of fileExists or exec.",
+      "properties": {
+        "fileExists": {
+          "type": "object",
+          "description": "Check by file existence",
+          "required": ["name", "file"],
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Description of the check"
+            },
+            "file": {
+              "$ref": "#/$defs/platformString",
+              "description": "Path to check. Supports $SERVER_HOME$ variable and glob patterns."
+            }
+          }
+        },
+        "exec": {
+          "type": "object",
+          "description": "Check by running a command",
+          "required": ["name", "command"],
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Description of the check"
+            },
+            "command": {
+              "$ref": "#/$defs/platformString",
+              "description": "Command to execute (e.g. 'gopls version', 'dart --version')"
+            },
+            "timeout": {
+              "type": "integer",
+              "description": "Max wait time in milliseconds (e.g. 2000)"
+            }
+          }
+        }
+      }
+    },
+    "run": {
+      "type": "object",
+      "description": "How to install if the check fails. Use ONE of: download, exec, copy, or configureServer.",
+      "properties": {
+        "download": {
+          "type": "object",
+          "description": "Download an artifact from a URL, GitHub Releases, or Open VSX",
+          "required": ["name"],
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Description of the download"
+            },
+            "url": {
+              "type": "string",
+              "description": "Direct download URL"
+            },
+            "github": {
+              "type": "object",
+              "description": "Download from GitHub Releases",
+              "required": ["owner", "repository", "asset"],
+              "properties": {
+                "owner": {
+                  "type": "string",
+                  "description": "GitHub repository owner"
+                },
+                "repository": {
+                  "type": "string",
+                  "description": "GitHub repository name"
+                },
+                "prerelease": {
+                  "type": "boolean",
+                  "description": "Include pre-releases (default: false)"
+                },
+                "asset": {
+                  "$ref": "#/$defs/platformString",
+                  "description": "Asset filename pattern, supports wildcards (*) and platform/arch nesting"
+                }
+              }
+            },
+            "openvsx": {
+              "type": "object",
+              "description": "Download from Open VSX marketplace",
+              "required": ["namespace", "extensionName"],
+              "properties": {
+                "namespace": { "type": "string" },
+                "extensionName": { "type": "string" }
+              }
+            },
+            "output": {
+              "type": "object",
+              "description": "Where to place the downloaded file",
+              "properties": {
+                "dir": {
+                  "type": "string",
+                  "description": "Target directory (typically '$SERVER_HOME$')"
+                },
+                "stripRootDir": {
+                  "type": "boolean",
+                  "description": "Strip the root directory from the archive"
+                },
+                "file": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "$ref": "#/$defs/platformString",
+                      "description": "Output filename"
+                    },
+                    "executable": {
+                      "type": "boolean",
+                      "description": "Mark the file as executable (chmod +x)"
+                    }
+                  }
+                }
+              }
+            },
+            "onSuccess": {
+              "$ref": "#/$defs/onSuccess"
+            }
+          }
+        },
+        "exec": {
+          "type": "object",
+          "description": "Run a shell command to install",
+          "required": ["name", "command"],
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Description of the install step"
+            },
+            "command": {
+              "$ref": "#/$defs/platformString",
+              "description": "Install command (e.g. 'npm install -g typescript-language-server')"
+            },
+            "workingDir": {
+              "type": "string",
+              "description": "Working directory for the command"
+            },
+            "onSuccess": {
+              "$ref": "#/$defs/onSuccess"
+            }
+          }
+        },
+        "copy": {
+          "type": "object",
+          "description": "Copy a local file from extension resources",
+          "required": ["name", "source", "destination"],
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Description of the copy step"
+            },
+            "source": {
+              "type": "string",
+              "description": "Source path relative to extension resources"
+            },
+            "destination": {
+              "type": "string",
+              "description": "Destination path"
+            },
+            "onSuccess": {
+              "$ref": "#/$defs/onSuccess"
+            }
+          }
+        },
+        "configureServer": {
+          "$ref": "#/$defs/configureServer",
+          "description": "Use directly (no download/exec/copy) when the tool is expected to be pre-installed"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "platformString": {
+      "description": "A plain string or a platform-discriminated object. Platform keys: windows, unix, mac, default. Each can be a string or an arch-discriminated object with keys: x86_64, x86, arm64.",
+      "oneOf": [
+        { "type": "string" },
+        {
+          "type": "object",
+          "properties": {
+            "windows": { "$ref": "#/$defs/platformOrArchValue" },
+            "unix": { "$ref": "#/$defs/platformOrArchValue" },
+            "mac": { "$ref": "#/$defs/platformOrArchValue" },
+            "default": { "$ref": "#/$defs/platformOrArchValue" }
+          }
+        }
+      ]
+    },
+    "platformOrArchValue": {
+      "oneOf": [
+        { "type": "string" },
+        {
+          "type": "object",
+          "properties": {
+            "x86_64": { "type": "string" },
+            "x86": { "type": "string" },
+            "arm64": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "configureServer": {
+      "type": "object",
+      "description": "Configure the server launch command after installation",
+      "required": ["name", "command"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Description of the configuration step"
+        },
+        "command": {
+          "$ref": "#/$defs/platformString",
+          "description": "Command to launch the server"
+        },
+        "update": {
+          "type": "boolean",
+          "description": "Overwrite existing command configuration (default: false)"
+        }
+      }
+    },
+    "onSuccess": {
+      "type": "object",
+      "description": "Actions to perform after successful installation",
+      "properties": {
+        "configureServer": {
+          "$ref": "#/$defs/configureServer"
+        }
+      }
+    }
+  },
+  "variables": {
+    "$SERVER_HOME$": "Root installation directory for the server",
+    "$USER_HOME$": "User's home directory",
+    "$PROJECT_DIR$": "Current project/workspace directory",
+    "${output.file.name}": "Output filename from the download step",
+    "${output.dir}": "Output directory from the download step",
+    "${port}": "DAP server port"
+  }
+}

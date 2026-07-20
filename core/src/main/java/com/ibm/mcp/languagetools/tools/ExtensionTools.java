@@ -24,6 +24,8 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
 
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
@@ -193,6 +195,38 @@ public class ExtensionTools {
         } catch (Exception e) {
             LOG.error("Failed to remove DAP server", e);
             return Map.of("success", false, "error", e.getMessage());
+        }
+    }
+
+    // ========== Schemas ==========
+
+    @Tool(name = "get_extension_schemas",
+          description = "Returns the JSON Schemas for building an mcp-languagetools extension. " +
+                        "An extension is a folder with the following structure: " +
+                        "mcp-extension.json (optional root descriptor with extension id), " +
+                        "lsp/<server-id>/server.json + installer.json (for each LSP language server), " +
+                        "dap/<server-id>/server.json + installer.json (for each DAP debug adapter). " +
+                        "Both lsp/ and dap/ are optional. " +
+                        "Use the returned schemas to generate valid configuration files, " +
+                        "then register the extension with the add_extension tool.")
+    public Map<String, Object> getExtensionSchemas() {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("mcpExtensionSchema", loadSchema("schemas/mcp-extension-schema.json"));
+        result.put("lspServerSchema", loadSchema("schemas/lsp-server-schema.json"));
+        result.put("dapServerSchema", loadSchema("schemas/dap-server-schema.json"));
+        result.put("installerSchema", loadSchema("schemas/installer-schema.json"));
+        return result;
+    }
+
+    private String loadSchema(String resourcePath) {
+        try (InputStream is = Thread.currentThread().getContextClassLoader().getResourceAsStream(resourcePath)) {
+            if (is == null) {
+                return "{\"error\": \"Schema not found: " + resourcePath + "\"}";
+            }
+            return new String(is.readAllBytes(), StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            LOG.error("Failed to load schema: " + resourcePath, e);
+            return "{\"error\": \"Failed to load schema: " + e.getMessage() + "\"}";
         }
     }
 
