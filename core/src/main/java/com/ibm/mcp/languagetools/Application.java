@@ -146,15 +146,16 @@ public class Application {
         LOG.infof("Loaded %d DAP server descriptors", getDapServerConfigs().size());
     }
 
-    @SuppressWarnings("unchecked")
     private void loadDisabledState() {
-        Object extDisabled = applicationConfiguration.get("extensions.disabled");
-        if (extDisabled instanceof List) {
-            extensionRegistry.setDisabledExtensions((List<String>) extDisabled);
+        applicationConfiguration.migrateOldDisabledFormat();
+
+        List<String> disabledExtensions = applicationConfiguration.getDisabledExtensionIds();
+        if (!disabledExtensions.isEmpty()) {
+            extensionRegistry.setDisabledExtensions(disabledExtensions);
         }
-        Object srvDisabled = applicationConfiguration.get("servers.disabled");
-        if (srvDisabled instanceof List) {
-            extensionRegistry.setDisabledServers((List<String>) srvDisabled);
+        List<String> disabledServers = applicationConfiguration.getDisabledServerIds();
+        if (!disabledServers.isEmpty()) {
+            extensionRegistry.setDisabledServers(disabledServers);
         }
     }
 

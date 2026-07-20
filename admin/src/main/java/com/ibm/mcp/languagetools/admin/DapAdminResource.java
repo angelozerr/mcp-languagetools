@@ -21,6 +21,7 @@ import com.ibm.mcp.languagetools.admin.dto.DapConfigDTO;
 import com.ibm.mcp.languagetools.admin.dto.ErrorResponse;
 import com.ibm.mcp.languagetools.admin.dto.StatusResponse;
 import com.ibm.mcp.languagetools.dap.server.DapServerConfig;
+import com.ibm.mcp.languagetools.extension.ExtensionRegistry;
 import com.ibm.mcp.languagetools.installer.TaskRegistryInstaller;
 import com.ibm.mcp.languagetools.installer.TraceProgressMonitor;
 import com.ibm.mcp.languagetools.progress.ProgressBroadcaster;
@@ -55,6 +56,9 @@ public class DapAdminResource {
 
     @Inject
     ContributionDTOBuilder contributionBuilder;
+
+    @Inject
+    ExtensionRegistry extensionRegistry;
 
     @Inject
     ProgressBroadcaster progressBroadcaster;
@@ -95,7 +99,8 @@ public class DapAdminResource {
             config.getDescription(),
             config.getUrl(),
             config.getDocumentSelector(),
-            contributionBuilder.buildContributions(config)
+            contributionBuilder.buildContributions(config),
+            extensionRegistry.isServerEnabled(config.getServerId())
         );
     }
 

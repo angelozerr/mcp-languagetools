@@ -7,6 +7,45 @@
         // Filter to show only active (non-STOPPED) servers
         let showOnlyActiveServers = false;
 
+        async function toggleWorkspaceLspServerEnabled(serverId, enabled) {
+            const action = enabled ? 'enable' : 'disable';
+            try {
+                const response = await fetch(`/api/admin/extensions/lsp/servers/${serverId}/${action}`, { method: 'POST' });
+                if (response.ok) {
+                    // Update cached config
+                    if (window.lspConfigs[serverId]) {
+                        window.lspConfigs[serverId].enabled = enabled;
+                    }
+                    // Update workspace server data and re-render
+                    const workspace = workspaces.find(w => w.rootUri === selectedWorkspace);
+                    if (workspace && workspace.lspServers) {
+                        const srv = workspace.lspServers.find(s => s.id === serverId);
+                        if (srv) srv.enabled = enabled;
+                    }
+                    if (workspace) renderServers(workspace.lspServers || [], [], workspace);
+                }
+            } catch (error) {
+                console.error(`Failed to ${action} LSP server:`, error);
+            }
+        }
+
+        async function toggleWorkspaceDapServerEnabled(serverId, enabled) {
+            const action = enabled ? 'enable' : 'disable';
+            try {
+                const response = await fetch(`/api/admin/extensions/dap/servers/${serverId}/${action}`, { method: 'POST' });
+                if (response.ok) {
+                    if (window.dapConfigs && window.dapConfigs[serverId]) {
+                        window.dapConfigs[serverId].enabled = enabled;
+                    }
+                    const workspace = workspaces.find(w => w.rootUri === selectedWorkspace);
+                    const sessions = window.dapSessions || [];
+                    if (workspace) renderServers([], sessions, workspace);
+                }
+            } catch (error) {
+                console.error(`Failed to ${action} DAP server:`, error);
+            }
+        }
+
         function toggleShowActiveServers() {
             showOnlyActiveServers = !showOnlyActiveServers;
             const workspace = workspaces.find(w => w.rootUri === selectedWorkspace);
@@ -445,6 +484,7 @@
                                        (server.status === 'CONNECTED_TO_IDE' || server.status === 'CONNECTING_TO_IDE');
                     const serverClass = isExternal ? 'server-item-external' : 'server-item-managed';
                     const extensionClass = server.isExtension ? 'server-extension' : '';
+                    const disabledClass = server.enabled === false ? 'server-disabled' : '';
                     const extensionBadge = server.isExtension ? ' <span style="color: #999999; font-size: 0.85em;">(Extension)</span>' : '';
 
                     let actions = '';
@@ -489,13 +529,19 @@
                     const contributedInfo = formatContributeInfo(server, contributedByMap);
 
                     return `
-                        <div class="server-item ${serverClass} ${extensionClass} ${selectedServer?.id === server.id ? 'active' : ''}"
+                        <div class="server-item ${serverClass} ${extensionClass} ${disabledClass} ${selectedServer?.id === server.id ? 'active' : ''}"
                              data-server-id="${server.id}"
                              onclick='selectServer(${JSON.stringify(server)}, true)'
                              ${tooltipText ? `title="${tooltipText.replace(/"/g, '&quot;')}"` : ''}>
-                            <div class="server-name">
-                                <span class="server-source-icon" title="${sourceLabel}">${sourceIcon}</span>
-                                ${server.name}${extensionBadge}
+                            <div class="server-name" style="display: flex; align-items: center; justify-content: space-between;">
+                                <span>
+                                    <span class="server-source-icon" title="${sourceLabel}">${sourceIcon}</span>
+                                    ${server.name}${extensionBadge}
+                                </span>
+                                <label class="toggle-switch" onclick="event.stopPropagation()">
+                                    <input type="checkbox" ${server.enabled !== false ? 'checked' : ''} onchange="toggleWorkspaceLspServerEnabled('${server.id}', this.checked)">
+                                    <span class="toggle-slider"></span>
+                                </label>
                             </div>
                             <div class="server-id" ${contributedInfo.tooltip ? `title="${contributedInfo.tooltip}"` : ''}>${server.id}${contributedInfo.text}</div>
                             <div class="server-status-badge-container">
@@ -545,11 +591,19 @@
                         <button class="server-action-btn" onclick='event.stopPropagation(); createNewTestSession("${server.id}")' title="New Test Launch">+</button>
                     `;
 
+                    const disabledClass = server.enabled === false ? 'server-disabled' : '';
+
                     return `
-                        <div class="server-item ${selectedServer?.id === server.id ? 'active' : ''}" data-dap-server="${server.id}" onclick='selectDapServer(${JSON.stringify(server)})' style="cursor: pointer;">
-                            <div class="server-name">
-                                <span class="server-source-icon">🐛</span>
-                                ${server.name}
+                        <div class="server-item ${disabledClass} ${selectedServer?.id === server.id ? 'active' : ''}" data-dap-server="${server.id}" onclick='selectDapServer(${JSON.stringify(server)})' style="cursor: pointer;">
+                            <div class="server-name" style="display: flex; align-items: center; justify-content: space-between;">
+                                <span>
+                                    <span class="server-source-icon">🐛</span>
+                                    ${server.name}
+                                </span>
+                                <label class="toggle-switch" onclick="event.stopPropagation()">
+                                    <input type="checkbox" ${server.enabled !== false ? 'checked' : ''} onchange="toggleWorkspaceDapServerEnabled('${server.id}', this.checked)">
+                                    <span class="toggle-slider"></span>
+                                </label>
                             </div>
                             <div class="server-id">${server.id}</div>
                             <div class="server-actions">

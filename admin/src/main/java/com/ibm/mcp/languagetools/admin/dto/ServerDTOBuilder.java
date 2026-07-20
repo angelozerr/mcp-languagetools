@@ -13,6 +13,7 @@
  *******************************************************************************/
 package com.ibm.mcp.languagetools.admin.dto;
 
+import com.ibm.mcp.languagetools.extension.ExtensionRegistry;
 import com.ibm.mcp.languagetools.lsp.server.LspServer;
 import com.ibm.mcp.languagetools.lsp.server.LspServerConfig;
 import com.ibm.mcp.languagetools.server.ServerStatus;
@@ -28,6 +29,9 @@ public class ServerDTOBuilder {
 
     @Inject
     ContributionDTOBuilder contributionBuilder;
+
+    @Inject
+    ExtensionRegistry extensionRegistry;
 
     /**
      * Build LspConfigDTO from LspServerConfig.
@@ -47,7 +51,8 @@ public class ServerDTOBuilder {
             config.getWorkingDirectory(),
             config.getInitializationOptions(),
             contributionBuilder.buildContributions(config),
-            isExtension
+            isExtension,
+            extensionRegistry.isServerEnabled(config.getServerId())
         );
     }
 

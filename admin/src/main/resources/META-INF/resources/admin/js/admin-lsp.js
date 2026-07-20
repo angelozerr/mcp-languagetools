@@ -31,14 +31,21 @@ async function loadAllLspServers(serverIdToSelect) {
         container.innerHTML = lspServers.map(server => {
             const isActive = selectedAllServer === server.id ? 'active' : '';
             const extensionClass = server.isExtension ? 'server-extension' : '';
+            const disabledClass = server.enabled === false ? 'server-disabled' : '';
             const extensionBadge = server.isExtension ? ' <span style="color: #999999; font-size: 0.85em;">(Extension)</span>' : '';
             const serverIcon = server.isExtension ? '🧩' : '🚀';
             const contributeInfo = formatContributeInfo(server, contributedByMap);
             return `
-                <div class="server-item ${isActive} ${extensionClass}" onclick="showServerDetails('${server.id}')">
-                    <div class="server-name">
-                        <span class="server-source-icon">${serverIcon}</span>
-                        ${server.name}${extensionBadge}
+                <div class="server-item ${isActive} ${extensionClass} ${disabledClass}" onclick="showServerDetails('${server.id}')">
+                    <div class="server-name" style="display: flex; align-items: center; justify-content: space-between;">
+                        <span>
+                            <span class="server-source-icon">${serverIcon}</span>
+                            ${server.name}${extensionBadge}
+                        </span>
+                        <label class="toggle-switch" onclick="event.stopPropagation()">
+                            <input type="checkbox" ${server.enabled !== false ? 'checked' : ''} onchange="toggleLspServerEnabled('${server.id}', this.checked)">
+                            <span class="toggle-slider"></span>
+                        </label>
                     </div>
                     <div class="server-id" ${contributeInfo.tooltip ? `title="${contributeInfo.tooltip}"` : ''}>${server.id}${contributeInfo.text}</div>
                 </div>
@@ -82,14 +89,21 @@ async function showServerDetails(serverId) {
     container.innerHTML = lspServers.map(server => {
         const isActive = selectedAllServer === server.id ? 'active' : '';
         const extensionClass = server.isExtension ? 'server-extension' : '';
+        const disabledClass = server.enabled === false ? 'server-disabled' : '';
         const extensionBadge = server.isExtension ? ' <span style="color: #999999; font-size: 0.85em;">(Extension)</span>' : '';
         const serverIcon = server.isExtension ? '🧩' : '🚀';
         const contributeInfo = formatContributeInfo(server, contributedByMap);
         return `
-            <div class="server-item ${isActive} ${extensionClass}" onclick="showServerDetails('${server.id}')">
-                <div class="server-name">
-                    <span class="server-source-icon">${serverIcon}</span>
-                    ${server.name}${extensionBadge}
+            <div class="server-item ${isActive} ${extensionClass} ${disabledClass}" onclick="showServerDetails('${server.id}')">
+                <div class="server-name" style="display: flex; align-items: center; justify-content: space-between;">
+                    <span>
+                        <span class="server-source-icon">${serverIcon}</span>
+                        ${server.name}${extensionBadge}
+                    </span>
+                    <label class="toggle-switch" onclick="event.stopPropagation()">
+                        <input type="checkbox" ${server.enabled !== false ? 'checked' : ''} onchange="toggleLspServerEnabled('${server.id}', this.checked)">
+                        <span class="toggle-slider"></span>
+                    </label>
                 </div>
                 <div class="server-id" ${contributeInfo.tooltip ? `title="${contributeInfo.tooltip}"` : ''}>${server.id}${contributeInfo.text}</div>
             </div>
@@ -460,7 +474,28 @@ async function changeLspServerTraceLevel(serverId, level) {
     }
 }
 
+/**
+ * Toggle enable/disable for an LSP server.
+ */
+async function toggleLspServerEnabled(serverId, enabled) {
+    const action = enabled ? 'enable' : 'disable';
+    try {
+        const response = await fetch(`/api/admin/extensions/lsp/servers/${serverId}/${action}`, { method: 'POST' });
+        if (response.ok) {
+            // Update cached config
+            if (window.lspConfigs[serverId]) {
+                window.lspConfigs[serverId].enabled = enabled;
+            }
+            // Re-render the list
+            loadAllLspServers(selectedAllServer);
+        }
+    } catch (error) {
+        console.error(`Failed to ${action} LSP server:`, error);
+    }
+}
+
 // Expose functions globally
+window.toggleLspServerEnabled = toggleLspServerEnabled;
 window.loadAllLspServers = loadAllLspServers;
 window.showServerDetails = showServerDetails;
 window.switchServerTab = switchServerTab;

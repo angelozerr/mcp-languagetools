@@ -23,7 +23,11 @@ import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import org.jboss.logging.Logger;
+import org.jboss.resteasy.reactive.multipart.FileUpload;
+import org.jboss.resteasy.reactive.RestForm;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -90,6 +94,52 @@ public class ExtensionAdminResource {
             return Response.status(Response.Status.BAD_REQUEST)
                     .entity(Map.of("error", e.getMessage()))
                     .build();
+        }
+    }
+
+    @POST
+    @Path("/upload")
+    @Consumes(MediaType.MULTIPART_FORM_DATA)
+    public Response uploadExtension(@RestForm("extensionId") String extensionId,
+                                    @RestForm("file") FileUpload file) {
+        if (extensionId == null || extensionId.isBlank()) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(Map.of("error", "extensionId is required"))
+                    .build();
+        }
+        if (file == null) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(Map.of("error", "file is required"))
+                    .build();
+        }
+
+        java.nio.file.Path uploadedPath = file.uploadedFile();
+        String fileName = file.fileName();
+        java.nio.file.Path renamedPath = null;
+        try {
+            renamedPath = uploadedPath.getParent().resolve(fileName);
+            Files.move(uploadedPath, renamedPath);
+
+            ExtensionRegistry registry = application.getExtensionRegistry();
+            Extension ext = registry.addExtension(extensionId, renamedPath, application);
+
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("success", true);
+            result.put("extension", toMap(ext, registry));
+            return Response.status(Response.Status.CREATED).entity(result).build();
+        } catch (Exception e) {
+            LOG.error("Failed to upload extension", e);
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(Map.of("error", e.getMessage()))
+                    .build();
+        } finally {
+            try {
+                if (renamedPath != null && Files.exists(renamedPath)) {
+                    Files.deleteIfExists(renamedPath);
+                }
+                Files.deleteIfExists(uploadedPath);
+            } catch (IOException ignored) {
+            }
         }
     }
 

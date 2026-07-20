@@ -18,12 +18,14 @@
                     <div class="tab active" onclick="switchTab('workspaces', this)">Workspaces</div>
                     <div class="tab" onclick="switchTab('lsp-servers', this)">Servers</div>
                     <div class="tab" onclick="switchTab('dap-servers', this)">Debuggers</div>
+                    <div class="tab" onclick="switchTab('extensions', this)">Extensions</div>
                     <div class="tab" onclick="switchTab('mcp-traces', this)">MCP</div>
                 </div>
             </div>
             <div id="workspaces-list"></div>
             <div id="lsp-servers-list" style="display: none;"></div>
             <div id="dap-servers-list" style="display: none;"></div>
+            <div id="extensions-list" style="display: none;"></div>
             <div id="mcp-traces-list" style="display: none;">
                 <div style="padding: 1rem; border-bottom: 1px solid #1e1e1e;">
                     <h3 style="margin-bottom: 0.25rem; color: #cccccc;">AI Clients</h3>
@@ -107,6 +109,7 @@
     <script src="js/admin-workspace.js"></script>
     <script src="js/admin-lsp.js"></script>
     <script src="js/admin-dap.js"></script>
+    <script src="js/admin-extensions.js"></script>
     <script src="js/admin-mcp.js"></script>
     <script src="js/admin.js"></script>
 </body>

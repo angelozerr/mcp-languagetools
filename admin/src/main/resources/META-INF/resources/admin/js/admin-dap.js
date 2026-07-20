@@ -617,11 +617,18 @@ async function loadAllDapServers(serverIdToSelect) {
 
         container.innerHTML = dapServers.map(server => {
             const isActive = selectedDapServer === server.id ? 'active' : '';
+            const disabledClass = server.enabled === false ? 'server-disabled' : '';
             return `
-                <div class="server-item ${isActive}" onclick="showDapServerDetails('${server.id}')">
-                    <div class="server-name">
-                        <span class="server-source-icon">🐛</span>
-                        ${server.name}
+                <div class="server-item ${isActive} ${disabledClass}" onclick="showDapServerDetails('${server.id}')">
+                    <div class="server-name" style="display: flex; align-items: center; justify-content: space-between;">
+                        <span>
+                            <span class="server-source-icon">🐛</span>
+                            ${server.name}
+                        </span>
+                        <label class="toggle-switch" onclick="event.stopPropagation()">
+                            <input type="checkbox" ${server.enabled !== false ? 'checked' : ''} onchange="toggleDapServerEnabled('${server.id}', this.checked)">
+                            <span class="toggle-slider"></span>
+                        </label>
                     </div>
                     <div class="server-id">${server.id}</div>
                 </div>
@@ -665,11 +672,18 @@ async function showDapServerDetails(serverId) {
     const container = document.getElementById('dap-servers-list');
     container.innerHTML = dapServers.map(server => {
         const isActive = selectedDapServer === server.id ? 'active' : '';
+        const disabledClass = server.enabled === false ? 'server-disabled' : '';
         return `
-            <div class="server-item ${isActive}" onclick="showDapServerDetails('${server.id}')">
-                <div class="server-name">
-                    <span class="server-source-icon">🐛</span>
-                    ${server.name}
+            <div class="server-item ${isActive} ${disabledClass}" onclick="showDapServerDetails('${server.id}')">
+                <div class="server-name" style="display: flex; align-items: center; justify-content: space-between;">
+                    <span>
+                        <span class="server-source-icon">🐛</span>
+                        ${server.name}
+                    </span>
+                    <label class="toggle-switch" onclick="event.stopPropagation()">
+                        <input type="checkbox" ${server.enabled !== false ? 'checked' : ''} onchange="toggleDapServerEnabled('${server.id}', this.checked)">
+                        <span class="toggle-slider"></span>
+                    </label>
                 </div>
                 <div class="server-id">${server.id}</div>
             </div>
@@ -1596,7 +1610,26 @@ function applyLaunchTemplate(sessionId, templateIndex) {
     }
 }
 
+/**
+ * Toggle enable/disable for a DAP server.
+ */
+async function toggleDapServerEnabled(serverId, enabled) {
+    const action = enabled ? 'enable' : 'disable';
+    try {
+        const response = await fetch(`/api/admin/extensions/dap/servers/${serverId}/${action}`, { method: 'POST' });
+        if (response.ok) {
+            if (dapServerConfigs[serverId]) {
+                dapServerConfigs[serverId].enabled = enabled;
+            }
+            loadAllDapServers(selectedDapServer);
+        }
+    } catch (error) {
+        console.error(`Failed to ${action} DAP server:`, error);
+    }
+}
+
 // Expose functions globally
+window.toggleDapServerEnabled = toggleDapServerEnabled;
 window.createNewTestSession = createNewTestSession;
 window.launchDapSession = launchDapSession;
 window.stopDapSession = stopDapSession;

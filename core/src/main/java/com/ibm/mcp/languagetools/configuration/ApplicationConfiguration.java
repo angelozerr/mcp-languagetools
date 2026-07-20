@@ -68,7 +68,7 @@ public class ApplicationConfiguration extends AbstractConfiguration {
         save();
     }
 
-    private synchronized void save() {
+    public synchronized void save() {
         try {
             Files.createDirectories(getSettingsFile().getParent());
             String json = PRETTY_GSON.toJson(getSettings());
@@ -79,48 +79,101 @@ public class ApplicationConfiguration extends AbstractConfiguration {
         }
     }
 
-    // ========== Extensions disabled state ==========
+    // ========== Migration from old nested format ==========
 
     @SuppressWarnings("unchecked")
-    public List<String> getDisabledExtensionIds() {
-        Object value = get("extensions.disabled");
-        if (value instanceof List) {
-            return (List<String>) value;
+    public synchronized void migrateOldDisabledFormat() {
+        Map<String, Object> settings = getSettings();
+        boolean migrated = false;
+
+        Object extensionsObj = settings.get("extensions");
+        if (extensionsObj instanceof Map) {
+            Map<String, Object> extMap = (Map<String, Object>) extensionsObj;
+            Object disabled = extMap.get("disabled");
+            if (disabled instanceof List) {
+                for (Object id : (List<?>) disabled) {
+                    settings.put("extension." + id + ".enabled", false);
+                }
+            }
+            settings.remove("extensions");
+            migrated = true;
         }
-        return new ArrayList<>();
+
+        Object serversObj = settings.get("servers");
+        if (serversObj instanceof Map) {
+            Map<String, Object> srvMap = (Map<String, Object>) serversObj;
+            Object disabled = srvMap.get("disabled");
+            if (disabled instanceof List) {
+                for (Object id : (List<?>) disabled) {
+                    settings.put("lsp." + id + ".enabled", false);
+                }
+            }
+            settings.remove("servers");
+            migrated = true;
+        }
+
+        if (migrated) {
+            LOG.info("Migrated disabled state from nested to flat format in settings.json");
+            save();
+        }
     }
 
-    @SuppressWarnings("unchecked")
-    public List<String> getDisabledServerIds() {
-        Object value = get("servers.disabled");
-        if (value instanceof List) {
-            return (List<String>) value;
+    // ========== Extensions/servers enabled state (flat format) ==========
+
+    /**
+     * Get disabled extension IDs by scanning "extension.{id}.enabled" = false entries.
+     */
+    public List<String> getDisabledExtensionIds() {
+        List<String> result = new ArrayList<>();
+        for (Map.Entry<String, Object> entry : getSettings().entrySet()) {
+            String key = entry.getKey();
+            if (key.startsWith("extension.") && key.endsWith(".enabled")) {
+                if (Boolean.FALSE.equals(entry.getValue())) {
+                    String id = key.substring("extension.".length(), key.length() - ".enabled".length());
+                    result.add(id);
+                }
+            }
         }
-        return new ArrayList<>();
+        return result;
+    }
+
+    /**
+     * Get disabled server IDs by scanning "lsp.{id}.enabled" = false entries.
+     */
+    public List<String> getDisabledServerIds() {
+        List<String> result = new ArrayList<>();
+        for (Map.Entry<String, Object> entry : getSettings().entrySet()) {
+            String key = entry.getKey();
+            if (key.startsWith("lsp.") && key.endsWith(".enabled")) {
+                if (Boolean.FALSE.equals(entry.getValue())) {
+                    String id = key.substring("lsp.".length(), key.length() - ".enabled".length());
+                    result.add(id);
+                }
+            }
+        }
+        return result;
     }
 
     public synchronized void setDisabledExtensionIds(List<String> ids) {
-        setNestedValue("extensions", "disabled", ids);
+        // Remove all existing extension.*.enabled entries
+        getSettings().entrySet().removeIf(e ->
+                e.getKey().startsWith("extension.") && e.getKey().endsWith(".enabled"));
+        // Write only disabled ones (enabled is the default)
+        for (String id : ids) {
+            getSettings().put("extension." + id + ".enabled", false);
+        }
         save();
     }
 
     public synchronized void setDisabledServerIds(List<String> ids) {
-        setNestedValue("servers", "disabled", ids);
-        save();
-    }
-
-    @SuppressWarnings("unchecked")
-    private void setNestedValue(String section, String key, Object value) {
-        Map<String, Object> settings = getSettings();
-        Object sectionObj = settings.get(section);
-        Map<String, Object> sectionMap;
-        if (sectionObj instanceof Map) {
-            sectionMap = (Map<String, Object>) sectionObj;
-        } else {
-            sectionMap = new LinkedHashMap<>();
-            settings.put(section, sectionMap);
+        // Remove all existing lsp.*.enabled entries
+        getSettings().entrySet().removeIf(e ->
+                e.getKey().startsWith("lsp.") && e.getKey().endsWith(".enabled"));
+        // Write only disabled ones (enabled is the default)
+        for (String id : ids) {
+            getSettings().put("lsp." + id + ".enabled", false);
         }
-        sectionMap.put(key, value);
+        save();
     }
 
     // ========== Trace entries ==========

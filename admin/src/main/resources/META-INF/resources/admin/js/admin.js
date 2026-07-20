@@ -31,6 +31,8 @@
         window.lspConfigs = lspConfigs;
         window.dapConfigs = dapConfigs;
         window.mergeServerData = mergeServerData;
+        window.loadLspConfigs = loadLspConfigs;
+        window.loadDapConfigs = loadDapConfigs;
 
         /**
          * Returns the API base path for a server: '/api/admin/dap/configs' or '/api/admin/lsp/configs'.
@@ -176,6 +178,7 @@
                 initializationOptions: config.initializationOptions,
                 contributions: config.contributions,
                 isExtension: config.isExtension,
+                enabled: config.enabled,
                 parentServerId: runtime.parentServerId,
 
                 // Runtime fields
@@ -737,6 +740,7 @@
                 document.getElementById('workspaces-list').style.display = 'block';
                 document.getElementById('lsp-servers-list').style.display = 'none';
                 document.getElementById('dap-servers-list').style.display = 'none';
+                document.getElementById('extensions-list').style.display = 'none';
                 document.getElementById('mcp-traces-list').style.display = 'none';
                 serversColumn.style.display = 'block';
                 consoleColumn.style.display = 'flex';
@@ -773,6 +777,7 @@
                 document.getElementById('workspaces-list').style.display = 'none';
                 document.getElementById('lsp-servers-list').style.display = 'block';
                 document.getElementById('dap-servers-list').style.display = 'none';
+                document.getElementById('extensions-list').style.display = 'none';
                 document.getElementById('mcp-traces-list').style.display = 'none';
                 serversColumn.style.display = 'none';
                 consoleColumn.style.display = 'flex';
@@ -788,6 +793,7 @@
                 document.getElementById('workspaces-list').style.display = 'none';
                 document.getElementById('lsp-servers-list').style.display = 'none';
                 document.getElementById('dap-servers-list').style.display = 'block';
+                document.getElementById('extensions-list').style.display = 'none';
                 document.getElementById('mcp-traces-list').style.display = 'none';
                 serversColumn.style.display = 'none';
                 consoleColumn.style.display = 'flex';
@@ -800,10 +806,24 @@
                 loadAllDapServers(options.serverId);
                 // DAP now supports search via TraceRenderer
                 // Search box visibility will be updated when session detail is shown
+            } else if (tab === 'extensions') {
+                document.getElementById('workspaces-list').style.display = 'none';
+                document.getElementById('lsp-servers-list').style.display = 'none';
+                document.getElementById('dap-servers-list').style.display = 'none';
+                document.getElementById('extensions-list').style.display = 'block';
+                document.getElementById('mcp-traces-list').style.display = 'none';
+                serversColumn.style.display = 'none';
+                consoleColumn.style.display = 'flex';
+                appContainer.style.gridTemplateColumns = '400px 1fr';
+                consoleColumn.style.gridColumn = '2';
+
+                loadAllExtensions();
+                updateSearchBoxVisibility(false);
             } else if (tab === 'mcp-traces') {
                 document.getElementById('workspaces-list').style.display = 'none';
                 document.getElementById('lsp-servers-list').style.display = 'none';
                 document.getElementById('dap-servers-list').style.display = 'none';
+                document.getElementById('extensions-list').style.display = 'none';
                 document.getElementById('mcp-traces-list').style.display = 'block';
                 serversColumn.style.display = 'none';
                 consoleColumn.style.display = 'flex';

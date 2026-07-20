@@ -33,6 +33,7 @@ public record LspConfigDTO(
     String workingDirectory,
     Map<String, Object> initializationOptions,
     Map<String, Map<String, List<?>>> contributions,
-    boolean isExtension
+    boolean isExtension,
+    boolean enabled
 ) {
 }

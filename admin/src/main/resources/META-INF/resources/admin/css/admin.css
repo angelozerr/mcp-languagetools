@@ -1642,3 +1642,181 @@ body {
     background: rgba(209, 105, 105, 0.1);
 }
 
+/* Toggle switch */
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 32px;
+    height: 18px;
+    flex-shrink: 0;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    inset: 0;
+    background-color: #555;
+    border-radius: 18px;
+    transition: background-color 0.2s;
+}
+
+.toggle-slider::before {
+    content: "";
+    position: absolute;
+    height: 12px;
+    width: 12px;
+    left: 3px;
+    bottom: 3px;
+    background-color: #ccc;
+    border-radius: 50%;
+    transition: transform 0.2s;
+}
+
+.toggle-switch input:checked + .toggle-slider {
+    background-color: #007acc;
+}
+
+.toggle-switch input:checked + .toggle-slider::before {
+    transform: translateX(14px);
+    background-color: #fff;
+}
+
+/* Disabled server dimmed state */
+.server-item.server-disabled {
+    opacity: 0.45;
+}
+
+/* Extension list items */
+.extension-item {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #2d2d2d;
+    cursor: pointer;
+    transition: background-color 0.15s;
+}
+
+.extension-item:hover {
+    background-color: #2a2d2e;
+}
+
+.extension-item.active {
+    background-color: #37373d;
+    border-left: 2px solid #007acc;
+}
+
+.extension-item.extension-disabled {
+    opacity: 0.45;
+}
+
+.extension-name {
+    font-size: 0.9rem;
+    color: #cccccc;
+    font-weight: 500;
+}
+
+.extension-id {
+    font-size: 0.75rem;
+    color: #888;
+    margin-top: 0.15rem;
+}
+
+.extension-source-badge {
+    font-size: 0.65rem;
+    padding: 0.1rem 0.4rem;
+    border-radius: 3px;
+    font-weight: 600;
+    margin-left: 0.5rem;
+}
+
+.extension-source-badge.bundled {
+    background: #3a3a3a;
+    color: #999;
+}
+
+.extension-source-badge.user {
+    background: rgba(0, 122, 204, 0.2);
+    color: #4fc1ff;
+}
+
+.extension-server-item {
+    padding: 0.35rem 0.5rem 0.35rem 1.5rem;
+    font-size: 0.8rem;
+    color: #aaa;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.extension-server-item.server-disabled {
+    opacity: 0.45;
+}
+
+.add-extension-bar {
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid #3a3a3a;
+    background: #252526;
+}
+
+.add-extension-bar button {
+    background: #007acc;
+    color: #fff;
+    border: none;
+    padding: 0.35rem 0.75rem;
+    border-radius: 3px;
+    cursor: pointer;
+    font-size: 0.8rem;
+}
+
+.add-extension-bar button:hover {
+    background: #1177bb;
+}
+
+/* Drop zone for file upload */
+.drop-zone {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    max-width: 400px;
+    padding: 2rem;
+    margin-bottom: 1.25rem;
+    border: 2px dashed #555;
+    border-radius: 6px;
+    background: #2a2d2e;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+}
+
+.drop-zone:hover {
+    border-color: #007acc;
+    background: #1e2a35;
+}
+
+.drop-zone-active {
+    border-color: #007acc;
+    background: #1e2a35;
+    border-style: solid;
+}
+
+.drop-zone-icon {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+}
+
+.drop-zone-text {
+    color: #d4d4d4;
+    font-size: 0.9rem;
+    margin-bottom: 0.25rem;
+}
+
+.drop-zone-hint {
+    color: #666;
+    font-size: 0.8rem;
+}
+

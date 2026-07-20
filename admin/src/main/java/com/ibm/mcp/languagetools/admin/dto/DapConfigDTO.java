@@ -28,6 +28,7 @@ public record DapConfigDTO(
     String description,
     String url,
     DocumentSelector documentSelector,
-    Map<String, Map<String, List<?>>> contributions
+    Map<String, Map<String, List<?>>> contributions,
+    boolean enabled
 ) {
 }
