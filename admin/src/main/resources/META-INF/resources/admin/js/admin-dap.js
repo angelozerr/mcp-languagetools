@@ -596,7 +596,7 @@ let dapServerConfigs = {};
 async function loadAllDapServers(serverIdToSelect) {
     try {
         const response = await fetch('/api/admin/dap/configs');
-        const dapServers = await response.json();
+        const dapServers = (await response.json()).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
         // Store in map for easy access
         dapServerConfigs = {};
@@ -661,7 +661,7 @@ async function showDapServerDetails(serverId) {
     }
 
     // Re-render server list to update active state
-    const dapServers = Object.values(dapServerConfigs);
+    const dapServers = Object.values(dapServerConfigs).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     const container = document.getElementById('dap-servers-list');
     container.innerHTML = dapServers.map(server => {
         const isActive = selectedDapServer === server.id ? 'active' : '';

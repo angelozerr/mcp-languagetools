@@ -14,7 +14,7 @@ let allServersLoaded = false;
 async function loadAllLspServers(serverIdToSelect) {
     try {
         // Use cached server configs from admin.js (include both LSP and DAP for contribution detection)
-        const lspServers = Object.values(window.lspConfigs || {});
+        const lspServers = Object.values(window.lspConfigs || {}).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
         const dapServers = Object.values(window.dapConfigs || {}).map(s => ({...s, isDap: true}));
         const allServers = [...lspServers, ...dapServers];
 
@@ -72,7 +72,7 @@ async function showServerDetails(serverId) {
     selectedAllServer = serverId;
 
     // Re-render server list to update active state
-    const lspServers = Object.values(window.lspConfigs || {});
+    const lspServers = Object.values(window.lspConfigs || {}).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     const dapServers = Object.values(window.dapConfigs || {}).map(s => ({...s, isDap: true}));
     const allServers = [...lspServers, ...dapServers];
     const contributedByMap = buildContributedByMap(allServers);

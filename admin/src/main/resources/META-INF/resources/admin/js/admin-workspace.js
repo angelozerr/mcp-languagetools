@@ -359,7 +359,7 @@
 
             // Merge runtime with configs
             // Servers are already merged in handleWorkspacesUpdate()
-            const servers = serversRuntime;
+            const servers = serversRuntime.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
             // Calculate contributedBy for all servers
             const contributedByMap = buildContributedByMap(servers);
@@ -488,8 +488,8 @@
                 sessionsByServerId[session.serverId].push(session);
             });
 
-            // Use global dapConfigs
-            const configs = Object.values(dapConfigs || {});
+            // Use global dapConfigs, sorted by name
+            const configs = Object.values(dapConfigs || {}).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
             if (configs.length === 0 && dapSessions.length === 0) {
                 return '';
             }
