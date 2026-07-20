@@ -48,15 +48,16 @@ cd mcp-languagetools
 
 **Why `dev`?**  
 The project structure is:
-- `core/` - Base MCP server (no language servers)
-- `extensions/` - Individual language servers (JDT.LS, MicroProfile, Qute, etc.)
+- `core/` - Base MCP server (no language servers or debug adapters)
+- `extensions/` - Language extensions (Java, XML, Python, Go, etc.)
 - `dev/` - **Pre-configured with all extensions**
 
-Running from `dev/` automatically:
-- ✅ Loads JDT.LS (Java)
-- ✅ Loads MicroProfile LS
-- ✅ Loads Qute LS  
-- ✅ Loads LemMinX (XML)
+Running from `dev/` automatically loads all bundled extensions:
+- ✅ Java (JDT.LS + java-debug)
+- ✅ JavaScript (typescript-language-server + vscode-js-debug)
+- ✅ Python (Pyright + debugpy)
+- ✅ XML (LemMinX)
+- ✅ MicroProfile, Quarkus, and many more
 - ✅ Configures extension relationships (bindings, contributions)
 
 **Wait for**:
@@ -245,11 +246,13 @@ Out of the box:
 - View contribution diagrams
 
 ### Add More Languages
-Check `extensions/` folder for available language servers:
-- `jdtls` - Java
-- `microprofile` - MicroProfile
-- `qute` - Qute templates
-- `lemminx` - XML
+Check `extensions/` folder for available extensions:
+- `java` - Java (JDT.LS + java-debug)
+- `javascript` - JavaScript/TypeScript
+- `python` - Python (Pyright + debugpy)
+- `xml` - XML (LemMinX)
+- `go`, `rust`, `c`, `dart`, `kotlin`, `php`, `lua`, `yaml`, `dockerfile`
+- `microprofile`, `quarkus`, `liberty`
 
 ### Try Advanced Features
 - Ask Claude to fix validation errors
@@ -319,7 +322,8 @@ Let's trace the complete flow in the Admin UI.
 
 📖 **[Admin UI Complete Guide](./admin-ui.md)** - All features, workflows, and tips  
 📖 **[Bind Mechanism](./bind-mechanism.md)** - How servers collaborate (deep dive)  
-📖 **[Extension System](./extensions.md)** - Add your own language servers  
+📖 **[Extension Guide](./extensions.md)** - Add your own language servers and debug adapters  
+📖 **[Getting Started (DAP)](./getting-started-dap.md)** - Debug your code with breakpoints and stepping  
 
 ### Try More Examples
 
