@@ -211,13 +211,12 @@ function buildServerDetailsHTML(details, allServers) {
     let docSelectorHTML = '<p style="color: #999;">None configured</p>';
     if (details.documentSelector && details.documentSelector.length > 0) {
         docSelectorHTML = details.documentSelector.map(selector => {
-            const parts = [];
-            if (selector.language) parts.push(`Language: <code>${selector.language}</code>`);
-            if (selector.pattern) parts.push(`Pattern: <code>${selector.pattern}</code>`);
-            if (selector.scheme) parts.push(`Scheme: <code>${selector.scheme}</code>`);
-            return `<li>${parts.join(', ')}</li>`;
+            return `<div class="selector-item">
+                ${selector.language ? `<span class="selector-tag">language: ${selector.language}</span>` : ''}
+                ${selector.scheme ? `<span class="selector-tag">scheme: ${selector.scheme}</span>` : ''}
+                ${selector.pattern ? `<span class="selector-tag">pattern: ${selector.pattern}</span>` : ''}
+            </div>`;
         }).join('');
-        docSelectorHTML = `<ul style="margin: 0.5rem 0; padding-left: 1.5rem;">${docSelectorHTML}</ul>`;
     }
 
     // Command

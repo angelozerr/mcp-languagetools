@@ -13,6 +13,8 @@
  *******************************************************************************/
 package com.ibm.mcp.languagetools.language;
 
+import com.fasterxml.jackson.annotation.JsonValue;
+
 import java.net.URI;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -31,6 +33,11 @@ public class DocumentSelector {
 
     public DocumentSelector(List<DocumentFilter> filters) {
         this.filters = filters != null ? filters : Collections.emptyList();
+    }
+
+    @JsonValue
+    public List<DocumentFilter> getFilters() {
+        return filters;
     }
 
     /**
