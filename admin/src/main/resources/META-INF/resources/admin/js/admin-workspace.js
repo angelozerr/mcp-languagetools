@@ -4,6 +4,22 @@
         // Track if user explicitly selected a server (to prevent auto-switching)
         let userExplicitlySelectedServer = false;
 
+        // Filter to show only active (non-STOPPED) servers
+        let showOnlyActiveServers = false;
+
+        function toggleShowActiveServers() {
+            showOnlyActiveServers = !showOnlyActiveServers;
+            const workspace = workspaces.find(w => w.rootUri === selectedWorkspace);
+            if (!workspace) return;
+
+            if (currentWorkspaceTab === 'debuggers') {
+                const sessions = window.dapSessions || [];
+                renderServers([], sessions, workspace);
+            } else {
+                renderServers(workspace.lspServers || [], [], workspace);
+            }
+        }
+
         // Load DAP sessions from API
         async function loadDapSessions() {
             try {
@@ -269,6 +285,16 @@
                 </div>
             `;
 
+            // Filter bar
+            const filterHTML = `
+                <div style="display: flex; align-items: center; padding: 0.35rem 0.75rem; background: #2d2d2d; border-bottom: 1px solid #3a3a3a; font-size: 0.8rem;">
+                    <label style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer; color: #aaa; user-select: none;">
+                        <input type="checkbox" onchange="toggleShowActiveServers()" ${showOnlyActiveServers ? 'checked' : ''}>
+                        Show active only
+                    </label>
+                </div>
+            `;
+
             // Render content based on active tab
             let contentHTML = '';
             if (currentWorkspaceTab === 'servers') {
@@ -281,7 +307,7 @@
                     : '<div class="servers-placeholder">No debug adapters</div>';
             }
 
-            container.innerHTML = headerHTML + tabsHTML + contentHTML;
+            container.innerHTML = headerHTML + tabsHTML + filterHTML + contentHTML;
 
             // Auto-select first DAP server after rendering (not session)
             if (currentWorkspaceTab === 'debuggers' && Object.values(window.dapConfigs || {}) && Object.values(window.dapConfigs || {}).length > 0) {
@@ -359,7 +385,16 @@
 
             // Merge runtime with configs
             // Servers are already merged in handleWorkspacesUpdate()
-            const servers = serversRuntime.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+            let servers = serversRuntime.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
+            // Filter to active servers only if toggle is on
+            if (showOnlyActiveServers) {
+                servers = servers.filter(s => s.status !== 'STOPPED');
+            }
+
+            if (servers.length === 0) {
+                return '<div class="servers-placeholder">No active servers</div>';
+            }
 
             // Calculate contributedBy for all servers
             const contributedByMap = buildContributedByMap(servers);
@@ -489,9 +524,15 @@
             });
 
             // Use global dapConfigs, sorted by name
-            const configs = Object.values(dapConfigs || {}).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+            let configs = Object.values(dapConfigs || {}).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+
+            // Filter to only DAP configs with active sessions if toggle is on
+            if (showOnlyActiveServers) {
+                configs = configs.filter(c => (sessionsByServerId[c.id] || []).length > 0);
+            }
+
             if (configs.length === 0 && dapSessions.length === 0) {
-                return '';
+                return showOnlyActiveServers ? '<div class="servers-placeholder">No active debug adapters</div>' : '';
             }
 
             return `
