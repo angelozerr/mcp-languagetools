@@ -346,7 +346,9 @@
                     : '<div class="servers-placeholder">No debug adapters</div>';
             }
 
-            container.innerHTML = headerHTML + tabsHTML + filterHTML + contentHTML;
+            container.innerHTML =
+                '<div class="workspace-servers-header">' + headerHTML + tabsHTML + filterHTML + '</div>' +
+                '<div class="workspace-servers-content">' + contentHTML + '</div>';
 
             // Auto-select first DAP server after rendering (not session)
             if (currentWorkspaceTab === 'debuggers' && Object.values(window.dapConfigs || {}) && Object.values(window.dapConfigs || {}).length > 0) {
