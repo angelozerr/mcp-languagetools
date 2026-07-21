@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?eclipse version="3.4"?>
+<plugin>
+    <extension point="org.eclipse.jdt.ls.core.delegateCommandHandler">
+        <delegateCommandHandler class="com.ibm.mcp.jdtls.McpDelegateCommandHandler">
+            <command id="mcp.jdtls.diagnostics"/>
+            <command id="mcp.jdtls.typeHierarchy"/>
+            <command id="mcp.jdtls.callHierarchyIncoming"/>
+            <command id="mcp.jdtls.callHierarchyOutgoing"/>
+            <command id="mcp.jdtls.findAnnotationUsages"/>
+            <command id="mcp.jdtls.findTypeInstantiations"/>
+            <command id="mcp.jdtls.getComplexityMetrics"/>
+        </delegateCommandHandler>
+    </extension>
+</plugin>

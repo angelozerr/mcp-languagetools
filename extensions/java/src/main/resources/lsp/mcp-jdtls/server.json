@@ -1,0 +1,25 @@
+{
+  "id": "mcp-jdtls",
+  "name": "MCP JDT.LS Extensions",
+  "description": "Advanced Java analysis commands via JDT.LS delegate command handlers",
+  "documentSelector": [
+    {
+      "language": "java"
+    }
+  ],
+  "contributes": {
+    "jdtls": {
+      "bundles": ["plugins/*.jar"],
+      "diagnostics": "mcp.jdtls.diagnostics",
+      "bindRequest": [
+        "mcp.jdtls.diagnostics",
+        "mcp.jdtls.typeHierarchy",
+        "mcp.jdtls.callHierarchyIncoming",
+        "mcp.jdtls.callHierarchyOutgoing",
+        "mcp.jdtls.findAnnotationUsages",
+        "mcp.jdtls.findTypeInstantiations",
+        "mcp.jdtls.getComplexityMetrics"
+      ]
+    }
+  }
+}

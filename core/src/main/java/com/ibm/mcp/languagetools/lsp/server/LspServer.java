@@ -507,6 +507,22 @@ public class LspServer extends ServerBase<LspServerConfig> {
                 .thenApply(result -> result);
     }
 
+    public CompletableFuture<Object> executeCommand(String command, Object params) {
+        ServerTrace trace = getServerTrace();
+        boolean verbose = trace == ServerTrace.verbose;
+        if (trace != ServerTrace.off) {
+            getTracing().traceRequest(command, params, verbose);
+        }
+        long startTime = System.nanoTime();
+        return sendCommandRequest(command, params)
+                .whenComplete((result, error) -> {
+                    if (trace != ServerTrace.off) {
+                        long durationMs = (System.nanoTime() - startTime) / 1_000_000;
+                        getTracing().traceResponse(command, result, error, durationMs, verbose);
+                    }
+                });
+    }
+
     /**
      * Shutdown the language server.
      */
@@ -815,6 +831,18 @@ public class LspServer extends ServerBase<LspServerConfig> {
             return config.getInitializationOptions();
         }
         return null;
+    }
+
+    @Override
+    protected void onBindRequestStart(String method, Object params) {
+        // No-op for LSP servers: TracingMessageConsumer (wrapMessages) already traces
+        // the incoming JSON-RPC request on the wire, so tracing here would duplicate.
+    }
+
+    @Override
+    protected void onBindRequestEnd(String method, Object params, Object result, Throwable error, long durationMs) {
+        // No-op for LSP servers: TracingMessageConsumer (wrapMessages) already traces
+        // the outgoing JSON-RPC response on the wire, so tracing here would duplicate.
     }
 
     @Override

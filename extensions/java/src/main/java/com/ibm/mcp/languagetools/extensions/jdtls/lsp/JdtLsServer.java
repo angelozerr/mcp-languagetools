@@ -25,15 +25,20 @@ import com.ibm.mcp.languagetools.workspace.Workspace;
 import org.eclipse.lsp4j.services.LanguageClient;
 import org.jboss.logging.Logger;
 
+import org.eclipse.lsp4j.Diagnostic;
+import org.eclipse.lsp4j.PublishDiagnosticsParams;
+
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -153,6 +158,63 @@ public class JdtLsServer extends LspServer implements InstallerListener {
         setReady(true);
     }
 
+    private static final String DIAGNOSTICS_COMMAND = "mcp.jdtls.diagnostics";
+
+    /**
+     * Get diagnostics for a Java file.
+     * Uses the "mcp.jdtls.diagnostics" delegate command handler when the
+     * mcp-jdtls bundle is loaded, avoiding the didOpen/publishDiagnostics cycle.
+     * Falls back to standard didOpen when the delegate command is not available.
+     */
+    @Override
+    public CompletableFuture<List<Diagnostic>> getDiagnostics(String uri, String languageId, boolean autoClose) {
+        if (!hasDiagnosticsCommand()) {
+            return super.getDiagnostics(uri, languageId, autoClose);
+        }
+
+        List<Diagnostic> cached = getDiagnosticsCache().get(uri);
+        if (cached != null) {
+            return CompletableFuture.completedFuture(cached);
+        }
+
+        Object params = Map.of("uris", List.of(uri));
+        return executeCommand(DIAGNOSTICS_COMMAND, List.of(params))
+                .thenApply(result -> {
+                    List<Diagnostic> diags = parseDiagnosticsResult(result);
+                    getDiagnosticsCache().put(uri, diags);
+                    return diags;
+                })
+                .exceptionally(ex -> {
+                    LOG.warnf(ex, "Delegate diagnostics failed for %s, falling back to didOpen", uri);
+                    return super.getDiagnostics(uri, languageId, autoClose).join();
+                });
+    }
+
+    private boolean hasDiagnosticsCommand() {
+        var contributionManager = getWorkspace().getApplication().getContributionManager();
+        List<String> bundles = contributionManager.extractFilesFromContribution(getId(), JdtLsContributes.BUNDLES);
+        return !bundles.isEmpty();
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Diagnostic> parseDiagnosticsResult(Object result) {
+        if (result instanceof List<?> list) {
+            return list.stream()
+                    .map(item -> {
+                        try {
+                            var pdp = com.ibm.mcp.languagetools.utils.JsonUtils.toModel(item, PublishDiagnosticsParams.class);
+                            return pdp != null ? pdp.getDiagnostics() : null;
+                        } catch (Exception e) {
+                            return null;
+                        }
+                    })
+                    .filter(Objects::nonNull)
+                    .flatMap(List::stream)
+                    .toList();
+        }
+        return Collections.emptyList();
+    }
+
     @Override
     public void onInstalled(InstallerEvent event) {
         ServerConfigBase config = event.getConfig();
@@ -192,7 +254,7 @@ public class JdtLsServer extends LspServer implements InstallerListener {
             return CompletableFuture.completedFuture(null);
         }
         LOG.infof("Reloading %d bundles into JDT.LS via java.reloadBundles", bundlePaths.size());
-        return sendCommandRequest("java.reloadBundles", List.of(bundlePaths));
+        return executeCommand("java.reloadBundles", List.of(bundlePaths));
     }
 
     @Override
