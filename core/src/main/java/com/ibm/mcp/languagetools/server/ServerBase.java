@@ -558,6 +558,9 @@ public abstract class ServerBase<T extends ServerConfigBase> extends BindEndpoin
 
     @Override
     protected void onBindRequestStart(String method, Object params) {
+        if (isBindRequestTracedByWire()) {
+            return;
+        }
         ServerTrace trace = getServerTrace();
         if (trace != ServerTrace.off) {
             boolean verbose = trace == ServerTrace.verbose;
@@ -567,11 +570,24 @@ public abstract class ServerBase<T extends ServerConfigBase> extends BindEndpoin
 
     @Override
     protected void onBindRequestEnd(String method, Object params, Object result, Throwable error, long durationMs) {
+        if (isBindRequestTracedByWire()) {
+            return;
+        }
         ServerTrace trace = getServerTrace();
         if (trace != ServerTrace.off) {
             boolean verbose = trace == ServerTrace.verbose;
             getTracing().traceResponse(method, result, error, durationMs, verbose);
         }
+    }
+
+    /**
+     * Returns true if bind requests are already traced at the wire level
+     * (e.g., by TracingMessageConsumer via wrapMessages on the LSP connection).
+     * In that case, onBindRequestStart/End should not add duplicate traces.
+     * Subclasses with wire-level tracing (LspServer) override to return true.
+     */
+    protected boolean isBindRequestTracedByWire() {
+        return false;
     }
 
     public TraceCollector getTraceCollector() {

@@ -834,15 +834,8 @@ public class LspServer extends ServerBase<LspServerConfig> {
     }
 
     @Override
-    protected void onBindRequestStart(String method, Object params) {
-        // No-op for LSP servers: TracingMessageConsumer (wrapMessages) already traces
-        // the incoming JSON-RPC request on the wire, so tracing here would duplicate.
-    }
-
-    @Override
-    protected void onBindRequestEnd(String method, Object params, Object result, Throwable error, long durationMs) {
-        // No-op for LSP servers: TracingMessageConsumer (wrapMessages) already traces
-        // the outgoing JSON-RPC response on the wire, so tracing here would duplicate.
+    protected boolean isBindRequestTracedByWire() {
+        return true;
     }
 
     @Override

@@ -77,6 +77,8 @@ public class DiagnosticsHandler implements ICommandHandler {
         ASTParser parser = ASTParser.newParser(AST.getJLSLatest());
         parser.setSource(cu);
         parser.setResolveBindings(true);
+        parser.setBindingsRecovery(true);
+        parser.setStatementsRecovery(true);
         CompilationUnit ast = (CompilationUnit) parser.createAST(monitor);
 
         IProblem[] problems = ast.getProblems();
@@ -85,21 +87,27 @@ public class DiagnosticsHandler implements ICommandHandler {
         for (IProblem problem : problems) {
             Map<String, Object> diagnostic = new HashMap<>();
 
-            // Range (LSP format: 0-based)
+            int startOffset = problem.getSourceStart();
+            int endOffset = problem.getSourceEnd();
+
+            // Use CompilationUnit to convert absolute offsets to line/column
+            // getLineNumber returns 1-based, LSP expects 0-based
+            // getColumnNumber returns 0-based (matches LSP)
             Map<String, Object> range = new HashMap<>();
             Map<String, Object> start = new HashMap<>();
-            start.put("line", problem.getSourceLineNumber() - 1);
-            start.put("character", problem.getSourceStart());
+            start.put("line", ast.getLineNumber(startOffset) - 1);
+            start.put("character", ast.getColumnNumber(startOffset));
             Map<String, Object> end = new HashMap<>();
-            end.put("line", problem.getSourceLineNumber() - 1);
-            end.put("character", problem.getSourceEnd() + 1);
+            end.put("line", ast.getLineNumber(endOffset) - 1);
+            end.put("character", ast.getColumnNumber(endOffset) + 1);
             range.put("start", start);
             range.put("end", end);
 
             diagnostic.put("range", range);
             diagnostic.put("message", problem.getMessage());
-            diagnostic.put("severity", problem.isError() ? 1 : 2); // 1=Error, 2=Warning
+            diagnostic.put("severity", getSeverity(problem));
             diagnostic.put("source", "jdt");
+            diagnostic.put("code", problem.getID());
 
             diagnostics.add(diagnostic);
         }
@@ -108,5 +116,15 @@ public class DiagnosticsHandler implements ICommandHandler {
         result.put("uri", uri);
         result.put("diagnostics", diagnostics);
         return result;
+    }
+
+    private static int getSeverity(IProblem problem) {
+        if (problem.isError()) {
+            return 1; // DiagnosticSeverity.Error
+        }
+        if (problem.isWarning()) {
+            return 2; // DiagnosticSeverity.Warning
+        }
+        return 3; // DiagnosticSeverity.Information
     }
 }
