@@ -16,6 +16,7 @@ package com.ibm.mcp.languagetools.extension;
 import com.ibm.mcp.languagetools.Application;
 import com.ibm.mcp.languagetools.PathManager;
 import com.ibm.mcp.languagetools.configuration.ApplicationConfiguration;
+import com.ibm.mcp.languagetools.configuration.PathConfig;
 import com.ibm.mcp.languagetools.dap.server.DapServerConfig;
 import com.ibm.mcp.languagetools.installer.InstallerEvent;
 import com.ibm.mcp.languagetools.installer.InstallerListener;
@@ -36,12 +37,8 @@ import java.io.InputStreamReader;
 import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.FileSystem;
-import java.nio.file.FileSystems;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
+import java.nio.file.*;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -148,7 +145,7 @@ public class ExtensionRegistry {
 
             Path basePath = resolveBasePath(descriptorUrl);
 
-            for (String root : List.of("lsp", "dap")) {
+            for (String root : List.of(PathConfig.getLspDirName(), PathConfig.getDapDirName())) {
                 Path rootPath = basePath.resolve(root);
                 if (!Files.isDirectory(rootPath)) {
                     continue;
@@ -183,7 +180,7 @@ public class ExtensionRegistry {
             FileSystem fs;
             try {
                 fs = FileSystems.newFileSystem(uri, Collections.emptyMap());
-            } catch (java.nio.file.FileSystemAlreadyExistsException e) {
+            } catch (FileSystemAlreadyExistsException e) {
                 fs = FileSystems.getFileSystem(uri);
             }
             Path descriptorPath = fs.getPath("/" + MCP_EXTENSION_JSON);
@@ -725,17 +722,17 @@ public class ExtensionRegistry {
             return;
         }
         try {
-            Files.walkFileTree(path, new java.nio.file.SimpleFileVisitor<Path>() {
+            Files.walkFileTree(path, new SimpleFileVisitor<Path>() {
                 @Override
-                public java.nio.file.FileVisitResult visitFile(Path file, java.nio.file.attribute.BasicFileAttributes attrs) throws IOException {
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
                     Files.delete(file);
-                    return java.nio.file.FileVisitResult.CONTINUE;
+                    return FileVisitResult.CONTINUE;
                 }
 
                 @Override
-                public java.nio.file.FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
+                public FileVisitResult postVisitDirectory(Path dir, IOException exc) throws IOException {
                     Files.delete(dir);
-                    return java.nio.file.FileVisitResult.CONTINUE;
+                    return FileVisitResult.CONTINUE;
                 }
             });
         } catch (IOException e) {

@@ -1,0 +1,15 @@
+{
+  "id": "netcoredbg",
+  "name": "netcoredbg (C# Debug Adapter)",
+  "description": "Debug adapter for C#/.NET based on netcoredbg",
+  "url": "https://github.com/Samsung/netcoredbg",
+  "documentSelector": [
+    {
+      "language": "csharp"
+    }
+  ],
+  "launch": {
+    "windows": "$SERVER_HOME$/netcoredbg/netcoredbg.exe --interpreter=vscode",
+    "default": "$SERVER_HOME$/netcoredbg/netcoredbg --interpreter=vscode"
+  }
+}

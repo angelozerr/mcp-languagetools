@@ -1,0 +1,57 @@
+{
+  "id": "netcoredbg-installer",
+  "name": "netcoredbg",
+  "check": {
+    "fileExists": {
+      "name": "Check if netcoredbg is installed",
+      "file": {
+        "windows": "$SERVER_HOME$/netcoredbg/netcoredbg.exe",
+        "default": "$SERVER_HOME$/netcoredbg/netcoredbg"
+      }
+    }
+  },
+  "run": {
+    "download": {
+      "name": "Download netcoredbg",
+      "github": {
+        "owner": "Samsung",
+        "repository": "netcoredbg",
+        "prerelease": false,
+        "asset": {
+          "windows": {
+            "x86_64": "netcoredbg-win64.zip",
+            "arm64": "netcoredbg-win-arm64.zip"
+          },
+          "unix": {
+            "x86_64": "netcoredbg-linux-amd64.tar.gz",
+            "arm64": "netcoredbg-linux-arm64.tar.gz"
+          },
+          "mac": {
+            "x86_64": "netcoredbg-osx-amd64.tar.gz",
+            "arm64": "netcoredbg-osx-arm64.tar.gz"
+          }
+        }
+      },
+      "output": {
+        "dir": "$SERVER_HOME$",
+        "file": {
+          "name": {
+            "windows": "netcoredbg/netcoredbg.exe",
+            "default": "netcoredbg/netcoredbg"
+          },
+          "executable": true
+        }
+      },
+      "onSuccess": {
+        "configureServer": {
+          "name": "Configure netcoredbg server command",
+          "command": {
+            "windows": "$SERVER_HOME$/netcoredbg/netcoredbg.exe --interpreter=vscode",
+            "default": "$SERVER_HOME$/netcoredbg/netcoredbg --interpreter=vscode"
+          },
+          "update": true
+        }
+      }
+    }
+  }
+}
