@@ -179,10 +179,16 @@ public class DapSessionManager {
     }
 
     /**
-     * Get a session by ID (returns null if not found).
+     * Get a session by ID.
+     *
+     * @throws IllegalArgumentException if no session exists with the given ID
      */
     public DapSession getSession(String sessionId) {
-        return sessions.get(sessionId);
+        DapSession session = sessions.get(sessionId);
+        if (session == null) {
+            throw new IllegalArgumentException("Debug session not found: " + sessionId);
+        }
+        return session;
     }
 
     /**

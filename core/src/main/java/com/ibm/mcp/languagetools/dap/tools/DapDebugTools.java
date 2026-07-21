@@ -193,6 +193,91 @@ public class DapDebugTools {
         );
     }
 
+    // ========== Instruction Breakpoints ==========
+
+    @Tool(
+            name = "set_instruction_breakpoint",
+            description = "Set a breakpoint at a memory instruction address. " +
+                    "Use instructionPointerReference from get_stack_trace or address from disassemble output. " +
+                    "Requires adapter support (supportsInstructionBreakpoints capability).")
+    public Map<String, Object> setInstructionBreakpointSync(
+            String sessionId,
+            @ToolArg(description = "Instruction memory reference (e.g., from stack frame's instructionPointerReference)") String instructionReference,
+            @ToolArg(description = "Optional byte offset from the instruction reference", required = false) Integer offset,
+            @ToolArg(description = "Optional condition expression (e.g., 'x > 10')", required = false) String condition) {
+        return setInstructionBreakpoint(sessionId, instructionReference, offset, condition).join();
+    }
+
+    public CompletableFuture<Map<String, Object>> setInstructionBreakpoint(
+            String sessionId, String instructionReference, Integer offset, String condition) {
+        DapSession session = sessionManager.getSession(sessionId);
+        return session.setInstructionBreakpoint(instructionReference, offset, condition)
+                .thenApply(info -> {
+                    Map<String, Object> result = new HashMap<>();
+                    result.put("success", true);
+                    result.put("breakpointId", info.breakpointId);
+                    result.put("instructionReference", info.instructionReference);
+                    if (info.offset != null) {
+                        result.put("offset", info.offset);
+                    }
+                    result.put("verified", info.verified);
+                    result.put("message", "Instruction breakpoint set at " + instructionReference);
+                    return result;
+                });
+    }
+
+    @Tool(
+            name = "remove_instruction_breakpoint",
+            description = "Remove a previously set instruction breakpoint by its ID.")
+    public Map<String, Object> removeInstructionBreakpointSync(
+            String sessionId,
+            String breakpointId) {
+        return removeInstructionBreakpoint(sessionId, breakpointId).join();
+    }
+
+    public CompletableFuture<Map<String, Object>> removeInstructionBreakpoint(
+            String sessionId, String breakpointId) {
+        DapSession session = sessionManager.getSession(sessionId);
+        return session.removeInstructionBreakpoint(breakpointId)
+                .thenApply(removed -> Map.of(
+                        "success", removed,
+                        "breakpointId", breakpointId,
+                        "message", removed ? "Instruction breakpoint removed" : "Instruction breakpoint not found"
+                ));
+    }
+
+    @Tool(
+            name = "list_instruction_breakpoints",
+            description = "List all instruction breakpoints currently set in a debug session.")
+    public Map<String, Object> listInstructionBreakpointsSync(String sessionId) {
+        return listInstructionBreakpoints(sessionId);
+    }
+
+    public Map<String, Object> listInstructionBreakpoints(String sessionId) {
+        DapSession session = sessionManager.getSession(sessionId);
+        List<DapSession.InstructionBreakpointInfo> breakpoints = session.listInstructionBreakpoints();
+
+        List<Map<String, Object>> bpList = breakpoints.stream()
+                .map(bp -> {
+                    Map<String, Object> map = new HashMap<>();
+                    map.put("breakpointId", bp.breakpointId);
+                    map.put("instructionReference", bp.instructionReference);
+                    if (bp.offset != null) {
+                        map.put("offset", bp.offset);
+                    }
+                    map.put("verified", bp.verified);
+                    map.put("condition", bp.condition != null ? bp.condition : "");
+                    return map;
+                })
+                .collect(Collectors.toList());
+
+        return Map.of(
+                "success", true,
+                "count", bpList.size(),
+                "instructionBreakpoints", bpList
+        );
+    }
+
     // ========== Debugging Lifecycle ==========
 
     @Tool(
@@ -301,6 +386,20 @@ public class DapDebugTools {
             result.put("sessionId", sessionId);
             result.put("language", session.getLanguage());
 
+            // Expose disassembly-related capabilities
+            Capabilities caps = session.getDapServer() != null && session.getDapServer().getDapClient() != null
+                    ? session.getDapServer().getDapClient().getCapabilities() : null;
+            if (caps != null) {
+                Map<String, Object> disassemblyCapabilities = new HashMap<>();
+                disassemblyCapabilities.put("supportsDisassembleRequest",
+                        Boolean.TRUE.equals(caps.getSupportsDisassembleRequest()));
+                disassemblyCapabilities.put("supportsInstructionBreakpoints",
+                        Boolean.TRUE.equals(caps.getSupportsInstructionBreakpoints()));
+                disassemblyCapabilities.put("supportsSteppingGranularity",
+                        Boolean.TRUE.equals(caps.getSupportsSteppingGranularity()));
+                result.put("disassemblyCapabilities", disassemblyCapabilities);
+            }
+
             if (session.getState() == DapSession.SessionState.TERMINATED) {
                 result.put("success", false);
                 result.put("state", "terminated");
@@ -349,22 +448,62 @@ public class DapDebugTools {
         );
     }
 
-    @Tool(description = "Step over the current line (execute without entering function calls). Returns console output if any was printed during execution.")
-    public Map<String, Object> step_over(String sessionId) {
-        DapSession session = sessionManager.getSession(sessionId);
-        return session.stepOver().join();
+    @Tool(
+            name = "step_over",
+            description = "Step over the current line (execute without entering function calls). " +
+                    "Optionally specify granularity: 'statement' (default) or 'instruction' for assembly-level stepping. " +
+                    "Returns console output if any was printed during execution.")
+    public Map<String, Object> stepOverSync(
+            String sessionId,
+            @ToolArg(description = "Optional stepping granularity: 'statement' (default), 'line', or 'instruction'", required = false) String granularity) {
+        return stepOver(sessionId, granularity).join();
     }
 
-    @Tool(description = "Step into a function call on the current line.")
-    public Map<String, Object> step_in(String sessionId) {
+    public CompletableFuture<Map<String, Object>> stepOver(String sessionId, String granularity) {
         DapSession session = sessionManager.getSession(sessionId);
-        return session.stepIn().join();
+        return session.stepOver(parseGranularity(granularity));
     }
 
-    @Tool(description = "Step out of the current function, returning to the caller.")
-    public Map<String, Object> step_out(String sessionId) {
+    @Tool(
+            name = "step_in",
+            description = "Step into a function call on the current line. " +
+                    "Optionally specify granularity: 'statement' (default) or 'instruction' for assembly-level stepping.")
+    public Map<String, Object> stepInSync(
+            String sessionId,
+            @ToolArg(description = "Optional stepping granularity: 'statement' (default), 'line', or 'instruction'", required = false) String granularity) {
+        return stepIn(sessionId, granularity).join();
+    }
+
+    public CompletableFuture<Map<String, Object>> stepIn(String sessionId, String granularity) {
         DapSession session = sessionManager.getSession(sessionId);
-        return session.stepOut().join();
+        return session.stepIn(parseGranularity(granularity));
+    }
+
+    @Tool(
+            name = "step_out",
+            description = "Step out of the current function, returning to the caller. " +
+                    "Optionally specify granularity: 'statement' (default) or 'instruction' for assembly-level stepping.")
+    public Map<String, Object> stepOutSync(
+            String sessionId,
+            @ToolArg(description = "Optional stepping granularity: 'statement' (default), 'line', or 'instruction'", required = false) String granularity) {
+        return stepOut(sessionId, granularity).join();
+    }
+
+    public CompletableFuture<Map<String, Object>> stepOut(String sessionId, String granularity) {
+        DapSession session = sessionManager.getSession(sessionId);
+        return session.stepOut(parseGranularity(granularity));
+    }
+
+    private SteppingGranularity parseGranularity(String granularity) {
+        if (granularity == null || granularity.isEmpty()) {
+            return null;
+        }
+        return switch (granularity.toLowerCase()) {
+            case "instruction" -> SteppingGranularity.INSTRUCTION;
+            case "statement" -> SteppingGranularity.STATEMENT;
+            case "line" -> SteppingGranularity.LINE;
+            default -> null;
+        };
     }
 
     // ========== Inspection ==========
@@ -384,6 +523,9 @@ public class DapDebugTools {
                     if (frame.getSource() != null) {
                         frameMap.put("file", frame.getSource().getPath());
                     }
+                    if (frame.getInstructionPointerReference() != null) {
+                        frameMap.put("instructionPointerReference", frame.getInstructionPointerReference());
+                    }
                     return frameMap;
                 })
                 .collect(Collectors.toList());
@@ -392,6 +534,65 @@ public class DapDebugTools {
                 "success", true,
                 "frames", framesList
         );
+    }
+
+    // ========== Disassembly ==========
+
+    @Tool(
+            name = "disassemble",
+            description = "Disassemble instructions at a memory address. " +
+                    "Use instructionPointerReference from get_stack_trace as the memoryReference. " +
+                    "Returns disassembled instructions with addresses, instruction text, and source locations. " +
+                    "Requires adapter support (supportsDisassembleRequest capability).",
+            structuredContent = true)
+    public Map<String, Object> disassembleSync(
+            @ToolArg(description = "Debug session ID") String sessionId,
+            @ToolArg(description = "Memory reference to disassemble from (use instructionPointerReference from stack frame)") String memoryReference,
+            @ToolArg(description = "Optional byte offset from the memory reference", required = false) Integer offset,
+            @ToolArg(description = "Optional offset in instructions (negative=before, positive=after)", required = false) Integer instructionOffset,
+            @ToolArg(description = "Number of instructions to disassemble (default: 50)", required = false) Integer instructionCount) {
+        return disassemble(sessionId, memoryReference, offset, instructionOffset, instructionCount).join();
+    }
+
+    public CompletableFuture<Map<String, Object>> disassemble(
+            String sessionId, String memoryReference, Integer offset,
+            Integer instructionOffset, Integer instructionCount) {
+        DapSession session = sessionManager.getSession(sessionId);
+        return session.disassemble(memoryReference, offset, instructionOffset, instructionCount)
+                .thenApply(instructions -> {
+                    List<Map<String, Object>> instrList = Arrays.stream(instructions)
+                            .map(instr -> {
+                                Map<String, Object> map = new HashMap<>();
+                                map.put("address", instr.getAddress());
+                                map.put("instruction", instr.getInstruction());
+                                if (instr.getInstructionBytes() != null) {
+                                    map.put("instructionBytes", instr.getInstructionBytes());
+                                }
+                                if (instr.getSymbol() != null) {
+                                    map.put("symbol", instr.getSymbol());
+                                }
+                                if (instr.getLocation() != null) {
+                                    map.put("sourceFile", instr.getLocation().getPath());
+                                }
+                                if (instr.getLine() != null) {
+                                    map.put("line", instr.getLine());
+                                }
+                                if (instr.getColumn() != null) {
+                                    map.put("column", instr.getColumn());
+                                }
+                                if (instr.getEndLine() != null) {
+                                    map.put("endLine", instr.getEndLine());
+                                }
+                                return map;
+                            })
+                            .collect(Collectors.toList());
+
+                    return Map.of(
+                            "success", true,
+                            "instructions", instrList,
+                            "count", instrList.size()
+                    );
+                });
     }
 
     @Tool(description = "Get the console output (stdout/stderr/console.log) from the debugged program. Use this to see what the program has printed or logged. Very useful to understand program behavior without re-running. Returns up to 200 recent lines.")

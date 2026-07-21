@@ -95,6 +95,7 @@ public class DapSession implements DapEventListener {
     private Instant launchedAt; // When the session was last launched
     private Runnable stateChangeCallback; // Callback when session state changes
     private final Map<String, BreakpointInfo> breakpoints = new ConcurrentHashMap<>();
+    private final Map<String, InstructionBreakpointInfo> instructionBreakpoints = new ConcurrentHashMap<>();
     private Thread[] threads = new Thread[0];
     private StackFrame[] currentStackFrames = new StackFrame[0];
     private Integer currentThreadId;
@@ -139,6 +140,23 @@ public class DapSession implements DapEventListener {
             this.breakpointId = breakpointId;
             this.file = file;
             this.line = line;
+            this.condition = condition;
+            this.verified = false;
+        }
+    }
+
+    public static class InstructionBreakpointInfo {
+        public final String breakpointId;
+        public final String instructionReference;
+        public final Integer offset;
+        public final String condition;
+        public boolean verified;
+        public Breakpoint dapBreakpoint;
+
+        public InstructionBreakpointInfo(String breakpointId, String instructionReference, Integer offset, String condition) {
+            this.breakpointId = breakpointId;
+            this.instructionReference = instructionReference;
+            this.offset = offset;
             this.condition = condition;
             this.verified = false;
         }
@@ -859,22 +877,35 @@ public class DapSession implements DapEventListener {
      * @return CompletableFuture that completes when all breakpoints are sent
      */
     public CompletableFuture<Void> sendAllBreakpoints() {
-        if (breakpoints.isEmpty()) {
+        List<CompletableFuture<Void>> futures = new ArrayList<>();
+
+        // Send source breakpoints grouped by file
+        if (!breakpoints.isEmpty()) {
+            Set<String> files = breakpoints.values().stream()
+                    .map(bp -> bp.file)
+                    .collect(java.util.stream.Collectors.toSet());
+
+            LOG.infof("Sending breakpoints for %d file(s): %s", files.size(), files);
+
+            files.stream()
+                    .map(this::sendBreakpoints)
+                    .forEach(futures::add);
+        }
+
+        // Send instruction breakpoints if adapter supports them
+        if (!instructionBreakpoints.isEmpty()) {
+            Capabilities caps = dapServer.getDapClient() != null
+                    ? dapServer.getDapClient().getCapabilities() : null;
+            if (caps != null && Boolean.TRUE.equals(caps.getSupportsInstructionBreakpoints())) {
+                LOG.infof("Sending %d instruction breakpoint(s)", instructionBreakpoints.size());
+                futures.add(sendInstructionBreakpoints());
+            }
+        }
+
+        if (futures.isEmpty()) {
             LOG.infof("No breakpoints to send");
             return CompletableFuture.completedFuture(null);
         }
-
-        // Group breakpoints by file
-        Set<String> files = breakpoints.values().stream()
-                .map(bp -> bp.file)
-                .collect(java.util.stream.Collectors.toSet());
-
-        LOG.infof("Sending breakpoints for %d file(s): %s", files.size(), files);
-
-        // Send one setBreakpoints per file
-        List<CompletableFuture<Void>> futures = files.stream()
-                .map(this::sendBreakpoints)
-                .toList();
 
         return trackFuture(CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])));
     }
@@ -919,6 +950,95 @@ public class DapSession implements DapEventListener {
         return new ArrayList<>(breakpoints.values());
     }
 
+    // ========== Instruction Breakpoints ==========
+
+    /**
+     * Set an instruction breakpoint at a memory address.
+     */
+    public CompletableFuture<InstructionBreakpointInfo> setInstructionBreakpoint(
+            String instructionReference, Integer offset, String condition) {
+        String breakpointId = UUID.randomUUID().toString();
+        InstructionBreakpointInfo info = new InstructionBreakpointInfo(
+                breakpointId, instructionReference, offset, condition);
+        instructionBreakpoints.put(breakpointId, info);
+
+        LOG.infof("Added instruction breakpoint: %s at %s (offset=%s)", breakpointId, instructionReference, offset);
+
+        return trackFuture(sendInstructionBreakpoints().thenApply(v -> info));
+    }
+
+    /**
+     * Remove an instruction breakpoint.
+     */
+    public CompletableFuture<Boolean> removeInstructionBreakpoint(String breakpointId) {
+        InstructionBreakpointInfo info = instructionBreakpoints.remove(breakpointId);
+        if (info == null) {
+            return CompletableFuture.completedFuture(false);
+        }
+
+        LOG.infof("Removed instruction breakpoint: %s at %s", breakpointId, info.instructionReference);
+
+        return trackFuture(sendInstructionBreakpoints().thenApply(v -> true));
+    }
+
+    /**
+     * List all instruction breakpoints.
+     */
+    public List<InstructionBreakpointInfo> listInstructionBreakpoints() {
+        return new ArrayList<>(instructionBreakpoints.values());
+    }
+
+    /**
+     * Send all instruction breakpoints to the DAP server.
+     * Unlike source breakpoints (per-file), setInstructionBreakpoints replaces ALL instruction breakpoints at once.
+     */
+    private CompletableFuture<Void> sendInstructionBreakpoints() {
+        IDebugProtocolServer server = getActiveServer();
+        if (server == null) {
+            LOG.warnf("Cannot send instruction breakpoints: server not initialized");
+            return CompletableFuture.completedFuture(null);
+        }
+
+        List<InstructionBreakpointInfo> allInstrBps = new ArrayList<>(instructionBreakpoints.values());
+
+        LOG.infof("Sending %d instruction breakpoint(s)", allInstrBps.size());
+
+        SetInstructionBreakpointsArguments args = new SetInstructionBreakpointsArguments();
+        InstructionBreakpoint[] instrBps = allInstrBps.stream()
+                .map(info -> {
+                    InstructionBreakpoint bp = new InstructionBreakpoint();
+                    bp.setInstructionReference(info.instructionReference);
+                    if (info.offset != null) {
+                        bp.setOffset(info.offset);
+                    }
+                    if (info.condition != null && !info.condition.isEmpty()) {
+                        bp.setCondition(info.condition);
+                    }
+                    return bp;
+                })
+                .toArray(InstructionBreakpoint[]::new);
+        args.setBreakpoints(instrBps);
+
+        return server.setInstructionBreakpoints(args)
+                .thenAccept(response -> {
+                    if (response.getBreakpoints() != null) {
+                        Breakpoint[] dapBps = response.getBreakpoints();
+                        for (int i = 0; i < Math.min(dapBps.length, allInstrBps.size()); i++) {
+                            InstructionBreakpointInfo info = allInstrBps.get(i);
+                            Breakpoint dapBp = dapBps[i];
+                            info.verified = dapBp.isVerified();
+                            info.dapBreakpoint = dapBp;
+                            LOG.infof("Instruction breakpoint %s at %s verified=%s",
+                                    info.breakpointId, info.instructionReference, info.verified);
+                        }
+                    }
+                })
+                .exceptionally(t -> {
+                    LOG.errorf(t, "Failed to send instruction breakpoints");
+                    return null;
+                });
+    }
+
     // ========== Execution Control ==========
 
     /**
@@ -949,7 +1069,14 @@ public class DapSession implements DapEventListener {
      * Step over (next line).
      */
     public CompletableFuture<Map<String, Object>> stepOver() {
-        LOG.infof("Step over: %s", sessionId);
+        return stepOver(null);
+    }
+
+    /**
+     * Step over with optional stepping granularity.
+     */
+    public CompletableFuture<Map<String, Object>> stepOver(SteppingGranularity granularity) {
+        LOG.infof("Step over: %s (granularity=%s)", sessionId, granularity);
 
         IDebugProtocolServer server = getActiveServer();
         if (server == null || currentThreadId == null) {
@@ -958,6 +1085,7 @@ public class DapSession implements DapEventListener {
 
         NextArguments args = new NextArguments();
         args.setThreadId(currentThreadId);
+        args.setGranularity(granularity);
 
         return trackFuture(server.next(args)
                 .thenApply(v -> createResultWithOutput(Map.of("success", true))));
@@ -967,7 +1095,14 @@ public class DapSession implements DapEventListener {
      * Step into function.
      */
     public CompletableFuture<Map<String, Object>> stepIn() {
-        LOG.infof("Step in: %s", sessionId);
+        return stepIn(null);
+    }
+
+    /**
+     * Step into with optional stepping granularity.
+     */
+    public CompletableFuture<Map<String, Object>> stepIn(SteppingGranularity granularity) {
+        LOG.infof("Step in: %s (granularity=%s)", sessionId, granularity);
 
         IDebugProtocolServer server = getActiveServer();
         if (server == null || currentThreadId == null) {
@@ -976,6 +1111,7 @@ public class DapSession implements DapEventListener {
 
         StepInArguments args = new StepInArguments();
         args.setThreadId(currentThreadId);
+        args.setGranularity(granularity);
 
         return trackFuture(server.stepIn(args)
                 .thenApply(v -> createResultWithOutput(Map.of("success", true))));
@@ -985,7 +1121,14 @@ public class DapSession implements DapEventListener {
      * Step out of current function.
      */
     public CompletableFuture<Map<String, Object>> stepOut() {
-        LOG.infof("Step out: %s", sessionId);
+        return stepOut(null);
+    }
+
+    /**
+     * Step out with optional stepping granularity.
+     */
+    public CompletableFuture<Map<String, Object>> stepOut(SteppingGranularity granularity) {
+        LOG.infof("Step out: %s (granularity=%s)", sessionId, granularity);
 
         IDebugProtocolServer server = getActiveServer();
         if (server == null || currentThreadId == null) {
@@ -994,6 +1137,7 @@ public class DapSession implements DapEventListener {
 
         StepOutArguments args = new StepOutArguments();
         args.setThreadId(currentThreadId);
+        args.setGranularity(granularity);
 
         return trackFuture(server.stepOut(args)
                 .thenApply(v -> createResultWithOutput(Map.of("success", true))));
@@ -1144,6 +1288,35 @@ public class DapSession implements DapEventListener {
         args.setContext("watch");
 
         return trackFuture(server.evaluate(args));
+    }
+
+    // ========== Disassembly ==========
+
+    /**
+     * Disassemble instructions at a memory address.
+     */
+    public CompletableFuture<DisassembledInstruction[]> disassemble(
+            String memoryReference, Integer offset, Integer instructionOffset, Integer instructionCount) {
+        LOG.infof("Disassemble at %s: %s", memoryReference, sessionId);
+
+        IDebugProtocolServer server = getActiveServer();
+        if (server == null) {
+            return CompletableFuture.failedFuture(new IllegalStateException("DAP server not initialized"));
+        }
+
+        DisassembleArguments args = new DisassembleArguments();
+        args.setMemoryReference(memoryReference);
+        if (offset != null) {
+            args.setOffset(offset);
+        }
+        if (instructionOffset != null) {
+            args.setInstructionOffset(instructionOffset);
+        }
+        args.setInstructionCount(instructionCount != null ? instructionCount : 50);
+        args.setResolveSymbols(true);
+
+        return trackFuture(server.disassemble(args)
+                .thenApply(DisassembleResponse::getInstructions));
     }
 
     // ========== Event Handlers (DapEventListener implementation) ==========
