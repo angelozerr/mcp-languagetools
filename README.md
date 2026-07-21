@@ -50,17 +50,23 @@ This means AI assistants can leverage the same tooling that developers use in th
 
 | Tool | Description |
 |------|-------------|
-| `list_debug_adapters` | List available debug adapters for a file |
+| `list_debug_adapters` | List available debug adapters with supported languages |
 | `get_debug_templates` | Get launch/attach configuration templates |
 | `start_debugging` | Launch or attach a debug session |
-| `set_breakpoint` / `remove_breakpoint` | Manage breakpoints |
-| `continue_execution` | Continue after a breakpoint |
-| `step_over` / `step_in` / `step_out` | Step through code |
-| `get_stack_trace` | View the call stack |
-| `get_local_variables` | Inspect variables in the current frame |
-| `evaluate_expression` | Evaluate expressions in debug context |
-| `get_console_output` | Read program stdout/stderr |
 | `list_debug_sessions` / `close_debug_session` | Manage debug sessions |
+| `set_breakpoint` / `remove_breakpoint` / `list_all_breakpoints` | Manage line breakpoints |
+| `set_instruction_breakpoint` / `remove_instruction_breakpoint` / `list_instruction_breakpoints` | Manage instruction-level breakpoints |
+| `continue_execution` / `pause_execution` | Continue or pause execution |
+| `step_over` / `step_in` / `step_out` | Step through code (statement or instruction granularity) |
+| `get_stack_trace` | View the call stack |
+| `list_threads` | List all threads in the debugged program |
+| `get_scopes` / `get_variables` | Inspect variable scopes and values |
+| `get_local_variables` | Shortcut for local variables in the current frame |
+| `evaluate_expression` | Evaluate expressions in debug context |
+| `get_console_output` | Read program stdout/stderr output |
+| `disassemble` | Disassemble instructions at a memory address |
+| `detach_from_process` | Detach without terminating the process |
+| `get_debug_statistics` | Get statistics about active debug sessions |
 
 ### Extension & Workspace Tools
 
