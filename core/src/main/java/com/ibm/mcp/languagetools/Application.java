@@ -50,9 +50,7 @@ import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
 
 import java.net.URI;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -288,19 +286,14 @@ public class Application {
      * Converts the path to URI and creates/returns the workspace.
      *
      * @param cwd the workspace root path (e.g., "/home/user/project" or "C:\\Users\\project")
-     * @return completable future with the workspace
+     * @return the workspace
      */
-    public CompletableFuture<Workspace> getWorkspaceForPath(String cwd) {
-        // Convert path to URI
-        // If already a URI (starts with file:), use as-is
-        // Otherwise convert path to file:/// URI (3 slashes for absolute paths)
+    public Workspace getWorkspaceForPath(String cwd) {
         String workspaceUriStr;
         if (cwd.startsWith("file:")) {
             workspaceUriStr = cwd;
         } else {
-            // Normalize path separators and create file URI
             String normalizedPath = cwd.replace("\\", "/");
-            // Add leading slash if not present (for absolute paths)
             if (!normalizedPath.startsWith("/")) {
                 normalizedPath = "/" + normalizedPath;
             }
@@ -308,10 +301,7 @@ public class Application {
         }
 
         URI workspaceUri = URI.create(workspaceUriStr);
-
-        // Create workspace directly (no file detection needed)
-        Workspace workspace = getOrCreateWorkspace(workspaceUri);
-        return CompletableFuture.completedFuture(workspace);
+        return getOrCreateWorkspace(workspaceUri);
     }
 
     /**

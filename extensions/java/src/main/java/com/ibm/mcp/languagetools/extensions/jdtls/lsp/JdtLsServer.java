@@ -184,9 +184,9 @@ public class JdtLsServer extends LspServer implements InstallerListener {
                     getDiagnosticsCache().put(uri, diags);
                     return diags;
                 })
-                .exceptionally(ex -> {
+                .exceptionallyCompose(ex -> {
                     LOG.warnf(ex, "Delegate diagnostics failed for %s, falling back to didOpen", uri);
-                    return super.getDiagnostics(uri, languageId, autoClose).join();
+                    return super.getDiagnostics(uri, languageId, autoClose);
                 });
     }
 

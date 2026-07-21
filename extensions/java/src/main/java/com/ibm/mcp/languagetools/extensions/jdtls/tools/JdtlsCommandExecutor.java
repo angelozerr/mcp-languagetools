@@ -55,30 +55,28 @@ public class JdtlsCommandExecutor {
     @SuppressWarnings("unchecked")
     public CompletableFuture<String> executeCommand(String cwd, String commandId, Object arguments,
                                                      Cancellation cancellation, Progress progress) {
-        return application.getWorkspaceForPath(cwd)
-                .thenCompose(workspace -> {
-                    LspServer jdtls = workspace.getLspServers().stream()
-                            .filter(s -> JDTLS_SERVER_ID.equals(s.getConfig().getServerId()))
-                            .findFirst()
-                            .orElse(null);
+        var workspace = application.getWorkspaceForPath(cwd);
+        LspServer jdtls = workspace.getLspServers().stream()
+                .filter(s -> JDTLS_SERVER_ID.equals(s.getConfig().getServerId()))
+                .findFirst()
+                .orElse(null);
 
-                    if (jdtls == null) {
-                        return CompletableFuture.completedFuture(
-                                "Error: JDT.LS server not found for workspace " + cwd);
-                    }
+        if (jdtls == null) {
+            return CompletableFuture.completedFuture(
+                    "Error: JDT.LS server not found for workspace " + cwd);
+        }
 
-                    return jdtls.waitUntilReady()
-                            .thenCompose(v -> {
-                                List<Object> args = arguments instanceof List
-                                        ? (List<Object>) arguments
-                                        : List.of(arguments);
-                                return jdtls.executeCommand(commandId, args);
-                            })
-                            .thenApply(this::formatResult)
-                            .exceptionally(ex -> {
-                                LOG.errorf(ex, "Failed to execute command %s", commandId);
-                                return "Error executing " + commandId + ": " + ex.getMessage();
-                            });
+        return jdtls.waitUntilReady()
+                .thenCompose(v -> {
+                    List<Object> args = arguments instanceof List
+                            ? (List<Object>) arguments
+                            : List.of(arguments);
+                    return jdtls.executeCommand(commandId, args);
+                })
+                .thenApply(this::formatResult)
+                .exceptionally(ex -> {
+                    LOG.errorf(ex, "Failed to execute command %s", commandId);
+                    return "Error executing " + commandId + ": " + ex.getMessage();
                 });
     }
 

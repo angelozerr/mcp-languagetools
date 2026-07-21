@@ -16,6 +16,7 @@ package com.ibm.mcp.languagetools.lsp.server;
 import com.ibm.mcp.languagetools.Application;
 import com.ibm.mcp.languagetools.language.LanguageDocument;
 import com.ibm.mcp.languagetools.progress.ProgressMonitor;
+import com.ibm.mcp.languagetools.workspace.Workspace;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
@@ -51,21 +52,19 @@ public class LspServerResolver {
             Predicate<LspServer> filter,
             ProgressMonitor progressMonitor) {
 
-        return application.getWorkspaceForPath(cwd)
-                .thenCompose(workspace ->
-                    application.ensureServersForFile(document.getUri(), workspace, progressMonitor)
-                            .thenApply(v -> {
-                                var allServers = workspace.getLspServers();
-                                URI fileUri = document.getUri();
-                                String languageId = document.getLanguageId();
-                                java.nio.file.Path basePath = workspace.getRootPath();
-                                return allServers
-                                        .stream()
-                                        .filter(server -> server.getConfig().canHandle(fileUri, languageId, basePath))
-                                        .filter(filter)
-                                        .collect(Collectors.toList());
-                            })
-                );
+        Workspace workspace = application.getWorkspaceForPath(cwd);
+        return application.ensureServersForFile(document.getUri(), workspace, progressMonitor)
+                .thenApply(v -> {
+                    var allServers = workspace.getLspServers();
+                    URI fileUri = document.getUri();
+                    String languageId = document.getLanguageId();
+                    java.nio.file.Path basePath = workspace.getRootPath();
+                    return allServers
+                            .stream()
+                            .filter(server -> server.getConfig().canHandle(fileUri, languageId, basePath))
+                            .filter(filter)
+                            .collect(Collectors.toList());
+                });
     }
 
     /**
@@ -80,16 +79,12 @@ public class LspServerResolver {
             String cwd,
             Predicate<LspServer> filter) {
 
-        return application.getWorkspaceForPath(cwd)
-                .thenApply(workspace -> {
-                    // Get all LSP servers from workspace
-                    var allServers = workspace.getLspServers();
-
-                    // Filter servers based on the predicate
-                    return allServers
-                            .stream()
-                            .filter(filter)
-                            .collect(Collectors.toList());
-                });
+        Workspace workspace = application.getWorkspaceForPath(cwd);
+        return CompletableFuture.completedFuture(
+                workspace.getLspServers()
+                        .stream()
+                        .filter(filter)
+                        .collect(Collectors.toList())
+        );
     }
 }

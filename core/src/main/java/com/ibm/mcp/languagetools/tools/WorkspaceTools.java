@@ -38,7 +38,9 @@ public class WorkspaceTools {
     @Inject
     Application application;
 
-    @Tool(description = "Get information about all active workspaces, including root URIs and language server count. " +
+    @Tool(
+            name="list_workspaces",
+            description = "Get information about all active workspaces, including root URIs and language server count. " +
                         "Workspaces are initialized automatically when using diagnostics tools.")
     public String listWorkspaces() {
         try {
@@ -59,21 +61,19 @@ public class WorkspaceTools {
         }
     }
 
-    @Tool(name = "list_language_servers",
-          description = "Get information about configured language servers (ID, name, description, supported languages). " +
+    @Tool(
+            name = "list_language_servers",
+            description = "Get information about configured language servers (ID, name, description, supported languages). " +
                         "Without cwd: returns available server configurations. " +
                         "With cwd: returns server configurations enriched with runtime state for the given workspace " +
                         "(status, ready, statusMessage) to help diagnose server issues.")
     public List<Map<String, Object>> listLanguageServers(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd) {
-        try {
+        {
+            Workspace workspace = (cwd != null && !cwd.isEmpty())
+                    ? application.getWorkspaceForPath(cwd)
+                    : null;
             var configs = application.getLspServerConfigs();
-            Workspace workspace = null;
-
-            if (cwd != null && !cwd.isEmpty()) {
-                workspace = application.getWorkspaceForPath(cwd).join();
-            }
-
             List<Map<String, Object>> result = new ArrayList<>();
             for (var config : configs) {
                 Map<String, Object> server = new LinkedHashMap<>();
@@ -123,10 +123,6 @@ public class WorkspaceTools {
             }
 
             return result;
-        } catch (Exception e) {
-            LOG.error("Failed to list language servers", e);
-            Map<String, Object> error = Map.of("error", "Failed to list language servers: " + e.getMessage());
-            return List.of(error);
         }
     }
 }
