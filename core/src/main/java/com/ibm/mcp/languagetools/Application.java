@@ -214,14 +214,15 @@ public class Application {
         return workspace;
     }
 
+
+
     /**
-     * Ensure LSP server is running for the given file in the workspace.
-     * Detects language, finds matching servers, installs if needed, and starts them.
+     * Ensure LSP and DAP servers are running for the given file in the workspace.
+     * Detects language, finds matching server configs, and starts them.
      */
-    private CompletableFuture<Void> ensureServerForFile(URI fileUri,
+    public CompletableFuture<Void> ensureServersForFile(URI fileUri,
                                                         Workspace workspace,
                                                         ProgressMonitor progressMonitor) {
-        // Detect language from file
         Optional<String> languageId = languageRegistry.detectLanguage(fileUri);
         if (languageId.isEmpty()) {
             LOG.debugf("No language detected for: %s", fileUri);
@@ -231,7 +232,6 @@ public class Application {
         String language = languageId.get();
         LOG.debugf("Detected language '%s' for: %s", language, fileUri);
 
-        // Collect configs that need starting (only enabled ones)
         Path basePath = workspace.getRootPath();
         List<LspServerConfig> configsToStart = new ArrayList<>();
         for (LspServerConfig config : extensionRegistry.getEnabledLspServerConfigs()) {
@@ -240,22 +240,23 @@ public class Application {
             }
             if (config.canHandle(fileUri, language, basePath)) {
                 LspServer existingServer = workspace.getLspServer(config.getServerId());
-                if (existingServer == null) {
-                    configsToStart.add(config);
-                } else if (existingServer.getStatus() == ServerStatus.STOPPED) {
+                if (existingServer == null || existingServer.getStatus() == ServerStatus.STOPPED) {
                     configsToStart.add(config);
                 }
             }
         }
 
         // Also find and add matching DAP servers (without starting them)
-        ensureDapServersForFile(workspace, fileUri, language);
+        for (DapServerConfig config : extensionRegistry.getEnabledDapServerConfigs()) {
+            if (config.canHandle(fileUri, language, basePath)) {
+                workspace.addDapServer(config);
+            }
+        }
 
         if (configsToStart.isEmpty()) {
             return CompletableFuture.completedFuture(null);
         }
 
-        // Split progress range across servers so each has its own sub-range
         int count = configsToStart.size();
         List<CompletableFuture<Void>> serverFutures = new ArrayList<>();
         for (int i = 0; i < count; i++) {
@@ -270,10 +271,8 @@ public class Application {
                     : progressMonitor;
 
             CompletableFuture<Void> future = workspace.ensureLspServerStarted(
-                            config.getServerId(),
-                            serverMonitor)
-                    .thenAccept(server -> {
-                    })
+                            config.getServerId(), serverMonitor)
+                    .thenAccept(server -> {})
                     .exceptionally(ex -> {
                         LOG.errorf(ex, "Failed to start %s", config.getName());
                         return null;
@@ -282,43 +281,6 @@ public class Application {
         }
 
         return CompletableFuture.allOf(serverFutures.toArray(new CompletableFuture[0]));
-    }
-
-    /**
-     * Find and add matching DAP servers to the workspace for the given file.
-     * DAP servers are NOT started - they are added to the workspace configuration only.
-     */
-    private void ensureDapServersForFile(Workspace workspace, URI fileUri, String language) {
-        Path basePath = workspace.getRootPath();
-        for (DapServerConfig config : extensionRegistry.getEnabledDapServerConfigs()) {
-            if (config.canHandle(fileUri, language, basePath)) {
-                if (workspace.getApplication().getDapServerConfig(config.getServerId()) == null) {
-                    workspace.addDapServer(config);
-                    LOG.infof("Added DAP server %s for language '%s' in workspace: %s",
-                            config.getName(), language, workspace.getNormalizedUri());
-                }
-            }
-        }
-    }
-
-
-    /**
-     * Get workspace from a file URI by detecting the workspace root.
-     * Walks up the directory tree to find pom.xml or build.gradle.
-     * Ensures the appropriate LSP server is started for the file.
-     */
-    public CompletableFuture<Workspace> getWorkspaceForFile(URI fileUri,
-                                                            ProgressMonitor progressMonitor) {
-        URI rootUri = detectWorkspaceRoot(fileUri);
-        if (rootUri == null) {
-            return CompletableFuture.failedFuture(
-                    new IllegalArgumentException("Could not detect workspace root for: " + fileUri)
-            );
-        }
-
-        Workspace workspace = getOrCreateWorkspace(rootUri);
-        return ensureServerForFile(fileUri, workspace, progressMonitor)
-                .thenApply(v -> workspace);
     }
 
     /**
@@ -369,36 +331,6 @@ public class Application {
                 });
     }
 
-    /**
-     * Detect workspace root by walking up to find pom.xml or build.gradle.
-     */
-    private URI detectWorkspaceRoot(URI fileUri) {
-        try {
-            Path path = Paths.get(fileUri);
-
-            // If it's a file, start from its parent directory
-            if (Files.isRegularFile(path)) {
-                path = path.getParent();
-            }
-
-            // Walk up to find pom.xml or build.gradle
-            while (path != null) {
-                if (Files.exists(path.resolve("pom.xml")) ||
-                        Files.exists(path.resolve("build.gradle")) ||
-                        Files.exists(path.resolve("build.gradle.kts"))) {
-                    return path.toUri();
-                }
-                path = path.getParent();
-            }
-
-            LOG.warnf("Could not find workspace root for: %s", fileUri);
-            return null;
-
-        } catch (Exception e) {
-            LOG.error("Error detecting workspace root for: " + fileUri, e);
-            return null;
-        }
-    }
 
     /**
      * Normalize URI (remove trailing slashes).

@@ -22,7 +22,6 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
 
-import java.net.URI;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
@@ -56,9 +55,7 @@ public class JdtlsCommandExecutor {
     @SuppressWarnings("unchecked")
     public CompletableFuture<String> executeCommand(String cwd, String commandId, Object arguments,
                                                      Cancellation cancellation, Progress progress) {
-        URI workspaceUri = URI.create("file://" + cwd.replace("\\", "/"));
-
-        return application.getWorkspaceForFile(workspaceUri, null)
+        return application.getWorkspaceForPath(cwd)
                 .thenCompose(workspace -> {
                     LspServer jdtls = workspace.getLspServers().stream()
                             .filter(s -> JDTLS_SERVER_ID.equals(s.getConfig().getServerId()))

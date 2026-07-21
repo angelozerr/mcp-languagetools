@@ -37,6 +37,7 @@ public class LspServerResolver {
 
     /**
      * Get all LSP servers that can handle the given file and match the filter.
+     * Ensures matching servers are started if not already running.
      *
      * @param document        the language document
      * @param cwd             the current working directory (used for workspace detection)
@@ -50,21 +51,21 @@ public class LspServerResolver {
             Predicate<LspServer> filter,
             ProgressMonitor progressMonitor) {
 
-        return application.getWorkspaceForFile(document.getUri(), progressMonitor)
-                .thenApply(workspace -> {
-                    // Get all LSP servers from workspace
-                    var allServers = workspace.getLspServers();
-
-                    // Filter servers: must match document selector AND the caller's predicate
-                    URI fileUri = document.getUri();
-                    String languageId = document.getLanguageId();
-                    java.nio.file.Path basePath = workspace.getRootPath();
-                    return allServers
-                            .stream()
-                            .filter(server -> server.getConfig().canHandle(fileUri, languageId, basePath))
-                            .filter(filter)
-                            .collect(Collectors.toList());
-                });
+        return application.getWorkspaceForPath(cwd)
+                .thenCompose(workspace ->
+                    application.ensureServersForFile(document.getUri(), workspace, progressMonitor)
+                            .thenApply(v -> {
+                                var allServers = workspace.getLspServers();
+                                URI fileUri = document.getUri();
+                                String languageId = document.getLanguageId();
+                                java.nio.file.Path basePath = workspace.getRootPath();
+                                return allServers
+                                        .stream()
+                                        .filter(server -> server.getConfig().canHandle(fileUri, languageId, basePath))
+                                        .filter(filter)
+                                        .collect(Collectors.toList());
+                            })
+                );
     }
 
     /**
