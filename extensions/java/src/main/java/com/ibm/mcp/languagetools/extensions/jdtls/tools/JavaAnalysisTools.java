@@ -131,4 +131,96 @@ public class JavaAnalysisTools {
                 Map.of("uri", fileUri),
                 cancellation, progress);
     }
+
+    @Tool(name = "java_analyze_file",
+          description = "Get comprehensive analysis of a Java file. " +
+                        "Returns types, methods, fields count, diagnostics, complexity metrics, and LOC. " +
+                        "Example: java_analyze_file(cwd='/project', fileUri='file:///project/src/Service.java')")
+    public CompletableFuture<String> analyzeFile(
+            @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
+            @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
+            Cancellation cancellation,
+            Progress progress) {
+        return executor.executeCommand(cwd, "mcp.jdtls.analyzeFile",
+                Map.of("uri", fileUri),
+                cancellation, progress);
+    }
+
+    @Tool(name = "java_analyze_type",
+          description = "Get comprehensive analysis of a Java type. " +
+                        "Returns type hierarchy, member counts, references, and complexity metrics. " +
+                        "Example: java_analyze_type(cwd='/project', fullyQualifiedName='com.example.MyService')")
+    public CompletableFuture<String> analyzeType(
+            @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
+            @ToolArg(description = "Fully qualified name of the type") String fullyQualifiedName,
+            Cancellation cancellation,
+            Progress progress) {
+        return executor.executeCommand(cwd, "mcp.jdtls.analyzeType",
+                Map.of("fullyQualifiedName", fullyQualifiedName),
+                cancellation, progress);
+    }
+
+    @Tool(name = "java_analyze_method",
+          description = "Get comprehensive analysis of a Java method. " +
+                        "Returns complexity, callers, callees, and override information. " +
+                        "Example: java_analyze_method(cwd='/project', fileUri='file:///project/src/Service.java', line=15, character=10)")
+    public CompletableFuture<String> analyzeMethod(
+            @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
+            @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
+            @ToolArg(description = ToolArgDescriptions.POSITION_LINE) int line,
+            @ToolArg(description = ToolArgDescriptions.POSITION_CHARACTER) int character,
+            Cancellation cancellation,
+            Progress progress) {
+        return executor.executeCommand(cwd, "mcp.jdtls.analyzeMethod",
+                Map.of("uri", fileUri, "line", line, "character", character),
+                cancellation, progress);
+    }
+
+    @Tool(name = "java_analyze_change_impact",
+          description = "Analyze the ripple effect of changing a symbol at a specific position. " +
+                        "Returns directly and transitively affected elements, methods, and files. " +
+                        "Example: java_analyze_change_impact(cwd='/project', fileUri='file:///project/src/Service.java', line=10, character=5)")
+    public CompletableFuture<String> analyzeChangeImpact(
+            @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
+            @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
+            @ToolArg(description = ToolArgDescriptions.POSITION_LINE) int line,
+            @ToolArg(description = ToolArgDescriptions.POSITION_CHARACTER) int character,
+            Cancellation cancellation,
+            Progress progress) {
+        return executor.executeCommand(cwd, "mcp.jdtls.analyzeChangeImpact",
+                Map.of("uri", fileUri, "line", line, "character", character),
+                cancellation, progress);
+    }
+
+    @Tool(name = "java_analyze_control_flow",
+          description = "Analyze control flow paths through a Java method. " +
+                        "Returns branches, loops, exception handlers, and return points. " +
+                        "Example: java_analyze_control_flow(cwd='/project', fileUri='file:///project/src/Service.java', line=15, character=10)")
+    public CompletableFuture<String> analyzeControlFlow(
+            @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
+            @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
+            @ToolArg(description = ToolArgDescriptions.POSITION_LINE) int line,
+            @ToolArg(description = ToolArgDescriptions.POSITION_CHARACTER) int character,
+            Cancellation cancellation,
+            Progress progress) {
+        return executor.executeCommand(cwd, "mcp.jdtls.analyzeControlFlow",
+                Map.of("uri", fileUri, "line", line, "character", character),
+                cancellation, progress);
+    }
+
+    @Tool(name = "java_analyze_data_flow",
+          description = "Track data flow through variables and parameters in a Java method. " +
+                        "Returns variable definitions, reads, and writes. " +
+                        "Example: java_analyze_data_flow(cwd='/project', fileUri='file:///project/src/Service.java', line=15, character=10)")
+    public CompletableFuture<String> analyzeDataFlow(
+            @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
+            @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
+            @ToolArg(description = ToolArgDescriptions.POSITION_LINE) int line,
+            @ToolArg(description = ToolArgDescriptions.POSITION_CHARACTER) int character,
+            Cancellation cancellation,
+            Progress progress) {
+        return executor.executeCommand(cwd, "mcp.jdtls.analyzeDataFlow",
+                Map.of("uri", fileUri, "line", line, "character", character),
+                cancellation, progress);
+    }
 }

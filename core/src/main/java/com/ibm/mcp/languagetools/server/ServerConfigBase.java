@@ -428,15 +428,20 @@ public class ServerConfigBase implements ServerConfig {
                     // Map InstallationStatus to ServerStatus
                     InstallerContext context = createInstallerContext(pathManager, serverStatusCallback, force);
 
+                    final SharedProgressMonitor installProgress = sharedInstallProgress;
                     future = installer.ensureInstalled(context)
                             .whenComplete((result, error) -> {
-                                sharedInstallProgress.endTask(taskId);
-                                sharedInstallProgress = null;
+                                installProgress.endTask(taskId);
+                                synchronized (ServerConfigBase.this) {
+                                    if (sharedInstallProgress == installProgress) {
+                                        sharedInstallProgress = null;
+                                    }
+                                }
 
                                 if (error != null) {
                                     Throwable cause = error.getCause();
                                     lastInstallError = cause != null ? cause.getMessage() : error.getMessage();
-                                    synchronized (this) {
+                                    synchronized (ServerConfigBase.this) {
                                         installationFuture = null;
                                     }
                                 } else {

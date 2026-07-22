@@ -1,0 +1,266 @@
+/*******************************************************************************
+ * Copyright (c) 2026 IBM Corporation and others.
+ *
+ * This program and the accompanying materials
+ * are made available under the terms of the Eclipse Public License 2.0
+ * which accompanies this distribution, and is available at
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
+ *
+ * Contributors:
+ *     Angelo ZERR - initial API and implementation
+ *******************************************************************************/
+package com.ibm.mcp.jdtls.handlers.refactoring;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.eclipse.core.runtime.IProgressMonitor;
+import org.eclipse.jdt.core.ICompilationUnit;
+import org.eclipse.jdt.core.IJavaElement;
+import org.eclipse.jdt.core.JavaModelException;
+import org.eclipse.jdt.core.dom.AST;
+import org.eclipse.jdt.core.dom.ASTParser;
+import org.eclipse.jdt.core.dom.CompilationUnit;
+import org.eclipse.jface.text.Document;
+import org.eclipse.text.edits.TextEdit;
+
+import com.ibm.mcp.jdtls.ICommandHandler;
+import com.ibm.mcp.jdtls.JdtUtils;
+
+/**
+ * Base class for refactoring handlers providing common utility methods.
+ *
+ * <p>Provides shared logic for parsing arguments, resolving elements at positions,
+ * and converting JDT TextEdits to the serializable format expected by MCP clients.</p>
+ */
+public abstract class AbstractRefactoringHandler implements ICommandHandler {
+
+    /**
+     * Parse the first argument as a Map of parameters.
+     *
+     * @param arguments the command arguments list
+     * @return the parameters map, or an empty map if arguments are null/empty
+     */
+    @SuppressWarnings("unchecked")
+    protected Map<String, Object> parseParams(List<Object> arguments) {
+        if (arguments == null || arguments.isEmpty()) {
+            return Map.of();
+        }
+        Object first = arguments.get(0);
+        if (first instanceof Map) {
+            return (Map<String, Object>) first;
+        }
+        return Map.of();
+    }
+
+    /**
+     * Resolve the IJavaElement at the position specified by {uri, line, character} in the arguments.
+     *
+     * @param arguments the command arguments containing {uri, line, character}
+     * @param monitor   the progress monitor
+     * @return the resolved elements array, or null if resolution fails
+     * @throws JavaModelException if an error occurs during code select
+     */
+    protected IJavaElement[] resolveElementAtPosition(List<Object> arguments, IProgressMonitor monitor)
+            throws JavaModelException {
+        Map<String, Object> params = parseParams(arguments);
+        String uri = (String) params.get("uri");
+        if (uri == null) {
+            return null;
+        }
+        int line = ((Number) params.get("line")).intValue();
+        int character = ((Number) params.get("character")).intValue();
+
+        ICompilationUnit cu = JdtUtils.getCompilationUnit(uri);
+        if (cu == null) {
+            return null;
+        }
+
+        int offset = JdtUtils.getOffset(cu, line, character);
+        return cu.codeSelect(offset, 0);
+    }
+
+    /**
+     * Convert a map of JDT TextEdits (keyed by ICompilationUnit) to the serializable
+     * result format expected by MCP clients.
+     *
+     * @param edits map of compilation units to their text edits
+     * @return a map with "applied" flag and "edits" list in LSP-compatible format
+     * @throws JavaModelException if source retrieval fails
+     */
+    protected Map<String, Object> createTextEditResult(Map<ICompilationUnit, TextEdit> edits)
+            throws JavaModelException {
+        List<Map<String, Object>> editList = new ArrayList<>();
+
+        for (Map.Entry<ICompilationUnit, TextEdit> entry : edits.entrySet()) {
+            ICompilationUnit cu = entry.getKey();
+            TextEdit textEdit = entry.getValue();
+            String source = cu.getSource();
+            String uri = cu.getResource().getLocationURI().toString();
+
+            Document document = new Document(source);
+            try {
+                TextEdit copy = textEdit.copy();
+                copy.apply(document);
+            } catch (Exception e) {
+                continue;
+            }
+
+            String newSource = document.get();
+            if (!newSource.equals(source)) {
+                // Compute line-level diff and create edits
+                List<Map<String, Object>> fileEdits = computeLineEdits(uri, source, newSource);
+                editList.addAll(fileEdits);
+            }
+        }
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("applied", !editList.isEmpty());
+        result.put("edits", editList);
+        return result;
+    }
+
+    /**
+     * Create a single whole-file replacement edit.
+     *
+     * @param uri       the file URI
+     * @param source    the original source
+     * @param newSource the new source
+     * @return a list containing one edit that replaces the entire file content
+     */
+    protected List<Map<String, Object>> createWholeFileEdit(String uri, String source, String newSource) {
+        List<Map<String, Object>> edits = new ArrayList<>();
+        int lineCount = countLines(source);
+
+        Map<String, Object> edit = new HashMap<>();
+        edit.put("uri", uri);
+        edit.put("range", createRange(0, 0, lineCount, 0));
+        edit.put("newText", newSource);
+        edits.add(edit);
+        return edits;
+    }
+
+    /**
+     * Compute line-level edits between original and new source.
+     *
+     * @param uri       the file URI
+     * @param source    the original source
+     * @param newSource the new source
+     * @return a list of edit maps
+     */
+    protected List<Map<String, Object>> computeLineEdits(String uri, String source, String newSource) {
+        // For simplicity, produce a single whole-file replacement edit
+        return createWholeFileEdit(uri, source, newSource);
+    }
+
+    /**
+     * Create a result map indicating an error.
+     *
+     * @param message the error message
+     * @return a map with "applied" set to false and an "error" message
+     */
+    protected Map<String, Object> createErrorResult(String message) {
+        Map<String, Object> result = new HashMap<>();
+        result.put("applied", false);
+        result.put("error", message);
+        result.put("edits", List.of());
+        return result;
+    }
+
+    /**
+     * Create a successful result map with the given edits.
+     *
+     * @param edits the list of edit maps
+     * @return a map with "applied" set to true and the edits
+     */
+    protected Map<String, Object> createSuccessResult(List<Map<String, Object>> edits) {
+        Map<String, Object> result = new HashMap<>();
+        result.put("applied", !edits.isEmpty());
+        result.put("edits", edits);
+        return result;
+    }
+
+    /**
+     * Create an LSP-compatible range map.
+     *
+     * @param startLine      start line (0-based)
+     * @param startCharacter start character (0-based)
+     * @param endLine        end line (0-based)
+     * @param endCharacter   end character (0-based)
+     * @return a range map
+     */
+    protected Map<String, Object> createRange(int startLine, int startCharacter, int endLine, int endCharacter) {
+        Map<String, Object> start = new HashMap<>();
+        start.put("line", startLine);
+        start.put("character", startCharacter);
+
+        Map<String, Object> end = new HashMap<>();
+        end.put("line", endLine);
+        end.put("character", endCharacter);
+
+        Map<String, Object> range = new HashMap<>();
+        range.put("start", start);
+        range.put("end", end);
+        return range;
+    }
+
+    /**
+     * Parse an AST from a compilation unit with bindings resolved.
+     *
+     * @param cu      the compilation unit
+     * @param monitor the progress monitor
+     * @return the parsed CompilationUnit AST node
+     */
+    protected CompilationUnit parseAST(ICompilationUnit cu, IProgressMonitor monitor) {
+        ASTParser parser = ASTParser.newParser(AST.getJLSLatest());
+        parser.setSource(cu);
+        parser.setResolveBindings(true);
+        parser.setBindingsRecovery(true);
+        parser.setStatementsRecovery(true);
+        return (CompilationUnit) parser.createAST(monitor);
+    }
+
+    /**
+     * Count the number of lines in a string.
+     *
+     * @param text the text to count lines in
+     * @return the number of lines
+     */
+    protected int countLines(String text) {
+        if (text == null || text.isEmpty()) {
+            return 0;
+        }
+        int lines = 1;
+        for (int i = 0; i < text.length(); i++) {
+            if (text.charAt(i) == '\n') {
+                lines++;
+            }
+        }
+        return lines;
+    }
+
+    /**
+     * Compute the offset in source for a given line and character (0-based).
+     *
+     * @param source    the source text
+     * @param line      the line number (0-based)
+     * @param character the character offset in the line (0-based)
+     * @return the absolute offset
+     */
+    protected int getOffset(String source, int line, int character) {
+        int currentLine = 0;
+        for (int i = 0; i < source.length(); i++) {
+            if (currentLine == line) {
+                return i + character;
+            }
+            if (source.charAt(i) == '\n') {
+                currentLine++;
+            }
+        }
+        return source.length();
+    }
+}

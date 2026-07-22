@@ -1,0 +1,58 @@
+/*******************************************************************************
+ * Copyright (c) 2026 IBM Corporation and others.
+ *
+ * This program and the accompanying materials
+ * are made available under the terms of the Eclipse Public License 2.0
+ * which accompanies this distribution, and is available at
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
+ *
+ * Contributors:
+ *     Angelo ZERR - initial API and implementation
+ *******************************************************************************/
+package com.ibm.mcp.languagetools.extensions.jdtls.tools;
+
+import com.ibm.mcp.languagetools.tools.ToolArgDescriptions;
+import io.quarkiverse.mcp.server.Cancellation;
+import io.quarkiverse.mcp.server.Progress;
+import io.quarkiverse.mcp.server.Tool;
+import io.quarkiverse.mcp.server.ToolArg;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+
+@ApplicationScoped
+public class JavaProjectTools {
+
+    @Inject
+    JdtlsCommandExecutor executor;
+
+    @Tool(name = "java_get_project_structure",
+          description = "Get the package hierarchy and file structure of a Java project. " +
+                        "Returns source folders, packages, and compilation unit counts. " +
+                        "Example: java_get_project_structure(cwd='/project')")
+    public CompletableFuture<String> getProjectStructure(
+            @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
+            Cancellation cancellation,
+            Progress progress) {
+        return executor.executeCommand(cwd, "mcp.jdtls.getProjectStructure",
+                Map.of(),
+                cancellation, progress);
+    }
+
+    @Tool(name = "java_get_classpath_info",
+          description = "Get the classpath entries of a Java project. " +
+                        "Returns source folders, libraries, containers, and project dependencies. " +
+                        "Example: java_get_classpath_info(cwd='/project')")
+    public CompletableFuture<String> getClasspathInfo(
+            @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
+            Cancellation cancellation,
+            Progress progress) {
+        return executor.executeCommand(cwd, "mcp.jdtls.getClasspathInfo",
+                Map.of(),
+                cancellation, progress);
+    }
+}

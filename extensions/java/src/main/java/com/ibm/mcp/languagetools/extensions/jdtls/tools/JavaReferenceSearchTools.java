@@ -1,0 +1,118 @@
+/*******************************************************************************
+ * Copyright (c) 2026 IBM Corporation and others.
+ *
+ * This program and the accompanying materials
+ * are made available under the terms of the Eclipse Public License 2.0
+ * which accompanies this distribution, and is available at
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
+ *
+ * Contributors:
+ *     Angelo ZERR - initial API and implementation
+ *******************************************************************************/
+package com.ibm.mcp.languagetools.extensions.jdtls.tools;
+
+import com.ibm.mcp.languagetools.tools.ToolArgDescriptions;
+import io.quarkiverse.mcp.server.Cancellation;
+import io.quarkiverse.mcp.server.Progress;
+import io.quarkiverse.mcp.server.Tool;
+import io.quarkiverse.mcp.server.ToolArg;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+
+@ApplicationScoped
+public class JavaReferenceSearchTools {
+
+    @Inject
+    JdtlsCommandExecutor executor;
+
+    @Tool(name = "java_find_casts",
+          description = "Find all cast expressions to a Java type. " +
+                        "Returns every location where the type is used in a cast expression ((Type) expr). " +
+                        "Example: java_find_casts(cwd='/project', fullyQualifiedName='java.lang.String')")
+    public CompletableFuture<String> findCasts(
+            @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
+            @ToolArg(description = "Fully qualified name of the type (e.g., 'java.lang.String')") String fullyQualifiedName,
+            Cancellation cancellation,
+            Progress progress) {
+        return executor.executeCommand(cwd, "mcp.jdtls.findCasts",
+                Map.of("fullyQualifiedName", fullyQualifiedName),
+                cancellation, progress);
+    }
+
+    @Tool(name = "java_find_catch_blocks",
+          description = "Find all catch blocks catching a Java exception type. " +
+                        "Returns every location where the type appears in a catch clause. " +
+                        "Example: java_find_catch_blocks(cwd='/project', fullyQualifiedName='java.io.IOException')")
+    public CompletableFuture<String> findCatchBlocks(
+            @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
+            @ToolArg(description = "Fully qualified name of the exception type") String fullyQualifiedName,
+            Cancellation cancellation,
+            Progress progress) {
+        return executor.executeCommand(cwd, "mcp.jdtls.findCatchBlocks",
+                Map.of("fullyQualifiedName", fullyQualifiedName),
+                cancellation, progress);
+    }
+
+    @Tool(name = "java_find_instanceof_checks",
+          description = "Find all instanceof checks for a Java type. " +
+                        "Returns every location where 'instanceof Type' is used. " +
+                        "Example: java_find_instanceof_checks(cwd='/project', fullyQualifiedName='java.util.List')")
+    public CompletableFuture<String> findInstanceofChecks(
+            @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
+            @ToolArg(description = "Fully qualified name of the type") String fullyQualifiedName,
+            Cancellation cancellation,
+            Progress progress) {
+        return executor.executeCommand(cwd, "mcp.jdtls.findInstanceofChecks",
+                Map.of("fullyQualifiedName", fullyQualifiedName),
+                cancellation, progress);
+    }
+
+    @Tool(name = "java_find_throws_declarations",
+          description = "Find all throws clause declarations of a Java exception type. " +
+                        "Returns every location where the type appears in a throws clause. " +
+                        "Example: java_find_throws_declarations(cwd='/project', fullyQualifiedName='java.io.IOException')")
+    public CompletableFuture<String> findThrowsDeclarations(
+            @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
+            @ToolArg(description = "Fully qualified name of the exception type") String fullyQualifiedName,
+            Cancellation cancellation,
+            Progress progress) {
+        return executor.executeCommand(cwd, "mcp.jdtls.findThrowsDeclarations",
+                Map.of("fullyQualifiedName", fullyQualifiedName),
+                cancellation, progress);
+    }
+
+    @Tool(name = "java_find_type_arguments",
+          description = "Find all type argument usages of a Java type in generics. " +
+                        "Returns every location where the type is used as a generic type argument (e.g., List<Type>). " +
+                        "Example: java_find_type_arguments(cwd='/project', fullyQualifiedName='java.lang.String')")
+    public CompletableFuture<String> findTypeArguments(
+            @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
+            @ToolArg(description = "Fully qualified name of the type") String fullyQualifiedName,
+            Cancellation cancellation,
+            Progress progress) {
+        return executor.executeCommand(cwd, "mcp.jdtls.findTypeArguments",
+                Map.of("fullyQualifiedName", fullyQualifiedName),
+                cancellation, progress);
+    }
+
+    @Tool(name = "java_find_method_references",
+          description = "Find all references to a method at a specific position. " +
+                        "Returns every location where the method is called or referenced. " +
+                        "Example: java_find_method_references(cwd='/project', fileUri='file:///project/src/Service.java', line=10, character=5)")
+    public CompletableFuture<String> findMethodReferences(
+            @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
+            @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
+            @ToolArg(description = ToolArgDescriptions.POSITION_LINE) int line,
+            @ToolArg(description = ToolArgDescriptions.POSITION_CHARACTER) int character,
+            Cancellation cancellation,
+            Progress progress) {
+        return executor.executeCommand(cwd, "mcp.jdtls.findMethodReferences",
+                Map.of("uri", fileUri, "line", line, "character", character),
+                cancellation, progress);
+    }
+}
