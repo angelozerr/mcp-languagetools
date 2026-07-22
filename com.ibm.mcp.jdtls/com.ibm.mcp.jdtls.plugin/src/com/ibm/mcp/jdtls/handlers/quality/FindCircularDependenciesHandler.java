@@ -44,6 +44,10 @@ import com.ibm.mcp.jdtls.ICommandHandler;
  *
  * <p>Builds a package dependency graph from imports across all CUs, then runs
  * Tarjan's strongly connected components algorithm to find cycles.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/FindCircularDependenciesTool.java">javalens-mcp FindCircularDependenciesTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class FindCircularDependenciesHandler implements ICommandHandler {
 

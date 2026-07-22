@@ -57,6 +57,10 @@ import com.ibm.mcp.jdtls.JdtUtils;
  * <p>Arguments: [{uri, fixId, line, character}]</p>
  *
  * <p>Applies a specific quick fix identified by fixId using ASTRewrite.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/ApplyQuickFixTool.java">javalens-mcp ApplyQuickFixTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class ApplyQuickFixHandler implements ICommandHandler {
 

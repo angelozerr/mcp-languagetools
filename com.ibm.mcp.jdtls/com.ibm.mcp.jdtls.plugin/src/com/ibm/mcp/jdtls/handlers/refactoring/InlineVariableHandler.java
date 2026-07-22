@@ -51,6 +51,10 @@ import com.ibm.mcp.jdtls.JdtUtils;
  * <p>This works for local variables with simple initializers. Variables without
  * initializers cannot be inlined. If the initializer has side effects, inlining
  * may change the program semantics when the variable is referenced multiple times.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/InlineVariableTool.java">javalens-mcp InlineVariableTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class InlineVariableHandler extends AbstractRefactoringHandler {
 

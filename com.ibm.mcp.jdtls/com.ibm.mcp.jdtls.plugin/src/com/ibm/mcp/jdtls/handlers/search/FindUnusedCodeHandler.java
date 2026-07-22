@@ -38,6 +38,10 @@ import com.ibm.mcp.jdtls.JdtUtils;
  * <p>Parses the given file with bindings resolved and inspects the
  * {@link IProblem} array for unused-related problem IDs such as unused private
  * fields, methods, types, imports, and local variables.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/FindUnusedCodeTool.java">javalens-mcp FindUnusedCodeTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class FindUnusedCodeHandler implements ICommandHandler {
 

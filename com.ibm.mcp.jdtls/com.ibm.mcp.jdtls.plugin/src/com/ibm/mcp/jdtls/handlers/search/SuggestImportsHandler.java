@@ -36,6 +36,10 @@ import com.ibm.mcp.jdtls.ICommandHandler;
  * <p>Searches for all types matching the given simple type name using
  * {@link SearchEngine#searchAllTypeNames} and returns fully qualified
  * name suggestions.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/SuggestImportsTool.java">javalens-mcp SuggestImportsTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class SuggestImportsHandler implements ICommandHandler {
 

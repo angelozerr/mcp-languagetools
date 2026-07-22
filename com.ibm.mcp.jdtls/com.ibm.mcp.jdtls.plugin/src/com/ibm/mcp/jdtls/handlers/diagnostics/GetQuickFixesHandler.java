@@ -35,6 +35,10 @@ import com.ibm.mcp.jdtls.JdtUtils;
  *
  * <p>Gets problems at or near the given line and suggests available quick fixes
  * based on the problem ID.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/GetQuickFixesTool.java">javalens-mcp GetQuickFixesTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class GetQuickFixesHandler implements ICommandHandler {
 

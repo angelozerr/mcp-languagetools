@@ -37,6 +37,10 @@ import com.ibm.mcp.jdtls.JdtUtils;
  *
  * <p>Parses the given file with bindings resolved and inspects the
  * {@link IProblem} array for dead code and unreachable code problem IDs.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/FindUnreachableCodeTool.java">javalens-mcp FindUnreachableCodeTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class FindUnreachableCodeHandler implements ICommandHandler {
 

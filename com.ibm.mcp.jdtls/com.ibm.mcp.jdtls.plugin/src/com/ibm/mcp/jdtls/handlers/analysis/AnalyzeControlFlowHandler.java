@@ -50,6 +50,10 @@ import com.ibm.mcp.jdtls.JdtUtils;
  * <p>Uses ASTParser and ASTVisitor on the MethodDeclaration body to track
  * if/else branches, loops, try/catch/finally, switch/case, return/throw statements.
  * Builds a simplified control flow summary.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/AnalyzeControlFlowTool.java">javalens-mcp AnalyzeControlFlowTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class AnalyzeControlFlowHandler implements ICommandHandler {
 

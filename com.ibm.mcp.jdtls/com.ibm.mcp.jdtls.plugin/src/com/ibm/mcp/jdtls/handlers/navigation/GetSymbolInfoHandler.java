@@ -38,6 +38,10 @@ import org.eclipse.jdt.core.Signature;
  * <p>Resolves the element at the given position and returns detailed
  * information depending on the element kind (field, method, type, or
  * local variable).</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/GetSymbolInfoTool.java">javalens-mcp GetSymbolInfoTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class GetSymbolInfoHandler extends AbstractPositionHandler {
 

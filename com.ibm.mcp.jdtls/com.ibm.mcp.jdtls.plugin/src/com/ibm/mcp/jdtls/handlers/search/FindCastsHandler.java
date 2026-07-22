@@ -22,6 +22,10 @@ import org.eclipse.jdt.core.search.IJavaSearchConstants;
  *
  * <p>Finds all cast expressions {@code (Type) expr} for the given type using
  * fine-grained CAST_TYPE_REFERENCE search.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/FindCastsTool.java">javalens-mcp FindCastsTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class FindCastsHandler extends AbstractFineGrainReferenceHandler {
 

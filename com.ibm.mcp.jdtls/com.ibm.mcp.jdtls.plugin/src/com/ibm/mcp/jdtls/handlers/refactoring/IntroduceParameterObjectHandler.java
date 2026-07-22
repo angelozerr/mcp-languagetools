@@ -59,6 +59,10 @@ import com.ibm.mcp.jdtls.JdtUtils;
  * </p>
  *
  * <p>The new parameter object class is created in the same package as the original class.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/IntroduceParameterObjectTool.java">javalens-mcp IntroduceParameterObjectTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class IntroduceParameterObjectHandler extends AbstractRefactoringHandler {
 

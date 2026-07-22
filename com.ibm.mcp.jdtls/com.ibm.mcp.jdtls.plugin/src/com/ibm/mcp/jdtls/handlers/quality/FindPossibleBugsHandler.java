@@ -49,6 +49,10 @@ import com.ibm.mcp.jdtls.JdtUtils;
  * <p>Detects common bug patterns: empty catch blocks, String comparison with ==,
  * equals() without hashCode(), null check after dereference, resource not closed,
  * returning null from Optional.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/FindPossibleBugsTool.java">javalens-mcp FindPossibleBugsTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class FindPossibleBugsHandler implements ICommandHandler {
 

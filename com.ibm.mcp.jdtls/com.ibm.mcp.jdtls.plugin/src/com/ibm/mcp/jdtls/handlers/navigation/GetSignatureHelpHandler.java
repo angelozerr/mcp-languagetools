@@ -36,6 +36,10 @@ import org.eclipse.jdt.core.Signature;
  * <p>Resolves the method at the given position and returns its full
  * signature information including parameters with Javadoc descriptions,
  * type parameters, and thrown exceptions.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/GetSignatureHelpTool.java">javalens-mcp GetSignatureHelpTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class GetSignatureHelpHandler extends AbstractPositionHandler {
 

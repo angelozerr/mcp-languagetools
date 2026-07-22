@@ -28,6 +28,9 @@ import java.util.concurrent.CompletableFuture;
  * MCP tools for advanced Java analysis via JDT.LS delegate command handlers.
  * These tools go beyond standard LSP capabilities by leveraging JDT APIs
  * through delegate command handlers running inside JDT.LS.
+ *
+ * <p>Tools adapted from <a href="https://github.com/pzalutski-pixel/javalens-mcp">javalens-mcp</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 @ApplicationScoped
 public class JavaAnalysisTools {

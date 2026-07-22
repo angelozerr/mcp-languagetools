@@ -41,6 +41,11 @@ import com.ibm.mcp.jdtls.JdtUtils;
  * <p>Arguments: [{uri, line, character}]</p>
  *
  * <p>Returns the call hierarchy (callers or callees) for the method at the given position.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/GetCallHierarchyIncomingTool.java">javalens-mcp GetCallHierarchyIncomingTool</a> and
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/GetCallHierarchyOutgoingTool.java">javalens-mcp GetCallHierarchyOutgoingTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class CallHierarchyHandler implements ICommandHandler {
 

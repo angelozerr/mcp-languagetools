@@ -41,6 +41,10 @@ import com.ibm.mcp.jdtls.JdtUtils;
  *
  * <p>Resolves the field at the given position via {@code codeSelect}, then
  * searches for all write accesses to that field across the workspace.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/FindFieldWritesTool.java">javalens-mcp FindFieldWritesTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class FindFieldWritesHandler implements ICommandHandler {
 

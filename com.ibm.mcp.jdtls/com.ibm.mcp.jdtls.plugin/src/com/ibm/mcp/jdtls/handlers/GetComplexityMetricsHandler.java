@@ -43,6 +43,10 @@ import com.ibm.mcp.jdtls.JdtUtils;
  * <p>Arguments: [{uri}]</p>
  *
  * <p>Computes cyclomatic complexity and LOC per method for a file.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/GetComplexityMetricsTool.java">javalens-mcp GetComplexityMetricsTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class GetComplexityMetricsHandler implements ICommandHandler {
 

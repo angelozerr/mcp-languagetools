@@ -37,6 +37,10 @@ import com.ibm.mcp.jdtls.ICommandHandler;
  *
  * <p>Enumerates source folders, packages, and compilation unit counts for the
  * project, providing a structural overview.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/GetProjectStructureTool.java">javalens-mcp GetProjectStructureTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class GetProjectStructureHandler implements ICommandHandler {
 

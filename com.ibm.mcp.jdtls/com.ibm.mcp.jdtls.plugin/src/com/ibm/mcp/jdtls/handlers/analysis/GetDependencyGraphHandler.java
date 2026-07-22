@@ -43,6 +43,10 @@ import com.ibm.mcp.jdtls.JdtUtils;
  *
  * <p>Builds an import dependency graph by scanning all ICompilationUnit imports.
  * For each CU, extracts the package and all imported packages to build edges.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/GetDependencyGraphTool.java">javalens-mcp GetDependencyGraphTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class GetDependencyGraphHandler implements ICommandHandler {
 

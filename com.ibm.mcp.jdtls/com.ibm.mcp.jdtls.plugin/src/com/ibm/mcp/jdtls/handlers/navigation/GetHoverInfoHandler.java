@@ -38,6 +38,10 @@ import org.eclipse.jdt.core.Signature;
  * <p>Resolves the element at the given position and returns rich hover
  * information including name, kind, signature, Javadoc text, modifiers,
  * declaring type, and kind-specific details.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/GetHoverInfoTool.java">javalens-mcp GetHoverInfoTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class GetHoverInfoHandler extends AbstractPositionHandler {
 

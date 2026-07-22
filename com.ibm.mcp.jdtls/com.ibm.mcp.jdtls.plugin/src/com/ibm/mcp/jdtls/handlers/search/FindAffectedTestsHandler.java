@@ -54,6 +54,10 @@ import com.ibm.mcp.jdtls.JdtUtils;
  * <p>Resolves the element at the given position, then transitively finds all
  * references (up to 2 levels deep) and filters for test methods (annotated with
  * JUnit 4/5 or TestNG test annotations).</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/FindAffectedTestsTool.java">javalens-mcp FindAffectedTestsTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class FindAffectedTestsHandler implements ICommandHandler {
 

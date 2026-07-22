@@ -48,6 +48,10 @@ import com.ibm.mcp.jdtls.JdtUtils;
  *
  * <p>Comprehensive file analysis combining types, methods, fields, diagnostics,
  * imports, unused imports, LOC, and per-method complexity.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/AnalyzeFileTool.java">javalens-mcp AnalyzeFileTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class AnalyzeFileHandler implements ICommandHandler {
 

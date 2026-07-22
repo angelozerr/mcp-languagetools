@@ -58,6 +58,10 @@ import com.ibm.mcp.jdtls.JdtUtils;
  *
  * <p>Comprehensive method analysis: complexity, LOC, callers (via SearchEngine),
  * callees (via ASTVisitor), and override information.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/AnalyzeMethodTool.java">javalens-mcp AnalyzeMethodTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class AnalyzeMethodHandler implements ICommandHandler {
 

@@ -47,6 +47,10 @@ import com.ibm.mcp.jdtls.JdtUtils;
  *   <li>{@code Constructor.newInstance()}</li>
  *   <li>Import declarations for {@code java.lang.reflect.*}</li>
  * </ul>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/FindReflectionUsageTool.java">javalens-mcp FindReflectionUsageTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class FindReflectionUsageHandler implements ICommandHandler {
 

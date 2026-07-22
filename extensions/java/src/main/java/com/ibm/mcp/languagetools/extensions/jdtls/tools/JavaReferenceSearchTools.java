@@ -24,6 +24,12 @@ import jakarta.inject.Inject;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
+/**
+ * MCP tools for Java reference search via JDT.LS delegate command handlers.
+ *
+ * <p>Tools adapted from <a href="https://github.com/pzalutski-pixel/javalens-mcp">javalens-mcp</a>
+ * for JDT.LS delegate command handler architecture.</p>
+ */
 @ApplicationScoped
 public class JavaReferenceSearchTools {
 

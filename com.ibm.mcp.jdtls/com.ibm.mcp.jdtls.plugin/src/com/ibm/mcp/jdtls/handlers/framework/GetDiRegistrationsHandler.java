@@ -42,6 +42,10 @@ import com.ibm.mcp.jdtls.ICommandHandler;
  *
  * <p>Searches for dependency injection annotations from Spring and Jakarta CDI
  * frameworks and extracts component registration and injection point metadata.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/GetDiRegistrationsTool.java">javalens-mcp GetDiRegistrationsTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class GetDiRegistrationsHandler implements ICommandHandler {
 

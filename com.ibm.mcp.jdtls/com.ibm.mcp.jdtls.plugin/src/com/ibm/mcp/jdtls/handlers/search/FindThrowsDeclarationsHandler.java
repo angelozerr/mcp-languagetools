@@ -22,6 +22,10 @@ import org.eclipse.jdt.core.search.IJavaSearchConstants;
  *
  * <p>Finds all {@code throws Type} declarations for the given exception type using
  * fine-grained THROW_STATEMENT_TYPE_REFERENCE search.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/FindThrowsDeclarationsTool.java">javalens-mcp FindThrowsDeclarationsTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class FindThrowsDeclarationsHandler extends AbstractFineGrainReferenceHandler {
 

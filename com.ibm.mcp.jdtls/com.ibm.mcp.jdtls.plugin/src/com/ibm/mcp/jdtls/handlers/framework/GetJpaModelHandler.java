@@ -43,6 +43,10 @@ import com.ibm.mcp.jdtls.ICommandHandler;
  * <p>Searches for JPA annotations (@Entity, @Table, @MappedSuperclass, etc.)
  * and extracts entity metadata including fields, column mappings, and
  * relationships.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/GetJpaModelTool.java">javalens-mcp GetJpaModelTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class GetJpaModelHandler implements ICommandHandler {
 

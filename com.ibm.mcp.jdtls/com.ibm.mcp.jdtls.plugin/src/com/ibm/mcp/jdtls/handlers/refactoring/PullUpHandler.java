@@ -44,6 +44,10 @@ import com.ibm.mcp.jdtls.JdtUtils;
  *
  * <p>The superclass must be in the workspace (source-available) for editing.
  * Members are inserted before the closing brace of the superclass type declaration.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/PullUpTool.java">javalens-mcp PullUpTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class PullUpHandler extends AbstractRefactoringHandler {
 

@@ -34,6 +34,10 @@ import com.ibm.mcp.jdtls.ICommandHandler;
  *
  * <p>Retrieves both raw and resolved classpath entries for the project,
  * including source, library, container, project, and variable entries.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/GetClasspathInfoTool.java">javalens-mcp GetClasspathInfoTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class GetClasspathInfoHandler implements ICommandHandler {
 

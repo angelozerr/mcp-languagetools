@@ -29,6 +29,10 @@ import org.eclipse.jdt.core.ISourceReference;
  *
  * <p>Uses {@code codeSelect} to find the element at the given position and returns
  * the source location where that element is defined.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/GoToDefinitionTool.java">javalens-mcp GoToDefinitionTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class GoToDefinitionHandler extends AbstractPositionHandler {
 

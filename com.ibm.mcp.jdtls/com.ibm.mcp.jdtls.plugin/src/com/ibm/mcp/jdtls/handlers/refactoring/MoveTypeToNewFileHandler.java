@@ -54,6 +54,10 @@ import com.ibm.mcp.jdtls.JdtUtils;
  * is created in the same package. Static keyword is removed if present (since the type
  * becomes top-level). Imports from the original file that are used by the moved type
  * are copied to the new file.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/MoveTypeToNewFileTool.java">javalens-mcp MoveTypeToNewFileTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class MoveTypeToNewFileHandler extends AbstractRefactoringHandler {
 

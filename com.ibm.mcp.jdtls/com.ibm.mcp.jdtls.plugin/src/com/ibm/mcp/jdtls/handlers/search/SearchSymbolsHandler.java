@@ -42,6 +42,10 @@ import com.ibm.mcp.jdtls.ICommandHandler;
  * <p>For types, uses {@link SearchEngine#searchAllTypeNames}. For methods and
  * fields, uses {@link SearchPattern} with a string pattern and
  * {@link IJavaSearchConstants#DECLARATIONS}.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/SearchSymbolsTool.java">javalens-mcp SearchSymbolsTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class SearchSymbolsHandler implements ICommandHandler {
 

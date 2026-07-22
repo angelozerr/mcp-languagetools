@@ -22,6 +22,10 @@ import org.eclipse.jdt.core.search.IJavaSearchConstants;
  *
  * <p>Finds all usages of the given type as a generic type argument (e.g.
  * {@code List<Type>}) using fine-grained TYPE_ARGUMENT_TYPE_REFERENCE search.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/FindTypeArgumentsTool.java">javalens-mcp FindTypeArgumentsTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class FindTypeArgumentsHandler extends AbstractFineGrainReferenceHandler {
 

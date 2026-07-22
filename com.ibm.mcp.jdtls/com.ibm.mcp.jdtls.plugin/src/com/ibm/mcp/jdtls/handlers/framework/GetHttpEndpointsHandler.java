@@ -46,6 +46,10 @@ import com.ibm.mcp.jdtls.ICommandHandler;
  *
  * <p>Searches for HTTP endpoint annotations from Spring MVC and JAX-RS
  * frameworks and extracts endpoint metadata.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/GetHttpEndpointsTool.java">javalens-mcp GetHttpEndpointsTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class GetHttpEndpointsHandler implements ICommandHandler {
 

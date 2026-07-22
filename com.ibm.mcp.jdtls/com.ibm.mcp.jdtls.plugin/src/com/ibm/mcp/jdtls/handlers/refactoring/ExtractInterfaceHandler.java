@@ -43,6 +43,10 @@ import com.ibm.mcp.jdtls.JdtUtils;
  * <p>The new interface file is created in the same package as the original class.
  * Method signatures are copied without bodies. Parameter types are resolved using
  * JDT's Signature utilities.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/ExtractInterfaceTool.java">javalens-mcp ExtractInterfaceTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class ExtractInterfaceHandler extends AbstractRefactoringHandler {
 

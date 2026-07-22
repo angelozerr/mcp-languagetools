@@ -33,6 +33,10 @@ import com.ibm.mcp.jdtls.JdtUtils;
  *
  * <p>Resolves the type and uses {@link ITypeHierarchy#getAllSubtypes} to find
  * all implementations (for interfaces) or subclasses (for classes).</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/FindImplementationsTool.java">javalens-mcp FindImplementationsTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class FindImplementationsHandler implements ICommandHandler {
 

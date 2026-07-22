@@ -50,6 +50,10 @@ import com.ibm.mcp.jdtls.JdtUtils;
  *
  * <p>Uses ASTParser to find methods annotated with JUnit 4/5 or TestNG test
  * annotations.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/FindTestsTool.java">javalens-mcp FindTestsTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class FindTestsHandler implements ICommandHandler {
 

@@ -35,6 +35,10 @@ import org.eclipse.jdt.core.Signature;
  *
  * <p>Resolves the element at the given position. If it is an {@link IField},
  * returns detailed field information. Otherwise returns an error.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/GetFieldAtPositionTool.java">javalens-mcp GetFieldAtPositionTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class GetFieldAtPositionHandler extends AbstractPositionHandler {
 

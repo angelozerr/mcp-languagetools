@@ -44,6 +44,10 @@ import com.ibm.mcp.jdtls.JdtUtils;
  *
  * <p>All subclasses must be in the workspace (source-available) for editing.
  * Members are inserted before the closing brace of each subclass type declaration.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/PushDownTool.java">javalens-mcp PushDownTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class PushDownHandler extends AbstractRefactoringHandler {
 

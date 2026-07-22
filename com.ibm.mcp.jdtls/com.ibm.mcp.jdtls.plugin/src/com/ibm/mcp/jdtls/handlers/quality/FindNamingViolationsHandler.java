@@ -52,6 +52,10 @@ import com.ibm.mcp.jdtls.JdtUtils;
  * <p>Checks naming conventions: UpperCamelCase for types, lowerCamelCase for
  * methods/fields, UPPER_SNAKE_CASE for constants, lowercase for packages,
  * single uppercase letter or UpperCamelCase for type parameters.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/FindNamingViolationsTool.java">javalens-mcp FindNamingViolationsTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class FindNamingViolationsHandler implements ICommandHandler {
 

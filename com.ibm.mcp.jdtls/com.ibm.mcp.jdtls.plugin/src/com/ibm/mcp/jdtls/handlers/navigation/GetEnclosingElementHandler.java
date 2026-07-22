@@ -33,6 +33,10 @@ import org.eclipse.jdt.core.JavaModelException;
  *
  * <p>Resolves the element at the given position, then navigates up the parent
  * chain to return the enclosing method, type, and package.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/GetEnclosingElementTool.java">javalens-mcp GetEnclosingElementTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class GetEnclosingElementHandler extends AbstractPositionHandler {
 

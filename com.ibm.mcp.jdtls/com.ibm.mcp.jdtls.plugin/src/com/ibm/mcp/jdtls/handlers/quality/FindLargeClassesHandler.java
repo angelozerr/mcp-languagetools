@@ -44,6 +44,10 @@ import com.ibm.mcp.jdtls.ICommandHandler;
  * maxLoc (optional, default 500)}]</p>
  *
  * <p>Scans all CUs in the workspace and filters types exceeding any threshold.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/FindLargeClassesTool.java">javalens-mcp FindLargeClassesTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class FindLargeClassesHandler implements ICommandHandler {
 

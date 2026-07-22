@@ -41,6 +41,10 @@ import com.ibm.mcp.jdtls.JdtUtils;
  * <p>Resolves the {@link IType} and returns its methods, fields, and nested
  * types. When {@code includeInherited} is {@code true}, members from
  * supertypes are included as well.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/GetTypeMembersTool.java">javalens-mcp GetTypeMembersTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class GetTypeMembersHandler implements ICommandHandler {
 

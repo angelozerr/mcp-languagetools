@@ -45,6 +45,10 @@ import com.ibm.mcp.jdtls.JdtUtils;
  * <p>The new superclass file is created in the same package as the original class.
  * Moved methods retain their bodies. Moved fields retain their initializers.
  * Access modifiers are adjusted from private to protected where necessary.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/ExtractSuperclassTool.java">javalens-mcp ExtractSuperclassTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class ExtractSuperclassHandler extends AbstractRefactoringHandler {
 

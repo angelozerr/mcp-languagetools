@@ -64,6 +64,10 @@ import com.ibm.mcp.jdtls.JdtUtils;
  * return statement or methods that consist of a single expression. Complex methods
  * with multiple return paths, local variables that conflict with the call site scope,
  * or side effects in argument expressions are not fully handled.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/InlineMethodTool.java">javalens-mcp InlineMethodTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class InlineMethodHandler extends AbstractRefactoringHandler {
 

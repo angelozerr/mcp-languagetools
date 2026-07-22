@@ -41,6 +41,10 @@ import com.ibm.mcp.jdtls.JdtUtils;
  * <p>This is a best-effort implementation. It handles the common case where a single
  * expression is selected. Complex expressions spanning multiple statements or
  * partial expressions are not supported.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/ExtractVariableTool.java">javalens-mcp ExtractVariableTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class ExtractVariableHandler extends AbstractRefactoringHandler {
 

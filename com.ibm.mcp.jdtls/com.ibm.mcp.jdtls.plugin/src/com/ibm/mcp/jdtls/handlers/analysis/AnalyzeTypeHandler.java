@@ -55,6 +55,10 @@ import com.ibm.mcp.jdtls.JdtUtils;
  *
  * <p>Comprehensive type analysis: type hierarchy, member counts,
  * references, and per-method complexity.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/AnalyzeTypeTool.java">javalens-mcp AnalyzeTypeTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class AnalyzeTypeHandler implements ICommandHandler {
 

@@ -40,6 +40,10 @@ import com.ibm.mcp.jdtls.JdtUtils;
  *
  * <p>Finds all usages of an annotation type using fine-grained
  * ANNOTATION_TYPE_REFERENCE search.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/FindAnnotationUsagesTool.java">javalens-mcp FindAnnotationUsagesTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class FindAnnotationUsagesHandler implements ICommandHandler {
 

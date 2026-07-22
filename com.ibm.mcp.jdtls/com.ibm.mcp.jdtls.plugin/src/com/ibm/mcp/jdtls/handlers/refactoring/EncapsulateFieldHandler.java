@@ -59,6 +59,10 @@ import com.ibm.mcp.jdtls.JdtUtils;
  *
  * <p>Call site replacement distinguishes read vs. write access based on the SearchMatch
  * flags. Custom getter and setter names can be specified via arguments.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/EncapsulateFieldTool.java">javalens-mcp EncapsulateFieldTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class EncapsulateFieldHandler extends AbstractRefactoringHandler {
 

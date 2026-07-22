@@ -42,6 +42,10 @@ import com.ibm.mcp.jdtls.JdtUtils;
  *
  * <p>The constant is placed as a field declaration at the beginning of the class body,
  * before any existing field or method declarations.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/ExtractConstantTool.java">javalens-mcp ExtractConstantTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class ExtractConstantHandler extends AbstractRefactoringHandler {
 

@@ -32,6 +32,10 @@ import com.ibm.mcp.jdtls.JdtUtils;
  * <p>Arguments: [uri, line, character] or [fullyQualifiedName]</p>
  *
  * <p>Returns the type hierarchy (supertypes and subtypes) for the given type.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/GetTypeHierarchyTool.java">javalens-mcp GetTypeHierarchyTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class TypeHierarchyHandler implements ICommandHandler {
 

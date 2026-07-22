@@ -44,6 +44,10 @@ import com.ibm.mcp.jdtls.JdtUtils;
  *
  * <p>Resolves the element at the given position and builds an impact chain:
  * element -> direct callers -> their callers (up to 2 levels).</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/AnalyzeChangeImpactTool.java">javalens-mcp AnalyzeChangeImpactTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class AnalyzeChangeImpactHandler implements ICommandHandler {
 

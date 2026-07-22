@@ -35,6 +35,10 @@ import com.ibm.mcp.jdtls.JdtUtils;
  *
  * <p>Performs quick syntax-only validation using ASTParser with binding
  * resolution disabled. Filters results to syntax errors only.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/ValidateSyntaxTool.java">javalens-mcp ValidateSyntaxTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class ValidateSyntaxHandler implements ICommandHandler {
 

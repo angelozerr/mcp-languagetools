@@ -39,6 +39,10 @@ import com.ibm.mcp.jdtls.JdtUtils;
  *
  * <p>Finds all {@code new Type()} instantiations using fine-grained
  * CLASS_INSTANCE_CREATION_TYPE_REFERENCE search.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/FindTypeInstantiationsTool.java">javalens-mcp FindTypeInstantiationsTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class FindTypeInstantiationsHandler implements ICommandHandler {
 

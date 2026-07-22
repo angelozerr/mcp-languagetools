@@ -36,6 +36,10 @@ import org.eclipse.jdt.core.JavaModelException;
  * comment. Parses the raw Javadoc into structured sections: description,
  * {@code @param}, {@code @return}, {@code @throws}, {@code @see}, and
  * {@code @since} tags.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/GetJavadocTool.java">javalens-mcp GetJavadocTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class GetJavadocHandler extends AbstractPositionHandler {
 

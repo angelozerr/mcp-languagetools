@@ -44,6 +44,10 @@ import com.ibm.mcp.jdtls.JdtUtils;
  *
  * <p>Composed handler that runs diagnostics, determines available quick fixes,
  * and optionally applies safe fixes automatically.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/DiagnoseAndFixTool.java">javalens-mcp DiagnoseAndFixTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class DiagnoseAndFixHandler implements ICommandHandler {
 

@@ -34,6 +34,10 @@ import org.eclipse.jdt.core.JavaModelException;
  * <p>Resolves an {@link IMethod} at the given position. Walks up the type
  * hierarchy (superclass chain and interface chain) to find the method that
  * this method overrides or implements.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/GetSuperMethodTool.java">javalens-mcp GetSuperMethodTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class GetSuperMethodHandler extends AbstractPositionHandler {
 

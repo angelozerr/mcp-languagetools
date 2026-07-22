@@ -37,6 +37,10 @@ import com.ibm.mcp.jdtls.JdtUtils;
  * <p>Subclasses supply the search constant (e.g.
  * {@code IJavaSearchConstants.CAST_TYPE_REFERENCE}), a label for the type key
  * in the result map, and a key for the result list.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/AbstractFineGrainReferenceTool.java">javalens-mcp AbstractFineGrainReferenceTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public abstract class AbstractFineGrainReferenceHandler implements ICommandHandler {
 

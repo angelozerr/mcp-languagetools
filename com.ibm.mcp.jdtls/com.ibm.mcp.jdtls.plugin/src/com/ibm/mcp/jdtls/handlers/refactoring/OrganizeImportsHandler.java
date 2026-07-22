@@ -70,6 +70,10 @@ import com.ibm.mcp.jdtls.JdtUtils;
  * <p>Note: Adding missing imports requires type resolution which may rely on the
  * project's classpath configuration. This implementation handles removal and sorting
  * of existing imports, and attempts to resolve missing types via SearchEngine.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/OrganizeImportsTool.java">javalens-mcp OrganizeImportsTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class OrganizeImportsHandler extends AbstractRefactoringHandler {
 

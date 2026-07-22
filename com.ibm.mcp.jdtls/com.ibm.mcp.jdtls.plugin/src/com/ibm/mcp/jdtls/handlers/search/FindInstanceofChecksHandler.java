@@ -22,6 +22,10 @@ import org.eclipse.jdt.core.search.IJavaSearchConstants;
  *
  * <p>Finds all {@code instanceof Type} checks for the given type using
  * fine-grained INSTANCEOF_TYPE_REFERENCE search.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/FindInstanceofChecksTool.java">javalens-mcp FindInstanceofChecksTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class FindInstanceofChecksHandler extends AbstractFineGrainReferenceHandler {
 

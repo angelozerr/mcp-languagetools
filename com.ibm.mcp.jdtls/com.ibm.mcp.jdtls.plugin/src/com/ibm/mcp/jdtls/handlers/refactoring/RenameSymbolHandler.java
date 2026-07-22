@@ -53,6 +53,10 @@ import com.ibm.mcp.jdtls.JdtUtils;
  * edits to replace the old name with the new name at each occurrence.</p>
  *
  * <p>Supports renaming of types, methods, fields, local variables, and parameters.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/RenameSymbolTool.java">javalens-mcp RenameSymbolTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class RenameSymbolHandler extends AbstractRefactoringHandler {
 

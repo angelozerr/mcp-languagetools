@@ -49,6 +49,10 @@ import com.ibm.mcp.jdtls.JdtUtils;
  *
  * <p>Uses ASTParser and ASTVisitor on the MethodDeclaration to track
  * variable definitions, reads, and writes for each local variable and parameter.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/AnalyzeDataFlowTool.java">javalens-mcp AnalyzeDataFlowTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class AnalyzeDataFlowHandler implements ICommandHandler {
 

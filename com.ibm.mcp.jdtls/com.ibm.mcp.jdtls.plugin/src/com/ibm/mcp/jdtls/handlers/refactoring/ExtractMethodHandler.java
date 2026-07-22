@@ -62,6 +62,10 @@ import com.ibm.mcp.jdtls.JdtUtils;
  * <p>This is a best-effort implementation handling common scenarios. Complex cases
  * such as multiple return values, control flow statements (break, continue) spanning
  * the selection boundary, or exception handling may not be fully supported.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/ExtractMethodTool.java">javalens-mcp ExtractMethodTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class ExtractMethodHandler extends AbstractRefactoringHandler {
 

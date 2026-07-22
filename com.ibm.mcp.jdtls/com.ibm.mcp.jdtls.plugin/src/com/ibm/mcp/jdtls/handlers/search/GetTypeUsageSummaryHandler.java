@@ -40,6 +40,10 @@ import java.util.List;
  * <p>Resolves the type and runs multiple fine-grained searches to build a
  * comprehensive usage summary including total references, instantiations,
  * casts, instanceof checks, annotation usages, and type argument usages.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/GetTypeUsageSummaryTool.java">javalens-mcp GetTypeUsageSummaryTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class GetTypeUsageSummaryHandler implements ICommandHandler {
 

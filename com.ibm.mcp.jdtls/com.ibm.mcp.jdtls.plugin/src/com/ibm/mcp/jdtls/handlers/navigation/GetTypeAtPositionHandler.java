@@ -35,6 +35,10 @@ import org.eclipse.jdt.core.JavaModelException;
  * <p>Resolves the element at the given position. If it is an {@link IType},
  * or can provide an enclosing {@link IType}, returns detailed type
  * information.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/GetTypeAtPositionTool.java">javalens-mcp GetTypeAtPositionTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class GetTypeAtPositionHandler extends AbstractPositionHandler {
 

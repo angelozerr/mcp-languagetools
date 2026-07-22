@@ -55,6 +55,10 @@ import com.ibm.mcp.jdtls.JdtUtils;
  *
  * <p>If the method body contains a single return statement, the lambda uses expression
  * form. Otherwise, a block lambda is generated.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/ConvertAnonymousToLambdaTool.java">javalens-mcp ConvertAnonymousToLambdaTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class ConvertAnonymousToLambdaHandler extends AbstractRefactoringHandler {
 

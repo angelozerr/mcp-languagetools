@@ -54,6 +54,10 @@ import com.ibm.mcp.jdtls.JdtUtils;
  * <p>Applies a specified cleanup operation to a compilation unit. Supported
  * cleanupIds: remove_unused_imports, add_missing_override, convert_to_lambda,
  * add_missing_serial_version_id, remove_unnecessary_casts, add_final_modifier.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/ApplyCleanupTool.java">javalens-mcp ApplyCleanupTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class ApplyCleanupHandler implements ICommandHandler {
 

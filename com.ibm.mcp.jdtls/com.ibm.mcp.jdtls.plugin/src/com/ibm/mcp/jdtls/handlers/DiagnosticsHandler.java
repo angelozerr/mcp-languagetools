@@ -39,6 +39,10 @@ import com.ibm.mcp.jdtls.JdtUtils;
  *
  * <p>Returns a list of PublishDiagnosticsParams-like objects with uri and diagnostics,
  * following the same format as MicroProfile's microprofile/java/diagnostics.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/GetDiagnosticsTool.java">javalens-mcp GetDiagnosticsTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class DiagnosticsHandler implements ICommandHandler {
 

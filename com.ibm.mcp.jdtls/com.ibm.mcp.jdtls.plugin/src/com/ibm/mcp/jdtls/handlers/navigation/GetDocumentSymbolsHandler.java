@@ -45,6 +45,10 @@ import com.ibm.mcp.jdtls.JdtUtils;
  * type, method, field, enum, annotation member, and enum constant
  * declarations. Returns a hierarchical list of symbols with nesting
  * support for inner types.</p>
+ *
+ * <p>Copied and adapted from
+ * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/GetDocumentSymbolsTool.java">javalens-mcp GetDocumentSymbolsTool</a>
+ * for JDT.LS delegate command handler architecture.</p>
  */
 public class GetDocumentSymbolsHandler implements ICommandHandler {
 
