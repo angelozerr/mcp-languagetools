@@ -26,6 +26,6 @@ import org.eclipse.jdt.core.search.IJavaSearchConstants;
 public class FindThrowsDeclarationsHandler extends AbstractFineGrainReferenceHandler {
 
     public FindThrowsDeclarationsHandler() {
-        super(IJavaSearchConstants.THROW_STATEMENT_TYPE_REFERENCE, "type", "throwsDeclarations");
+        super(IJavaSearchConstants.THROWS_CLAUSE_TYPE_REFERENCE, "type", "throwsDeclarations");
     }
 }

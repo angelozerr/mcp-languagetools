@@ -25,8 +25,6 @@ import org.eclipse.jdt.core.JavaModelException;
 import org.eclipse.jdt.core.dom.AST;
 import org.eclipse.jdt.core.dom.ASTParser;
 import org.eclipse.jdt.core.dom.CompilationUnit;
-import org.eclipse.jface.text.Document;
-import org.eclipse.text.edits.TextEdit;
 
 import com.ibm.mcp.jdtls.ICommandHandler;
 import com.ibm.mcp.jdtls.JdtUtils;
@@ -82,46 +80,6 @@ public abstract class AbstractRefactoringHandler implements ICommandHandler {
 
         int offset = JdtUtils.getOffset(cu, line, character);
         return cu.codeSelect(offset, 0);
-    }
-
-    /**
-     * Convert a map of JDT TextEdits (keyed by ICompilationUnit) to the serializable
-     * result format expected by MCP clients.
-     *
-     * @param edits map of compilation units to their text edits
-     * @return a map with "applied" flag and "edits" list in LSP-compatible format
-     * @throws JavaModelException if source retrieval fails
-     */
-    protected Map<String, Object> createTextEditResult(Map<ICompilationUnit, TextEdit> edits)
-            throws JavaModelException {
-        List<Map<String, Object>> editList = new ArrayList<>();
-
-        for (Map.Entry<ICompilationUnit, TextEdit> entry : edits.entrySet()) {
-            ICompilationUnit cu = entry.getKey();
-            TextEdit textEdit = entry.getValue();
-            String source = cu.getSource();
-            String uri = cu.getResource().getLocationURI().toString();
-
-            Document document = new Document(source);
-            try {
-                TextEdit copy = textEdit.copy();
-                copy.apply(document);
-            } catch (Exception e) {
-                continue;
-            }
-
-            String newSource = document.get();
-            if (!newSource.equals(source)) {
-                // Compute line-level diff and create edits
-                List<Map<String, Object>> fileEdits = computeLineEdits(uri, source, newSource);
-                editList.addAll(fileEdits);
-            }
-        }
-
-        Map<String, Object> result = new HashMap<>();
-        result.put("applied", !editList.isEmpty());
-        result.put("edits", editList);
-        return result;
     }
 
     /**

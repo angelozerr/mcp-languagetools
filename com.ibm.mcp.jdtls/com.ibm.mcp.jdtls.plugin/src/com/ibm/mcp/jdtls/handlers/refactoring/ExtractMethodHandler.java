@@ -42,8 +42,6 @@ import org.eclipse.jdt.core.dom.VariableDeclarationFragment;
 import org.eclipse.jdt.core.dom.VariableDeclarationStatement;
 import org.eclipse.jdt.core.dom.rewrite.ASTRewrite;
 import org.eclipse.jdt.core.dom.rewrite.ListRewrite;
-import org.eclipse.jface.text.Document;
-import org.eclipse.text.edits.TextEdit;
 
 import com.ibm.mcp.jdtls.JdtUtils;
 

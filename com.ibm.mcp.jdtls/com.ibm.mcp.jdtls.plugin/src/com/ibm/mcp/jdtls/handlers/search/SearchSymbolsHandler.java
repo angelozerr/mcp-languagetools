@@ -85,7 +85,7 @@ public class SearchSymbolsHandler implements ICommandHandler {
                 null,
                 0,
                 query.toCharArray(),
-                SearchEngine.R_PATTERN_MATCH | SearchEngine.R_CAMELCASE_MATCH,
+                SearchPattern.R_PATTERN_MATCH | SearchPattern.R_CAMELCASE_MATCH,
                 IJavaSearchConstants.TYPE,
                 scope,
                 new TypeNameMatchRequestor() {

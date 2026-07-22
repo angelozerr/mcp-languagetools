@@ -40,8 +40,6 @@ import org.eclipse.jdt.core.search.SearchMatch;
 import org.eclipse.jdt.core.search.SearchParticipant;
 import org.eclipse.jdt.core.search.SearchPattern;
 import org.eclipse.jdt.core.search.SearchRequestor;
-import org.eclipse.jface.text.Document;
-import org.eclipse.text.edits.ReplaceEdit;
 
 import com.ibm.mcp.jdtls.JdtUtils;
 

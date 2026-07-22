@@ -22,6 +22,7 @@ import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.jdt.core.search.IJavaSearchConstants;
 import org.eclipse.jdt.core.search.IJavaSearchScope;
 import org.eclipse.jdt.core.search.SearchEngine;
+import org.eclipse.jdt.core.search.SearchPattern;
 import org.eclipse.jdt.core.search.TypeNameMatch;
 import org.eclipse.jdt.core.search.TypeNameMatchRequestor;
 
@@ -58,7 +59,7 @@ public class SuggestImportsHandler implements ICommandHandler {
                 null,
                 0,
                 typeName.toCharArray(),
-                SearchEngine.R_EXACT_MATCH | SearchEngine.R_CASE_SENSITIVE,
+                SearchPattern.R_EXACT_MATCH | SearchPattern.R_CASE_SENSITIVE,
                 IJavaSearchConstants.TYPE,
                 scope,
                 new TypeNameMatchRequestor() {
