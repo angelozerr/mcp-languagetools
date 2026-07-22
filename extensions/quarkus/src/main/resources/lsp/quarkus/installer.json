@@ -1,0 +1,40 @@
+{
+	"id": "quarkus",
+	"name": "Quarkus Extension",
+	"check": {
+		"fileExists": {
+			"name": "Check if Quarkus extension is installed",
+			"file": "$SERVER_HOME$/lib/com.redhat.quarkus.ls.jar"
+		}
+	},
+	"run": {
+		"download": {
+			"name": "Download Quarkus LS JAR",
+			"github": {
+				"owner": "redhat-developer",
+				"repository": "quarkus-ls",
+				"prerelease": false,
+				"asset": "com.redhat.quarkus.ls-*.jar"
+			},
+			"output": {
+				"dir": "$SERVER_HOME$/lib",
+				"file": { "name": "com.redhat.quarkus.ls.jar" }
+			},
+			"onSuccess": {
+				"download": {
+					"name": "Download Quarkus JDT plugin",
+					"github": {
+						"owner": "redhat-developer",
+						"repository": "quarkus-ls",
+						"prerelease": false,
+						"asset": "com.redhat.microprofile.jdt.quarkus_*.jar"
+					},
+					"output": {
+						"dir": "$SERVER_HOME$/plugins",
+						"file": { "name": "com.redhat.microprofile.jdt.quarkus.jar" }
+					}
+				}
+			}
+		}
+	}
+}

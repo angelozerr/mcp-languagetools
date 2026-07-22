@@ -48,8 +48,7 @@
           "command": {
             "windows": "$SERVER_HOME$/OmniSharp.exe -lsp",
             "default": "$SERVER_HOME$/OmniSharp -lsp"
-          },
-          "update": true
+          }
         }
       }
     }

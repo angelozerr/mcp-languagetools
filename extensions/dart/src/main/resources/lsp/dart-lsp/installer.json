@@ -11,8 +11,7 @@
   "run": {
     "configureServer": {
       "name": "Configure Dart LSP server command",
-      "command": "dart language-server",
-      "update": true
+      "command": "dart language-server"
     }
   }
 }

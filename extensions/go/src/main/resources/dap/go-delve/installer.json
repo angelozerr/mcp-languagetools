@@ -15,8 +15,7 @@
       "onSuccess": {
         "configureServer": {
           "name": "Configure go-delve server command",
-          "command": "dlv dap",
-          "update": true
+          "command": "dlv dap"
         }
       }
     }

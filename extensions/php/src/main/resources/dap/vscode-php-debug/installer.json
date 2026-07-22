@@ -22,8 +22,7 @@
       "onSuccess": {
         "configureServer": {
           "name": "Configure vscode-php-debug command",
-          "command": "node $SERVER_HOME$/extension/out/phpDebug.js",
-          "update": true
+          "command": "node $SERVER_HOME$/extension/out/phpDebug.js"
         }
       }
     }

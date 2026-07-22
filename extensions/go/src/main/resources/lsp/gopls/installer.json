@@ -15,8 +15,7 @@
       "onSuccess": {
         "configureServer": {
           "name": "Configure gopls server command",
-          "command": "gopls -mode=stdio",
-          "update": true
+          "command": "gopls -mode=stdio"
         }
       }
     }

@@ -45,8 +45,7 @@
           "command": {
             "windows": "$SERVER_HOME$/extension/adapter/codelldb.exe",
             "default": "$SERVER_HOME$/extension/adapter/codelldb"
-          },
-          "update": true
+          }
         }
       }
     }

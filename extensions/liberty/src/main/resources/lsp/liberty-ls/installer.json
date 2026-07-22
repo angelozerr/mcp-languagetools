@@ -20,8 +20,7 @@
       "onSuccess": {
         "configureServer": {
           "name": "Configure Liberty LS command",
-          "command": "java -jar $SERVER_HOME$/liberty-langserver.jar",
-          "update": true
+          "command": "java -jar $SERVER_HOME$/liberty-langserver.jar"
         }
       }
     }

@@ -4,19 +4,41 @@
 	"check": {
 		"fileExists": {
 			"name": "Check if Qute is installed",
-			"file": "$SERVER_HOME$/com.redhat.qute.ls-uber.jar"
+			"file": "$SERVER_HOME$/lib/com.redhat.qute.ls-uber.jar"
 		}
 	},
 	"run": {
-		"copy": {
-			"name": "Copy Qute LS JAR",
-			"source": "/lsp/qute/lib/com.redhat.qute.ls-uber.jar",
-			"destination": "$SERVER_HOME$/com.redhat.qute.ls-uber.jar",
+		"download": {
+			"name": "Download Qute LS uber JAR",
+			"github": {
+				"owner": "redhat-developer",
+				"repository": "quarkus-ls",
+				"prerelease": false,
+				"asset": "com.redhat.qute.ls-uber.jar"
+			},
+			"output": {
+				"dir": "$SERVER_HOME$/lib",
+				"file": { "name": "com.redhat.qute.ls-uber.jar" }
+			},
 			"onSuccess": {
-				"configureServer": {
-					"name": "Configure Qute server command",
-					"command": "java -jar \"$SERVER_HOME$/com.redhat.qute.ls-uber.jar\"",
-					"update": true
+				"download": {
+					"name": "Download Qute JDT plugin",
+					"github": {
+						"owner": "redhat-developer",
+						"repository": "quarkus-ls",
+						"prerelease": false,
+						"asset": "com.redhat.qute.jdt_*.jar"
+					},
+					"output": {
+						"dir": "$SERVER_HOME$/plugins",
+						"file": { "name": "com.redhat.qute.jdt.jar" }
+					},
+					"onSuccess": {
+						"configureServer": {
+							"name": "Configure Qute server command",
+							"command": "java -jar \"$SERVER_HOME$/lib/com.redhat.qute.ls-uber.jar\""
+						}
+					}
 				}
 			}
 		}

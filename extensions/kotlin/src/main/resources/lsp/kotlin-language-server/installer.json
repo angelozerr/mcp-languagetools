@@ -35,8 +35,7 @@
           "command": {
             "windows": "$SERVER_HOME$/server/bin/kotlin-language-server.bat",
             "default": "$SERVER_HOME$/server/bin/kotlin-language-server"
-          },
-          "update": true
+          }
         }
       }
     }

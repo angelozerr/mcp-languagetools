@@ -48,8 +48,7 @@
           "command": {
             "windows": "$SERVER_HOME$/netcoredbg/netcoredbg.exe --interpreter=vscode",
             "default": "$SERVER_HOME$/netcoredbg/netcoredbg --interpreter=vscode"
-          },
-          "update": true
+          }
         }
       }
     }

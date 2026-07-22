@@ -23,8 +23,7 @@
       "onSuccess": {
         "configureServer": {
           "name": "Configure vscode-js-debug command",
-          "command": "node $SERVER_HOME$/js-debug/src/dapDebugServer.js ${port} 127.0.0.1",
-          "update": true
+          "command": "node $SERVER_HOME$/js-debug/src/dapDebugServer.js ${port} 127.0.0.1"
         }
       }
     }

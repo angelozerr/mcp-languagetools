@@ -63,8 +63,7 @@
               "x86_64": "$SERVER_HOME$/rust-analyzer-x86_64-apple-darwin",
               "arm64": "$SERVER_HOME$/rust-analyzer-aarch64-apple-darwin"
             }
-          },
-          "update": true
+          }
         }
       }
     }

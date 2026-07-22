@@ -47,8 +47,7 @@
           "command": {
             "windows": "$SERVER_HOME$/bin/lua-language-server.exe",
             "default": "$SERVER_HOME$/bin/lua-language-server"
-          },
-          "update": true
+          }
         }
       }
     }
