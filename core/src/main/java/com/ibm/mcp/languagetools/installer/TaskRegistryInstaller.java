@@ -61,7 +61,9 @@ public class TaskRegistryInstaller implements ServerInstaller {
 
     @Override
     public CompletableFuture<InstallResult> ensureInstalled(InstallerContext context) {
+        ClassLoader callerClassLoader = Thread.currentThread().getContextClassLoader();
         return CompletableFuture.supplyAsync(() -> {
+            Thread.currentThread().setContextClassLoader(callerClassLoader);
             long startTime = System.currentTimeMillis();
             try {
                 // Parse installer.json

@@ -325,6 +325,11 @@
         function handleLspTrace(trace) {
             console.log('handleLspTrace called for server:', trace.serverId, 'current:', window.currentServerId);
 
+            // Forward to install output panel if this server is being installed
+            if (window.installOutputServerId === trace.serverId && typeof appendInstallTrace === 'function') {
+                appendInstallTrace(trace);
+            }
+
             // Store trace by server
             if (!tracesByServer[trace.serverId]) {
                 tracesByServer[trace.serverId] = [];

@@ -408,24 +408,87 @@ async function runInstaller(serverId, force) {
     if (!outputDiv) return;
 
     const label = force ? 'Force installing' : 'Installing';
-    outputDiv.innerHTML = `<div style="color: #4ec9b0;">${label}...</div>`;
+    outputDiv.innerHTML = `
+        <div class="install-output-header" style="color: #4ec9b0; margin-bottom: 0.5rem;">${label} ${serverId}...</div>
+        <div id="install-progress-bar" style="height: 4px; background: #333; border-radius: 2px; margin-bottom: 0.5rem; display: none;">
+            <div id="install-progress-fill" style="height: 100%; background: #4ec9b0; border-radius: 2px; width: 0%; transition: width 0.3s;"></div>
+        </div>
+        <div id="install-traces" style="font-family: monospace; font-size: 12px; max-height: 300px; overflow-y: auto; background: #1e1e1e; padding: 0.5rem; border-radius: 4px;"></div>
+    `;
+
+    window.installOutputServerId = serverId;
 
     try {
         const url = `${getServerApiBase(serverId)}/${serverId}/install${force ? '?force=true' : ''}`;
         const response = await fetch(url, { method: 'POST' });
 
         if (!response.ok) {
+            window.installOutputServerId = null;
             throw new Error('Installation failed');
         }
-
-        const result = await response.json();
-        outputDiv.innerHTML = `
-            <div style="color: #4ec9b0;">✓ Installation started</div>
-            <pre style="margin-top: 0.5rem; color: #d4d4d4;">${JSON.stringify(result, null, 2)}</pre>
-        `;
     } catch (error) {
         console.error('Failed to run installer:', error);
+        window.installOutputServerId = null;
         outputDiv.innerHTML = `<div style="color: #f48771;">✗ Installation failed: ${error.message}</div>`;
+    }
+}
+
+/**
+ * Append an installation trace to the install output panel.
+ */
+function appendInstallTrace(trace) {
+    const tracesDiv = document.getElementById('install-traces');
+    if (!tracesDiv) return;
+
+    const color = trace.messageType === 'ERROR' ? '#f48771'
+        : trace.messageType === 'UPDATE' ? '#858585'
+        : '#d4d4d4';
+
+    if (trace.messageType === 'UPDATE') {
+        const lastLine = tracesDiv.lastElementChild;
+        if (lastLine && lastLine.dataset.update === 'true') {
+            lastLine.textContent = trace.content;
+            return;
+        }
+    }
+
+    const line = document.createElement('div');
+    line.style.color = color;
+    line.textContent = trace.content;
+    if (trace.messageType === 'UPDATE') {
+        line.dataset.update = 'true';
+    }
+    tracesDiv.appendChild(line);
+    tracesDiv.scrollTop = tracesDiv.scrollHeight;
+}
+
+/**
+ * Update the install output progress bar.
+ */
+function updateInstallProgress(msg) {
+    const bar = document.getElementById('install-progress-bar');
+    const fill = document.getElementById('install-progress-fill');
+    const header = document.querySelector('.install-output-header');
+
+    if (bar && fill) {
+        bar.style.display = 'block';
+        fill.style.width = `${Math.round((msg.progress || 0) * 100)}%`;
+    }
+
+    if (msg.status === 'completed') {
+        window.installOutputServerId = null;
+        if (fill) fill.style.background = '#4ec9b0';
+        if (header) {
+            header.style.color = '#4ec9b0';
+            header.textContent = `✓ Installation completed`;
+        }
+    } else if (msg.status === 'failed') {
+        window.installOutputServerId = null;
+        if (fill) fill.style.background = '#f48771';
+        if (header) {
+            header.style.color = '#f48771';
+            header.textContent = `✗ Installation failed`;
+        }
     }
 }
 
@@ -503,6 +566,8 @@ window.loadInstallerJson = loadInstallerJson;
 window.saveInstallerJson = saveInstallerJson;
 window.resetInstallerJson = resetInstallerJson;
 window.runInstaller = runInstaller;
+window.appendInstallTrace = appendInstallTrace;
+window.updateInstallProgress = updateInstallProgress;
 window.buildContributedByMap = buildContributedByMap;
 window.formatContributeInfo = formatContributeInfo;
 window.renderServerDiagram = renderServerDiagram;

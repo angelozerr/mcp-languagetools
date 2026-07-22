@@ -215,6 +215,11 @@ function getStepLabel(taskId, stepId) {
  * Handle progress update messages from WebSocket
  */
 function handleProgressUpdate(msg) {
+    // Forward to install output panel if this server is being installed
+    if (window.installOutputServerId === msg.serverId && typeof updateInstallProgress === 'function') {
+        updateInstallProgress(msg);
+    }
+
     if (msg.status === 'completed' || msg.status === 'failed') {
         // Remove task after a short delay
         setTimeout(() => removeTask(msg.taskId), 2000);
