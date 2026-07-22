@@ -68,6 +68,17 @@ This means AI assistants can leverage the same tooling that developers use in th
 | `detach_from_process` | Detach without terminating the process |
 | `get_debug_statistics` | Get statistics about active debug sessions |
 
+### Java Tools (from Java extension)
+
+| Tool | Description |
+|------|-------------|
+| `java_get_type_hierarchy` | Get supertypes, super interfaces, and subtypes of a Java type |
+| `java_get_call_hierarchy_incoming` | Find all callers of a method |
+| `java_get_call_hierarchy_outgoing` | Find all methods called by a method |
+| `java_find_annotation_usages` | Find all usages of a Java annotation type |
+| `java_find_type_instantiations` | Find all `new Type()` instantiations of a Java type |
+| `java_get_complexity_metrics` | Compute cyclomatic complexity and LOC per method |
+
 ### Extension & Workspace Tools
 
 | Tool | Description |
