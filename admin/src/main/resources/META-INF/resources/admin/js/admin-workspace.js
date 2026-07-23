@@ -12,17 +12,22 @@
             try {
                 const response = await fetch(`/api/admin/extensions/lsp/servers/${serverId}/${action}`, { method: 'POST' });
                 if (response.ok) {
-                    // Update cached config
                     if (window.lspConfigs[serverId]) {
                         window.lspConfigs[serverId].enabled = enabled;
                     }
-                    // Update workspace server data and re-render
                     const workspace = workspaces.find(w => w.rootUri === selectedWorkspace);
                     if (workspace && workspace.lspServers) {
                         const srv = workspace.lspServers.find(s => s.id === serverId);
                         if (srv) srv.enabled = enabled;
                     }
-                    if (workspace) renderServers(workspace.lspServers || [], [], workspace);
+                    const serverElement = document.querySelector(`.server-item[data-server-id="${serverId}"]`);
+                    if (serverElement) {
+                        if (enabled) {
+                            serverElement.classList.remove('server-disabled');
+                        } else {
+                            serverElement.classList.add('server-disabled');
+                        }
+                    }
                 }
             } catch (error) {
                 console.error(`Failed to ${action} LSP server:`, error);
@@ -37,9 +42,14 @@
                     if (window.dapConfigs && window.dapConfigs[serverId]) {
                         window.dapConfigs[serverId].enabled = enabled;
                     }
-                    const workspace = workspaces.find(w => w.rootUri === selectedWorkspace);
-                    const sessions = window.dapSessions || [];
-                    if (workspace) renderServers([], sessions, workspace);
+                    const serverElement = document.querySelector(`.server-item[data-server-id="${serverId}"]`);
+                    if (serverElement) {
+                        if (enabled) {
+                            serverElement.classList.remove('server-disabled');
+                        } else {
+                            serverElement.classList.add('server-disabled');
+                        }
+                    }
                 }
             } catch (error) {
                 console.error(`Failed to ${action} DAP server:`, error);
@@ -672,14 +682,14 @@
             // Clear DAP session when selecting an LSP server
             window.currentDapSessionId = null;
 
-            const workspace = workspaces.find(w => w.rootUri === selectedWorkspace);
-            // Use the correct data based on current tab
-            if (currentWorkspaceTab === 'debuggers') {
-                dapSessions = window.dapSessions || [];
-                renderServers([], dapSessions, workspace);
-            } else {
-                renderServers(workspace?.lspServers || [], [], workspace);
-            }
+            // Update active class without full re-render to preserve scroll position
+            document.querySelectorAll('.server-item').forEach(el => {
+                if (el.dataset.serverId === server.id) {
+                    el.classList.add('active');
+                } else {
+                    el.classList.remove('active');
+                }
+            });
 
             // Only reload console if switching to a different server
             if (!wasAlreadySelected) {
@@ -1424,6 +1434,14 @@
             }
         }
 
+        function clearServerActions(serverId) {
+            const serverElement = document.querySelector(`.server-item[data-server-id="${serverId}"]`);
+            if (serverElement) {
+                const actionsContainer = serverElement.querySelector('.server-actions');
+                if (actionsContainer) actionsContainer.innerHTML = '';
+            }
+        }
+
         async function stopServerAction(serverId) {
             if (!selectedWorkspace) return;
 
@@ -1438,16 +1456,14 @@
             );
             if (!confirmed) return;
 
+            clearServerActions(serverId);
             try {
                 const response = await fetch(
                     `/api/admin/lsp/servers/${encodeURIComponent(selectedWorkspace)}/${serverId}/stop`,
                     { method: 'POST' }
                 );
 
-                if (response.ok) {
-                    // Refresh workspace to update status
-                    loadServers(selectedWorkspace);
-                } else {
+                if (!response.ok) {
                     const error = await response.text();
                     showAlert('Error', 'Failed to stop server: ' + error);
                 }
@@ -1463,15 +1479,14 @@
             const server = workspaces.find(w => w.rootUri === selectedWorkspace)?.lspServers.find(s => s.id === serverId);
             if (!server) return;
 
+            clearServerActions(serverId);
             try {
                 const response = await fetch(
                     `/api/admin/lsp/servers/${encodeURIComponent(selectedWorkspace)}/${serverId}/start-managed`,
                     { method: 'POST' }
                 );
 
-                if (response.ok) {
-                    loadServers(selectedWorkspace);
-                } else {
+                if (!response.ok) {
                     const error = await response.text();
                     showAlert('Error', 'Failed to start managed server: ' + error);
                 }
@@ -1495,16 +1510,14 @@
             );
             if (!confirmed) return;
 
+            clearServerActions(serverId);
             try {
                 const response = await fetch(
                     `/api/admin/lsp/servers/${encodeURIComponent(selectedWorkspace)}/${serverId}/restart`,
                     { method: 'POST' }
                 );
 
-                if (response.ok) {
-                    // Refresh workspace to update status
-                    loadServers(selectedWorkspace);
-                } else {
+                if (!response.ok) {
                     const error = await response.text();
                     showAlert('Error', 'Failed to restart server: ' + error);
                 }
@@ -1528,15 +1541,14 @@
             );
             if (!confirmed) return;
 
+            clearServerActions(serverId);
             try {
                 const response = await fetch(
                     `/api/admin/lsp/servers/${encodeURIComponent(selectedWorkspace)}/${serverId}/disconnect`,
                     { method: 'POST' }
                 );
 
-                if (response.ok) {
-                    loadServers(selectedWorkspace);
-                } else {
+                if (!response.ok) {
                     const error = await response.text();
                     showAlert('Error', 'Failed to disconnect: ' + error);
                 }
@@ -1552,15 +1564,14 @@
             const server = workspaces.find(w => w.rootUri === selectedWorkspace)?.lspServers.find(s => s.id === serverId);
             if (!server) return;
 
+            clearServerActions(serverId);
             try {
                 const response = await fetch(
                     `/api/admin/lsp/servers/${encodeURIComponent(selectedWorkspace)}/${serverId}/connect-ide`,
                     { method: 'POST' }
                 );
 
-                if (response.ok) {
-                    loadServers(selectedWorkspace);
-                } else {
+                if (!response.ok) {
                     const error = await response.text();
                     showAlert('Error', 'Failed to connect to IDE: ' + error);
                 }

@@ -429,12 +429,6 @@ public class AdminWebSocketEndpoint {
                 isReady
         );
         broadcast(msg);
-
-        // Also send full workspace list to keep UI in sync
-        WorkspacesUpdateWsMessage workspacesMsg = new WorkspacesUpdateWsMessage(
-                getCurrentWorkspaces()
-        );
-        broadcast(workspacesMsg);
     }
 
     /**

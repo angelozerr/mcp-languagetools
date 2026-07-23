@@ -663,15 +663,33 @@
                 return;
             }
 
+            // Update status badge
             const statusBadgeContainer = serverElement.querySelector('.server-status-badge-container');
-            if (!statusBadgeContainer) {
-                return;
+            if (statusBadgeContainer) {
+                const statusClass = formatStatusClass(server.status, server.isReady);
+                const label = formatStatusLabel(server.status, server.externalInstance);
+                statusBadgeContainer.innerHTML = `<span class="status-badge ${statusClass}">${label}</span>`;
             }
 
-            // Just update the status badge (progress is shown in footer now)
-            const statusClass = formatStatusClass(server.status, server.isReady);
-            const label = formatStatusLabel(server.status, server.externalInstance);
-            statusBadgeContainer.innerHTML = `<span class="status-badge ${statusClass}">${label}</span>`;
+            // Update action buttons based on new status
+            const actionsContainer = serverElement.querySelector('.server-actions');
+            if (actionsContainer && !server.isExtension) {
+                const isExternal = server.externalInstance != null &&
+                                   (server.status === 'CONNECTED_TO_IDE' || server.status === 'CONNECTING_TO_IDE');
+                let actions = '';
+                if (isExternal) {
+                    actions = `<button class="server-action-btn server-action-disconnect"
+                                      onclick='event.stopPropagation(); disconnectFromIdeAction("${serverId}")'
+                                      title="Disconnect from IDE">⏏</button>`;
+                } else if (server.status === 'RUNNING' || server.status === 'STARTING') {
+                    actions = `<button class="server-action-btn" onclick='event.stopPropagation(); restartServerAction("${serverId}")' title="Restart">↻</button>
+                               <button class="server-action-btn" onclick='event.stopPropagation(); stopServerAction("${serverId}")' title="Stop">■</button>`;
+                } else if (server.status === 'STOPPED' || server.status === 'START_FAILED' || server.status === 'INSTALL_FAILED' || server.status === 'ERROR') {
+                    actions = `<button class="server-action-btn" onclick='event.stopPropagation(); startManagedServerAction("${serverId}")' title="Start MCP-managed server">▶</button>
+                               <button class="server-action-btn" onclick='event.stopPropagation(); connectToIdeAction("${serverId}")' title="Try to connect to IDE instance">🔗</button>`;
+                }
+                actionsContainer.innerHTML = actions;
+            }
         }
 
         /**
