@@ -574,10 +574,16 @@ function renderDapTracesForSession(sessionId) {
     const sessionTraces = window.dapTracesBySession?.[sessionId] || [];
     const traces = [...serverTraces, ...sessionTraces];
 
+    const wasAtBottom = TraceRenderer.isScrolledToBottom(container);
+    const expandedIds = TraceRenderer.saveExpandedState(container);
+
     container.innerHTML = traces.length > 0 ? renderDapTraces(traces, sessionId) : '<div style="color: #666;">No traces yet.</div>';
 
-    // Auto-scroll to bottom
-    container.scrollTop = container.scrollHeight;
+    TraceRenderer.restoreExpandedState(container, expandedIds);
+
+    if (wasAtBottom) {
+        container.scrollTop = container.scrollHeight;
+    }
 }
 
 /**

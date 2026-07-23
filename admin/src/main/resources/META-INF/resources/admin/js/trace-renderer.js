@@ -430,6 +430,45 @@ const TraceRenderer = (function() {
         if (clearButton) clearButton.disabled = level === 'off';
     }
 
+    /**
+     * Check if a scrollable container is at (or near) the bottom.
+     */
+    function isScrolledToBottom(container, threshold) {
+        if (!container) return true;
+        if (typeof threshold !== 'number') threshold = 30;
+        return container.scrollHeight - container.scrollTop - container.clientHeight <= threshold;
+    }
+
+    /**
+     * Save the set of expanded trace body element IDs in a container.
+     */
+    function saveExpandedState(container) {
+        const ids = new Set();
+        if (!container) return ids;
+        container.querySelectorAll('.trace-body.expanded').forEach(el => {
+            if (el.id) ids.add(el.id);
+        });
+        return ids;
+    }
+
+    /**
+     * Restore expanded state from a saved set of IDs.
+     */
+    function restoreExpandedState(container, expandedIds) {
+        if (!container || !expandedIds || expandedIds.size === 0) return;
+        expandedIds.forEach(bodyId => {
+            const body = document.getElementById(bodyId);
+            if (!body) return;
+            body.classList.remove('collapsed');
+            body.classList.add('expanded');
+            const idx = bodyId.replace('body-', '');
+            const toggle = document.getElementById('toggle-' + idx);
+            if (toggle) toggle.textContent = '▼';
+            const header = document.getElementById('header-' + idx);
+            if (header) header.classList.remove('folded');
+        });
+    }
+
     // Public API
     return {
         // Rendering
@@ -441,6 +480,11 @@ const TraceRenderer = (function() {
         highlightText,
         escapeHtml,
         escapeRegex,
+
+        // Scroll & state preservation
+        isScrolledToBottom,
+        saveExpandedState,
+        restoreExpandedState,
 
         // Trace controls
         renderTraceControls,

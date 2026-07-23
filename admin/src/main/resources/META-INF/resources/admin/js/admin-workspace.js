@@ -1206,16 +1206,8 @@
             const container = document.getElementById('console-output');
             if (!container) return;
 
-            console.log('renderConsole - window.currentServerId:', window.currentServerId);
-            console.log('tracesByServer keys:', Object.keys(tracesByServer));
-            console.log('mcpTracesByClient keys:', Object.keys(mcpTracesByClient));
-
             // Get traces for current server
             const traces = tracesByServer[window.currentServerId] || [];
-            console.log('Traces for', window.currentServerId, ':', traces.length);
-            if (traces.length > 0) {
-                console.log('First trace:', traces[0]);
-            }
 
             // Filter traces based on current level
             const filteredTraces = traces.filter(trace => shouldShowTrace(trace, currentTraceLevel));
@@ -1227,6 +1219,9 @@
                 container.innerHTML = `<div style="text-align: center; padding: 2rem; color: #858585;">${message}</div>`;
                 return;
             }
+
+            const wasAtBottom = TraceRenderer.isScrolledToBottom(container);
+            const expandedIds = TraceRenderer.saveExpandedState(container);
 
             container.innerHTML = filteredTraces.map((trace, index) => {
                 const content = trace.content;
@@ -1303,7 +1298,11 @@
                 `;
             }).join('');
 
-            container.scrollTop = container.scrollHeight;
+            TraceRenderer.restoreExpandedState(container, expandedIds);
+
+            if (wasAtBottom) {
+                container.scrollTop = container.scrollHeight;
+            }
         }
 
         // escapeHtml, showTooltip, hideTooltip, toggleTrace now provided by TraceRenderer

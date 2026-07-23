@@ -253,28 +253,17 @@ function renderMcpConsole() {
         return;
     }
 
-    // Save expanded state before re-rendering
-    const expandedTraces = new Set();
-    output.querySelectorAll('.mcp-trace-body.expanded').forEach(el => {
-        expandedTraces.add(el.id);
-    });
+    const wasAtBottom = TraceRenderer.isScrolledToBottom(output);
+    const expandedIds = TraceRenderer.saveExpandedState(output);
 
     const html = clientTraces.map((trace, index) => formatMcpTrace(trace, index, '')).join('');
     output.innerHTML = html;
 
-    // Restore expanded state
-    expandedTraces.forEach(traceId => {
-        const body = document.getElementById(traceId);
-        const arrow = document.getElementById(traceId + '-arrow');
-        if (body && arrow) {
-            body.classList.remove('collapsed');
-            body.classList.add('expanded');
-            arrow.textContent = '▼';
-        }
-    });
+    TraceRenderer.restoreExpandedState(output, expandedIds);
 
-    // Auto-scroll to bottom
-    output.scrollTop = output.scrollHeight;
+    if (wasAtBottom) {
+        output.scrollTop = output.scrollHeight;
+    }
 }
 
 function renderMcpConsoleWithHighlights() {
@@ -294,25 +283,12 @@ function renderMcpConsoleWithHighlights() {
         return;
     }
 
-    // Save expanded state before re-rendering
-    const expandedTraces = new Set();
-    output.querySelectorAll('.mcp-trace-body.expanded').forEach(el => {
-        expandedTraces.add(el.id);
-    });
+    const expandedIds = TraceRenderer.saveExpandedState(output);
 
     const html = clientTraces.map((trace, index) => formatMcpTrace(trace, index, TraceRenderer.getCurrentSearchQuery())).join('');
     output.innerHTML = html;
 
-    // Restore expanded state
-    expandedTraces.forEach(traceId => {
-        const body = document.getElementById(traceId);
-        const arrow = document.getElementById(traceId + '-arrow');
-        if (body && arrow) {
-            body.classList.remove('collapsed');
-            body.classList.add('expanded');
-            arrow.textContent = '▼';
-        }
-    });
+    TraceRenderer.restoreExpandedState(output, expandedIds);
 }
 
 function formatMcpTrace(trace, index, searchQuery = '') {
