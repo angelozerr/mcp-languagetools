@@ -72,10 +72,6 @@ public abstract class AbstractLTKRefactoringHandler extends AbstractRefactoringH
      */
     protected Map<String, Object> executeRefactoring(Refactoring refactoring, boolean apply,
             IProgressMonitor monitor) throws CoreException {
-        if (monitor == null) {
-            monitor = new NullProgressMonitor();
-        }
-
         RefactoringStatus initialStatus = refactoring.checkInitialConditions(monitor);
         if (initialStatus.hasFatalError()) {
             return createErrorResult("Refactoring precondition failed: " + initialStatus.getMessageMatchingSeverity(RefactoringStatus.FATAL));

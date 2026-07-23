@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.eclipse.core.runtime.IProgressMonitor;
+import org.eclipse.core.runtime.NullProgressMonitor;
 import org.eclipse.jdt.ls.core.internal.IDelegateCommandHandler;
 
 import com.ibm.mcp.jdtls.handlers.CallHierarchyHandler;
@@ -150,6 +151,9 @@ public class McpDelegateCommandHandler implements IDelegateCommandHandler {
 
     @Override
     public Object executeCommand(String commandId, List<Object> arguments, IProgressMonitor monitor) throws Exception {
+        if (monitor == null) {
+            monitor = new NullProgressMonitor();
+        }
         ICommandHandler handler = HANDLERS.get(commandId);
         if (handler == null) {
             throw new UnsupportedOperationException("Unknown command: " + commandId);
