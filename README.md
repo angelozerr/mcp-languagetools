@@ -216,7 +216,7 @@ All refactoring tools (except `java_organize_imports`) support the [`apply` para
 | `java_diagnose_and_fix` | Diagnose problems and optionally apply safe auto-fixes |
 | `java_apply_cleanup` | Apply a code cleanup to a Java file |
 
-#### Code Quality (4 tools)
+#### Code Quality (5 tools)
 
 | Tool | Description |
 |------|-------------|
@@ -224,6 +224,7 @@ All refactoring tools (except `java_organize_imports`) support the [`apply` para
 | `java_find_naming_violations` | Find naming convention violations |
 | `java_find_possible_bugs` | Find potential bug patterns |
 | `java_find_circular_dependencies` | Find circular package dependencies |
+| `java_code_quality_report` | Run all quality checks on a file in one call (unused code, naming, bugs, complexity) |
 
 #### Framework (3 tools)
 
@@ -253,10 +254,10 @@ All refactoring tools (except `java_organize_imports`) support the [`apply` para
 | Refactoring | 18 |
 | Code Generation | 5 |
 | Diagnostics & Fix | 4 |
-| Code Quality | 4 |
+| Code Quality | 5 |
 | Framework | 3 |
 | Project | 4 |
-| **Total** | **79** *(including `java_get_type_members` and `java_get_dependency_graph`)* |
+| **Total** | **80** *(including `java_get_type_members` and `java_get_dependency_graph`)* |
 
 ### Extension & Workspace Tools
 

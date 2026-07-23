@@ -100,7 +100,7 @@ public class FindReferencesHandler implements ICommandHandler {
             result.put("declaringType", declaringType.getFullyQualifiedName());
         }
         result.put("count", references.size());
-        result.put("references", references);
+        result.put("references", JdtUtils.groupResultsByUri(references));
         return result;
     }
 }

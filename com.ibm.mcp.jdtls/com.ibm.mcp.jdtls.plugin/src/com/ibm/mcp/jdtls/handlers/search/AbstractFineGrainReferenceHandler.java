@@ -107,7 +107,7 @@ public abstract class AbstractFineGrainReferenceHandler implements ICommandHandl
         Map<String, Object> result = new HashMap<>();
         result.put(typeLabel, type.getFullyQualifiedName());
         result.put("count", usages.size());
-        result.put(resultKey, usages);
+        result.put(resultKey, JdtUtils.groupResultsByUri(usages));
         return result;
     }
 }

@@ -38,10 +38,7 @@ public class JavaFrameworkTools {
     JdtlsCommandExecutor executor;
 
     @Tool(name = "java_get_http_endpoints",
-          description = "Find all HTTP endpoints (REST API routes) in a Java project. " +
-                        "Detects Spring MVC (@GetMapping, @PostMapping, @RequestMapping) and " +
-                        "JAX-RS (@GET, @POST, @Path) annotations. " +
-                        "Example: java_get_http_endpoints(cwd='/project')")
+          description = "Find all HTTP endpoints (REST API routes) in a Java project")
     public CompletableFuture<String> getHttpEndpoints(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             Cancellation cancellation,
@@ -52,10 +49,7 @@ public class JavaFrameworkTools {
     }
 
     @Tool(name = "java_get_jpa_model",
-          description = "Get the JPA entity model from a Java project. " +
-                        "Returns entities, fields, column mappings, and relationships " +
-                        "(@Entity, @Table, @Column, @ManyToOne, @OneToMany, etc.). " +
-                        "Example: java_get_jpa_model(cwd='/project')")
+          description = "Get the JPA entity model from a Java project")
     public CompletableFuture<String> getJpaModel(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             Cancellation cancellation,
@@ -66,11 +60,7 @@ public class JavaFrameworkTools {
     }
 
     @Tool(name = "java_get_di_registrations",
-          description = "Find dependency injection registrations in a Java project. " +
-                        "Detects Spring (@Component, @Service, @Repository, @Controller, @Bean, @Autowired) and " +
-                        "Jakarta CDI (@ApplicationScoped, @Inject, @Produces, @Named) annotations. " +
-                        "Use scope='project' for faster project-only scan (default scans entire workspace). " +
-                        "Example: java_get_di_registrations(cwd='/project', scope='project')")
+          description = "Find dependency injection registrations (Spring, Jakarta CDI)")
     public CompletableFuture<String> getDiRegistrations(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = JavaToolArgDescriptions.SEARCH_SCOPE, required = false) String scope,

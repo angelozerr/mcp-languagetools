@@ -81,7 +81,7 @@ public class FindAnnotationUsagesHandler implements ICommandHandler {
         Map<String, Object> result = new HashMap<>();
         result.put("annotation", type.getFullyQualifiedName());
         result.put("count", usages.size());
-        result.put("usages", usages);
+        result.put("usages", JdtUtils.groupResultsByUri(usages));
         return result;
     }
 }

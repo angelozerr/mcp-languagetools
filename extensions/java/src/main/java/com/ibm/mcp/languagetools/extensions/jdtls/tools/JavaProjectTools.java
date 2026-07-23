@@ -38,10 +38,7 @@ public class JavaProjectTools {
     JdtlsCommandExecutor executor;
 
     @Tool(name = "java_get_project_structure",
-          description = "Get the package hierarchy and file structure of a Java project. " +
-                        "Returns source folders, packages, and compilation unit counts. " +
-                        "Use projectName to target a specific project in multi-project workspaces. " +
-                        "Example: java_get_project_structure(cwd='/project', projectName='myapp')")
+          description = "Get the package hierarchy and file structure of a Java project")
     public CompletableFuture<String> getProjectStructure(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = "Name of the Java project to inspect (defaults to first Java project in workspace)", required = false) String projectName,
@@ -57,9 +54,7 @@ public class JavaProjectTools {
     }
 
     @Tool(name = "java_get_classpath_info",
-          description = "Get the classpath entries of a Java project. " +
-                        "Returns source folders, libraries, containers, and project dependencies. " +
-                        "Example: java_get_classpath_info(cwd='/project')")
+          description = "Get the classpath entries of a Java project")
     public CompletableFuture<String> getClasspathInfo(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             Cancellation cancellation,

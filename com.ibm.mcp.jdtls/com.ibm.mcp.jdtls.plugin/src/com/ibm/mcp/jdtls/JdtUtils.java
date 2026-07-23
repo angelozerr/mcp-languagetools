@@ -14,7 +14,9 @@
 package com.ibm.mcp.jdtls;
 
 import java.net.URI;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -229,6 +231,27 @@ public final class JdtUtils {
             }
         }
         return entry;
+    }
+
+    /**
+     * Group a flat list of search results by file URI for compact output.
+     *
+     * <p>Transforms [{uri, line, character, ...}, ...] into
+     * {uri1: [{line, character, ...}, ...], uri2: [...]}.
+     * Removes the redundant "uri" field from each entry.</p>
+     */
+    public static Map<String, List<Map<String, Object>>> groupResultsByUri(List<Map<String, Object>> results) {
+        Map<String, List<Map<String, Object>>> grouped = new LinkedHashMap<>();
+        for (Map<String, Object> entry : results) {
+            String uri = (String) entry.get("uri");
+            if (uri == null) {
+                uri = "unknown";
+            }
+            Map<String, Object> stripped = new LinkedHashMap<>(entry);
+            stripped.remove("uri");
+            grouped.computeIfAbsent(uri, k -> new ArrayList<>()).add(stripped);
+        }
+        return grouped;
     }
 
     /**

@@ -37,9 +37,7 @@ public class JavaTypeMemberTools {
     JdtlsCommandExecutor executor;
 
     @Tool(name = "java_get_type_members",
-          description = "Get all members (methods, fields, nested types) of a Java type. " +
-                        "Optionally include inherited members from supertypes. " +
-                        "Example: java_get_type_members(cwd='/project', fullyQualifiedName='com.example.MyClass')")
+          description = "Get all members (methods, fields, nested types) of a Java type")
     public CompletableFuture<String> getTypeMembers(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = "Fully qualified name of the type") String fullyQualifiedName,
@@ -51,9 +49,7 @@ public class JavaTypeMemberTools {
     }
 
     @Tool(name = "java_get_dependency_graph",
-          description = "Get the import-based dependency graph for a Java project. " +
-                        "Returns packages as nodes and import relationships as edges. " +
-                        "Example: java_get_dependency_graph(cwd='/project')")
+          description = "Get the import-based dependency graph for a Java project")
     public CompletableFuture<String> getDependencyGraph(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             Cancellation cancellation,

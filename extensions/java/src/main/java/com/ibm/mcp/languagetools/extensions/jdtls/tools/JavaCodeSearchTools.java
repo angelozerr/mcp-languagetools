@@ -38,9 +38,7 @@ public class JavaCodeSearchTools {
     JdtlsCommandExecutor executor;
 
     @Tool(name = "java_find_field_writes",
-          description = "Find all write accesses to a field at a specific position. " +
-                        "Returns every location where the field is assigned a value. " +
-                        "Example: java_find_field_writes(cwd='/project', fileUri='file:///project/src/Model.java', line=5, character=10)")
+          description = "Find all write accesses to a field")
     public CompletableFuture<String> findFieldWrites(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
@@ -56,9 +54,7 @@ public class JavaCodeSearchTools {
     }
 
     @Tool(name = "java_find_tests",
-          description = "Find test methods in a Java file or across the workspace. " +
-                        "Detects JUnit 4, JUnit 5, and TestNG test methods. " +
-                        "Example: java_find_tests(cwd='/project', fileUri='file:///project/src/test/MyTest.java')")
+          description = "Find test methods in a Java file (JUnit 4/5, TestNG)")
     public CompletableFuture<String> findTests(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
@@ -76,9 +72,7 @@ public class JavaCodeSearchTools {
     }
 
     @Tool(name = "java_find_affected_tests",
-          description = "Find tests transitively affected by changes to a symbol at a specific position. " +
-                        "Returns test methods that directly or indirectly depend on the symbol. " +
-                        "Example: java_find_affected_tests(cwd='/project', fileUri='file:///project/src/Service.java', line=15, character=10)")
+          description = "Find tests transitively affected by changes to a symbol")
     public CompletableFuture<String> findAffectedTests(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
@@ -92,8 +86,7 @@ public class JavaCodeSearchTools {
     }
 
     @Tool(name = "java_find_unused_code",
-          description = "Find unused code in a Java file (unused imports, private fields, methods, local variables). " +
-                        "Example: java_find_unused_code(cwd='/project', fileUri='file:///project/src/Service.java')")
+          description = "Find unused code in a Java file (imports, private fields, methods, variables)")
     public CompletableFuture<String> findUnusedCode(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
@@ -111,8 +104,7 @@ public class JavaCodeSearchTools {
     }
 
     @Tool(name = "java_find_unreachable_code",
-          description = "Find unreachable code in a Java file (dead code after return/throw, unreachable branches). " +
-                        "Example: java_find_unreachable_code(cwd='/project', fileUri='file:///project/src/Service.java')")
+          description = "Find unreachable code in a Java file (dead code after return/throw)")
     public CompletableFuture<String> findUnreachableCode(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
@@ -130,8 +122,7 @@ public class JavaCodeSearchTools {
     }
 
     @Tool(name = "java_find_reflection_usage",
-          description = "Find reflection API usage in a Java file (Class.forName, Method.invoke, Field access, etc.). " +
-                        "Example: java_find_reflection_usage(cwd='/project', fileUri='file:///project/src/Service.java')")
+          description = "Find reflection API usage in a Java file")
     public CompletableFuture<String> findReflectionUsage(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
@@ -149,9 +140,7 @@ public class JavaCodeSearchTools {
     }
 
     @Tool(name = "java_suggest_imports",
-          description = "Find import candidates for an unresolved type name. " +
-                        "Returns all fully qualified names matching the simple type name. " +
-                        "Example: java_suggest_imports(cwd='/project', typeName='List')")
+          description = "Find import candidates for an unresolved type name")
     public CompletableFuture<String> suggestImports(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = "Simple type name to search for (e.g., 'List', 'Map')") String typeName,
@@ -163,10 +152,7 @@ public class JavaCodeSearchTools {
     }
 
     @Tool(name = "java_get_type_usage_summary",
-          description = "Get a comprehensive usage summary for a Java type. " +
-                        "Returns counts and locations for all usage kinds: references, instantiations, casts, " +
-                        "instanceof checks, annotations, and type arguments. " +
-                        "Example: java_get_type_usage_summary(cwd='/project', fullyQualifiedName='java.util.ArrayList')")
+          description = "Get a comprehensive usage summary for a Java type")
     public CompletableFuture<String> getTypeUsageSummary(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = "Fully qualified name of the type") String fullyQualifiedName,
@@ -178,9 +164,7 @@ public class JavaCodeSearchTools {
     }
 
     @Tool(name = "java_search_symbols",
-          description = "Search for Java symbols (types, methods, fields) by name pattern. " +
-                        "Supports glob patterns (e.g., 'My*Service'). " +
-                        "Example: java_search_symbols(cwd='/project', query='UserService')")
+          description = "Search for Java symbols by name pattern (supports glob, e.g. 'My*Service')")
     public CompletableFuture<String> searchSymbols(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = "Search query string or glob pattern") String query,
@@ -192,9 +176,7 @@ public class JavaCodeSearchTools {
     }
 
     @Tool(name = "java_find_references",
-          description = "Find all references to a Java symbol at a specific position. " +
-                        "Returns enriched reference information with Java-specific context. " +
-                        "Example: java_find_references(cwd='/project', fileUri='file:///project/src/Service.java', line=10, character=5)")
+          description = "Find all references to a Java symbol")
     public CompletableFuture<String> findReferences(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
@@ -210,9 +192,7 @@ public class JavaCodeSearchTools {
     }
 
     @Tool(name = "java_find_implementations",
-          description = "Find all implementations of a Java interface or abstract class. " +
-                        "Returns concrete classes that implement or extend the type. " +
-                        "Example: java_find_implementations(cwd='/project', fullyQualifiedName='com.example.Service')")
+          description = "Find all implementations of a Java interface or abstract class")
     public CompletableFuture<String> findImplementations(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = "Fully qualified name of the interface or abstract class") String fullyQualifiedName,

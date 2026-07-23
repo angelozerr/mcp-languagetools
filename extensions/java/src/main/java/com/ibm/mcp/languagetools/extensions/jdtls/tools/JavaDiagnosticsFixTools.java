@@ -41,9 +41,7 @@ public class JavaDiagnosticsFixTools {
     JdtlsCommandExecutor executor;
 
     @Tool(name = "java_validate_syntax",
-          description = "Quick syntax-only validation of a Java file (no semantic analysis). " +
-                        "Faster than full diagnostics - only checks syntax errors. " +
-                        "Example: java_validate_syntax(cwd='/project', fileUri='file:///project/src/Main.java')")
+          description = "Quick syntax-only validation of a Java file (no semantic analysis)")
     public CompletableFuture<String> validateSyntax(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
@@ -61,10 +59,7 @@ public class JavaDiagnosticsFixTools {
     }
 
     @Tool(name = "java_get_quick_fixes",
-          description = "Get available quick fixes for problems at a specific position in a Java file. " +
-                        "Returns a list of fixes that can be applied to resolve the problem. " +
-                        "Use java_get_quick_fixes first to get available fixes and their IDs. " +
-                        "Example: java_get_quick_fixes(cwd='/project', fileUri='file:///project/src/Main.java', line=10, character=5)")
+          description = "Get available quick fixes for problems at a position. Pass optional fixId to apply a specific fix")
     public CompletableFuture<String> getQuickFixes(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
@@ -84,9 +79,7 @@ public class JavaDiagnosticsFixTools {
     }
 
     @Tool(name = "java_diagnose_and_fix",
-          description = "Diagnose problems in a Java file and optionally apply safe auto-fixes. " +
-                        "Combines diagnostics, quick fix suggestions, and optional auto-fix application. " +
-                        "Example: java_diagnose_and_fix(cwd='/project', fileUri='file:///project/src/Main.java')")
+          description = "Diagnose problems in a Java file and optionally apply safe auto-fixes")
     public CompletableFuture<String> diagnoseAndFix(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
@@ -104,10 +97,7 @@ public class JavaDiagnosticsFixTools {
     }
 
     @Tool(name = "java_apply_cleanup",
-          description = "Apply a code cleanup to a Java file. " +
-                        "Available cleanups: remove_unused_imports, add_missing_override, convert_to_lambda, " +
-                        "remove_unnecessary_casts, add_final_modifier. " +
-                        "Example: java_apply_cleanup(cwd='/project', fileUri='file:///project/src/Service.java', cleanupId='remove_unused_imports')")
+          description = "Apply a code cleanup to a Java file")
     public CompletableFuture<String> applyCleanup(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,

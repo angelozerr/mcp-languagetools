@@ -21,6 +21,7 @@ import io.quarkiverse.mcp.server.ToolArg;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -38,8 +39,7 @@ public class JavaCodeQualityTools {
     JdtlsCommandExecutor executor;
 
     @Tool(name = "java_find_large_classes",
-          description = "Find Java classes exceeding size thresholds (methods, fields, lines of code). " +
-                        "Example: java_find_large_classes(cwd='/project')")
+          description = "Find Java classes exceeding size thresholds")
     public CompletableFuture<String> findLargeClasses(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             Cancellation cancellation,
@@ -50,9 +50,7 @@ public class JavaCodeQualityTools {
     }
 
     @Tool(name = "java_find_naming_violations",
-          description = "Find naming convention violations in a Java file. " +
-                        "Checks CamelCase for types, camelCase for methods/fields, UPPER_SNAKE for constants. " +
-                        "Example: java_find_naming_violations(cwd='/project', fileUri='file:///project/src/Service.java')")
+          description = "Find naming convention violations in a Java file")
     public CompletableFuture<String> findNamingViolations(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
@@ -70,9 +68,7 @@ public class JavaCodeQualityTools {
     }
 
     @Tool(name = "java_find_possible_bugs",
-          description = "Find potential bug patterns in a Java file. " +
-                        "Detects: empty catch blocks, String == comparison, equals without hashCode, resource leaks, etc. " +
-                        "Example: java_find_possible_bugs(cwd='/project', fileUri='file:///project/src/Service.java')")
+          description = "Find potential bug patterns in a Java file")
     public CompletableFuture<String> findPossibleBugs(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
@@ -90,9 +86,7 @@ public class JavaCodeQualityTools {
     }
 
     @Tool(name = "java_find_circular_dependencies",
-          description = "Find circular package dependencies in a Java project. " +
-                        "Returns cycles in the package dependency graph. " +
-                        "Example: java_find_circular_dependencies(cwd='/project')")
+          description = "Find circular package dependencies in a Java project")
     public CompletableFuture<String> findCircularDependencies(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             Cancellation cancellation,
@@ -100,5 +94,30 @@ public class JavaCodeQualityTools {
         return executor.executeCommand(cwd, JdtlsCommands.FIND_CIRCULAR_DEPENDENCIES,
                 Map.of(),
                 cancellation, progress);
+    }
+
+    @Tool(name = "java_code_quality_report",
+          description = "Run all quality checks on a Java file in one call (unused code, naming, bugs, complexity)")
+    public CompletableFuture<String> codeQualityReport(
+            @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
+            @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
+            Cancellation cancellation,
+            Progress progress) {
+        Map<String, Object> uriArgs = Map.of("uri", fileUri);
+        CompletableFuture<Object> unused = executor.executeCommandRaw(cwd, JdtlsCommands.FIND_UNUSED_CODE, uriArgs);
+        CompletableFuture<Object> naming = executor.executeCommandRaw(cwd, JdtlsCommands.FIND_NAMING_VIOLATIONS, uriArgs);
+        CompletableFuture<Object> bugs = executor.executeCommandRaw(cwd, JdtlsCommands.FIND_POSSIBLE_BUGS, uriArgs);
+        CompletableFuture<Object> complexity = executor.executeCommandRaw(cwd, JdtlsCommands.GET_COMPLEXITY_METRICS, uriArgs);
+
+        return CompletableFuture.allOf(unused, naming, bugs, complexity)
+                .thenApply(v -> {
+                    Map<String, Object> report = new LinkedHashMap<>();
+                    report.put("fileUri", fileUri);
+                    report.put("unusedCode", unused.join());
+                    report.put("namingViolations", naming.join());
+                    report.put("possibleBugs", bugs.join());
+                    report.put("complexity", complexity.join());
+                    return executor.formatResult(report);
+                });
     }
 }

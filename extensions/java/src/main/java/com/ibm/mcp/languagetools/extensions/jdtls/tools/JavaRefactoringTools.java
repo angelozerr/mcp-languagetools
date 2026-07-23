@@ -38,9 +38,7 @@ public class JavaRefactoringTools {
     JdtlsCommandExecutor executor;
 
     @Tool(name = "java_rename_symbol",
-          description = "Rename a Java symbol across the entire project. " +
-                        "Returns text edits for all affected files. " +
-                        "Example: java_rename_symbol(cwd='/project', fileUri='file:///project/src/Main.java', line=10, character=5, newName='newMethodName')")
+          description = "Rename a Java symbol across the entire project")
     public CompletableFuture<String> renameSymbol(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
@@ -57,8 +55,7 @@ public class JavaRefactoringTools {
     }
 
     @Tool(name = "java_organize_imports",
-          description = "Organize imports in a Java file: remove unused imports and sort. " +
-                        "Example: java_organize_imports(cwd='/project', fileUri='file:///project/src/Main.java')")
+          description = "Organize imports in a Java file: remove unused and sort")
     public CompletableFuture<String> organizeImports(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
@@ -76,9 +73,7 @@ public class JavaRefactoringTools {
     }
 
     @Tool(name = "java_extract_method",
-          description = "Extract a code selection into a new method. " +
-                        "Analyzes variables to determine parameters and return type. " +
-                        "Example: java_extract_method(cwd='/project', fileUri='file:///...', startLine=10, startCharacter=0, endLine=15, endCharacter=0, methodName='extractedMethod')")
+          description = "Extract a code selection into a new method")
     public CompletableFuture<String> extractMethod(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
@@ -97,8 +92,7 @@ public class JavaRefactoringTools {
     }
 
     @Tool(name = "java_extract_variable",
-          description = "Extract an expression into a local variable. " +
-                        "Example: java_extract_variable(cwd='/project', fileUri='file:///...', startLine=10, startCharacter=5, endLine=10, endCharacter=30, variableName='result')")
+          description = "Extract an expression into a local variable")
     public CompletableFuture<String> extractVariable(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
@@ -117,8 +111,7 @@ public class JavaRefactoringTools {
     }
 
     @Tool(name = "java_extract_constant",
-          description = "Extract an expression into a static final constant field. " +
-                        "Example: java_extract_constant(cwd='/project', fileUri='file:///...', startLine=10, startCharacter=5, endLine=10, endCharacter=30, constantName='MAX_SIZE')")
+          description = "Extract an expression into a static final constant field")
     public CompletableFuture<String> extractConstant(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
@@ -137,9 +130,7 @@ public class JavaRefactoringTools {
     }
 
     @Tool(name = "java_extract_interface",
-          description = "Extract an interface from a Java class with selected methods. " +
-                        "Creates a new interface file and adds implements clause to the class. " +
-                        "Example: java_extract_interface(cwd='/project', fileUri='file:///...', line=5, character=10, interfaceName='IService')")
+          description = "Extract an interface from a Java class with selected methods")
     public CompletableFuture<String> extractInterface(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
@@ -158,9 +149,7 @@ public class JavaRefactoringTools {
     }
 
     @Tool(name = "java_extract_superclass",
-          description = "Extract a superclass from a Java class with selected members. " +
-                        "Creates a new abstract superclass and modifies the original class to extend it. " +
-                        "Example: java_extract_superclass(cwd='/project', fileUri='file:///...', line=5, character=10, superclassName='AbstractService')")
+          description = "Extract a superclass from a Java class with selected members")
     public CompletableFuture<String> extractSuperclass(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
@@ -179,8 +168,7 @@ public class JavaRefactoringTools {
     }
 
     @Tool(name = "java_inline_method",
-          description = "Inline a method by replacing its call sites with the method body. " +
-                        "Example: java_inline_method(cwd='/project', fileUri='file:///...', line=15, character=10)")
+          description = "Inline a method by replacing call sites with the method body")
     public CompletableFuture<String> inlineMethod(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
@@ -195,8 +183,7 @@ public class JavaRefactoringTools {
     }
 
     @Tool(name = "java_inline_variable",
-          description = "Inline a local variable by replacing all usages with its initializer expression. " +
-                        "Example: java_inline_variable(cwd='/project', fileUri='file:///...', line=15, character=10)")
+          description = "Inline a local variable by replacing usages with its initializer")
     public CompletableFuture<String> inlineVariable(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
@@ -211,8 +198,7 @@ public class JavaRefactoringTools {
     }
 
     @Tool(name = "java_change_method_signature",
-          description = "Change a method's signature (name, return type, parameters) and update all call sites. " +
-                        "Example: java_change_method_signature(cwd='/project', fileUri='file:///...', line=10, character=5, newName='updatedMethod')")
+          description = "Change a method's signature and update all call sites")
     public CompletableFuture<String> changeMethodSignature(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
@@ -229,8 +215,7 @@ public class JavaRefactoringTools {
     }
 
     @Tool(name = "java_convert_anonymous_to_lambda",
-          description = "Convert an anonymous class to a lambda expression (for functional interfaces). " +
-                        "Example: java_convert_anonymous_to_lambda(cwd='/project', fileUri='file:///...', line=15, character=20)")
+          description = "Convert an anonymous class to a lambda expression")
     public CompletableFuture<String> convertAnonymousToLambda(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
@@ -245,8 +230,7 @@ public class JavaRefactoringTools {
     }
 
     @Tool(name = "java_encapsulate_field",
-          description = "Encapsulate a field by generating getter/setter methods and updating all direct accesses. " +
-                        "Example: java_encapsulate_field(cwd='/project', fileUri='file:///...', line=8, character=10)")
+          description = "Encapsulate a field by generating getter/setter methods")
     public CompletableFuture<String> encapsulateField(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
@@ -261,9 +245,7 @@ public class JavaRefactoringTools {
     }
 
     @Tool(name = "java_introduce_parameter_object",
-          description = "Bundle method parameters into a parameter object class. " +
-                        "Creates a new class and modifies the method signature and all call sites. " +
-                        "Example: java_introduce_parameter_object(cwd='/project', fileUri='file:///...', line=10, character=5, className='SearchCriteria')")
+          description = "Bundle method parameters into a parameter object class")
     public CompletableFuture<String> introduceParameterObject(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
@@ -282,8 +264,7 @@ public class JavaRefactoringTools {
     }
 
     @Tool(name = "java_move_type_to_new_file",
-          description = "Move a nested/inner type to its own top-level file. " +
-                        "Example: java_move_type_to_new_file(cwd='/project', fileUri='file:///...', line=20, character=10)")
+          description = "Move a nested/inner type to its own top-level file")
     public CompletableFuture<String> moveTypeToNewFile(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
@@ -298,8 +279,7 @@ public class JavaRefactoringTools {
     }
 
     @Tool(name = "java_pull_up",
-          description = "Pull members up from a subclass into its superclass. " +
-                        "Example: java_pull_up(cwd='/project', fileUri='file:///...', line=5, character=10)")
+          description = "Pull members up from a subclass into its superclass")
     public CompletableFuture<String> pullUp(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
@@ -316,8 +296,7 @@ public class JavaRefactoringTools {
     }
 
     @Tool(name = "java_push_down",
-          description = "Push members down from a superclass into its subclasses. " +
-                        "Example: java_push_down(cwd='/project', fileUri='file:///...', line=5, character=10)")
+          description = "Push members down from a superclass into its subclasses")
     public CompletableFuture<String> pushDown(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
@@ -334,10 +313,7 @@ public class JavaRefactoringTools {
     }
 
     @Tool(name = "java_convert_to_record",
-          description = "Convert a Java class to a record (Java 16+). " +
-                        "The class must not extend another class, must not be abstract, and should have instance fields. " +
-                        "Removes canonical constructor and simple getters. " +
-                        "Example: java_convert_to_record(cwd='/project', fileUri='file:///project/src/Point.java', line=3, character=10)")
+          description = "Convert a Java class to a record (Java 16+)")
     public CompletableFuture<String> convertToRecord(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
@@ -352,9 +328,7 @@ public class JavaRefactoringTools {
     }
 
     @Tool(name = "java_move_type_to_package",
-          description = "Move a top-level Java type to a different package. " +
-                        "Updates package declaration, moves the file, and updates all imports across the workspace. " +
-                        "Example: java_move_type_to_package(cwd='/project', fileUri='file:///project/src/util/Helper.java', targetPackage='com.example.common')")
+          description = "Move a top-level Java type to a different package")
     public CompletableFuture<String> moveTypeToPackage(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,

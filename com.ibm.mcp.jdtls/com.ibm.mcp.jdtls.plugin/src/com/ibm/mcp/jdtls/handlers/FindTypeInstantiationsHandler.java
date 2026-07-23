@@ -81,7 +81,7 @@ public class FindTypeInstantiationsHandler implements ICommandHandler {
         Map<String, Object> result = new HashMap<>();
         result.put("type", type.getFullyQualifiedName());
         result.put("count", instantiations.size());
-        result.put("instantiations", instantiations);
+        result.put("instantiations", JdtUtils.groupResultsByUri(instantiations));
         return result;
     }
 }

@@ -103,7 +103,7 @@ public class FindFieldWritesHandler implements ICommandHandler {
         result.put("field", field.getElementName());
         result.put("declaringType", field.getDeclaringType().getFullyQualifiedName());
         result.put("count", writes.size());
-        result.put("writeAccesses", writes);
+        result.put("writeAccesses", JdtUtils.groupResultsByUri(writes));
         return result;
     }
 }

@@ -83,11 +83,14 @@
             <command id="mcp.jdtls.moveTypeToNewFile"/>
             <command id="mcp.jdtls.pullUp"/>
             <command id="mcp.jdtls.pushDown"/>
+            <command id="mcp.jdtls.convertToRecord"/>
+            <command id="mcp.jdtls.moveTypeToPackage"/>
             <!-- Code generation -->
             <command id="mcp.jdtls.generateGettersSetters"/>
             <command id="mcp.jdtls.generateConstructor"/>
             <command id="mcp.jdtls.generateToString"/>
             <command id="mcp.jdtls.generateEqualsHashCode"/>
+            <command id="mcp.jdtls.generateDelegateMethods"/>
             <!-- Project -->
             <command id="mcp.jdtls.getProjectStructure"/>
             <command id="mcp.jdtls.getClasspathInfo"/>

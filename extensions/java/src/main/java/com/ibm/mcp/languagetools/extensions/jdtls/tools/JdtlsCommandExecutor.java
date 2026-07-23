@@ -46,19 +46,19 @@ public class JdtlsCommandExecutor {
     @Inject
     ProgressMonitorManager progressMonitorManager;
 
-    /**
-     * Execute a JDT.LS delegate command.
-     *
-     * @param cwd          current working directory
-     * @param commandId    the command ID (e.g., "mcp.jdtls.typeHierarchy")
-     * @param arguments    command arguments
-     * @param cancellation cancellation token
-     * @param progress     progress reporting
-     * @return the command result as a string
-     */
     @SuppressWarnings("unchecked")
     public CompletableFuture<String> executeCommand(String cwd, String commandId, Object arguments,
                                                      Cancellation cancellation, Progress progress) {
+        return executeCommandRaw(cwd, commandId, arguments)
+                .thenApply(this::formatResult)
+                .exceptionally(ex -> {
+                    LOG.errorf(ex, "Failed to execute command %s", commandId);
+                    return "Error executing " + commandId + ": " + ex.getMessage();
+                });
+    }
+
+    @SuppressWarnings("unchecked")
+    public CompletableFuture<Object> executeCommandRaw(String cwd, String commandId, Object arguments) {
         var workspace = application.getWorkspaceForPath(cwd);
         LspServer jdtls = workspace.getLspServers().stream()
                 .filter(s -> JDTLS_SERVER_ID.equals(s.getConfig().getServerId()))
@@ -67,7 +67,7 @@ public class JdtlsCommandExecutor {
 
         if (jdtls == null) {
             return CompletableFuture.completedFuture(
-                    "Error: JDT.LS server not found for workspace " + cwd);
+                    Map.of("error", "JDT.LS server not found for workspace " + cwd));
         }
 
         return jdtls.waitUntilReady()
@@ -76,11 +76,6 @@ public class JdtlsCommandExecutor {
                             ? (List<Object>) arguments
                             : List.of(arguments);
                     return jdtls.executeCommand(commandId, args);
-                })
-                .thenApply(this::formatResult)
-                .exceptionally(ex -> {
-                    LOG.errorf(ex, "Failed to execute command %s", commandId);
-                    return "Error executing " + commandId + ": " + ex.getMessage();
                 });
     }
 
@@ -129,7 +124,7 @@ public class JdtlsCommandExecutor {
                 });
     }
 
-    private String formatResult(Object result) {
+    String formatResult(Object result) {
         if (result == null) {
             return "No result";
         }

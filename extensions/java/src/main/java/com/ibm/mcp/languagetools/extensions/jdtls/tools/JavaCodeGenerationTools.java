@@ -36,9 +36,7 @@ public class JavaCodeGenerationTools {
     JdtlsCommandExecutor executor;
 
     @Tool(name = "java_generate_getters_setters",
-          description = "Generate getter and/or setter methods for fields in a Java class. " +
-                        "Skips static final fields and methods that already exist. " +
-                        "Example: java_generate_getters_setters(cwd='/project', fileUri='file:///project/src/User.java', line=3, character=10)")
+          description = "Generate getter and/or setter methods for fields in a Java class")
     public CompletableFuture<String> generateGettersSetters(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
@@ -59,9 +57,7 @@ public class JavaCodeGenerationTools {
     }
 
     @Tool(name = "java_generate_constructor",
-          description = "Generate a constructor for a Java class from its fields. " +
-                        "Can also generate a default no-arg constructor. " +
-                        "Example: java_generate_constructor(cwd='/project', fileUri='file:///project/src/User.java', line=3, character=10)")
+          description = "Generate a constructor for a Java class from its fields")
     public CompletableFuture<String> generateConstructor(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
@@ -78,8 +74,7 @@ public class JavaCodeGenerationTools {
     }
 
     @Tool(name = "java_generate_to_string",
-          description = "Generate a toString() method for a Java class using its instance fields. " +
-                        "Example: java_generate_to_string(cwd='/project', fileUri='file:///project/src/User.java', line=3, character=10)")
+          description = "Generate a toString() method for a Java class")
     public CompletableFuture<String> generateToString(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
@@ -93,9 +88,7 @@ public class JavaCodeGenerationTools {
     }
 
     @Tool(name = "java_generate_equals_hashcode",
-          description = "Generate equals() and hashCode() methods for a Java class using java.util.Objects. " +
-                        "Compares all instance fields by default. " +
-                        "Example: java_generate_equals_hashcode(cwd='/project', fileUri='file:///project/src/User.java', line=3, character=10)")
+          description = "Generate equals() and hashCode() methods for a Java class")
     public CompletableFuture<String> generateEqualsHashCode(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
@@ -109,9 +102,7 @@ public class JavaCodeGenerationTools {
     }
 
     @Tool(name = "java_generate_delegate_methods",
-          description = "Generate delegate methods for a field in a Java class. " +
-                        "Creates forwarding methods for all public methods of the field's type. " +
-                        "Example: java_generate_delegate_methods(cwd='/project', fileUri='file:///project/src/Service.java', line=5, character=10)")
+          description = "Generate delegate methods for a field in a Java class")
     public CompletableFuture<String> generateDelegateMethods(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,

@@ -37,9 +37,7 @@ public class JavaReferenceSearchTools {
     JdtlsCommandExecutor executor;
 
     @Tool(name = "java_find_casts",
-          description = "Find all cast expressions to a Java type. " +
-                        "Returns every location where the type is used in a cast expression ((Type) expr). " +
-                        "Example: java_find_casts(cwd='/project', fullyQualifiedName='java.lang.String')")
+          description = "Find all cast expressions to a Java type")
     public CompletableFuture<String> findCasts(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = "Fully qualified name of the type (e.g., 'java.lang.String')") String fullyQualifiedName,
@@ -51,9 +49,7 @@ public class JavaReferenceSearchTools {
     }
 
     @Tool(name = "java_find_catch_blocks",
-          description = "Find all catch blocks catching a Java exception type. " +
-                        "Returns every location where the type appears in a catch clause. " +
-                        "Example: java_find_catch_blocks(cwd='/project', fullyQualifiedName='java.io.IOException')")
+          description = "Find all catch blocks catching a Java exception type")
     public CompletableFuture<String> findCatchBlocks(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = "Fully qualified name of the exception type") String fullyQualifiedName,
@@ -65,9 +61,7 @@ public class JavaReferenceSearchTools {
     }
 
     @Tool(name = "java_find_instanceof_checks",
-          description = "Find all instanceof checks for a Java type. " +
-                        "Returns every location where 'instanceof Type' is used. " +
-                        "Example: java_find_instanceof_checks(cwd='/project', fullyQualifiedName='java.util.List')")
+          description = "Find all instanceof checks for a Java type")
     public CompletableFuture<String> findInstanceofChecks(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = "Fully qualified name of the type") String fullyQualifiedName,
@@ -79,9 +73,7 @@ public class JavaReferenceSearchTools {
     }
 
     @Tool(name = "java_find_throws_declarations",
-          description = "Find all throws clause declarations of a Java exception type. " +
-                        "Returns every location where the type appears in a throws clause. " +
-                        "Example: java_find_throws_declarations(cwd='/project', fullyQualifiedName='java.io.IOException')")
+          description = "Find all throws clause declarations of a Java exception type")
     public CompletableFuture<String> findThrowsDeclarations(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = "Fully qualified name of the exception type") String fullyQualifiedName,
@@ -93,9 +85,7 @@ public class JavaReferenceSearchTools {
     }
 
     @Tool(name = "java_find_type_arguments",
-          description = "Find all type argument usages of a Java type in generics. " +
-                        "Returns every location where the type is used as a generic type argument (e.g., List<Type>). " +
-                        "Example: java_find_type_arguments(cwd='/project', fullyQualifiedName='java.lang.String')")
+          description = "Find all type argument usages of a Java type in generics")
     public CompletableFuture<String> findTypeArguments(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = "Fully qualified name of the type") String fullyQualifiedName,
@@ -107,9 +97,7 @@ public class JavaReferenceSearchTools {
     }
 
     @Tool(name = "java_find_method_references",
-          description = "Find all references to a method at a specific position. " +
-                        "Returns every location where the method is called or referenced. " +
-                        "Example: java_find_method_references(cwd='/project', fileUri='file:///project/src/Service.java', line=10, character=5)")
+          description = "Find all references to a method")
     public CompletableFuture<String> findMethodReferences(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,

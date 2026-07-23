@@ -137,7 +137,8 @@ public class CallHierarchyHandler implements ICommandHandler {
         Map<String, Object> result = new HashMap<>();
         result.put("method", method.getElementName());
         result.put("declaringType", method.getDeclaringType().getFullyQualifiedName());
-        result.put("callers", callers);
+        result.put("count", callers.size());
+        result.put("callers", JdtUtils.groupResultsByUri(callers));
         return result;
     }
 

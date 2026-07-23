@@ -38,9 +38,7 @@ public class JavaNavigationTools {
     JdtlsCommandExecutor executor;
 
     @Tool(name = "java_go_to_definition",
-          description = "Navigate to the definition of a Java symbol at a specific position. " +
-                        "Returns the source location where the symbol is defined with Java-specific details. " +
-                        "Example: java_go_to_definition(cwd='/project', fileUri='file:///project/src/Main.java', line=10, character=5)")
+          description = "Navigate to the definition of a Java symbol")
     public CompletableFuture<String> goToDefinition(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
@@ -54,8 +52,7 @@ public class JavaNavigationTools {
     }
 
     @Tool(name = "java_get_hover_info",
-          description = "Get rich hover information for a Java symbol (signature, Javadoc, type info). " +
-                        "Example: java_get_hover_info(cwd='/project', fileUri='file:///project/src/Main.java', line=10, character=5)")
+          description = "Get rich hover information for a Java symbol (signature, Javadoc, type info)")
     public CompletableFuture<String> getHoverInfo(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
@@ -69,9 +66,7 @@ public class JavaNavigationTools {
     }
 
     @Tool(name = "java_get_javadoc",
-          description = "Get parsed Javadoc documentation for a Java symbol. " +
-                        "Returns structured Javadoc with description, @param, @return, @throws tags. " +
-                        "Example: java_get_javadoc(cwd='/project', fileUri='file:///project/src/Service.java', line=15, character=10)")
+          description = "Get parsed Javadoc documentation for a Java symbol")
     public CompletableFuture<String> getJavadoc(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
@@ -85,9 +80,7 @@ public class JavaNavigationTools {
     }
 
     @Tool(name = "java_get_symbol_info",
-          description = "Get detailed information about any Java symbol at a position. " +
-                        "Returns kind, modifiers, type info, declaring type, and more depending on the symbol kind. " +
-                        "Example: java_get_symbol_info(cwd='/project', fileUri='file:///project/src/Main.java', line=10, character=5)")
+          description = "Get detailed information about any Java symbol at a position")
     public CompletableFuture<String> getSymbolInfo(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
@@ -101,8 +94,7 @@ public class JavaNavigationTools {
     }
 
     @Tool(name = "java_get_enclosing_element",
-          description = "Get the enclosing method, class, and package for a position in a Java file. " +
-                        "Example: java_get_enclosing_element(cwd='/project', fileUri='file:///project/src/Main.java', line=20, character=10)")
+          description = "Get the enclosing method, class, and package for a position")
     public CompletableFuture<String> getEnclosingElement(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
@@ -116,9 +108,7 @@ public class JavaNavigationTools {
     }
 
     @Tool(name = "java_get_field_at_position",
-          description = "Get field information at a specific position in a Java file. " +
-                        "Returns field name, type, modifiers, and declaring type. " +
-                        "Example: java_get_field_at_position(cwd='/project', fileUri='file:///project/src/Model.java', line=8, character=15)")
+          description = "Get field information at a specific position in a Java file")
     public CompletableFuture<String> getFieldAtPosition(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
@@ -132,9 +122,7 @@ public class JavaNavigationTools {
     }
 
     @Tool(name = "java_get_method_at_position",
-          description = "Get method information at a specific position in a Java file. " +
-                        "Returns method name, return type, parameters, modifiers, and declaring type. " +
-                        "Example: java_get_method_at_position(cwd='/project', fileUri='file:///project/src/Service.java', line=12, character=15)")
+          description = "Get method information at a specific position in a Java file")
     public CompletableFuture<String> getMethodAtPosition(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
@@ -148,9 +136,7 @@ public class JavaNavigationTools {
     }
 
     @Tool(name = "java_get_type_at_position",
-          description = "Get type information at a specific position in a Java file. " +
-                        "Returns type name, kind (class/interface/enum/annotation/record), modifiers, superclass, and interfaces. " +
-                        "Example: java_get_type_at_position(cwd='/project', fileUri='file:///project/src/Main.java', line=5, character=10)")
+          description = "Get type information at a specific position in a Java file")
     public CompletableFuture<String> getTypeAtPosition(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
@@ -164,9 +150,7 @@ public class JavaNavigationTools {
     }
 
     @Tool(name = "java_get_signature_help",
-          description = "Get method signature help at a specific position. " +
-                        "Returns parameter names, types, and Javadoc descriptions. " +
-                        "Example: java_get_signature_help(cwd='/project', fileUri='file:///project/src/Service.java', line=20, character=30)")
+          description = "Get method signature help at a specific position")
     public CompletableFuture<String> getSignatureHelp(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
@@ -180,9 +164,7 @@ public class JavaNavigationTools {
     }
 
     @Tool(name = "java_get_super_method",
-          description = "Find the method that a Java method overrides or implements. " +
-                        "Returns the superclass or interface method that this method overrides. " +
-                        "Example: java_get_super_method(cwd='/project', fileUri='file:///project/src/Impl.java', line=15, character=10)")
+          description = "Find the method that a Java method overrides or implements")
     public CompletableFuture<String> getSuperMethod(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
@@ -196,9 +178,7 @@ public class JavaNavigationTools {
     }
 
     @Tool(name = "java_get_document_symbols",
-          description = "Get all symbols (types, methods, fields) in a Java file. " +
-                        "Returns a hierarchical list of all declarations in the file. " +
-                        "Example: java_get_document_symbols(cwd='/project', fileUri='file:///project/src/Service.java')")
+          description = "Get all symbols (types, methods, fields) in a Java file")
     public CompletableFuture<String> getDocumentSymbols(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,

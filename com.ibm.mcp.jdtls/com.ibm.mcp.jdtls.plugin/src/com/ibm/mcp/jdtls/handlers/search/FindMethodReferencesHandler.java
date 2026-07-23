@@ -103,7 +103,7 @@ public class FindMethodReferencesHandler implements ICommandHandler {
         result.put("method", method.getElementName());
         result.put("declaringType", method.getDeclaringType().getFullyQualifiedName());
         result.put("count", refs.size());
-        result.put("methodReferences", refs);
+        result.put("methodReferences", JdtUtils.groupResultsByUri(refs));
         return result;
     }
 }
