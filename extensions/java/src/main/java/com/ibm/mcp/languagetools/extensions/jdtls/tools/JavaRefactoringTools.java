@@ -21,6 +21,8 @@ import io.quarkiverse.mcp.server.ToolArg;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
@@ -46,11 +48,16 @@ public class JavaRefactoringTools {
             @ToolArg(description = ToolArgDescriptions.POSITION_LINE) int line,
             @ToolArg(description = ToolArgDescriptions.POSITION_CHARACTER) int character,
             @ToolArg(description = "New name for the symbol") String newName,
+            @ToolArg(description = ToolArgDescriptions.APPLY, required = false) Boolean apply,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.renameSymbol",
-                Map.of("uri", fileUri, "line", line, "character", character, "newName", newName),
-                cancellation, progress);
+        Map<String, Object> params = new HashMap<>();
+        params.put("uri", fileUri);
+        params.put("line", line);
+        params.put("character", character);
+        params.put("newName", newName);
+        RefactoringHelper.putApply(params, apply);
+        return executor.executeCommand(cwd, "mcp.jdtls.renameSymbol", params, cancellation, progress);
     }
 
     @Tool(name = "java_organize_imports",
@@ -78,12 +85,18 @@ public class JavaRefactoringTools {
             @ToolArg(description = "End line of the selection (0-based)") int endLine,
             @ToolArg(description = "End character of the selection (0-based)") int endCharacter,
             @ToolArg(description = "Name for the extracted method") String methodName,
+            @ToolArg(description = ToolArgDescriptions.APPLY, required = false) Boolean apply,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.extractMethod",
-                Map.of("uri", fileUri, "startLine", startLine, "startCharacter", startCharacter,
-                       "endLine", endLine, "endCharacter", endCharacter, "methodName", methodName),
-                cancellation, progress);
+        Map<String, Object> params = new HashMap<>();
+        params.put("uri", fileUri);
+        params.put("startLine", startLine);
+        params.put("startCharacter", startCharacter);
+        params.put("endLine", endLine);
+        params.put("endCharacter", endCharacter);
+        params.put("methodName", methodName);
+        RefactoringHelper.putApply(params, apply);
+        return executor.executeCommand(cwd, "mcp.jdtls.extractMethod", params, cancellation, progress);
     }
 
     @Tool(name = "java_extract_variable",
@@ -97,12 +110,18 @@ public class JavaRefactoringTools {
             @ToolArg(description = "End line of the expression (0-based)") int endLine,
             @ToolArg(description = "End character of the expression (0-based)") int endCharacter,
             @ToolArg(description = "Name for the new variable") String variableName,
+            @ToolArg(description = ToolArgDescriptions.APPLY, required = false) Boolean apply,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.extractVariable",
-                Map.of("uri", fileUri, "startLine", startLine, "startCharacter", startCharacter,
-                       "endLine", endLine, "endCharacter", endCharacter, "variableName", variableName),
-                cancellation, progress);
+        Map<String, Object> params = new HashMap<>();
+        params.put("uri", fileUri);
+        params.put("startLine", startLine);
+        params.put("startCharacter", startCharacter);
+        params.put("endLine", endLine);
+        params.put("endCharacter", endCharacter);
+        params.put("variableName", variableName);
+        RefactoringHelper.putApply(params, apply);
+        return executor.executeCommand(cwd, "mcp.jdtls.extractVariable", params, cancellation, progress);
     }
 
     @Tool(name = "java_extract_constant",
@@ -116,12 +135,18 @@ public class JavaRefactoringTools {
             @ToolArg(description = "End line of the expression (0-based)") int endLine,
             @ToolArg(description = "End character of the expression (0-based)") int endCharacter,
             @ToolArg(description = "Name for the constant (e.g., 'MAX_SIZE')") String constantName,
+            @ToolArg(description = ToolArgDescriptions.APPLY, required = false) Boolean apply,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.extractConstant",
-                Map.of("uri", fileUri, "startLine", startLine, "startCharacter", startCharacter,
-                       "endLine", endLine, "endCharacter", endCharacter, "constantName", constantName),
-                cancellation, progress);
+        Map<String, Object> params = new HashMap<>();
+        params.put("uri", fileUri);
+        params.put("startLine", startLine);
+        params.put("startCharacter", startCharacter);
+        params.put("endLine", endLine);
+        params.put("endCharacter", endCharacter);
+        params.put("constantName", constantName);
+        RefactoringHelper.putApply(params, apply);
+        return executor.executeCommand(cwd, "mcp.jdtls.extractConstant", params, cancellation, progress);
     }
 
     @Tool(name = "java_extract_interface",
@@ -134,11 +159,18 @@ public class JavaRefactoringTools {
             @ToolArg(description = ToolArgDescriptions.POSITION_LINE) int line,
             @ToolArg(description = ToolArgDescriptions.POSITION_CHARACTER) int character,
             @ToolArg(description = "Name for the new interface") String interfaceName,
+            @ToolArg(description = "List of method names to include in the interface") List<String> methodNames,
+            @ToolArg(description = ToolArgDescriptions.APPLY, required = false) Boolean apply,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.extractInterface",
-                Map.of("uri", fileUri, "line", line, "character", character, "interfaceName", interfaceName),
-                cancellation, progress);
+        Map<String, Object> params = new HashMap<>();
+        params.put("uri", fileUri);
+        params.put("line", line);
+        params.put("character", character);
+        params.put("interfaceName", interfaceName);
+        params.put("methodNames", methodNames);
+        RefactoringHelper.putApply(params, apply);
+        return executor.executeCommand(cwd, "mcp.jdtls.extractInterface", params, cancellation, progress);
     }
 
     @Tool(name = "java_extract_superclass",
@@ -151,11 +183,18 @@ public class JavaRefactoringTools {
             @ToolArg(description = ToolArgDescriptions.POSITION_LINE) int line,
             @ToolArg(description = ToolArgDescriptions.POSITION_CHARACTER) int character,
             @ToolArg(description = "Name for the new superclass") String superclassName,
+            @ToolArg(description = "List of member names (fields and methods) to pull into the superclass") List<String> memberNames,
+            @ToolArg(description = ToolArgDescriptions.APPLY, required = false) Boolean apply,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.extractSuperclass",
-                Map.of("uri", fileUri, "line", line, "character", character, "superclassName", superclassName),
-                cancellation, progress);
+        Map<String, Object> params = new HashMap<>();
+        params.put("uri", fileUri);
+        params.put("line", line);
+        params.put("character", character);
+        params.put("superclassName", superclassName);
+        params.put("memberNames", memberNames);
+        RefactoringHelper.putApply(params, apply);
+        return executor.executeCommand(cwd, "mcp.jdtls.extractSuperclass", params, cancellation, progress);
     }
 
     @Tool(name = "java_inline_method",
@@ -166,11 +205,15 @@ public class JavaRefactoringTools {
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
             @ToolArg(description = ToolArgDescriptions.POSITION_LINE) int line,
             @ToolArg(description = ToolArgDescriptions.POSITION_CHARACTER) int character,
+            @ToolArg(description = ToolArgDescriptions.APPLY, required = false) Boolean apply,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.inlineMethod",
-                Map.of("uri", fileUri, "line", line, "character", character),
-                cancellation, progress);
+        Map<String, Object> params = new HashMap<>();
+        params.put("uri", fileUri);
+        params.put("line", line);
+        params.put("character", character);
+        RefactoringHelper.putApply(params, apply);
+        return executor.executeCommand(cwd, "mcp.jdtls.inlineMethod", params, cancellation, progress);
     }
 
     @Tool(name = "java_inline_variable",
@@ -181,11 +224,15 @@ public class JavaRefactoringTools {
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
             @ToolArg(description = ToolArgDescriptions.POSITION_LINE) int line,
             @ToolArg(description = ToolArgDescriptions.POSITION_CHARACTER) int character,
+            @ToolArg(description = ToolArgDescriptions.APPLY, required = false) Boolean apply,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.inlineVariable",
-                Map.of("uri", fileUri, "line", line, "character", character),
-                cancellation, progress);
+        Map<String, Object> params = new HashMap<>();
+        params.put("uri", fileUri);
+        params.put("line", line);
+        params.put("character", character);
+        RefactoringHelper.putApply(params, apply);
+        return executor.executeCommand(cwd, "mcp.jdtls.inlineVariable", params, cancellation, progress);
     }
 
     @Tool(name = "java_change_method_signature",
@@ -197,11 +244,16 @@ public class JavaRefactoringTools {
             @ToolArg(description = ToolArgDescriptions.POSITION_LINE) int line,
             @ToolArg(description = ToolArgDescriptions.POSITION_CHARACTER) int character,
             @ToolArg(description = "New method name (optional, keep current if empty)") String newName,
+            @ToolArg(description = ToolArgDescriptions.APPLY, required = false) Boolean apply,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.changeMethodSignature",
-                Map.of("uri", fileUri, "line", line, "character", character, "newName", newName),
-                cancellation, progress);
+        Map<String, Object> params = new HashMap<>();
+        params.put("uri", fileUri);
+        params.put("line", line);
+        params.put("character", character);
+        params.put("newName", newName);
+        RefactoringHelper.putApply(params, apply);
+        return executor.executeCommand(cwd, "mcp.jdtls.changeMethodSignature", params, cancellation, progress);
     }
 
     @Tool(name = "java_convert_anonymous_to_lambda",
@@ -212,11 +264,15 @@ public class JavaRefactoringTools {
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
             @ToolArg(description = ToolArgDescriptions.POSITION_LINE) int line,
             @ToolArg(description = ToolArgDescriptions.POSITION_CHARACTER) int character,
+            @ToolArg(description = ToolArgDescriptions.APPLY, required = false) Boolean apply,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.convertAnonymousToLambda",
-                Map.of("uri", fileUri, "line", line, "character", character),
-                cancellation, progress);
+        Map<String, Object> params = new HashMap<>();
+        params.put("uri", fileUri);
+        params.put("line", line);
+        params.put("character", character);
+        RefactoringHelper.putApply(params, apply);
+        return executor.executeCommand(cwd, "mcp.jdtls.convertAnonymousToLambda", params, cancellation, progress);
     }
 
     @Tool(name = "java_encapsulate_field",
@@ -227,11 +283,15 @@ public class JavaRefactoringTools {
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
             @ToolArg(description = ToolArgDescriptions.POSITION_LINE) int line,
             @ToolArg(description = ToolArgDescriptions.POSITION_CHARACTER) int character,
+            @ToolArg(description = ToolArgDescriptions.APPLY, required = false) Boolean apply,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.encapsulateField",
-                Map.of("uri", fileUri, "line", line, "character", character),
-                cancellation, progress);
+        Map<String, Object> params = new HashMap<>();
+        params.put("uri", fileUri);
+        params.put("line", line);
+        params.put("character", character);
+        RefactoringHelper.putApply(params, apply);
+        return executor.executeCommand(cwd, "mcp.jdtls.encapsulateField", params, cancellation, progress);
     }
 
     @Tool(name = "java_introduce_parameter_object",
@@ -244,11 +304,18 @@ public class JavaRefactoringTools {
             @ToolArg(description = ToolArgDescriptions.POSITION_LINE) int line,
             @ToolArg(description = ToolArgDescriptions.POSITION_CHARACTER) int character,
             @ToolArg(description = "Name for the new parameter object class") String className,
+            @ToolArg(description = "List of parameter names to bundle into the object") List<String> parameterNames,
+            @ToolArg(description = ToolArgDescriptions.APPLY, required = false) Boolean apply,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.introduceParameterObject",
-                Map.of("uri", fileUri, "line", line, "character", character, "className", className),
-                cancellation, progress);
+        Map<String, Object> params = new HashMap<>();
+        params.put("uri", fileUri);
+        params.put("line", line);
+        params.put("character", character);
+        params.put("className", className);
+        params.put("parameterNames", parameterNames);
+        RefactoringHelper.putApply(params, apply);
+        return executor.executeCommand(cwd, "mcp.jdtls.introduceParameterObject", params, cancellation, progress);
     }
 
     @Tool(name = "java_move_type_to_new_file",
@@ -259,11 +326,15 @@ public class JavaRefactoringTools {
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
             @ToolArg(description = ToolArgDescriptions.POSITION_LINE) int line,
             @ToolArg(description = ToolArgDescriptions.POSITION_CHARACTER) int character,
+            @ToolArg(description = ToolArgDescriptions.APPLY, required = false) Boolean apply,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.moveTypeToNewFile",
-                Map.of("uri", fileUri, "line", line, "character", character),
-                cancellation, progress);
+        Map<String, Object> params = new HashMap<>();
+        params.put("uri", fileUri);
+        params.put("line", line);
+        params.put("character", character);
+        RefactoringHelper.putApply(params, apply);
+        return executor.executeCommand(cwd, "mcp.jdtls.moveTypeToNewFile", params, cancellation, progress);
     }
 
     @Tool(name = "java_pull_up",
@@ -274,11 +345,17 @@ public class JavaRefactoringTools {
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
             @ToolArg(description = ToolArgDescriptions.POSITION_LINE) int line,
             @ToolArg(description = ToolArgDescriptions.POSITION_CHARACTER) int character,
+            @ToolArg(description = "List of member names (fields and methods) to pull up") List<String> memberNames,
+            @ToolArg(description = ToolArgDescriptions.APPLY, required = false) Boolean apply,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.pullUp",
-                Map.of("uri", fileUri, "line", line, "character", character),
-                cancellation, progress);
+        Map<String, Object> params = new HashMap<>();
+        params.put("uri", fileUri);
+        params.put("line", line);
+        params.put("character", character);
+        params.put("memberNames", memberNames);
+        RefactoringHelper.putApply(params, apply);
+        return executor.executeCommand(cwd, "mcp.jdtls.pullUp", params, cancellation, progress);
     }
 
     @Tool(name = "java_push_down",
@@ -289,10 +366,16 @@ public class JavaRefactoringTools {
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
             @ToolArg(description = ToolArgDescriptions.POSITION_LINE) int line,
             @ToolArg(description = ToolArgDescriptions.POSITION_CHARACTER) int character,
+            @ToolArg(description = "List of member names (fields and methods) to push down") List<String> memberNames,
+            @ToolArg(description = ToolArgDescriptions.APPLY, required = false) Boolean apply,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.pushDown",
-                Map.of("uri", fileUri, "line", line, "character", character),
-                cancellation, progress);
+        Map<String, Object> params = new HashMap<>();
+        params.put("uri", fileUri);
+        params.put("line", line);
+        params.put("character", character);
+        params.put("memberNames", memberNames);
+        RefactoringHelper.putApply(params, apply);
+        return executor.executeCommand(cwd, "mcp.jdtls.pushDown", params, cancellation, progress);
     }
 }

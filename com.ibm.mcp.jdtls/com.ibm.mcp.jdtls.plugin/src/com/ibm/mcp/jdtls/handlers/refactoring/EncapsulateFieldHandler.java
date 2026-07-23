@@ -86,6 +86,6 @@ public class EncapsulateFieldHandler extends AbstractLTKRefactoringHandler {
             refactoring.setSetterName(setterName);
         }
 
-        return executeRefactoring(refactoring, monitor);
+        return executeRefactoring(refactoring, params, monitor);
     }
 }

@@ -20,8 +20,9 @@ import java.util.Map;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.jdt.core.IMethod;
 import org.eclipse.jdt.core.IType;
-import org.eclipse.jdt.core.dom.CompilationUnit;
+import org.eclipse.jdt.internal.corext.codemanipulation.CodeGenerationSettings;
 import org.eclipse.jdt.internal.corext.refactoring.structure.ExtractInterfaceProcessor;
+import org.eclipse.jdt.internal.ui.preferences.JavaPreferencesSettings;
 import org.eclipse.ltk.core.refactoring.participants.ProcessorBasedRefactoring;
 
 import com.ibm.mcp.jdtls.JdtUtils;
@@ -71,7 +72,8 @@ public class ExtractInterfaceHandler extends AbstractLTKRefactoringHandler {
             return createErrorResult("Cannot extract interface from an interface");
         }
 
-        ExtractInterfaceProcessor processor = new ExtractInterfaceProcessor(type, null);
+        CodeGenerationSettings settings = JavaPreferencesSettings.getCodeGenerationSettings(type.getJavaProject());
+        ExtractInterfaceProcessor processor = new ExtractInterfaceProcessor(type, settings);
         processor.setTypeName(interfaceName);
 
         // Resolve methods to extract
@@ -90,6 +92,6 @@ public class ExtractInterfaceHandler extends AbstractLTKRefactoringHandler {
         processor.setExtractedMembers(extractMethods.toArray(new IMethod[0]));
 
         ProcessorBasedRefactoring refactoring = new ProcessorBasedRefactoring(processor);
-        return executeRefactoring(refactoring, monitor);
+        return executeRefactoring(refactoring, params, monitor);
     }
 }

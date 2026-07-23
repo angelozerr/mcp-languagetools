@@ -90,6 +90,6 @@ public class IntroduceParameterObjectHandler extends AbstractLTKRefactoringHandl
         IntroduceParameterObjectProcessor processor = new IntroduceParameterObjectProcessor(descriptor);
 
         ProcessorBasedRefactoring refactoring = new ProcessorBasedRefactoring(processor);
-        return executeRefactoring(refactoring, monitor);
+        return executeRefactoring(refactoring, params, monitor);
     }
 }

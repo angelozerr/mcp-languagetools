@@ -114,34 +114,37 @@ public class FindAffectedTestsHandler implements ICommandHandler {
 
                 IJavaSearchScope scope = SearchEngine.createWorkspaceScope();
                 SearchEngine engine = new SearchEngine();
-                engine.search(
-                        pattern,
-                        new SearchParticipant[]{SearchEngine.getDefaultSearchParticipant()},
-                        scope,
-                        new SearchRequestor() {
-                            @Override
-                            public void acceptSearchMatch(SearchMatch match) {
-                                if (match.getElement() instanceof IJavaElement refElement) {
-                                    if (visited.add(refElement.getHandleIdentifier())) {
-                                        queue.add(refElement);
-                                        // Check if this is a method - potential test candidate
-                                        IMethod method = null;
-                                        if (refElement instanceof IMethod) {
-                                            method = (IMethod) refElement;
-                                        } else {
-                                            IJavaElement ancestor = refElement.getAncestor(IJavaElement.METHOD);
-                                            if (ancestor instanceof IMethod) {
-                                                method = (IMethod) ancestor;
+                try {
+                    engine.search(
+                            pattern,
+                            new SearchParticipant[]{SearchEngine.getDefaultSearchParticipant()},
+                            scope,
+                            new SearchRequestor() {
+                                @Override
+                                public void acceptSearchMatch(SearchMatch match) {
+                                    if (match.getElement() instanceof IJavaElement refElement) {
+                                        if (visited.add(refElement.getHandleIdentifier())) {
+                                            queue.add(refElement);
+                                            IMethod method = null;
+                                            if (refElement instanceof IMethod) {
+                                                method = (IMethod) refElement;
+                                            } else {
+                                                IJavaElement ancestor = refElement.getAncestor(IJavaElement.METHOD);
+                                                if (ancestor instanceof IMethod) {
+                                                    method = (IMethod) ancestor;
+                                                }
                                             }
-                                        }
-                                        if (method != null) {
-                                            candidateMethods.add(method);
+                                            if (method != null) {
+                                                candidateMethods.add(method);
+                                            }
                                         }
                                     }
                                 }
-                            }
-                        },
-                        monitor);
+                            },
+                            monitor);
+                } catch (Exception e) {
+                    // Some element types may not support reference search; skip gracefully
+                }
             }
             depth++;
         }

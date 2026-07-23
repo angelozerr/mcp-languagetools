@@ -1,0 +1,1156 @@
+/*******************************************************************************
+ * Copyright (c) 2026 IBM Corporation and others.
+ *
+ * This program and the accompanying materials
+ * are made available under the terms of the Eclipse Public License 2.0
+ * which accompanies this distribution, and is available at
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
+ *
+ * Contributors:
+ *     Angelo ZERR - initial API and implementation
+ *******************************************************************************/
+package com.ibm.mcp.jdtls.tests;
+
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.junit.jupiter.api.Test;
+
+import com.ibm.mcp.jdtls.handlers.CallHierarchyHandler;
+import com.ibm.mcp.jdtls.handlers.DiagnosticsHandler;
+import com.ibm.mcp.jdtls.handlers.FindAnnotationUsagesHandler;
+import com.ibm.mcp.jdtls.handlers.FindTypeInstantiationsHandler;
+import com.ibm.mcp.jdtls.handlers.GetComplexityMetricsHandler;
+import com.ibm.mcp.jdtls.handlers.TypeHierarchyHandler;
+import com.ibm.mcp.jdtls.handlers.analysis.AnalyzeChangeImpactHandler;
+import com.ibm.mcp.jdtls.handlers.analysis.AnalyzeControlFlowHandler;
+import com.ibm.mcp.jdtls.handlers.analysis.AnalyzeDataFlowHandler;
+import com.ibm.mcp.jdtls.handlers.analysis.AnalyzeFileHandler;
+import com.ibm.mcp.jdtls.handlers.analysis.AnalyzeMethodHandler;
+import com.ibm.mcp.jdtls.handlers.analysis.AnalyzeTypeHandler;
+import com.ibm.mcp.jdtls.handlers.analysis.GetDependencyGraphHandler;
+import com.ibm.mcp.jdtls.handlers.codegen.GenerateConstructorHandler;
+import com.ibm.mcp.jdtls.handlers.codegen.GenerateEqualsHashCodeHandler;
+import com.ibm.mcp.jdtls.handlers.codegen.GenerateGettersSettersHandler;
+import com.ibm.mcp.jdtls.handlers.codegen.GenerateToStringHandler;
+import com.ibm.mcp.jdtls.handlers.diagnostics.ApplyCleanupHandler;
+import com.ibm.mcp.jdtls.handlers.diagnostics.DiagnoseAndFixHandler;
+import com.ibm.mcp.jdtls.handlers.diagnostics.GetQuickFixesHandler;
+import com.ibm.mcp.jdtls.handlers.diagnostics.ValidateSyntaxHandler;
+import com.ibm.mcp.jdtls.handlers.framework.GetDiRegistrationsHandler;
+import com.ibm.mcp.jdtls.handlers.framework.GetHttpEndpointsHandler;
+import com.ibm.mcp.jdtls.handlers.framework.GetJpaModelHandler;
+import com.ibm.mcp.jdtls.handlers.project.GetClasspathInfoHandler;
+import com.ibm.mcp.jdtls.handlers.project.GetProjectStructureHandler;
+import com.ibm.mcp.jdtls.handlers.quality.FindCircularDependenciesHandler;
+import com.ibm.mcp.jdtls.handlers.quality.FindLargeClassesHandler;
+import com.ibm.mcp.jdtls.handlers.quality.FindNamingViolationsHandler;
+import com.ibm.mcp.jdtls.handlers.quality.FindPossibleBugsHandler;
+import com.ibm.mcp.jdtls.handlers.search.FindAffectedTestsHandler;
+import com.ibm.mcp.jdtls.handlers.search.FindCastsHandler;
+import com.ibm.mcp.jdtls.handlers.search.FindCatchBlocksHandler;
+import com.ibm.mcp.jdtls.handlers.search.FindFieldWritesHandler;
+import com.ibm.mcp.jdtls.handlers.search.FindImplementationsHandler;
+import com.ibm.mcp.jdtls.handlers.search.FindInstanceofChecksHandler;
+import com.ibm.mcp.jdtls.handlers.search.FindMethodReferencesHandler;
+import com.ibm.mcp.jdtls.handlers.search.FindReferencesHandler;
+import com.ibm.mcp.jdtls.handlers.search.FindReflectionUsageHandler;
+import com.ibm.mcp.jdtls.handlers.search.FindTestsHandler;
+import com.ibm.mcp.jdtls.handlers.search.FindThrowsDeclarationsHandler;
+import com.ibm.mcp.jdtls.handlers.search.FindTypeArgumentsHandler;
+import com.ibm.mcp.jdtls.handlers.search.FindUnreachableCodeHandler;
+import com.ibm.mcp.jdtls.handlers.search.FindUnusedCodeHandler;
+import com.ibm.mcp.jdtls.handlers.search.GetTypeUsageSummaryHandler;
+import com.ibm.mcp.jdtls.handlers.search.SearchSymbolsHandler;
+import com.ibm.mcp.jdtls.handlers.search.SuggestImportsHandler;
+
+/**
+ * Comprehensive JUnit 5 tests for Eclipse JDT analysis, search, quality,
+ * diagnostics, code generation, project, framework, and root-package handlers.
+ *
+ * <p>Test project "simple-java" layout (0-based line numbers):</p>
+ * <ul>
+ *   <li>src/com/example/model/User.java - class (line 13), fields name/age/email/roles,
+ *       constructor, getters/setters, isAdult(), getDisplayName(), toString()</li>
+ *   <li>src/com/example/model/Admin.java - extends User, getDisplayName() override (line 31)</li>
+ *   <li>src/com/example/service/UserService.java - addUser, findByName, findAdults,
+ *       searchUsers (line 76), processUsers (line 98). MAX_USERS constant (line 15).
+ *       Has IOException throws on loadUsersFromFile.</li>
+ *   <li>src/com/example/service/Validator.java - generic interface Validator&lt;T&gt;</li>
+ *   <li>src/com/example/service/UserValidator.java - implements Validator&lt;User&gt;</li>
+ *   <li>src/com/example/util/StringUtils.java - static methods, EMPTY constant (line 4)</li>
+ *   <li>src/com/example/controller/UserController.java - uses UserService, UserValidator, StringUtils</li>
+ *   <li>test/com/example/UserServiceTest.java - simple test class (no JUnit annotations)</li>
+ * </ul>
+ */
+public class AnalysisAndSearchHandlerTest extends AbstractHandlerTest {
+
+    // =========================================================================
+    // Analysis handlers
+    // =========================================================================
+
+    @Test
+    void testAnalyzeFileHandler() throws Exception {
+        AnalyzeFileHandler handler = new AnalyzeFileHandler();
+        String uri = fileUri("src/com/example/model/User.java");
+
+        Map<String, Object> p = new HashMap<>();
+        p.put("uri", uri);
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        Map<String, Object> map = asMap(result);
+        assertEquals(uri, map.get("uri"));
+
+        // User.java has 1 type
+        assertTrue(((Number) map.get("types")).intValue() >= 1,
+                "Should find at least 1 type");
+
+        // Should have methods
+        assertNotNull(map.get("methods"));
+        assertInstanceOf(List.class, map.get("methods"));
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> methods = (List<Map<String, Object>>) map.get("methods");
+        assertTrue(methods.size() >= 5, "User.java should have several methods");
+
+        // Should have fields (name, age, email, roles)
+        assertTrue(((Number) map.get("fields")).intValue() >= 4,
+                "User.java should have at least 4 fields");
+
+        // Should have LOC
+        assertTrue(((Number) map.get("loc")).intValue() > 0, "LOC should be positive");
+    }
+
+    @Test
+    void testAnalyzeMethodHandler() throws Exception {
+        AnalyzeMethodHandler handler = new AnalyzeMethodHandler();
+        String uri = fileUri("src/com/example/service/UserService.java");
+
+        // searchUsers is at line 76 (0-based), character 25
+        Map<String, Object> p = params(uri, 76, 25);
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        Map<String, Object> map = asMap(result);
+        // The result should contain method analysis info
+        assertNotNull(map);
+        // Should not contain an error
+        assertTrue(!map.containsKey("error") || map.get("error") == null,
+                "Should not return error: " + map.get("error"));
+    }
+
+    @Test
+    void testAnalyzeTypeHandler() throws Exception {
+        AnalyzeTypeHandler handler = new AnalyzeTypeHandler();
+
+        Map<String, Object> p = new HashMap<>();
+        p.put("fullyQualifiedName", "com.example.model.User");
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        Map<String, Object> map = asMap(result);
+        assertEquals("com.example.model.User", map.get("type"));
+        assertEquals("class", map.get("kind"));
+
+        // User has at least 1 subtype (Admin)
+        assertTrue(((Number) map.get("subtypes")).intValue() >= 1,
+                "User should have at least 1 subtype (Admin)");
+
+        // User has methods
+        assertTrue(((Number) map.get("methods")).intValue() >= 5,
+                "User should have several methods");
+
+        // User has fields
+        assertTrue(((Number) map.get("fields")).intValue() >= 4,
+                "User should have at least 4 fields");
+
+        // Should have references in the project
+        assertTrue(((Number) map.get("references")).intValue() >= 1,
+                "User should be referenced in other files");
+
+        // Should have members list
+        assertNotNull(map.get("members"));
+        assertInstanceOf(List.class, map.get("members"));
+    }
+
+    @Test
+    void testAnalyzeControlFlowHandler() throws Exception {
+        AnalyzeControlFlowHandler handler = new AnalyzeControlFlowHandler();
+        String uri = fileUri("src/com/example/service/UserService.java");
+
+        // processUsers() at line 98 (0-based), char 20
+        Map<String, Object> p = params(uri, 98, 20);
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        Map<String, Object> map = asMap(result);
+        assertNotNull(map);
+        // processUsers has a for loop, if statements - should report branches/loops
+        assertTrue(!map.containsKey("error") || map.get("error") == null,
+                "Should not return error: " + map.get("error"));
+    }
+
+    @Test
+    void testAnalyzeDataFlowHandler() throws Exception {
+        AnalyzeDataFlowHandler handler = new AnalyzeDataFlowHandler();
+        String uri = fileUri("src/com/example/service/UserService.java");
+
+        // findByName method at line 36 (0-based), character 25
+        Map<String, Object> p = params(uri, 36, 25);
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        Map<String, Object> map = asMap(result);
+        assertNotNull(map);
+        assertTrue(!map.containsKey("error") || map.get("error") == null,
+                "Should not return error: " + map.get("error"));
+    }
+
+    @Test
+    void testAnalyzeChangeImpactHandler() throws Exception {
+        AnalyzeChangeImpactHandler handler = new AnalyzeChangeImpactHandler();
+        String uri = fileUri("src/com/example/model/User.java");
+
+        // getName() at line 33 (0-based), character 18
+        Map<String, Object> p = params(uri, 33, 18);
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        Map<String, Object> map = asMap(result);
+        assertNotNull(map);
+        assertTrue(!map.containsKey("error") || map.get("error") == null,
+                "Should not return error: " + map.get("error"));
+    }
+
+    @Test
+    void testGetComplexityMetricsHandler() throws Exception {
+        GetComplexityMetricsHandler handler = new GetComplexityMetricsHandler();
+        String uri = fileUri("src/com/example/service/UserService.java");
+
+        Map<String, Object> p = new HashMap<>();
+        p.put("uri", uri);
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        Map<String, Object> map = asMap(result);
+        assertEquals(uri, map.get("uri"));
+
+        // UserService has multiple methods
+        assertNotNull(map.get("methods"));
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> methods = (List<Map<String, Object>>) map.get("methods");
+        assertTrue(methods.size() >= 5, "UserService should have several methods");
+
+        // processUsers should have higher complexity due to nested if/for
+        boolean foundProcessUsers = false;
+        for (Map<String, Object> method : methods) {
+            if ("processUsers".equals(method.get("name"))) {
+                foundProcessUsers = true;
+                int complexity = ((Number) method.get("cyclomaticComplexity")).intValue();
+                assertTrue(complexity > 1, "processUsers should have complexity > 1");
+            }
+        }
+        assertTrue(foundProcessUsers, "Should find processUsers method");
+    }
+
+    @Test
+    void testGetDependencyGraphHandler() throws Exception {
+        GetDependencyGraphHandler handler = new GetDependencyGraphHandler();
+
+        // Workspace-wide (no uri param)
+        Map<String, Object> p = new HashMap<>();
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        Map<String, Object> map = asMap(result);
+
+        // Should have nodes (packages)
+        assertNotNull(map.get("nodes"));
+        @SuppressWarnings("unchecked")
+        List<String> nodes = (List<String>) map.get("nodes");
+        assertTrue(nodes.size() >= 2, "Should find multiple packages");
+
+        // Should have edges (dependencies between packages)
+        assertNotNull(map.get("edges"));
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> edges = (List<Map<String, Object>>) map.get("edges");
+        assertTrue(edges.size() >= 1, "Should find at least 1 dependency edge");
+
+        assertTrue(((Number) map.get("nodeCount")).intValue() >= 2);
+        assertTrue(((Number) map.get("edgeCount")).intValue() >= 1);
+    }
+
+    // =========================================================================
+    // Search handlers
+    // =========================================================================
+
+    @Test
+    void testFindReferencesHandler() throws Exception {
+        FindReferencesHandler handler = new FindReferencesHandler();
+        String uri = fileUri("src/com/example/model/User.java");
+
+        // User class name at line 12 (0-based), character 15
+        Map<String, Object> p = params(uri, 12, 15);
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        Map<String, Object> map = asMap(result);
+        assertNotNull(map.get("element"));
+        assertNotNull(map.get("references"));
+        // User is referenced in many places (UserService, UserController, Admin, etc.)
+        assertTrue(((Number) map.get("count")).intValue() >= 1,
+                "User should have references in other files");
+    }
+
+    @Test
+    void testFindMethodReferencesHandler() throws Exception {
+        FindMethodReferencesHandler handler = new FindMethodReferencesHandler();
+        String uri = fileUri("src/com/example/model/User.java");
+
+        // getName() at line 33 (0-based), character 18
+        Map<String, Object> p = params(uri, 33, 18);
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        Map<String, Object> map = asMap(result);
+        assertNotNull(map);
+        // getName() is called in UserService.findByName, UserValidator, Admin, etc.
+        assertTrue(!map.containsKey("error") || map.get("error") == null,
+                "Should not return error: " + map.get("error"));
+    }
+
+    @Test
+    void testFindFieldWritesHandler() throws Exception {
+        FindFieldWritesHandler handler = new FindFieldWritesHandler();
+        String uri = fileUri("src/com/example/model/User.java");
+
+        // name field at line 14 (0-based), character 19
+        Map<String, Object> p = params(uri, 14, 19);
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        Map<String, Object> map = asMap(result);
+        assertNotNull(map);
+        // name field is written in constructor and setName
+        assertTrue(!map.containsKey("error") || map.get("error") == null,
+                "Should not return error: " + map.get("error"));
+    }
+
+    @Test
+    void testFindImplementationsHandler() throws Exception {
+        FindImplementationsHandler handler = new FindImplementationsHandler();
+
+        Map<String, Object> p = new HashMap<>();
+        p.put("fullyQualifiedName", "com.example.service.Validator");
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        Map<String, Object> map = asMap(result);
+        assertEquals("com.example.service.Validator", map.get("type"));
+
+        // UserValidator implements Validator
+        assertTrue(((Number) map.get("count")).intValue() >= 1,
+                "Validator should have at least 1 implementation (UserValidator)");
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> impls = (List<Map<String, Object>>) map.get("implementations");
+        assertTrue(impls.size() >= 1);
+
+        boolean foundUserValidator = impls.stream()
+                .anyMatch(impl -> "UserValidator".equals(impl.get("name")));
+        assertTrue(foundUserValidator, "Should find UserValidator as implementation");
+    }
+
+    @Test
+    void testFindTestsHandler() throws Exception {
+        FindTestsHandler handler = new FindTestsHandler();
+
+        // Workspace-wide search (no uri)
+        Map<String, Object> p = new HashMap<>();
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        Map<String, Object> map = asMap(result);
+        assertNotNull(map.get("count"));
+        assertNotNull(map.get("tests"));
+        // The test project's UserServiceTest has no JUnit annotations,
+        // so the count may be 0, which is fine
+        assertTrue(((Number) map.get("count")).intValue() >= 0);
+    }
+
+    @Test
+    void testFindAffectedTestsHandler_noNPE() throws Exception {
+        // Bug #11 regression test: verify no NPE when searching affected tests
+        FindAffectedTestsHandler handler = new FindAffectedTestsHandler();
+        String uri = fileUri("src/com/example/service/UserService.java");
+
+        // addUser method at line 23 (0-based), character 16
+        Map<String, Object> p = params(uri, 23, 16);
+
+        // Should not throw NPE
+        Object result = assertDoesNotThrow(
+                () -> handler.execute(args(p), MONITOR),
+                "FindAffectedTestsHandler should not throw NPE (Bug #11 regression)");
+
+        assertNotNull(result);
+        Map<String, Object> map = asMap(result);
+        assertNotNull(map.get("element"));
+        assertNotNull(map.get("count"));
+        assertNotNull(map.get("affectedTests"));
+    }
+
+    @Test
+    void testFindUnusedCodeHandler() throws Exception {
+        FindUnusedCodeHandler handler = new FindUnusedCodeHandler();
+        String uri = fileUri("src/com/example/util/StringUtils.java");
+
+        Map<String, Object> p = new HashMap<>();
+        p.put("uri", uri);
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        Map<String, Object> map = asMap(result);
+        assertNotNull(map);
+        assertTrue(!map.containsKey("error") || map.get("error") == null,
+                "Should not return error: " + map.get("error"));
+    }
+
+    @Test
+    void testFindUnreachableCodeHandler() throws Exception {
+        FindUnreachableCodeHandler handler = new FindUnreachableCodeHandler();
+        String uri = fileUri("src/com/example/service/UserService.java");
+
+        Map<String, Object> p = new HashMap<>();
+        p.put("uri", uri);
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        Map<String, Object> map = asMap(result);
+        assertNotNull(map);
+        assertTrue(!map.containsKey("error") || map.get("error") == null,
+                "Should not return error: " + map.get("error"));
+    }
+
+    @Test
+    void testFindReflectionUsageHandler() throws Exception {
+        FindReflectionUsageHandler handler = new FindReflectionUsageHandler();
+        String uri = fileUri("src/com/example/model/User.java");
+
+        Map<String, Object> p = new HashMap<>();
+        p.put("uri", uri);
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        // No reflection usage in User.java, so expect empty or zero count results
+        Map<String, Object> map = asMap(result);
+        assertNotNull(map);
+        assertTrue(!map.containsKey("error") || map.get("error") == null,
+                "Should not return error: " + map.get("error"));
+    }
+
+    @Test
+    void testSuggestImportsHandler() throws Exception {
+        SuggestImportsHandler handler = new SuggestImportsHandler();
+
+        Map<String, Object> p = new HashMap<>();
+        p.put("typeName", "List");
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        Map<String, Object> map = asMap(result);
+        assertEquals("List", map.get("typeName"));
+        assertTrue(((Number) map.get("count")).intValue() >= 1,
+                "Should find at least java.util.List");
+
+        @SuppressWarnings("unchecked")
+        List<String> suggestions = (List<String>) map.get("suggestions");
+        assertTrue(suggestions.contains("java.util.List"),
+                "Suggestions should include java.util.List");
+    }
+
+    @Test
+    void testSearchSymbolsHandler() throws Exception {
+        SearchSymbolsHandler handler = new SearchSymbolsHandler();
+
+        Map<String, Object> p = new HashMap<>();
+        p.put("query", "User");
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        Map<String, Object> map = asMap(result);
+        assertEquals("User", map.get("query"));
+        assertTrue(((Number) map.get("count")).intValue() >= 1,
+                "Should find at least the User class");
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> symbols = (List<Map<String, Object>>) map.get("symbols");
+        assertTrue(symbols.size() >= 1);
+
+        boolean foundUser = symbols.stream()
+                .anyMatch(s -> "User".equals(s.get("name")) && "type".equals(s.get("kind")));
+        assertTrue(foundUser, "Should find User type in results");
+    }
+
+    @Test
+    void testGetTypeUsageSummaryHandler() throws Exception {
+        GetTypeUsageSummaryHandler handler = new GetTypeUsageSummaryHandler();
+
+        Map<String, Object> p = new HashMap<>();
+        p.put("fullyQualifiedName", "com.example.model.User");
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        Map<String, Object> map = asMap(result);
+        assertNotNull(map);
+        // User is used in various ways across the project
+        assertTrue(!map.containsKey("error") || map.get("error") == null,
+                "Should not return error: " + map.get("error"));
+    }
+
+    @Test
+    void testFindCastsHandler() throws Exception {
+        FindCastsHandler handler = new FindCastsHandler();
+
+        Map<String, Object> p = new HashMap<>();
+        p.put("fullyQualifiedName", "com.example.model.User");
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        Map<String, Object> map = asMap(result);
+        assertNotNull(map);
+        // May or may not find casts depending on test code, just verify no error
+        assertTrue(!map.containsKey("error") || map.get("error") == null,
+                "Should not return error: " + map.get("error"));
+    }
+
+    @Test
+    void testFindCatchBlocksHandler() throws Exception {
+        FindCatchBlocksHandler handler = new FindCatchBlocksHandler();
+
+        Map<String, Object> p = new HashMap<>();
+        p.put("fullyQualifiedName", "java.io.IOException");
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        Map<String, Object> map = asMap(result);
+        assertNotNull(map);
+        assertTrue(!map.containsKey("error") || map.get("error") == null,
+                "Should not return error: " + map.get("error"));
+    }
+
+    @Test
+    void testFindInstanceofChecksHandler() throws Exception {
+        FindInstanceofChecksHandler handler = new FindInstanceofChecksHandler();
+
+        Map<String, Object> p = new HashMap<>();
+        p.put("fullyQualifiedName", "com.example.model.User");
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        Map<String, Object> map = asMap(result);
+        assertNotNull(map);
+        assertTrue(!map.containsKey("error") || map.get("error") == null,
+                "Should not return error: " + map.get("error"));
+    }
+
+    @Test
+    void testFindThrowsDeclarationsHandler() throws Exception {
+        FindThrowsDeclarationsHandler handler = new FindThrowsDeclarationsHandler();
+
+        Map<String, Object> p = new HashMap<>();
+        p.put("fullyQualifiedName", "java.io.IOException");
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        Map<String, Object> map = asMap(result);
+        assertNotNull(map);
+        // UserService.loadUsersFromFile throws IOException
+        assertTrue(!map.containsKey("error") || map.get("error") == null,
+                "Should not return error: " + map.get("error"));
+    }
+
+    @Test
+    void testFindTypeArgumentsHandler() throws Exception {
+        FindTypeArgumentsHandler handler = new FindTypeArgumentsHandler();
+
+        Map<String, Object> p = new HashMap<>();
+        p.put("fullyQualifiedName", "com.example.model.User");
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        Map<String, Object> map = asMap(result);
+        assertNotNull(map);
+        // Validator<User> uses User as type argument
+        assertTrue(!map.containsKey("error") || map.get("error") == null,
+                "Should not return error: " + map.get("error"));
+    }
+
+    // =========================================================================
+    // Quality handlers
+    // =========================================================================
+
+    @Test
+    void testFindLargeClassesHandler() throws Exception {
+        FindLargeClassesHandler handler = new FindLargeClassesHandler();
+
+        Map<String, Object> p = new HashMap<>();
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        Map<String, Object> map = asMap(result);
+        assertNotNull(map);
+        // Test project classes are small, so may not find large classes
+        assertTrue(!map.containsKey("error") || map.get("error") == null,
+                "Should not return error: " + map.get("error"));
+    }
+
+    @Test
+    void testFindNamingViolationsHandler() throws Exception {
+        FindNamingViolationsHandler handler = new FindNamingViolationsHandler();
+        String uri = fileUri("src/com/example/model/User.java");
+
+        Map<String, Object> p = new HashMap<>();
+        p.put("uri", uri);
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        Map<String, Object> map = asMap(result);
+        assertNotNull(map);
+        assertTrue(!map.containsKey("error") || map.get("error") == null,
+                "Should not return error: " + map.get("error"));
+    }
+
+    @Test
+    void testFindPossibleBugsHandler() throws Exception {
+        FindPossibleBugsHandler handler = new FindPossibleBugsHandler();
+        String uri = fileUri("src/com/example/service/UserService.java");
+
+        Map<String, Object> p = new HashMap<>();
+        p.put("uri", uri);
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        Map<String, Object> map = asMap(result);
+        assertNotNull(map);
+        assertTrue(!map.containsKey("error") || map.get("error") == null,
+                "Should not return error: " + map.get("error"));
+    }
+
+    @Test
+    void testFindCircularDependenciesHandler() throws Exception {
+        FindCircularDependenciesHandler handler = new FindCircularDependenciesHandler();
+
+        Map<String, Object> p = new HashMap<>();
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        Map<String, Object> map = asMap(result);
+        assertNotNull(map);
+        assertTrue(!map.containsKey("error") || map.get("error") == null,
+                "Should not return error: " + map.get("error"));
+    }
+
+    // =========================================================================
+    // Diagnostics handlers
+    // =========================================================================
+
+    @Test
+    void testValidateSyntaxHandler() throws Exception {
+        ValidateSyntaxHandler handler = new ValidateSyntaxHandler();
+        String uri = fileUri("src/com/example/model/User.java");
+
+        Map<String, Object> p = new HashMap<>();
+        p.put("uri", uri);
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        Map<String, Object> map = asMap(result);
+        assertEquals(uri, map.get("uri"));
+
+        // User.java should have valid syntax
+        assertEquals(true, map.get("valid"), "User.java should have valid syntax");
+        assertEquals(0, ((Number) map.get("count")).intValue(),
+                "User.java should have no syntax errors");
+    }
+
+    @Test
+    void testDiagnoseAndFixHandler() throws Exception {
+        DiagnoseAndFixHandler handler = new DiagnoseAndFixHandler();
+        String uri = fileUri("src/com/example/model/User.java");
+
+        Map<String, Object> p = new HashMap<>();
+        p.put("uri", uri);
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        Map<String, Object> map = asMap(result);
+        assertEquals(uri, map.get("uri"));
+        assertNotNull(map.get("diagnostics"));
+        assertNotNull(map.get("totalDiagnostics"));
+    }
+
+    @Test
+    void testGetQuickFixesHandler() throws Exception {
+        // Hard to test without compilation errors, but we verify no crash
+        GetQuickFixesHandler handler = new GetQuickFixesHandler();
+        String uri = fileUri("src/com/example/model/User.java");
+
+        // Position on a valid symbol - should return empty or minimal fixes
+        Map<String, Object> p = params(uri, 33, 18);
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        // Result might be a map or have various shapes depending on implementation
+    }
+
+    @Test
+    void testApplyCleanupHandler_removeUnusedImports() throws Exception {
+        ApplyCleanupHandler handler = new ApplyCleanupHandler();
+        String uri = fileUri("src/com/example/model/User.java");
+
+        Map<String, Object> p = new HashMap<>();
+        p.put("uri", uri);
+        p.put("cleanupId", "remove_unused_imports");
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        Map<String, Object> map = asMap(result);
+        assertEquals(uri, map.get("uri"));
+        assertEquals("remove_unused_imports", map.get("cleanupId"));
+        assertNotNull(map.get("changesApplied"));
+    }
+
+    // =========================================================================
+    // Code generation handlers
+    // =========================================================================
+
+    @Test
+    void testGenerateGettersSettersHandler() throws Exception {
+        GenerateGettersSettersHandler handler = new GenerateGettersSettersHandler();
+        String uri = fileUri("src/com/example/model/Admin.java");
+
+        // Admin class at line 4 (0-based), character 15
+        Map<String, Object> p = params(uri, 4, 15);
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        Map<String, Object> map = asMap(result);
+        assertNotNull(map);
+        // Admin already has some getters/setters, result depends on what's missing
+    }
+
+    @Test
+    void testGenerateConstructorHandler() throws Exception {
+        GenerateConstructorHandler handler = new GenerateConstructorHandler();
+        String uri = fileUri("src/com/example/util/StringUtils.java");
+
+        // StringUtils class at line 2 (0-based), character 15
+        Map<String, Object> p = params(uri, 2, 15);
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        Map<String, Object> map = asMap(result);
+        assertNotNull(map);
+    }
+
+    @Test
+    void testGenerateToStringHandler() throws Exception {
+        GenerateToStringHandler handler = new GenerateToStringHandler();
+        String uri = fileUri("src/com/example/model/Admin.java");
+
+        // Admin class at line 4 (0-based), character 15
+        Map<String, Object> p = params(uri, 4, 15);
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        Map<String, Object> map = asMap(result);
+        assertNotNull(map);
+    }
+
+    @Test
+    void testGenerateEqualsHashCodeHandler() throws Exception {
+        GenerateEqualsHashCodeHandler handler = new GenerateEqualsHashCodeHandler();
+        String uri = fileUri("src/com/example/model/Admin.java");
+
+        // Admin class at line 4 (0-based), character 15
+        Map<String, Object> p = params(uri, 4, 15);
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        Map<String, Object> map = asMap(result);
+        assertNotNull(map);
+    }
+
+    // =========================================================================
+    // Project handlers
+    // =========================================================================
+
+    @Test
+    void testGetProjectStructureHandler() throws Exception {
+        GetProjectStructureHandler handler = new GetProjectStructureHandler();
+
+        Map<String, Object> p = new HashMap<>();
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        Map<String, Object> map = asMap(result);
+        assertNotNull(map.get("project"));
+        assertNotNull(map.get("sourceFolders"));
+        assertTrue(((Number) map.get("totalPackages")).intValue() >= 1,
+                "Should find at least 1 package");
+        assertTrue(((Number) map.get("totalFiles")).intValue() >= 1,
+                "Should find at least 1 file");
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> sourceFolders = (List<Map<String, Object>>) map.get("sourceFolders");
+        assertTrue(sourceFolders.size() >= 1, "Should have at least 1 source folder");
+    }
+
+    @Test
+    void testGetProjectStructureHandler_withProjectName() throws Exception {
+        GetProjectStructureHandler handler = new GetProjectStructureHandler();
+
+        Map<String, Object> p = new HashMap<>();
+        p.put("projectName", "simple-java");
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        Map<String, Object> map = asMap(result);
+        assertEquals("simple-java", map.get("project"));
+    }
+
+    @Test
+    void testGetClasspathInfoHandler() throws Exception {
+        GetClasspathInfoHandler handler = new GetClasspathInfoHandler();
+
+        Map<String, Object> p = new HashMap<>();
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        Map<String, Object> map = asMap(result);
+        assertNotNull(map);
+        assertTrue(!map.containsKey("error") || map.get("error") == null,
+                "Should not return error: " + map.get("error"));
+    }
+
+    // =========================================================================
+    // Type/Hierarchy handlers (root package)
+    // =========================================================================
+
+    @Test
+    void testTypeHierarchyHandler() throws Exception {
+        TypeHierarchyHandler handler = new TypeHierarchyHandler();
+
+        Map<String, Object> p = new HashMap<>();
+        p.put("fullyQualifiedName", "com.example.model.User");
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        Map<String, Object> map = asMap(result);
+
+        // Should have type info
+        assertNotNull(map.get("type"));
+        Map<String, Object> typeInfo = asMap(map.get("type"));
+        assertEquals("User", typeInfo.get("name"));
+        assertEquals("com.example.model.User", typeInfo.get("fullyQualifiedName"));
+
+        // Should have supertypes (at least java.lang.Object)
+        assertNotNull(map.get("supertypes"));
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> supertypes = (List<Map<String, Object>>) map.get("supertypes");
+        assertTrue(supertypes.size() >= 1, "Should have at least Object as supertype");
+
+        // Should have subtypes (Admin)
+        assertNotNull(map.get("subtypes"));
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> subtypes = (List<Map<String, Object>>) map.get("subtypes");
+        assertTrue(subtypes.size() >= 1, "Should have Admin as subtype");
+
+        boolean foundAdmin = subtypes.stream()
+                .anyMatch(t -> "Admin".equals(t.get("name")));
+        assertTrue(foundAdmin, "Should find Admin in subtypes");
+    }
+
+    @Test
+    void testCallHierarchyHandler_incoming() throws Exception {
+        CallHierarchyHandler handler = new CallHierarchyHandler(true);
+        String uri = fileUri("src/com/example/service/UserService.java");
+
+        // addUser method at line 23 (0-based), character 16
+        Map<String, Object> p = params(uri, 23, 16);
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        Map<String, Object> map = asMap(result);
+        assertEquals("addUser", map.get("method"));
+        assertNotNull(map.get("callers"));
+
+        // addUser is called from UserController.createUser
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> callers = (List<Map<String, Object>>) map.get("callers");
+        assertTrue(callers.size() >= 1,
+                "addUser should be called from at least UserController");
+    }
+
+    @Test
+    void testCallHierarchyHandler_outgoing() throws Exception {
+        CallHierarchyHandler handler = new CallHierarchyHandler(false);
+        String uri = fileUri("src/com/example/service/UserService.java");
+
+        // processUsers method at line 98 (0-based), character 16
+        Map<String, Object> p = params(uri, 98, 16);
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        Map<String, Object> map = asMap(result);
+        assertEquals("processUsers", map.get("method"));
+        assertNotNull(map.get("callees"));
+
+        // processUsers calls isAdult(), getRoles(), addRole(), getName()
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> callees = (List<Map<String, Object>>) map.get("callees");
+        assertTrue(callees.size() >= 1,
+                "processUsers should call other methods");
+    }
+
+    @Test
+    void testDiagnosticsHandler() throws Exception {
+        DiagnosticsHandler handler = new DiagnosticsHandler();
+        String uri = fileUri("src/com/example/model/User.java");
+
+        Map<String, Object> p = new HashMap<>();
+        p.put("uris", List.of(uri));
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        assertInstanceOf(List.class, result);
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> diagnosticsList = (List<Map<String, Object>>) result;
+        assertTrue(diagnosticsList.size() >= 1, "Should return diagnostics for at least 1 file");
+
+        Map<String, Object> fileDiag = diagnosticsList.get(0);
+        assertEquals(uri, fileDiag.get("uri"));
+        assertNotNull(fileDiag.get("diagnostics"));
+    }
+
+    @Test
+    void testFindAnnotationUsagesHandler() throws Exception {
+        FindAnnotationUsagesHandler handler = new FindAnnotationUsagesHandler();
+
+        // Override is used as annotation in the test project
+        Map<String, Object> p = new HashMap<>();
+        p.put("fullyQualifiedName", "java.lang.Override");
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        Map<String, Object> map = asMap(result);
+        assertNotNull(map);
+        // @Override is used in User.toString(), Admin.getDisplayName(), UserValidator methods
+        assertTrue(!map.containsKey("error") || map.get("error") == null,
+                "Should not return error: " + map.get("error"));
+    }
+
+    @Test
+    void testFindTypeInstantiationsHandler() throws Exception {
+        FindTypeInstantiationsHandler handler = new FindTypeInstantiationsHandler();
+
+        Map<String, Object> p = new HashMap<>();
+        p.put("fullyQualifiedName", "com.example.model.User");
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        Map<String, Object> map = asMap(result);
+        assertEquals("com.example.model.User", map.get("type"));
+
+        // User is instantiated in UserController.createUser and UserServiceTest
+        assertTrue(((Number) map.get("count")).intValue() >= 1,
+                "User should be instantiated at least once");
+
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> instantiations = (List<Map<String, Object>>) map.get("instantiations");
+        assertTrue(instantiations.size() >= 1);
+    }
+
+    // =========================================================================
+    // Framework handlers
+    // =========================================================================
+
+    @Test
+    void testGetHttpEndpointsHandler() throws Exception {
+        GetHttpEndpointsHandler handler = new GetHttpEndpointsHandler();
+
+        Map<String, Object> p = new HashMap<>();
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        Map<String, Object> map = asMap(result);
+        assertNotNull(map);
+        // Test project has no Spring/JAX-RS annotations, expect empty results
+        assertTrue(!map.containsKey("error") || map.get("error") == null,
+                "Should not return error: " + map.get("error"));
+    }
+
+    @Test
+    void testGetJpaModelHandler() throws Exception {
+        GetJpaModelHandler handler = new GetJpaModelHandler();
+
+        Map<String, Object> p = new HashMap<>();
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        Map<String, Object> map = asMap(result);
+        assertNotNull(map);
+        // Test project has no JPA annotations, expect empty results
+        assertTrue(!map.containsKey("error") || map.get("error") == null,
+                "Should not return error: " + map.get("error"));
+    }
+
+    @Test
+    void testGetDiRegistrationsHandler() throws Exception {
+        GetDiRegistrationsHandler handler = new GetDiRegistrationsHandler();
+
+        Map<String, Object> p = new HashMap<>();
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        Map<String, Object> map = asMap(result);
+        assertNotNull(map.get("registrations"));
+        assertNotNull(map.get("injectionPoints"));
+        assertNotNull(map.get("counts"));
+
+        // Test project has no DI annotations, expect empty
+        Map<String, Object> counts = asMap(map.get("counts"));
+        assertEquals(0, ((Number) counts.get("registrations")).intValue(),
+                "No DI registrations expected in test project");
+        assertEquals(0, ((Number) counts.get("injectionPoints")).intValue(),
+                "No injection points expected in test project");
+    }
+
+    @Test
+    void testGetDiRegistrationsHandler_withProjectScope() throws Exception {
+        GetDiRegistrationsHandler handler = new GetDiRegistrationsHandler();
+
+        Map<String, Object> p = new HashMap<>();
+        p.put("scope", "project");
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        Map<String, Object> map = asMap(result);
+        assertNotNull(map.get("registrations"));
+        assertNotNull(map.get("injectionPoints"));
+    }
+
+    // =========================================================================
+    // Additional edge cases and combined scenarios
+    // =========================================================================
+
+    @Test
+    void testAnalyzeFileHandler_onServiceFile() throws Exception {
+        AnalyzeFileHandler handler = new AnalyzeFileHandler();
+        String uri = fileUri("src/com/example/service/UserService.java");
+
+        Map<String, Object> p = new HashMap<>();
+        p.put("uri", uri);
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        Map<String, Object> map = asMap(result);
+        assertEquals(uri, map.get("uri"));
+
+        // UserService has at least 7 methods
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> methods = (List<Map<String, Object>>) map.get("methods");
+        assertTrue(methods.size() >= 7, "UserService should have at least 7 methods");
+
+        // Check complexity of a method
+        boolean foundSearchUsers = methods.stream()
+                .anyMatch(m -> "searchUsers".equals(m.get("name")));
+        assertTrue(foundSearchUsers, "Should find searchUsers method");
+    }
+
+    @Test
+    void testAnalyzeTypeHandler_interface() throws Exception {
+        AnalyzeTypeHandler handler = new AnalyzeTypeHandler();
+
+        Map<String, Object> p = new HashMap<>();
+        p.put("fullyQualifiedName", "com.example.service.Validator");
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        Map<String, Object> map = asMap(result);
+        assertEquals("com.example.service.Validator", map.get("type"));
+        assertEquals("interface", map.get("kind"));
+
+        // Validator has at least 1 subtype (UserValidator)
+        assertTrue(((Number) map.get("subtypes")).intValue() >= 1);
+    }
+
+    @Test
+    void testSearchSymbolsHandler_methodSearch() throws Exception {
+        SearchSymbolsHandler handler = new SearchSymbolsHandler();
+
+        Map<String, Object> p = new HashMap<>();
+        p.put("query", "findByName");
+        p.put("kind", "method");
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        Map<String, Object> map = asMap(result);
+        assertEquals("findByName", map.get("query"));
+        assertTrue(((Number) map.get("count")).intValue() >= 1,
+                "Should find findByName method");
+    }
+
+    @Test
+    void testTypeHierarchyHandler_withPositionParams() throws Exception {
+        TypeHierarchyHandler handler = new TypeHierarchyHandler();
+        String uri = fileUri("src/com/example/model/Admin.java");
+
+        // Admin class at line 4 (0-based), character 15
+        Map<String, Object> p = params(uri, 4, 15);
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        Map<String, Object> map = asMap(result);
+
+        assertNotNull(map.get("type"));
+        Map<String, Object> typeInfo = asMap(map.get("type"));
+        assertEquals("Admin", typeInfo.get("name"));
+
+        // Admin extends User, which extends Object
+        assertNotNull(map.get("supertypes"));
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> supertypes = (List<Map<String, Object>>) map.get("supertypes");
+        assertTrue(supertypes.size() >= 1, "Admin should have at least User as supertype");
+    }
+
+    @Test
+    void testGetDependencyGraphHandler_singleFile() throws Exception {
+        GetDependencyGraphHandler handler = new GetDependencyGraphHandler();
+        String uri = fileUri("src/com/example/controller/UserController.java");
+
+        Map<String, Object> p = new HashMap<>();
+        p.put("uri", uri);
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        Map<String, Object> map = asMap(result);
+        assertNotNull(map.get("nodes"));
+        assertNotNull(map.get("edges"));
+
+        // UserController imports from model, service, and util packages
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> edges = (List<Map<String, Object>>) map.get("edges");
+        assertTrue(edges.size() >= 2,
+                "UserController should depend on at least model and service packages");
+    }
+}

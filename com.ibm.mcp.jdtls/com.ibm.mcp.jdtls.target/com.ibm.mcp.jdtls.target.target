@@ -32,6 +32,14 @@
 
             <!-- LTK refactoring -->
             <unit id="org.eclipse.ltk.core.refactoring" version="0.0.0"/>
+
+            <!-- JUnit 5 for testing -->
+            <unit id="junit-jupiter-api" version="0.0.0"/>
+            <unit id="junit-jupiter-engine" version="0.0.0"/>
+            <unit id="junit-platform-commons" version="0.0.0"/>
+            <unit id="junit-platform-engine" version="0.0.0"/>
+            <unit id="junit-platform-launcher" version="0.0.0"/>
+            <unit id="org.opentest4j" version="0.0.0"/>
         </location>
 
         <!-- JDT.LS snapshot repository (for IDelegateCommandHandler) -->

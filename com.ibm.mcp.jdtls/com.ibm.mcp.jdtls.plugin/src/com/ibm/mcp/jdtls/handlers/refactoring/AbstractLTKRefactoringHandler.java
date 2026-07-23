@@ -45,10 +45,31 @@ import org.eclipse.text.edits.TextEditVisitor;
 public abstract class AbstractLTKRefactoringHandler extends AbstractRefactoringHandler {
 
     /**
-     * Execute an LTK refactoring and return the result in MCP edit format.
+     * Execute an LTK refactoring in preview mode (changes are NOT applied to disk).
      */
     protected Map<String, Object> executeRefactoring(Refactoring refactoring, IProgressMonitor monitor)
             throws CoreException {
+        return executeRefactoring(refactoring, false, monitor);
+    }
+
+    /**
+     * Execute an LTK refactoring, reading the "apply" flag from the params map.
+     */
+    protected Map<String, Object> executeRefactoring(Refactoring refactoring, Map<String, Object> params,
+            IProgressMonitor monitor) throws CoreException {
+        return executeRefactoring(refactoring, isApply(params), monitor);
+    }
+
+    /**
+     * Execute an LTK refactoring and return the result in MCP edit format.
+     *
+     * @param refactoring the LTK refactoring to execute
+     * @param apply       if true, apply changes to disk; if false, return preview only
+     * @param monitor     the progress monitor
+     * @return the result map with edits and applied status
+     */
+    protected Map<String, Object> executeRefactoring(Refactoring refactoring, boolean apply,
+            IProgressMonitor monitor) throws CoreException {
         if (monitor == null) {
             monitor = new NullProgressMonitor();
         }
@@ -69,7 +90,12 @@ public abstract class AbstractLTKRefactoringHandler extends AbstractRefactoringH
         }
 
         List<Map<String, Object>> edits = convertChangeToEdits(change);
-        return createSuccessResult(edits);
+
+        if (apply && !edits.isEmpty()) {
+            change.perform(monitor);
+        }
+
+        return createSuccessResult(edits, apply);
     }
 
     /**

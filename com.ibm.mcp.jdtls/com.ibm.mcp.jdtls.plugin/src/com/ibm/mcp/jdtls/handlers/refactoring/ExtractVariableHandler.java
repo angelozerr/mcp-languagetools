@@ -18,7 +18,10 @@ import java.util.Map;
 
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.jdt.core.ICompilationUnit;
+import org.eclipse.jdt.core.dom.ASTNode;
 import org.eclipse.jdt.core.dom.CompilationUnit;
+import org.eclipse.jdt.core.dom.Expression;
+import org.eclipse.jdt.core.dom.NodeFinder;
 import org.eclipse.jdt.internal.corext.refactoring.code.ExtractTempRefactoring;
 
 import com.ibm.mcp.jdtls.JdtUtils;
@@ -66,10 +69,19 @@ public class ExtractVariableHandler extends AbstractLTKRefactoringHandler {
 
         CompilationUnit ast = parseAST(cu, monitor);
 
+        ASTNode covering = NodeFinder.perform(ast, selStart, selLength);
+        if (covering == null) {
+            return createErrorResult("No AST node found at the specified selection range. Check that the line/character positions are correct.");
+        }
+        if (covering instanceof Expression) {
+            selStart = covering.getStartPosition();
+            selLength = covering.getLength();
+        }
+
         ExtractTempRefactoring refactoring = new ExtractTempRefactoring(ast, selStart, selLength);
         refactoring.setTempName(variableName);
         refactoring.setReplaceAllOccurrences(true);
 
-        return executeRefactoring(refactoring, monitor);
+        return executeRefactoring(refactoring, params, monitor);
     }
 }

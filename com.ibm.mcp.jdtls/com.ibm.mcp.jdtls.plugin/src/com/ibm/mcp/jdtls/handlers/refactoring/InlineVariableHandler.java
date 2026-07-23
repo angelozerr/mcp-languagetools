@@ -83,6 +83,6 @@ public class InlineVariableHandler extends AbstractLTKRefactoringHandler {
 
         InlineTempRefactoring refactoring = new InlineTempRefactoring(varDecl);
 
-        return executeRefactoring(refactoring, monitor);
+        return executeRefactoring(refactoring, params, monitor);
     }
 }

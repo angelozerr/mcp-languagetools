@@ -76,6 +76,6 @@ public class ExtractMethodHandler extends AbstractLTKRefactoringHandler {
         refactoring.setMethodName(methodName);
         refactoring.setVisibility(org.eclipse.jdt.core.dom.Modifier.PRIVATE);
 
-        return executeRefactoring(refactoring, monitor);
+        return executeRefactoring(refactoring, params, monitor);
     }
 }

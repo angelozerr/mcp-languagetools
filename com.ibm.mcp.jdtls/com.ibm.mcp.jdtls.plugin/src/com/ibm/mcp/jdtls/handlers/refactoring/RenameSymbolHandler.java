@@ -91,7 +91,7 @@ public class RenameSymbolHandler extends AbstractLTKRefactoringHandler {
         processor.setNewElementName(newName);
 
         RenameRefactoring refactoring = new RenameRefactoring(processor);
-        return executeRefactoring(refactoring, monitor);
+        return executeRefactoring(refactoring, params, monitor);
     }
 
     private JavaRenameProcessor createRenameProcessor(IJavaElement element) throws Exception {

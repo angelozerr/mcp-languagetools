@@ -112,6 +112,6 @@ public class ChangeMethodSignatureHandler extends AbstractLTKRefactoringHandler 
         }
 
         ProcessorBasedRefactoring refactoring = new ProcessorBasedRefactoring(processor);
-        return executeRefactoring(refactoring, monitor);
+        return executeRefactoring(refactoring, params, monitor);
     }
 }

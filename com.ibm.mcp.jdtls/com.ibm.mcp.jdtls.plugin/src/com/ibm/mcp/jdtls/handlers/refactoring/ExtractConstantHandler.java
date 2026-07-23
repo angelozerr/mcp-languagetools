@@ -18,9 +18,11 @@ import java.util.Map;
 
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.jdt.core.ICompilationUnit;
+import org.eclipse.jdt.core.dom.ASTNode;
 import org.eclipse.jdt.core.dom.CompilationUnit;
+import org.eclipse.jdt.core.dom.Expression;
+import org.eclipse.jdt.core.dom.NodeFinder;
 import org.eclipse.jdt.internal.corext.refactoring.code.ExtractConstantRefactoring;
-
 import org.eclipse.jdt.internal.corext.util.JdtFlags;
 
 import com.ibm.mcp.jdtls.JdtUtils;
@@ -68,11 +70,20 @@ public class ExtractConstantHandler extends AbstractLTKRefactoringHandler {
 
         CompilationUnit ast = parseAST(cu, monitor);
 
+        ASTNode covering = NodeFinder.perform(ast, selStart, selLength);
+        if (covering == null) {
+            return createErrorResult("No AST node found at the specified selection range. Check that the line/character positions are correct.");
+        }
+        if (covering instanceof Expression) {
+            selStart = covering.getStartPosition();
+            selLength = covering.getLength();
+        }
+
         ExtractConstantRefactoring refactoring = new ExtractConstantRefactoring(ast, selStart, selLength);
         refactoring.setConstantName(constantName);
         refactoring.setVisibility(JdtFlags.VISIBILITY_STRING_PRIVATE);
         refactoring.setReplaceAllOccurrences(true);
 
-        return executeRefactoring(refactoring, monitor);
+        return executeRefactoring(refactoring, params, monitor);
     }
 }

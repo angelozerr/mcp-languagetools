@@ -22,7 +22,9 @@ import org.eclipse.jdt.core.IField;
 import org.eclipse.jdt.core.IMember;
 import org.eclipse.jdt.core.IMethod;
 import org.eclipse.jdt.core.IType;
+import org.eclipse.jdt.internal.corext.codemanipulation.CodeGenerationSettings;
 import org.eclipse.jdt.internal.corext.refactoring.structure.ExtractSupertypeProcessor;
+import org.eclipse.jdt.internal.ui.preferences.JavaPreferencesSettings;
 import org.eclipse.ltk.core.refactoring.participants.ProcessorBasedRefactoring;
 
 import com.ibm.mcp.jdtls.JdtUtils;
@@ -91,11 +93,12 @@ public class ExtractSuperclassHandler extends AbstractLTKRefactoringHandler {
         }
 
         IMember[] members = membersToMove.toArray(new IMember[0]);
-        ExtractSupertypeProcessor processor = new ExtractSupertypeProcessor(members, null);
+        CodeGenerationSettings settings = JavaPreferencesSettings.getCodeGenerationSettings(type.getJavaProject());
+        ExtractSupertypeProcessor processor = new ExtractSupertypeProcessor(members, settings);
         processor.setTypeName(superclassName);
         processor.setMembersToMove(members);
 
         ProcessorBasedRefactoring refactoring = new ProcessorBasedRefactoring(processor);
-        return executeRefactoring(refactoring, monitor);
+        return executeRefactoring(refactoring, params, monitor);
     }
 }

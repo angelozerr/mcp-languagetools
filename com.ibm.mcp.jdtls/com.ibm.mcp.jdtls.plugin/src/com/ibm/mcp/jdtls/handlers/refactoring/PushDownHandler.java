@@ -92,6 +92,6 @@ public class PushDownHandler extends AbstractLTKRefactoringHandler {
         PushDownRefactoringProcessor processor = new PushDownRefactoringProcessor(members);
 
         ProcessorBasedRefactoring refactoring = new ProcessorBasedRefactoring(processor);
-        return executeRefactoring(refactoring, monitor);
+        return executeRefactoring(refactoring, params, monitor);
     }
 }

@@ -75,6 +75,6 @@ public class InlineMethodHandler extends AbstractLTKRefactoringHandler {
             return createErrorResult("Cannot create inline method refactoring at this position. Place cursor on a method name.");
         }
 
-        return executeRefactoring(refactoring, monitor);
+        return executeRefactoring(refactoring, params, monitor);
     }
 }

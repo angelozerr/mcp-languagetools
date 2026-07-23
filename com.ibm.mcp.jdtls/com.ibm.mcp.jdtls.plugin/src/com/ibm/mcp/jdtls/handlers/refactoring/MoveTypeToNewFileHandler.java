@@ -64,6 +64,6 @@ public class MoveTypeToNewFileHandler extends AbstractLTKRefactoringHandler {
 
         MoveInnerToTopRefactoring refactoring = new MoveInnerToTopRefactoring(type, null);
 
-        return executeRefactoring(refactoring, monitor);
+        return executeRefactoring(refactoring, params, monitor);
     }
 }

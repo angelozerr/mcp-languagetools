@@ -30,6 +30,7 @@
     <modules>
         <module>com.ibm.mcp.jdtls.target</module>
         <module>com.ibm.mcp.jdtls.plugin</module>
+        <module>com.ibm.mcp.jdtls.tests</module>
     </modules>
 
     <build>

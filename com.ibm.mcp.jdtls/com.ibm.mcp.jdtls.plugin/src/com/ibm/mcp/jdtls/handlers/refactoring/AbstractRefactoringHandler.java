@@ -130,16 +130,38 @@ public abstract class AbstractRefactoringHandler implements ICommandHandler {
     }
 
     /**
-     * Create a successful result map with the given edits.
+     * Create a successful result map with the given edits (preview mode).
      *
      * @param edits the list of edit maps
-     * @return a map with "applied" set to true and the edits
+     * @return a map with "applied" set to false and the edits as preview
      */
     protected Map<String, Object> createSuccessResult(List<Map<String, Object>> edits) {
+        return createSuccessResult(edits, false);
+    }
+
+    /**
+     * Create a successful result map with the given edits.
+     *
+     * @param edits   the list of edit maps
+     * @param applied whether the changes were applied to disk
+     * @return a map with "applied" status and the edits
+     */
+    protected Map<String, Object> createSuccessResult(List<Map<String, Object>> edits, boolean applied) {
         Map<String, Object> result = new HashMap<>();
-        result.put("applied", !edits.isEmpty());
+        result.put("applied", applied && !edits.isEmpty());
         result.put("edits", edits);
         return result;
+    }
+
+    /**
+     * Read the "apply" flag from the parameters map.
+     *
+     * @param params the command parameters
+     * @return true if the refactoring should be applied to disk, false for preview only
+     */
+    protected static boolean isApply(Map<String, Object> params) {
+        Object apply = params.get("apply");
+        return Boolean.TRUE.equals(apply);
     }
 
     /**
