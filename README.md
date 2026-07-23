@@ -68,7 +68,7 @@ This means AI assistants can leverage the same tooling that developers use in th
 | `detach_from_process` | Detach without terminating the process |
 | `get_debug_statistics` | Get statistics about active debug sessions |
 
-### Java Tools (80 tools from Java extension)
+### Java Tools (79 tools from Java extension)
 
 These tools are inspired by [javalens-mcp](https://github.com/pzalutski-pixel/javalens-mcp) and provide deep Java analysis, navigation, refactoring, and code generation capabilities powered by [Eclipse JDT.LS](https://github.com/eclipse-jdtls/eclipse.jdt.ls).
 
@@ -98,6 +98,19 @@ All refactoring tools (except `java_organize_imports`) support an optional `appl
 3. If satisfied, call again with `apply: true` to apply
 
 These 17 tools support the `apply` parameter: `java_rename_symbol`, `java_extract_method`, `java_extract_variable`, `java_extract_constant`, `java_extract_interface`, `java_extract_superclass`, `java_inline_method`, `java_inline_variable`, `java_change_method_signature`, `java_convert_anonymous_to_lambda`, `java_encapsulate_field`, `java_introduce_parameter_object`, `java_move_type_to_new_file`, `java_pull_up`, `java_push_down`, `java_convert_to_record`, `java_move_type_to_package`.
+
+#### The `scope` Parameter (Workspace vs Project)
+
+Several search tools support an optional `scope` parameter to limit search results to project sources only, avoiding large result sets from JDK and library code:
+
+| Value | Behavior |
+|-------|----------|
+| *(omitted)* | **Workspace scope** (default) — Searches the entire workspace including dependencies |
+| `"project"` | **Project scope** — Searches only project source files (excludes JDK/libraries) |
+
+When using `scope: "project"`, you can optionally specify `projectName` to target a specific project in multi-project workspaces (defaults to the first Java project).
+
+These tools support the `scope` parameter: `java_find_references`, `java_find_method_references`, `java_find_field_writes`, `java_find_annotation_usages`, `java_find_type_instantiations`, `java_get_call_hierarchy_incoming`, `java_get_di_registrations`.
 
 #### Analysis (12 tools)
 
@@ -194,13 +207,12 @@ All refactoring tools (except `java_organize_imports`) support the [`apply` para
 | `java_generate_equals_hashcode` | Generate equals() and hashCode() methods |
 | `java_generate_delegate_methods` | Generate delegate methods for a field's type |
 
-#### Diagnostics & Fix (5 tools)
+#### Diagnostics & Fix (4 tools)
 
 | Tool | Description |
 |------|-------------|
 | `java_validate_syntax` | Quick syntax-only validation (no semantic analysis) |
-| `java_get_quick_fixes` | Get available quick fixes for problems at a position |
-| `java_apply_quick_fix` | Apply a specific quick fix to resolve a problem |
+| `java_get_quick_fixes` | Get available quick fixes for problems at a position. Pass optional `fixId` to apply a specific fix |
 | `java_diagnose_and_fix` | Diagnose problems and optionally apply safe auto-fixes |
 | `java_apply_cleanup` | Apply a code cleanup to a Java file |
 
@@ -240,11 +252,11 @@ All refactoring tools (except `java_organize_imports`) support the [`apply` para
 | Reference Search | 6 |
 | Refactoring | 18 |
 | Code Generation | 5 |
-| Diagnostics & Fix | 5 |
+| Diagnostics & Fix | 4 |
 | Code Quality | 4 |
 | Framework | 3 |
 | Project | 4 |
-| **Total** | **80** *(including `java_get_type_members` and `java_get_dependency_graph`)* |
+| **Total** | **79** *(including `java_get_type_members` and `java_get_dependency_graph`)* |
 
 ### Extension & Workspace Tools
 

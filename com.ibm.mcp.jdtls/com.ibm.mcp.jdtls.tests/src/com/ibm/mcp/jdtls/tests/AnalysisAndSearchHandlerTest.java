@@ -46,6 +46,7 @@ import com.ibm.mcp.jdtls.handlers.codegen.GenerateEqualsHashCodeHandler;
 import com.ibm.mcp.jdtls.handlers.codegen.GenerateGettersSettersHandler;
 import com.ibm.mcp.jdtls.handlers.codegen.GenerateToStringHandler;
 import com.ibm.mcp.jdtls.handlers.diagnostics.ApplyCleanupHandler;
+import com.ibm.mcp.jdtls.handlers.diagnostics.ApplyQuickFixHandler;
 import com.ibm.mcp.jdtls.handlers.diagnostics.DiagnoseAndFixHandler;
 import com.ibm.mcp.jdtls.handlers.diagnostics.GetQuickFixesHandler;
 import com.ibm.mcp.jdtls.handlers.diagnostics.ValidateSyntaxHandler;
@@ -739,6 +740,34 @@ public class AnalysisAndSearchHandlerTest extends AbstractHandlerTest {
         assertEquals(uri, map.get("uri"));
         assertEquals("remove_unused_imports", map.get("cleanupId"));
         assertNotNull(map.get("changesApplied"));
+    }
+
+    @Test
+    void testApplyQuickFixHandler_unknownFixId() throws Exception {
+        ApplyQuickFixHandler handler = new ApplyQuickFixHandler();
+        String uri = fileUri("src/com/example/model/User.java");
+
+        Map<String, Object> p = params(uri, 14, 10);
+        p.put("fixId", "non_existent_fix");
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        Map<String, Object> map = asMap(result);
+        assertEquals(false, map.get("applied"));
+        assertTrue(((String) map.get("error")).contains("Unknown fix ID"),
+                "Should report unknown fix ID error");
+    }
+
+    @Test
+    void testApplyQuickFixHandler_missingArguments() throws Exception {
+        ApplyQuickFixHandler handler = new ApplyQuickFixHandler();
+
+        Object result = handler.execute(List.of(), MONITOR);
+
+        assertNotNull(result);
+        Map<String, Object> map = asMap(result);
+        assertTrue(((String) map.get("error")).contains("Missing arguments"),
+                "Should report missing arguments error");
     }
 
     // =========================================================================
