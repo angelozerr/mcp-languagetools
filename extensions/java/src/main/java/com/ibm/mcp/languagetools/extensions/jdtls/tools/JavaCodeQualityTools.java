@@ -43,7 +43,7 @@ public class JavaCodeQualityTools {
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.findLargeClasses",
+        return executor.executeCommand(cwd, JdtlsCommands.FIND_LARGE_CLASSES,
                 Map.of(),
                 cancellation, progress);
     }
@@ -57,7 +57,7 @@ public class JavaCodeQualityTools {
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.findNamingViolations",
+        return executor.executeCommand(cwd, JdtlsCommands.FIND_NAMING_VIOLATIONS,
                 Map.of("uri", fileUri),
                 cancellation, progress);
     }
@@ -71,7 +71,7 @@ public class JavaCodeQualityTools {
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.findPossibleBugs",
+        return executor.executeCommand(cwd, JdtlsCommands.FIND_POSSIBLE_BUGS,
                 Map.of("uri", fileUri),
                 cancellation, progress);
     }
@@ -84,7 +84,7 @@ public class JavaCodeQualityTools {
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.findCircularDependencies",
+        return executor.executeCommand(cwd, JdtlsCommands.FIND_CIRCULAR_DEPENDENCIES,
                 Map.of(),
                 cancellation, progress);
     }

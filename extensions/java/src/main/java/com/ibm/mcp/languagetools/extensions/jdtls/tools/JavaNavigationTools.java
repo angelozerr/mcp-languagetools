@@ -47,8 +47,8 @@ public class JavaNavigationTools {
             @ToolArg(description = ToolArgDescriptions.POSITION_CHARACTER) int character,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.goToDefinition",
-                Map.of("uri", fileUri, "line", line, "character", character),
+        return executor.executeCommand(cwd, JdtlsCommands.GO_TO_DEFINITION,
+                RefactoringHelper.positionParams(fileUri, line, character),
                 cancellation, progress);
     }
 
@@ -62,8 +62,8 @@ public class JavaNavigationTools {
             @ToolArg(description = ToolArgDescriptions.POSITION_CHARACTER) int character,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.getHoverInfo",
-                Map.of("uri", fileUri, "line", line, "character", character),
+        return executor.executeCommand(cwd, JdtlsCommands.GET_HOVER_INFO,
+                RefactoringHelper.positionParams(fileUri, line, character),
                 cancellation, progress);
     }
 
@@ -78,8 +78,8 @@ public class JavaNavigationTools {
             @ToolArg(description = ToolArgDescriptions.POSITION_CHARACTER) int character,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.getJavadoc",
-                Map.of("uri", fileUri, "line", line, "character", character),
+        return executor.executeCommand(cwd, JdtlsCommands.GET_JAVADOC,
+                RefactoringHelper.positionParams(fileUri, line, character),
                 cancellation, progress);
     }
 
@@ -94,8 +94,8 @@ public class JavaNavigationTools {
             @ToolArg(description = ToolArgDescriptions.POSITION_CHARACTER) int character,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.getSymbolInfo",
-                Map.of("uri", fileUri, "line", line, "character", character),
+        return executor.executeCommand(cwd, JdtlsCommands.GET_SYMBOL_INFO,
+                RefactoringHelper.positionParams(fileUri, line, character),
                 cancellation, progress);
     }
 
@@ -109,8 +109,8 @@ public class JavaNavigationTools {
             @ToolArg(description = ToolArgDescriptions.POSITION_CHARACTER) int character,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.getEnclosingElement",
-                Map.of("uri", fileUri, "line", line, "character", character),
+        return executor.executeCommand(cwd, JdtlsCommands.GET_ENCLOSING_ELEMENT,
+                RefactoringHelper.positionParams(fileUri, line, character),
                 cancellation, progress);
     }
 
@@ -125,8 +125,8 @@ public class JavaNavigationTools {
             @ToolArg(description = ToolArgDescriptions.POSITION_CHARACTER) int character,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.getFieldAtPosition",
-                Map.of("uri", fileUri, "line", line, "character", character),
+        return executor.executeCommand(cwd, JdtlsCommands.GET_FIELD_AT_POSITION,
+                RefactoringHelper.positionParams(fileUri, line, character),
                 cancellation, progress);
     }
 
@@ -141,8 +141,8 @@ public class JavaNavigationTools {
             @ToolArg(description = ToolArgDescriptions.POSITION_CHARACTER) int character,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.getMethodAtPosition",
-                Map.of("uri", fileUri, "line", line, "character", character),
+        return executor.executeCommand(cwd, JdtlsCommands.GET_METHOD_AT_POSITION,
+                RefactoringHelper.positionParams(fileUri, line, character),
                 cancellation, progress);
     }
 
@@ -157,8 +157,8 @@ public class JavaNavigationTools {
             @ToolArg(description = ToolArgDescriptions.POSITION_CHARACTER) int character,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.getTypeAtPosition",
-                Map.of("uri", fileUri, "line", line, "character", character),
+        return executor.executeCommand(cwd, JdtlsCommands.GET_TYPE_AT_POSITION,
+                RefactoringHelper.positionParams(fileUri, line, character),
                 cancellation, progress);
     }
 
@@ -173,8 +173,8 @@ public class JavaNavigationTools {
             @ToolArg(description = ToolArgDescriptions.POSITION_CHARACTER) int character,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.getSignatureHelp",
-                Map.of("uri", fileUri, "line", line, "character", character),
+        return executor.executeCommand(cwd, JdtlsCommands.GET_SIGNATURE_HELP,
+                RefactoringHelper.positionParams(fileUri, line, character),
                 cancellation, progress);
     }
 
@@ -189,8 +189,8 @@ public class JavaNavigationTools {
             @ToolArg(description = ToolArgDescriptions.POSITION_CHARACTER) int character,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.getSuperMethod",
-                Map.of("uri", fileUri, "line", line, "character", character),
+        return executor.executeCommand(cwd, JdtlsCommands.GET_SUPER_METHOD,
+                RefactoringHelper.positionParams(fileUri, line, character),
                 cancellation, progress);
     }
 
@@ -203,7 +203,7 @@ public class JavaNavigationTools {
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.getDocumentSymbols",
+        return executor.executeCommand(cwd, JdtlsCommands.GET_DOCUMENT_SYMBOLS,
                 Map.of("uri", fileUri),
                 cancellation, progress);
     }

@@ -109,7 +109,7 @@ public class FindTestsHandler implements ICommandHandler {
                                 if (monitor.isCanceled()) {
                                     break;
                                 }
-                                String cuUri = cu.getResource().getLocationURI().toString();
+                                String cuUri = JdtUtils.toFileUri(cu.getResource());
                                 collectTests(cu, cuUri, tests);
                             }
                         }

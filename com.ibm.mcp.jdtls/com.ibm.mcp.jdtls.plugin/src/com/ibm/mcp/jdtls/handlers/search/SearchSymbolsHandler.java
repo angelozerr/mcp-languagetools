@@ -32,6 +32,7 @@ import org.eclipse.jdt.core.search.TypeNameMatch;
 import org.eclipse.jdt.core.search.TypeNameMatchRequestor;
 
 import com.ibm.mcp.jdtls.ICommandHandler;
+import com.ibm.mcp.jdtls.JdtUtils;
 
 /**
  * Handler for "mcp.jdtls.searchSymbols" command.
@@ -101,7 +102,7 @@ public class SearchSymbolsHandler implements ICommandHandler {
                         symbol.put("kind", "type");
                         IType type = match.getType();
                         if (type.getResource() != null) {
-                            symbol.put("uri", type.getResource().getLocationURI().toString());
+                            symbol.put("uri", JdtUtils.toFileUri(type.getResource()));
                         }
                         symbols.add(symbol);
                     }
@@ -138,7 +139,7 @@ public class SearchSymbolsHandler implements ICommandHandler {
                                 symbol.put("fqn", declaringType.getFullyQualifiedName() + "." + element.getElementName());
                             }
                             if (match.getResource() != null) {
-                                symbol.put("uri", match.getResource().getLocationURI().toString());
+                                symbol.put("uri", JdtUtils.toFileUri(match.getResource()));
                             }
                             symbols.add(symbol);
                         }

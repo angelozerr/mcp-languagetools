@@ -14,10 +14,12 @@
 package com.ibm.mcp.jdtls;
 
 import java.net.URI;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import org.eclipse.core.resources.IFile;
+import org.eclipse.core.resources.IProject;
 import org.eclipse.core.resources.IResource;
 import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.IProgressMonitor;
@@ -27,6 +29,9 @@ import org.eclipse.jdt.core.IJavaProject;
 import org.eclipse.jdt.core.IType;
 import org.eclipse.jdt.core.JavaCore;
 import org.eclipse.jdt.core.JavaModelException;
+import org.eclipse.jdt.core.search.IJavaSearchScope;
+import org.eclipse.jdt.core.search.SearchEngine;
+import org.eclipse.jdt.core.search.SearchMatch;
 
 /**
  * Utility methods for resolving JDT elements from command arguments.
@@ -187,6 +192,83 @@ public final class JdtUtils {
                 } catch (JavaModelException e) {
                     return null;
                 }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Convert an {@link IResource} location URI to a normalized {@code file:///} URI string.
+     *
+     * <p>Java's {@code URI.toString()} produces {@code file:/C:/path} (single slash)
+     * while LSP/MCP clients expect {@code file:///C:/path} (triple slash, RFC 8089).</p>
+     */
+    public static String toFileUri(IResource resource) {
+        String uri = resource.getLocationURI().toString();
+        if (uri.startsWith("file:/") && !uri.startsWith("file:///")) {
+            uri = "file:///" + uri.substring(6);
+        }
+        return uri;
+    }
+
+    /**
+     * Format a {@link SearchMatch} into a map with uri, line, character, element, and declaringType.
+     */
+    public static Map<String, Object> formatSearchMatch(SearchMatch match, Map<IResource, String> sourceCache) {
+        Map<String, Object> entry = new HashMap<>();
+        if (match.getResource() != null) {
+            entry.put("uri", toFileUri(match.getResource()));
+            String source = sourceCache.computeIfAbsent(match.getResource(), JdtUtils::getSource);
+            putPosition(entry, source, match.getOffset());
+        }
+        if (match.getElement() instanceof IJavaElement element) {
+            entry.put("element", element.getElementName());
+            IType dt = (IType) element.getAncestor(IJavaElement.TYPE);
+            if (dt != null) {
+                entry.put("declaringType", dt.getFullyQualifiedName());
+            }
+        }
+        return entry;
+    }
+
+    /**
+     * Resolve a search scope from command arguments.
+     *
+     * <p>If {@code scope=project} is specified, returns a SOURCES-only scope
+     * for the given project (or the first Java project if unspecified).
+     * Otherwise returns a workspace scope.</p>
+     */
+    @SuppressWarnings("unchecked")
+    public static IJavaSearchScope resolveSearchScope(List<Object> arguments) {
+        if (arguments != null && !arguments.isEmpty() && arguments.get(0) instanceof Map) {
+            Map<String, Object> params = (Map<String, Object>) arguments.get(0);
+            String scopeParam = (String) params.get("scope");
+            if ("project".equals(scopeParam)) {
+                String projectName = (String) params.get("projectName");
+                IJavaProject javaProject = findJavaProject(projectName);
+                if (javaProject != null) {
+                    return SearchEngine.createJavaSearchScope(
+                            new IJavaElement[]{javaProject}, IJavaSearchScope.SOURCES);
+                }
+            }
+        }
+        return SearchEngine.createWorkspaceScope();
+    }
+
+    /**
+     * Find a Java project by name, or the first available Java project if name is null.
+     */
+    public static IJavaProject findJavaProject(String projectName) {
+        IProject[] projects = ResourcesPlugin.getWorkspace().getRoot().getProjects();
+        for (IProject project : projects) {
+            try {
+                if (project.isOpen() && project.hasNature(JavaCore.NATURE_ID)) {
+                    if (projectName == null || projectName.equals(project.getName())) {
+                        return JavaCore.create(project);
+                    }
+                }
+            } catch (Exception e) {
+                // Skip
             }
         }
         return null;

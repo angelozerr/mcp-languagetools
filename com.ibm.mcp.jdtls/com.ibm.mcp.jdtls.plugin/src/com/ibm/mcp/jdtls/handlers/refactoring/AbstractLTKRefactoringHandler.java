@@ -35,6 +35,8 @@ import org.eclipse.text.edits.ReplaceEdit;
 import org.eclipse.text.edits.TextEdit;
 import org.eclipse.text.edits.TextEditVisitor;
 
+import com.ibm.mcp.jdtls.JdtUtils;
+
 /**
  * Base class for refactoring handlers that delegate to the JDT LTK refactoring engine.
  *
@@ -205,14 +207,14 @@ public abstract class AbstractLTKRefactoringHandler extends AbstractRefactoringH
         if (change instanceof TextFileChange) {
             TextFileChange fileChange = (TextFileChange) change;
             if (fileChange.getFile() != null) {
-                return fileChange.getFile().getLocationURI().toString();
+                return JdtUtils.toFileUri(fileChange.getFile());
             }
         }
         Object modifiedElement = change.getModifiedElement();
         if (modifiedElement instanceof ICompilationUnit) {
             ICompilationUnit cu = (ICompilationUnit) modifiedElement;
             if (cu.getResource() != null) {
-                return cu.getResource().getLocationURI().toString();
+                return JdtUtils.toFileUri(cu.getResource());
             }
         }
         return null;

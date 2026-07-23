@@ -20,7 +20,6 @@ import java.util.Map;
 
 import org.eclipse.core.resources.IResource;
 import org.eclipse.core.runtime.IProgressMonitor;
-import org.eclipse.jdt.core.IJavaElement;
 import org.eclipse.jdt.core.IType;
 import org.eclipse.jdt.core.search.IJavaSearchConstants;
 import org.eclipse.jdt.core.search.IJavaSearchScope;
@@ -29,7 +28,6 @@ import org.eclipse.jdt.core.search.SearchMatch;
 import org.eclipse.jdt.core.search.SearchParticipant;
 import org.eclipse.jdt.core.search.SearchPattern;
 import org.eclipse.jdt.core.search.SearchRequestor;
-import org.eclipse.jdt.core.search.TypeReferenceMatch;
 
 import com.ibm.mcp.jdtls.ICommandHandler;
 import com.ibm.mcp.jdtls.JdtUtils;
@@ -63,7 +61,7 @@ public class FindAnnotationUsagesHandler implements ICommandHandler {
             return Map.of("annotation", type.getFullyQualifiedName(), "usages", List.of());
         }
 
-        IJavaSearchScope scope = SearchEngine.createWorkspaceScope();
+        IJavaSearchScope scope = JdtUtils.resolveSearchScope(arguments);
         List<Map<String, Object>> usages = new ArrayList<>();
         Map<IResource, String> sourceCache = new HashMap<>();
 
@@ -75,20 +73,7 @@ public class FindAnnotationUsagesHandler implements ICommandHandler {
                 new SearchRequestor() {
                     @Override
                     public void acceptSearchMatch(SearchMatch match) {
-                        Map<String, Object> usage = new HashMap<>();
-                        if (match.getResource() != null) {
-                            usage.put("uri", match.getResource().getLocationURI().toString());
-                            String source = sourceCache.computeIfAbsent(match.getResource(), JdtUtils::getSource);
-                            JdtUtils.putPosition(usage, source, match.getOffset());
-                        }
-                        if (match.getElement() instanceof IJavaElement element) {
-                            usage.put("element", element.getElementName());
-                            if (element.getAncestor(IJavaElement.TYPE) != null) {
-                                usage.put("declaringType",
-                                        ((IType) element.getAncestor(IJavaElement.TYPE)).getFullyQualifiedName());
-                            }
-                        }
-                        usages.add(usage);
+                        usages.add(JdtUtils.formatSearchMatch(match, sourceCache));
                     }
                 },
                 monitor);

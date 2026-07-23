@@ -50,8 +50,8 @@ public class JavaAnalysisTools {
             Cancellation cancellation,
             Progress progress) {
 
-        return executor.executeCommand(cwd, "mcp.jdtls.typeHierarchy",
-                Map.of("uri", fileUri, "line", line, "character", character),
+        return executor.executeCommand(cwd, JdtlsCommands.TYPE_HIERARCHY,
+                RefactoringHelper.positionParams(fileUri, line, character),
                 cancellation, progress);
     }
 
@@ -64,12 +64,13 @@ public class JavaAnalysisTools {
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
             @ToolArg(description = ToolArgDescriptions.POSITION_LINE) int line,
             @ToolArg(description = ToolArgDescriptions.POSITION_CHARACTER) int character,
+            @ToolArg(description = JavaToolArgDescriptions.SEARCH_SCOPE, required = false) String scope,
+            @ToolArg(description = JavaToolArgDescriptions.PROJECT_NAME, required = false) String projectName,
             Cancellation cancellation,
             Progress progress) {
-
-        return executor.executeCommand(cwd, "mcp.jdtls.callHierarchyIncoming",
-                Map.of("uri", fileUri, "line", line, "character", character),
-                cancellation, progress);
+        Map<String, Object> params = RefactoringHelper.positionParams(fileUri, line, character);
+        RefactoringHelper.putScope(params, scope, projectName);
+        return executor.executeCommand(cwd, JdtlsCommands.CALL_HIERARCHY_INCOMING, params, cancellation, progress);
     }
 
     @Tool(name = "java_get_call_hierarchy_outgoing",
@@ -84,8 +85,8 @@ public class JavaAnalysisTools {
             Cancellation cancellation,
             Progress progress) {
 
-        return executor.executeCommand(cwd, "mcp.jdtls.callHierarchyOutgoing",
-                Map.of("uri", fileUri, "line", line, "character", character),
+        return executor.executeCommand(cwd, JdtlsCommands.CALL_HIERARCHY_OUTGOING,
+                RefactoringHelper.positionParams(fileUri, line, character),
                 cancellation, progress);
     }
 
@@ -97,12 +98,13 @@ public class JavaAnalysisTools {
     public CompletableFuture<String> findAnnotationUsages(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = "Fully qualified name of the annotation (e.g., 'jakarta.inject.Inject')") String fullyQualifiedName,
+            @ToolArg(description = JavaToolArgDescriptions.SEARCH_SCOPE, required = false) String scope,
+            @ToolArg(description = JavaToolArgDescriptions.PROJECT_NAME, required = false) String projectName,
             Cancellation cancellation,
             Progress progress) {
-
-        return executor.executeCommand(cwd, "mcp.jdtls.findAnnotationUsages",
-                Map.of("fullyQualifiedName", fullyQualifiedName),
-                cancellation, progress);
+        Map<String, Object> params = RefactoringHelper.fqnParams(fullyQualifiedName);
+        RefactoringHelper.putScope(params, scope, projectName);
+        return executor.executeCommand(cwd, JdtlsCommands.FIND_ANNOTATION_USAGES, params, cancellation, progress);
     }
 
     @Tool(name = "java_find_type_instantiations",
@@ -112,12 +114,13 @@ public class JavaAnalysisTools {
     public CompletableFuture<String> findTypeInstantiations(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = "Fully qualified name of the type (e.g., 'java.util.ArrayList')") String fullyQualifiedName,
+            @ToolArg(description = JavaToolArgDescriptions.SEARCH_SCOPE, required = false) String scope,
+            @ToolArg(description = JavaToolArgDescriptions.PROJECT_NAME, required = false) String projectName,
             Cancellation cancellation,
             Progress progress) {
-
-        return executor.executeCommand(cwd, "mcp.jdtls.findTypeInstantiations",
-                Map.of("fullyQualifiedName", fullyQualifiedName),
-                cancellation, progress);
+        Map<String, Object> params = RefactoringHelper.fqnParams(fullyQualifiedName);
+        RefactoringHelper.putScope(params, scope, projectName);
+        return executor.executeCommand(cwd, JdtlsCommands.FIND_TYPE_INSTANTIATIONS, params, cancellation, progress);
     }
 
     @Tool(name = "java_get_complexity_metrics",
@@ -130,7 +133,7 @@ public class JavaAnalysisTools {
             Cancellation cancellation,
             Progress progress) {
 
-        return executor.executeCommand(cwd, "mcp.jdtls.getComplexityMetrics",
+        return executor.executeCommand(cwd, JdtlsCommands.GET_COMPLEXITY_METRICS,
                 Map.of("uri", fileUri),
                 cancellation, progress);
     }
@@ -144,7 +147,7 @@ public class JavaAnalysisTools {
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.analyzeFile",
+        return executor.executeCommand(cwd, JdtlsCommands.ANALYZE_FILE,
                 Map.of("uri", fileUri),
                 cancellation, progress);
     }
@@ -158,8 +161,8 @@ public class JavaAnalysisTools {
             @ToolArg(description = "Fully qualified name of the type") String fullyQualifiedName,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.analyzeType",
-                Map.of("fullyQualifiedName", fullyQualifiedName),
+        return executor.executeCommand(cwd, JdtlsCommands.ANALYZE_TYPE,
+                RefactoringHelper.fqnParams(fullyQualifiedName),
                 cancellation, progress);
     }
 
@@ -174,8 +177,8 @@ public class JavaAnalysisTools {
             @ToolArg(description = ToolArgDescriptions.POSITION_CHARACTER) int character,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.analyzeMethod",
-                Map.of("uri", fileUri, "line", line, "character", character),
+        return executor.executeCommand(cwd, JdtlsCommands.ANALYZE_METHOD,
+                RefactoringHelper.positionParams(fileUri, line, character),
                 cancellation, progress);
     }
 
@@ -190,8 +193,8 @@ public class JavaAnalysisTools {
             @ToolArg(description = ToolArgDescriptions.POSITION_CHARACTER) int character,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.analyzeChangeImpact",
-                Map.of("uri", fileUri, "line", line, "character", character),
+        return executor.executeCommand(cwd, JdtlsCommands.ANALYZE_CHANGE_IMPACT,
+                RefactoringHelper.positionParams(fileUri, line, character),
                 cancellation, progress);
     }
 
@@ -206,8 +209,8 @@ public class JavaAnalysisTools {
             @ToolArg(description = ToolArgDescriptions.POSITION_CHARACTER) int character,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.analyzeControlFlow",
-                Map.of("uri", fileUri, "line", line, "character", character),
+        return executor.executeCommand(cwd, JdtlsCommands.ANALYZE_CONTROL_FLOW,
+                RefactoringHelper.positionParams(fileUri, line, character),
                 cancellation, progress);
     }
 
@@ -222,8 +225,8 @@ public class JavaAnalysisTools {
             @ToolArg(description = ToolArgDescriptions.POSITION_CHARACTER) int character,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.analyzeDataFlow",
-                Map.of("uri", fileUri, "line", line, "character", character),
+        return executor.executeCommand(cwd, JdtlsCommands.ANALYZE_DATA_FLOW,
+                RefactoringHelper.positionParams(fileUri, line, character),
                 cancellation, progress);
     }
 }

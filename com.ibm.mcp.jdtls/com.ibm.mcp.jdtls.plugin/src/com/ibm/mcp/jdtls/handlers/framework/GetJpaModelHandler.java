@@ -34,6 +34,7 @@ import org.eclipse.jdt.core.search.SearchPattern;
 import org.eclipse.jdt.core.search.SearchRequestor;
 
 import com.ibm.mcp.jdtls.ICommandHandler;
+import com.ibm.mcp.jdtls.JdtUtils;
 
 /**
  * Handler for "mcp.jdtls.getJpaModel" command.
@@ -159,7 +160,7 @@ public class GetJpaModelHandler implements ICommandHandler {
         entity.put("relationships", relationships);
 
         if (type.getResource() != null) {
-            entity.put("uri", type.getResource().getLocationURI().toString());
+            entity.put("uri", JdtUtils.toFileUri(type.getResource()));
         }
 
         return entity;

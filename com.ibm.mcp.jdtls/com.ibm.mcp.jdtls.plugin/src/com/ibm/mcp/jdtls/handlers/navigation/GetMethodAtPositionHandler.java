@@ -28,6 +28,8 @@ import org.eclipse.jdt.core.ISourceReference;
 import org.eclipse.jdt.core.JavaModelException;
 import org.eclipse.jdt.core.Signature;
 
+import com.ibm.mcp.jdtls.JdtUtils;
+
 /**
  * Handler for "mcp.jdtls.getMethodAtPosition" command.
  *
@@ -93,11 +95,11 @@ public class GetMethodAtPositionHandler extends AbstractPositionHandler {
 
         // URI of the defining file
         if (method.getResource() != null) {
-            result.put("uri", method.getResource().getLocationURI().toString());
+            result.put("uri", JdtUtils.toFileUri(method.getResource()));
         } else {
             ICompilationUnit defCu = method.getCompilationUnit();
             if (defCu != null && defCu.getResource() != null) {
-                result.put("uri", defCu.getResource().getLocationURI().toString());
+                result.put("uri", JdtUtils.toFileUri(defCu.getResource()));
             }
         }
 

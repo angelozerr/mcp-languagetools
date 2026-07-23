@@ -36,6 +36,7 @@ import org.eclipse.jdt.core.dom.MethodDeclaration;
 import org.eclipse.jdt.core.dom.TypeDeclaration;
 
 import com.ibm.mcp.jdtls.ICommandHandler;
+import com.ibm.mcp.jdtls.JdtUtils;
 
 /**
  * Handler for "mcp.jdtls.findLargeClasses" command.
@@ -148,7 +149,7 @@ public class FindLargeClassesHandler implements ICommandHandler {
                         classInfo.put("fqn", node.resolveBinding().getQualifiedName());
                     }
                     if (cu.getResource() != null) {
-                        classInfo.put("uri", cu.getResource().getLocationURI().toString());
+                        classInfo.put("uri", JdtUtils.toFileUri(cu.getResource()));
                     }
                     classInfo.put("methods", methodCount);
                     classInfo.put("fields", fieldCount);

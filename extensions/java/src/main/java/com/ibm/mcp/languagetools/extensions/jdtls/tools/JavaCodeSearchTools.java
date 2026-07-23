@@ -45,11 +45,13 @@ public class JavaCodeSearchTools {
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
             @ToolArg(description = ToolArgDescriptions.POSITION_LINE) int line,
             @ToolArg(description = ToolArgDescriptions.POSITION_CHARACTER) int character,
+            @ToolArg(description = JavaToolArgDescriptions.SEARCH_SCOPE, required = false) String scope,
+            @ToolArg(description = JavaToolArgDescriptions.PROJECT_NAME, required = false) String projectName,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.findFieldWrites",
-                Map.of("uri", fileUri, "line", line, "character", character),
-                cancellation, progress);
+        Map<String, Object> params = RefactoringHelper.positionParams(fileUri, line, character);
+        RefactoringHelper.putScope(params, scope, projectName);
+        return executor.executeCommand(cwd, JdtlsCommands.FIND_FIELD_WRITES, params, cancellation, progress);
     }
 
     @Tool(name = "java_find_tests",
@@ -61,7 +63,7 @@ public class JavaCodeSearchTools {
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.findTests",
+        return executor.executeCommand(cwd, JdtlsCommands.FIND_TESTS,
                 Map.of("uri", fileUri),
                 cancellation, progress);
     }
@@ -77,8 +79,8 @@ public class JavaCodeSearchTools {
             @ToolArg(description = ToolArgDescriptions.POSITION_CHARACTER) int character,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.findAffectedTests",
-                Map.of("uri", fileUri, "line", line, "character", character),
+        return executor.executeCommand(cwd, JdtlsCommands.FIND_AFFECTED_TESTS,
+                RefactoringHelper.positionParams(fileUri, line, character),
                 cancellation, progress);
     }
 
@@ -90,7 +92,7 @@ public class JavaCodeSearchTools {
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.findUnusedCode",
+        return executor.executeCommand(cwd, JdtlsCommands.FIND_UNUSED_CODE,
                 Map.of("uri", fileUri),
                 cancellation, progress);
     }
@@ -103,7 +105,7 @@ public class JavaCodeSearchTools {
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.findUnreachableCode",
+        return executor.executeCommand(cwd, JdtlsCommands.FIND_UNREACHABLE_CODE,
                 Map.of("uri", fileUri),
                 cancellation, progress);
     }
@@ -116,7 +118,7 @@ public class JavaCodeSearchTools {
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.findReflectionUsage",
+        return executor.executeCommand(cwd, JdtlsCommands.FIND_REFLECTION_USAGE,
                 Map.of("uri", fileUri),
                 cancellation, progress);
     }
@@ -130,7 +132,7 @@ public class JavaCodeSearchTools {
             @ToolArg(description = "Simple type name to search for (e.g., 'List', 'Map')") String typeName,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.suggestImports",
+        return executor.executeCommand(cwd, JdtlsCommands.SUGGEST_IMPORTS,
                 Map.of("typeName", typeName),
                 cancellation, progress);
     }
@@ -145,8 +147,8 @@ public class JavaCodeSearchTools {
             @ToolArg(description = "Fully qualified name of the type") String fullyQualifiedName,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.getTypeUsageSummary",
-                Map.of("fullyQualifiedName", fullyQualifiedName),
+        return executor.executeCommand(cwd, JdtlsCommands.GET_TYPE_USAGE_SUMMARY,
+                RefactoringHelper.fqnParams(fullyQualifiedName),
                 cancellation, progress);
     }
 
@@ -159,7 +161,7 @@ public class JavaCodeSearchTools {
             @ToolArg(description = "Search query string or glob pattern") String query,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.searchSymbols",
+        return executor.executeCommand(cwd, JdtlsCommands.SEARCH_SYMBOLS,
                 Map.of("query", query),
                 cancellation, progress);
     }
@@ -173,11 +175,13 @@ public class JavaCodeSearchTools {
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
             @ToolArg(description = ToolArgDescriptions.POSITION_LINE) int line,
             @ToolArg(description = ToolArgDescriptions.POSITION_CHARACTER) int character,
+            @ToolArg(description = JavaToolArgDescriptions.SEARCH_SCOPE, required = false) String scope,
+            @ToolArg(description = JavaToolArgDescriptions.PROJECT_NAME, required = false) String projectName,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.findReferences",
-                Map.of("uri", fileUri, "line", line, "character", character),
-                cancellation, progress);
+        Map<String, Object> params = RefactoringHelper.positionParams(fileUri, line, character);
+        RefactoringHelper.putScope(params, scope, projectName);
+        return executor.executeCommand(cwd, JdtlsCommands.FIND_REFERENCES, params, cancellation, progress);
     }
 
     @Tool(name = "java_find_implementations",
@@ -189,8 +193,8 @@ public class JavaCodeSearchTools {
             @ToolArg(description = "Fully qualified name of the interface or abstract class") String fullyQualifiedName,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.findImplementations",
-                Map.of("fullyQualifiedName", fullyQualifiedName),
+        return executor.executeCommand(cwd, JdtlsCommands.FIND_IMPLEMENTATIONS,
+                RefactoringHelper.fqnParams(fullyQualifiedName),
                 cancellation, progress);
     }
 }

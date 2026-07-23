@@ -46,7 +46,7 @@ public class JavaFrameworkTools {
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.getHttpEndpoints",
+        return executor.executeCommand(cwd, JdtlsCommands.GET_HTTP_ENDPOINTS,
                 Map.of(),
                 cancellation, progress);
     }
@@ -60,7 +60,7 @@ public class JavaFrameworkTools {
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.getJpaModel",
+        return executor.executeCommand(cwd, JdtlsCommands.GET_JPA_MODEL,
                 Map.of(),
                 cancellation, progress);
     }
@@ -73,18 +73,13 @@ public class JavaFrameworkTools {
                         "Example: java_get_di_registrations(cwd='/project', scope='project')")
     public CompletableFuture<String> getDiRegistrations(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
-            @ToolArg(description = "Search scope: 'project' for project sources only (faster), 'workspace' for full workspace (default)", required = false) String scope,
-            @ToolArg(description = "Project name to search in (used when scope='project', defaults to first Java project)", required = false) String projectName,
+            @ToolArg(description = JavaToolArgDescriptions.SEARCH_SCOPE, required = false) String scope,
+            @ToolArg(description = JavaToolArgDescriptions.PROJECT_NAME, required = false) String projectName,
             Cancellation cancellation,
             Progress progress) {
         Map<String, Object> args = new HashMap<>();
-        if (scope != null) {
-            args.put("scope", scope);
-        }
-        if (projectName != null) {
-            args.put("projectName", projectName);
-        }
-        return executor.executeCommand(cwd, "mcp.jdtls.getDiRegistrations",
+        RefactoringHelper.putScope(args, scope, projectName);
+        return executor.executeCommand(cwd, JdtlsCommands.GET_DI_REGISTRATIONS,
                 args,
                 cancellation, progress);
     }

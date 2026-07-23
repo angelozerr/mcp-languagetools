@@ -45,8 +45,8 @@ public class JavaReferenceSearchTools {
             @ToolArg(description = "Fully qualified name of the type (e.g., 'java.lang.String')") String fullyQualifiedName,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.findCasts",
-                Map.of("fullyQualifiedName", fullyQualifiedName),
+        return executor.executeCommand(cwd, JdtlsCommands.FIND_CASTS,
+                RefactoringHelper.fqnParams(fullyQualifiedName),
                 cancellation, progress);
     }
 
@@ -59,8 +59,8 @@ public class JavaReferenceSearchTools {
             @ToolArg(description = "Fully qualified name of the exception type") String fullyQualifiedName,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.findCatchBlocks",
-                Map.of("fullyQualifiedName", fullyQualifiedName),
+        return executor.executeCommand(cwd, JdtlsCommands.FIND_CATCH_BLOCKS,
+                RefactoringHelper.fqnParams(fullyQualifiedName),
                 cancellation, progress);
     }
 
@@ -73,8 +73,8 @@ public class JavaReferenceSearchTools {
             @ToolArg(description = "Fully qualified name of the type") String fullyQualifiedName,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.findInstanceofChecks",
-                Map.of("fullyQualifiedName", fullyQualifiedName),
+        return executor.executeCommand(cwd, JdtlsCommands.FIND_INSTANCEOF_CHECKS,
+                RefactoringHelper.fqnParams(fullyQualifiedName),
                 cancellation, progress);
     }
 
@@ -87,8 +87,8 @@ public class JavaReferenceSearchTools {
             @ToolArg(description = "Fully qualified name of the exception type") String fullyQualifiedName,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.findThrowsDeclarations",
-                Map.of("fullyQualifiedName", fullyQualifiedName),
+        return executor.executeCommand(cwd, JdtlsCommands.FIND_THROWS_DECLARATIONS,
+                RefactoringHelper.fqnParams(fullyQualifiedName),
                 cancellation, progress);
     }
 
@@ -101,8 +101,8 @@ public class JavaReferenceSearchTools {
             @ToolArg(description = "Fully qualified name of the type") String fullyQualifiedName,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.findTypeArguments",
-                Map.of("fullyQualifiedName", fullyQualifiedName),
+        return executor.executeCommand(cwd, JdtlsCommands.FIND_TYPE_ARGUMENTS,
+                RefactoringHelper.fqnParams(fullyQualifiedName),
                 cancellation, progress);
     }
 
@@ -115,10 +115,12 @@ public class JavaReferenceSearchTools {
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
             @ToolArg(description = ToolArgDescriptions.POSITION_LINE) int line,
             @ToolArg(description = ToolArgDescriptions.POSITION_CHARACTER) int character,
+            @ToolArg(description = JavaToolArgDescriptions.SEARCH_SCOPE, required = false) String scope,
+            @ToolArg(description = JavaToolArgDescriptions.PROJECT_NAME, required = false) String projectName,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.findMethodReferences",
-                Map.of("uri", fileUri, "line", line, "character", character),
-                cancellation, progress);
+        Map<String, Object> params = RefactoringHelper.positionParams(fileUri, line, character);
+        RefactoringHelper.putScope(params, scope, projectName);
+        return executor.executeCommand(cwd, JdtlsCommands.FIND_METHOD_REFERENCES, params, cancellation, progress);
     }
 }

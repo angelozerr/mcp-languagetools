@@ -21,7 +21,6 @@ import io.quarkiverse.mcp.server.ToolArg;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
@@ -49,17 +48,14 @@ public class JavaCodeGenerationTools {
             @ToolArg(description = "Generate only setters (default true)", required = false) Boolean generateSetters,
             Cancellation cancellation,
             Progress progress) {
-        Map<String, Object> args = new HashMap<>();
-        args.put("uri", fileUri);
-        args.put("line", line);
-        args.put("character", character);
+        Map<String, Object> args = RefactoringHelper.positionParams(fileUri, line, character);
         if (generateGetters != null) {
             args.put("generateGetters", generateGetters);
         }
         if (generateSetters != null) {
             args.put("generateSetters", generateSetters);
         }
-        return executor.executeCommand(cwd, "mcp.jdtls.generateGettersSetters", args, cancellation, progress);
+        return executor.executeCommand(cwd, JdtlsCommands.GENERATE_GETTERS_SETTERS, args, cancellation, progress);
     }
 
     @Tool(name = "java_generate_constructor",
@@ -74,14 +70,11 @@ public class JavaCodeGenerationTools {
             @ToolArg(description = "Also generate a default no-arg constructor (default false)", required = false) Boolean generateDefault,
             Cancellation cancellation,
             Progress progress) {
-        Map<String, Object> args = new HashMap<>();
-        args.put("uri", fileUri);
-        args.put("line", line);
-        args.put("character", character);
+        Map<String, Object> args = RefactoringHelper.positionParams(fileUri, line, character);
         if (generateDefault != null) {
             args.put("generateDefault", generateDefault);
         }
-        return executor.executeCommand(cwd, "mcp.jdtls.generateConstructor", args, cancellation, progress);
+        return executor.executeCommand(cwd, JdtlsCommands.GENERATE_CONSTRUCTOR, args, cancellation, progress);
     }
 
     @Tool(name = "java_generate_to_string",
@@ -94,8 +87,8 @@ public class JavaCodeGenerationTools {
             @ToolArg(description = ToolArgDescriptions.POSITION_CHARACTER) int character,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.generateToString",
-                Map.of("uri", fileUri, "line", line, "character", character),
+        return executor.executeCommand(cwd, JdtlsCommands.GENERATE_TO_STRING,
+                RefactoringHelper.positionParams(fileUri, line, character),
                 cancellation, progress);
     }
 
@@ -110,8 +103,8 @@ public class JavaCodeGenerationTools {
             @ToolArg(description = ToolArgDescriptions.POSITION_CHARACTER) int character,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.generateEqualsHashCode",
-                Map.of("uri", fileUri, "line", line, "character", character),
+        return executor.executeCommand(cwd, JdtlsCommands.GENERATE_EQUALS_HASHCODE,
+                RefactoringHelper.positionParams(fileUri, line, character),
                 cancellation, progress);
     }
 }

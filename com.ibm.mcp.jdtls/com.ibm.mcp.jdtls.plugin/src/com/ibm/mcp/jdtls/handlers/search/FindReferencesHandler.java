@@ -76,7 +76,7 @@ public class FindReferencesHandler implements ICommandHandler {
             return Map.of("element", target.getElementName(), "references", List.of());
         }
 
-        IJavaSearchScope scope = SearchEngine.createWorkspaceScope();
+        IJavaSearchScope scope = JdtUtils.resolveSearchScope(arguments);
         List<Map<String, Object>> references = new ArrayList<>();
         Map<IResource, String> sourceCache = new HashMap<>();
 
@@ -88,20 +88,7 @@ public class FindReferencesHandler implements ICommandHandler {
                 new SearchRequestor() {
                     @Override
                     public void acceptSearchMatch(SearchMatch match) {
-                        Map<String, Object> ref = new HashMap<>();
-                        if (match.getResource() != null) {
-                            ref.put("uri", match.getResource().getLocationURI().toString());
-                            String source = sourceCache.computeIfAbsent(match.getResource(), JdtUtils::getSource);
-                            JdtUtils.putPosition(ref, source, match.getOffset());
-                        }
-                        if (match.getElement() instanceof IJavaElement element) {
-                            ref.put("element", element.getElementName());
-                            IType dt = (IType) element.getAncestor(IJavaElement.TYPE);
-                            if (dt != null) {
-                                ref.put("declaringType", dt.getFullyQualifiedName());
-                            }
-                        }
-                        references.add(ref);
+                        references.add(JdtUtils.formatSearchMatch(match, sourceCache));
                     }
                 },
                 monitor);

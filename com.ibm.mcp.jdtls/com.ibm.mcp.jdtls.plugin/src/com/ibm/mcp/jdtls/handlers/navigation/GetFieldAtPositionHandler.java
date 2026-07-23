@@ -28,6 +28,8 @@ import org.eclipse.jdt.core.ISourceReference;
 import org.eclipse.jdt.core.JavaModelException;
 import org.eclipse.jdt.core.Signature;
 
+import com.ibm.mcp.jdtls.JdtUtils;
+
 /**
  * Handler for "mcp.jdtls.getFieldAtPosition" command.
  *
@@ -74,11 +76,11 @@ public class GetFieldAtPositionHandler extends AbstractPositionHandler {
 
         // URI of the defining file
         if (field.getResource() != null) {
-            result.put("uri", field.getResource().getLocationURI().toString());
+            result.put("uri", JdtUtils.toFileUri(field.getResource()));
         } else {
             ICompilationUnit defCu = field.getCompilationUnit();
             if (defCu != null && defCu.getResource() != null) {
-                result.put("uri", defCu.getResource().getLocationURI().toString());
+                result.put("uri", JdtUtils.toFileUri(defCu.getResource()));
             }
         }
 

@@ -45,8 +45,8 @@ public class JavaTypeMemberTools {
             @ToolArg(description = "Fully qualified name of the type") String fullyQualifiedName,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.getTypeMembers",
-                Map.of("fullyQualifiedName", fullyQualifiedName),
+        return executor.executeCommand(cwd, JdtlsCommands.GET_TYPE_MEMBERS,
+                RefactoringHelper.fqnParams(fullyQualifiedName),
                 cancellation, progress);
     }
 
@@ -58,7 +58,7 @@ public class JavaTypeMemberTools {
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.getDependencyGraph",
+        return executor.executeCommand(cwd, JdtlsCommands.GET_DEPENDENCY_GRAPH,
                 Map.of(),
                 cancellation, progress);
     }

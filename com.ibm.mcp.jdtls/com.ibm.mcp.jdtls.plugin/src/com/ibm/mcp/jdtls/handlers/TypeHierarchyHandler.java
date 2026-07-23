@@ -62,7 +62,7 @@ public class TypeHierarchyHandler implements ICommandHandler {
         info.put("fullyQualifiedName", type.getFullyQualifiedName());
         info.put("isInterface", type.isInterface());
         if (type.getResource() != null) {
-            info.put("uri", type.getResource().getLocationURI().toString());
+            info.put("uri", JdtUtils.toFileUri(type.getResource()));
         }
         return info;
     }

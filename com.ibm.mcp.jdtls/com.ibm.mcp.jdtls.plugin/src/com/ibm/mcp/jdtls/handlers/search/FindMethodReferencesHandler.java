@@ -23,7 +23,6 @@ import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.jdt.core.ICompilationUnit;
 import org.eclipse.jdt.core.IJavaElement;
 import org.eclipse.jdt.core.IMethod;
-import org.eclipse.jdt.core.IType;
 import org.eclipse.jdt.core.search.IJavaSearchConstants;
 import org.eclipse.jdt.core.search.IJavaSearchScope;
 import org.eclipse.jdt.core.search.SearchEngine;
@@ -83,7 +82,7 @@ public class FindMethodReferencesHandler implements ICommandHandler {
             return Map.of("method", method.getElementName(), "methodReferences", List.of());
         }
 
-        IJavaSearchScope scope = SearchEngine.createWorkspaceScope();
+        IJavaSearchScope scope = JdtUtils.resolveSearchScope(arguments);
         List<Map<String, Object>> refs = new ArrayList<>();
         Map<IResource, String> sourceCache = new HashMap<>();
 
@@ -95,20 +94,7 @@ public class FindMethodReferencesHandler implements ICommandHandler {
                 new SearchRequestor() {
                     @Override
                     public void acceptSearchMatch(SearchMatch match) {
-                        Map<String, Object> ref = new HashMap<>();
-                        if (match.getResource() != null) {
-                            ref.put("uri", match.getResource().getLocationURI().toString());
-                            String source = sourceCache.computeIfAbsent(match.getResource(), JdtUtils::getSource);
-                            JdtUtils.putPosition(ref, source, match.getOffset());
-                        }
-                        if (match.getElement() instanceof IJavaElement element) {
-                            ref.put("element", element.getElementName());
-                            IType dt = (IType) element.getAncestor(IJavaElement.TYPE);
-                            if (dt != null) {
-                                ref.put("declaringType", dt.getFullyQualifiedName());
-                            }
-                        }
-                        refs.add(ref);
+                        refs.add(JdtUtils.formatSearchMatch(match, sourceCache));
                     }
                 },
                 monitor);

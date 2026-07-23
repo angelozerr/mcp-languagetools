@@ -27,6 +27,8 @@ import org.eclipse.jdt.core.ISourceReference;
 import org.eclipse.jdt.core.IType;
 import org.eclipse.jdt.core.JavaModelException;
 
+import com.ibm.mcp.jdtls.JdtUtils;
+
 /**
  * Handler for "mcp.jdtls.getTypeAtPosition" command.
  *
@@ -86,11 +88,11 @@ public class GetTypeAtPositionHandler extends AbstractPositionHandler {
 
         // URI of the defining file
         if (type.getResource() != null) {
-            result.put("uri", type.getResource().getLocationURI().toString());
+            result.put("uri", JdtUtils.toFileUri(type.getResource()));
         } else {
             ICompilationUnit defCu = type.getCompilationUnit();
             if (defCu != null && defCu.getResource() != null) {
-                result.put("uri", defCu.getResource().getLocationURI().toString());
+                result.put("uri", JdtUtils.toFileUri(defCu.getResource()));
             }
         }
 

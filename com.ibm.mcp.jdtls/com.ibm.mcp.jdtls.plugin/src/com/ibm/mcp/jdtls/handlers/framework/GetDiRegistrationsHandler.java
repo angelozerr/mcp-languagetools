@@ -18,17 +18,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.eclipse.core.resources.IProject;
-import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.jdt.core.IAnnotation;
 import org.eclipse.jdt.core.ICompilationUnit;
 import org.eclipse.jdt.core.IField;
 import org.eclipse.jdt.core.IJavaElement;
-import org.eclipse.jdt.core.IJavaProject;
 import org.eclipse.jdt.core.IMethod;
 import org.eclipse.jdt.core.IType;
-import org.eclipse.jdt.core.JavaCore;
 import org.eclipse.jdt.core.search.IJavaSearchConstants;
 import org.eclipse.jdt.core.search.IJavaSearchScope;
 import org.eclipse.jdt.core.search.SearchEngine;
@@ -38,6 +34,7 @@ import org.eclipse.jdt.core.search.SearchPattern;
 import org.eclipse.jdt.core.search.SearchRequestor;
 
 import com.ibm.mcp.jdtls.ICommandHandler;
+import com.ibm.mcp.jdtls.JdtUtils;
 
 /**
  * Handler for "mcp.jdtls.getDiRegistrations" command.
@@ -115,37 +112,8 @@ public class GetDiRegistrationsHandler implements ICommandHandler {
         return result;
     }
 
-    @SuppressWarnings("unchecked")
     private IJavaSearchScope resolveSearchScope(List<Object> arguments) {
-        if (arguments != null && !arguments.isEmpty() && arguments.get(0) instanceof Map) {
-            Map<String, Object> params = (Map<String, Object>) arguments.get(0);
-            String scopeParam = (String) params.get("scope");
-            if ("project".equals(scopeParam)) {
-                String projectName = (String) params.get("projectName");
-                IJavaProject javaProject = findJavaProject(projectName);
-                if (javaProject != null) {
-                    return SearchEngine.createJavaSearchScope(
-                            new IJavaElement[]{javaProject}, IJavaSearchScope.SOURCES);
-                }
-            }
-        }
-        return SearchEngine.createWorkspaceScope();
-    }
-
-    private IJavaProject findJavaProject(String projectName) {
-        IProject[] projects = ResourcesPlugin.getWorkspace().getRoot().getProjects();
-        for (IProject project : projects) {
-            try {
-                if (project.isOpen() && project.hasNature(JavaCore.NATURE_ID)) {
-                    if (projectName == null || projectName.equals(project.getName())) {
-                        return JavaCore.create(project);
-                    }
-                }
-            } catch (Exception e) {
-                // Skip
-            }
-        }
-        return null;
+        return JdtUtils.resolveSearchScope(arguments);
     }
 
     private void searchStereotype(String annotationName, String stereotype, String defaultScope,
@@ -179,7 +147,7 @@ public class GetDiRegistrationsHandler implements ICommandHandler {
                                 reg.put("annotationName", annotationName);
 
                                 if (type.getResource() != null) {
-                                    reg.put("uri", type.getResource().getLocationURI().toString());
+                                    reg.put("uri", JdtUtils.toFileUri(type.getResource()));
                                 }
 
                                 ICompilationUnit cu = type.getCompilationUnit();
@@ -258,7 +226,7 @@ public class GetDiRegistrationsHandler implements ICommandHandler {
                                 reg.put("producerMethod", method.getElementName());
 
                                 if (method.getResource() != null) {
-                                    reg.put("uri", method.getResource().getLocationURI().toString());
+                                    reg.put("uri", JdtUtils.toFileUri(method.getResource()));
                                 }
 
                                 ICompilationUnit cu = method.getCompilationUnit();
@@ -311,7 +279,7 @@ public class GetDiRegistrationsHandler implements ICommandHandler {
                                 reg.put("producerMethod", method.getElementName());
 
                                 if (method.getResource() != null) {
-                                    reg.put("uri", method.getResource().getLocationURI().toString());
+                                    reg.put("uri", JdtUtils.toFileUri(method.getResource()));
                                 }
 
                                 registrations.add(reg);
@@ -359,7 +327,7 @@ public class GetDiRegistrationsHandler implements ICommandHandler {
                                     injection.put("declaringClass", declaringType.getFullyQualifiedName());
                                 }
                                 if (field.getResource() != null) {
-                                    injection.put("uri", field.getResource().getLocationURI().toString());
+                                    injection.put("uri", JdtUtils.toFileUri(field.getResource()));
                                 }
                             } else if (element instanceof IMethod) {
                                 IMethod method = (IMethod) element;
@@ -370,7 +338,7 @@ public class GetDiRegistrationsHandler implements ICommandHandler {
                                     injection.put("declaringClass", declaringType.getFullyQualifiedName());
                                 }
                                 if (method.getResource() != null) {
-                                    injection.put("uri", method.getResource().getLocationURI().toString());
+                                    injection.put("uri", JdtUtils.toFileUri(method.getResource()));
                                 }
                             } else {
                                 return;

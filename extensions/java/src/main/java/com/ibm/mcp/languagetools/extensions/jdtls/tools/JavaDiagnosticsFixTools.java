@@ -24,6 +24,8 @@ import jakarta.inject.Inject;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
+import static com.ibm.mcp.languagetools.extensions.jdtls.tools.RefactoringHelper.positionParams;
+
 /**
  * MCP tools for Java diagnostics and quick fixes via JDT.LS delegate command handlers.
  *
@@ -45,7 +47,7 @@ public class JavaDiagnosticsFixTools {
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.validateSyntax",
+        return executor.executeCommand(cwd, JdtlsCommands.VALIDATE_SYNTAX,
                 Map.of("uri", fileUri),
                 cancellation, progress);
     }
@@ -53,34 +55,24 @@ public class JavaDiagnosticsFixTools {
     @Tool(name = "java_get_quick_fixes",
           description = "Get available quick fixes for problems at a specific position in a Java file. " +
                         "Returns a list of fixes that can be applied to resolve the problem. " +
+                        "Use java_get_quick_fixes first to get available fixes and their IDs. " +
                         "Example: java_get_quick_fixes(cwd='/project', fileUri='file:///project/src/Main.java', line=10, character=5)")
     public CompletableFuture<String> getQuickFixes(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
             @ToolArg(description = ToolArgDescriptions.POSITION_LINE) int line,
             @ToolArg(description = ToolArgDescriptions.POSITION_CHARACTER) int character,
+            @ToolArg(description = "ID of the fix to apply (from a previous call without fixId)", required = false) String fixId,
+            @ToolArg(description = ToolArgDescriptions.APPLY, required = false) Boolean apply,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.getQuickFixes",
-                Map.of("uri", fileUri, "line", line, "character", character),
-                cancellation, progress);
-    }
-
-    @Tool(name = "java_apply_quick_fix",
-          description = "Apply a specific quick fix to resolve a problem in a Java file. " +
-                        "Use java_get_quick_fixes first to get available fixes and their IDs. " +
-                        "Example: java_apply_quick_fix(cwd='/project', fileUri='file:///project/src/Main.java', line=10, character=5, fixId='add_import')")
-    public CompletableFuture<String> applyQuickFix(
-            @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
-            @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
-            @ToolArg(description = ToolArgDescriptions.POSITION_LINE) int line,
-            @ToolArg(description = ToolArgDescriptions.POSITION_CHARACTER) int character,
-            @ToolArg(description = "ID of the fix to apply (from java_get_quick_fixes)") String fixId,
-            Cancellation cancellation,
-            Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.applyQuickFix",
-                Map.of("uri", fileUri, "line", line, "character", character, "fixId", fixId),
-                cancellation, progress);
+        Map<String, Object> params = positionParams(fileUri, line, character);
+        if (fixId != null) {
+            params.put("fixId", fixId);
+            RefactoringHelper.putApply(params, apply);
+            return executor.executeCommand(cwd, JdtlsCommands.APPLY_QUICK_FIX, params, cancellation, progress);
+        }
+        return executor.executeCommand(cwd, JdtlsCommands.GET_QUICK_FIXES, params, cancellation, progress);
     }
 
     @Tool(name = "java_diagnose_and_fix",
@@ -92,7 +84,7 @@ public class JavaDiagnosticsFixTools {
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.diagnoseAndFix",
+        return executor.executeCommand(cwd, JdtlsCommands.DIAGNOSE_AND_FIX,
                 Map.of("uri", fileUri),
                 cancellation, progress);
     }
@@ -108,7 +100,7 @@ public class JavaDiagnosticsFixTools {
             @ToolArg(description = "Cleanup ID: remove_unused_imports, add_missing_override, convert_to_lambda, remove_unnecessary_casts, add_final_modifier") String cleanupId,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.applyCleanup",
+        return executor.executeCommand(cwd, JdtlsCommands.APPLY_CLEANUP,
                 Map.of("uri", fileUri, "cleanupId", cleanupId),
                 cancellation, progress);
     }

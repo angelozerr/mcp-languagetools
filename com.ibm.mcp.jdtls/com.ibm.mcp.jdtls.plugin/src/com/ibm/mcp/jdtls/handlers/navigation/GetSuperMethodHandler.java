@@ -26,6 +26,8 @@ import org.eclipse.jdt.core.IType;
 import org.eclipse.jdt.core.ITypeHierarchy;
 import org.eclipse.jdt.core.JavaModelException;
 
+import com.ibm.mcp.jdtls.JdtUtils;
+
 /**
  * Handler for "mcp.jdtls.getSuperMethod" command.
  *
@@ -71,11 +73,11 @@ public class GetSuperMethodHandler extends AbstractPositionHandler {
             superInfo.put("declaringType", superMethod.getDeclaringType().getFullyQualifiedName());
 
             if (superMethod.getResource() != null) {
-                superInfo.put("uri", superMethod.getResource().getLocationURI().toString());
+                superInfo.put("uri", JdtUtils.toFileUri(superMethod.getResource()));
             } else {
                 ICompilationUnit defCu = superMethod.getCompilationUnit();
                 if (defCu != null && defCu.getResource() != null) {
-                    superInfo.put("uri", defCu.getResource().getLocationURI().toString());
+                    superInfo.put("uri", JdtUtils.toFileUri(defCu.getResource()));
                 }
             }
 

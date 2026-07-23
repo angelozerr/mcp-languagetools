@@ -125,7 +125,7 @@ public class FindNamingViolationsHandler implements ICommandHandler {
         CompilationUnit ast = (CompilationUnit) parser.createAST(monitor);
 
         String fileUri = cu.getResource() != null
-                ? cu.getResource().getLocationURI().toString() : null;
+                ? JdtUtils.toFileUri(cu.getResource()) : null;
 
         ast.accept(new ASTVisitor() {
             @Override

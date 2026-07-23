@@ -20,7 +20,6 @@ import java.util.Map;
 
 import org.eclipse.core.resources.IResource;
 import org.eclipse.core.runtime.IProgressMonitor;
-import org.eclipse.jdt.core.IJavaElement;
 import org.eclipse.jdt.core.IType;
 import org.eclipse.jdt.core.search.IJavaSearchConstants;
 import org.eclipse.jdt.core.search.IJavaSearchScope;
@@ -62,7 +61,7 @@ public class FindTypeInstantiationsHandler implements ICommandHandler {
             return Map.of("type", type.getFullyQualifiedName(), "instantiations", List.of());
         }
 
-        IJavaSearchScope scope = SearchEngine.createWorkspaceScope();
+        IJavaSearchScope scope = JdtUtils.resolveSearchScope(arguments);
         List<Map<String, Object>> instantiations = new ArrayList<>();
         Map<IResource, String> sourceCache = new HashMap<>();
 
@@ -74,20 +73,7 @@ public class FindTypeInstantiationsHandler implements ICommandHandler {
                 new SearchRequestor() {
                     @Override
                     public void acceptSearchMatch(SearchMatch match) {
-                        Map<String, Object> usage = new HashMap<>();
-                        if (match.getResource() != null) {
-                            usage.put("uri", match.getResource().getLocationURI().toString());
-                            String source = sourceCache.computeIfAbsent(match.getResource(), JdtUtils::getSource);
-                            JdtUtils.putPosition(usage, source, match.getOffset());
-                        }
-                        if (match.getElement() instanceof IJavaElement element) {
-                            usage.put("element", element.getElementName());
-                            IType declaringType = (IType) element.getAncestor(IJavaElement.TYPE);
-                            if (declaringType != null) {
-                                usage.put("declaringType", declaringType.getFullyQualifiedName());
-                            }
-                        }
-                        instantiations.add(usage);
+                        instantiations.add(JdtUtils.formatSearchMatch(match, sourceCache));
                     }
                 },
                 monitor);

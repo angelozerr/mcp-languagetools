@@ -13,19 +13,54 @@
  *******************************************************************************/
 package com.ibm.mcp.languagetools.extensions.jdtls.tools;
 
+import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Static helper for refactoring tool parameters.
+ * Static helper for building tool parameter maps.
  */
 final class RefactoringHelper {
 
     private RefactoringHelper() {
     }
 
+    static Map<String, Object> positionParams(String fileUri, int line, int character) {
+        Map<String, Object> params = new HashMap<>();
+        params.put("uri", fileUri);
+        params.put("line", line);
+        params.put("character", character);
+        return params;
+    }
+
+    static Map<String, Object> rangeParams(String fileUri, int startLine, int startCharacter,
+                                              int endLine, int endCharacter) {
+        Map<String, Object> params = new HashMap<>();
+        params.put("uri", fileUri);
+        params.put("startLine", startLine);
+        params.put("startCharacter", startCharacter);
+        params.put("endLine", endLine);
+        params.put("endCharacter", endCharacter);
+        return params;
+    }
+
+    static Map<String, Object> fqnParams(String fullyQualifiedName) {
+        Map<String, Object> params = new HashMap<>();
+        params.put("fullyQualifiedName", fullyQualifiedName);
+        return params;
+    }
+
     static void putApply(Map<String, Object> params, Boolean apply) {
         if (apply != null) {
             params.put("apply", apply);
+        }
+    }
+
+    static void putScope(Map<String, Object> params, String scope, String projectName) {
+        if (scope != null) {
+            params.put("scope", scope);
+        }
+        if (projectName != null) {
+            params.put("projectName", projectName);
         }
     }
 }

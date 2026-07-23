@@ -18,6 +18,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.eclipse.core.resources.IFile;
 import org.eclipse.core.resources.IResource;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.jdt.core.IJavaElement;
@@ -94,22 +95,11 @@ public abstract class AbstractFineGrainReferenceHandler implements ICommandHandl
                 new SearchRequestor() {
                     @Override
                     public void acceptSearchMatch(SearchMatch match) {
-                        if (!(match.getResource() instanceof org.eclipse.core.resources.IFile f)
+                        if (!(match.getResource() instanceof IFile f)
                                 || !"java".equalsIgnoreCase(f.getFileExtension())) {
                             return;
                         }
-                        Map<String, Object> usage = new HashMap<>();
-                        usage.put("uri", match.getResource().getLocationURI().toString());
-                        String source = sourceCache.computeIfAbsent(match.getResource(), JdtUtils::getSource);
-                        JdtUtils.putPosition(usage, source, match.getOffset());
-                        if (match.getElement() instanceof IJavaElement element) {
-                            usage.put("element", element.getElementName());
-                            IType declaringType = (IType) element.getAncestor(IJavaElement.TYPE);
-                            if (declaringType != null) {
-                                usage.put("declaringType", declaringType.getFullyQualifiedName());
-                            }
-                        }
-                        usages.add(usage);
+                        usages.add(JdtUtils.formatSearchMatch(match, sourceCache));
                     }
                 },
                 monitor);

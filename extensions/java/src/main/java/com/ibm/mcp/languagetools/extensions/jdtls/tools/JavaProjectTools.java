@@ -51,7 +51,7 @@ public class JavaProjectTools {
         if (projectName != null) {
             args.put("projectName", projectName);
         }
-        return executor.executeCommand(cwd, "mcp.jdtls.getProjectStructure",
+        return executor.executeCommand(cwd, JdtlsCommands.GET_PROJECT_STRUCTURE,
                 args,
                 cancellation, progress);
     }
@@ -64,7 +64,7 @@ public class JavaProjectTools {
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             Cancellation cancellation,
             Progress progress) {
-        return executor.executeCommand(cwd, "mcp.jdtls.getClasspathInfo",
+        return executor.executeCommand(cwd, JdtlsCommands.GET_CLASSPATH_INFO,
                 Map.of(),
                 cancellation, progress);
     }

@@ -219,7 +219,7 @@ public class AnalyzeMethodHandler implements ICommandHandler {
                                 caller.put("declaringType", member.getDeclaringType().getFullyQualifiedName());
                             }
                             if (member.getResource() != null) {
-                                caller.put("uri", member.getResource().getLocationURI().toString());
+                                caller.put("uri", JdtUtils.toFileUri(member.getResource()));
                             }
                             callers.add(caller);
                         }

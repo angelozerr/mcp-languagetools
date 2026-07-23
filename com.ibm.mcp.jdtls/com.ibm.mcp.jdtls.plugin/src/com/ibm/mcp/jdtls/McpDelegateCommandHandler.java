@@ -46,103 +46,103 @@ public class McpDelegateCommandHandler implements IDelegateCommandHandler {
 
     static {
         // --- Existing handlers ---
-        HANDLERS.put("mcp.jdtls.diagnostics", new DiagnosticsHandler());
-        HANDLERS.put("mcp.jdtls.typeHierarchy", new TypeHierarchyHandler());
-        HANDLERS.put("mcp.jdtls.callHierarchyIncoming", new CallHierarchyHandler(true));
-        HANDLERS.put("mcp.jdtls.callHierarchyOutgoing", new CallHierarchyHandler(false));
-        HANDLERS.put("mcp.jdtls.findAnnotationUsages", new FindAnnotationUsagesHandler());
-        HANDLERS.put("mcp.jdtls.findTypeInstantiations", new FindTypeInstantiationsHandler());
-        HANDLERS.put("mcp.jdtls.getComplexityMetrics", new GetComplexityMetricsHandler());
+        HANDLERS.put(JdtlsCommands.DIAGNOSTICS, new DiagnosticsHandler());
+        HANDLERS.put(JdtlsCommands.TYPE_HIERARCHY, new TypeHierarchyHandler());
+        HANDLERS.put(JdtlsCommands.CALL_HIERARCHY_INCOMING, new CallHierarchyHandler(true));
+        HANDLERS.put(JdtlsCommands.CALL_HIERARCHY_OUTGOING, new CallHierarchyHandler(false));
+        HANDLERS.put(JdtlsCommands.FIND_ANNOTATION_USAGES, new FindAnnotationUsagesHandler());
+        HANDLERS.put(JdtlsCommands.FIND_TYPE_INSTANTIATIONS, new FindTypeInstantiationsHandler());
+        HANDLERS.put(JdtlsCommands.GET_COMPLEXITY_METRICS, new GetComplexityMetricsHandler());
 
         // --- Fine-grained reference search ---
-        HANDLERS.put("mcp.jdtls.findCasts", new FindCastsHandler());
-        HANDLERS.put("mcp.jdtls.findCatchBlocks", new FindCatchBlocksHandler());
-        HANDLERS.put("mcp.jdtls.findInstanceofChecks", new FindInstanceofChecksHandler());
-        HANDLERS.put("mcp.jdtls.findThrowsDeclarations", new FindThrowsDeclarationsHandler());
-        HANDLERS.put("mcp.jdtls.findTypeArguments", new FindTypeArgumentsHandler());
-        HANDLERS.put("mcp.jdtls.findMethodReferences", new FindMethodReferencesHandler());
+        HANDLERS.put(JdtlsCommands.FIND_CASTS, new FindCastsHandler());
+        HANDLERS.put(JdtlsCommands.FIND_CATCH_BLOCKS, new FindCatchBlocksHandler());
+        HANDLERS.put(JdtlsCommands.FIND_INSTANCEOF_CHECKS, new FindInstanceofChecksHandler());
+        HANDLERS.put(JdtlsCommands.FIND_THROWS_DECLARATIONS, new FindThrowsDeclarationsHandler());
+        HANDLERS.put(JdtlsCommands.FIND_TYPE_ARGUMENTS, new FindTypeArgumentsHandler());
+        HANDLERS.put(JdtlsCommands.FIND_METHOD_REFERENCES, new FindMethodReferencesHandler());
 
         // --- Code search ---
-        HANDLERS.put("mcp.jdtls.findFieldWrites", new FindFieldWritesHandler());
-        HANDLERS.put("mcp.jdtls.findTests", new FindTestsHandler());
-        HANDLERS.put("mcp.jdtls.findAffectedTests", new FindAffectedTestsHandler());
-        HANDLERS.put("mcp.jdtls.findUnusedCode", new FindUnusedCodeHandler());
-        HANDLERS.put("mcp.jdtls.findUnreachableCode", new FindUnreachableCodeHandler());
-        HANDLERS.put("mcp.jdtls.findReflectionUsage", new FindReflectionUsageHandler());
-        HANDLERS.put("mcp.jdtls.suggestImports", new SuggestImportsHandler());
-        HANDLERS.put("mcp.jdtls.getTypeUsageSummary", new GetTypeUsageSummaryHandler());
-        HANDLERS.put("mcp.jdtls.searchSymbols", new SearchSymbolsHandler());
-        HANDLERS.put("mcp.jdtls.findReferences", new FindReferencesHandler());
-        HANDLERS.put("mcp.jdtls.findImplementations", new FindImplementationsHandler());
+        HANDLERS.put(JdtlsCommands.FIND_FIELD_WRITES, new FindFieldWritesHandler());
+        HANDLERS.put(JdtlsCommands.FIND_TESTS, new FindTestsHandler());
+        HANDLERS.put(JdtlsCommands.FIND_AFFECTED_TESTS, new FindAffectedTestsHandler());
+        HANDLERS.put(JdtlsCommands.FIND_UNUSED_CODE, new FindUnusedCodeHandler());
+        HANDLERS.put(JdtlsCommands.FIND_UNREACHABLE_CODE, new FindUnreachableCodeHandler());
+        HANDLERS.put(JdtlsCommands.FIND_REFLECTION_USAGE, new FindReflectionUsageHandler());
+        HANDLERS.put(JdtlsCommands.SUGGEST_IMPORTS, new SuggestImportsHandler());
+        HANDLERS.put(JdtlsCommands.GET_TYPE_USAGE_SUMMARY, new GetTypeUsageSummaryHandler());
+        HANDLERS.put(JdtlsCommands.SEARCH_SYMBOLS, new SearchSymbolsHandler());
+        HANDLERS.put(JdtlsCommands.FIND_REFERENCES, new FindReferencesHandler());
+        HANDLERS.put(JdtlsCommands.FIND_IMPLEMENTATIONS, new FindImplementationsHandler());
 
         // --- Navigation ---
-        HANDLERS.put("mcp.jdtls.goToDefinition", new GoToDefinitionHandler());
-        HANDLERS.put("mcp.jdtls.getHoverInfo", new GetHoverInfoHandler());
-        HANDLERS.put("mcp.jdtls.getJavadoc", new GetJavadocHandler());
-        HANDLERS.put("mcp.jdtls.getSymbolInfo", new GetSymbolInfoHandler());
-        HANDLERS.put("mcp.jdtls.getEnclosingElement", new GetEnclosingElementHandler());
-        HANDLERS.put("mcp.jdtls.getFieldAtPosition", new GetFieldAtPositionHandler());
-        HANDLERS.put("mcp.jdtls.getMethodAtPosition", new GetMethodAtPositionHandler());
-        HANDLERS.put("mcp.jdtls.getTypeAtPosition", new GetTypeAtPositionHandler());
-        HANDLERS.put("mcp.jdtls.getSignatureHelp", new GetSignatureHelpHandler());
-        HANDLERS.put("mcp.jdtls.getSuperMethod", new GetSuperMethodHandler());
-        HANDLERS.put("mcp.jdtls.getDocumentSymbols", new GetDocumentSymbolsHandler());
-        HANDLERS.put("mcp.jdtls.getTypeMembers", new GetTypeMembersHandler());
+        HANDLERS.put(JdtlsCommands.GO_TO_DEFINITION, new GoToDefinitionHandler());
+        HANDLERS.put(JdtlsCommands.GET_HOVER_INFO, new GetHoverInfoHandler());
+        HANDLERS.put(JdtlsCommands.GET_JAVADOC, new GetJavadocHandler());
+        HANDLERS.put(JdtlsCommands.GET_SYMBOL_INFO, new GetSymbolInfoHandler());
+        HANDLERS.put(JdtlsCommands.GET_ENCLOSING_ELEMENT, new GetEnclosingElementHandler());
+        HANDLERS.put(JdtlsCommands.GET_FIELD_AT_POSITION, new GetFieldAtPositionHandler());
+        HANDLERS.put(JdtlsCommands.GET_METHOD_AT_POSITION, new GetMethodAtPositionHandler());
+        HANDLERS.put(JdtlsCommands.GET_TYPE_AT_POSITION, new GetTypeAtPositionHandler());
+        HANDLERS.put(JdtlsCommands.GET_SIGNATURE_HELP, new GetSignatureHelpHandler());
+        HANDLERS.put(JdtlsCommands.GET_SUPER_METHOD, new GetSuperMethodHandler());
+        HANDLERS.put(JdtlsCommands.GET_DOCUMENT_SYMBOLS, new GetDocumentSymbolsHandler());
+        HANDLERS.put(JdtlsCommands.GET_TYPE_MEMBERS, new GetTypeMembersHandler());
 
         // --- Analysis ---
-        HANDLERS.put("mcp.jdtls.getDependencyGraph", new GetDependencyGraphHandler());
-        HANDLERS.put("mcp.jdtls.analyzeChangeImpact", new AnalyzeChangeImpactHandler());
-        HANDLERS.put("mcp.jdtls.analyzeControlFlow", new AnalyzeControlFlowHandler());
-        HANDLERS.put("mcp.jdtls.analyzeDataFlow", new AnalyzeDataFlowHandler());
-        HANDLERS.put("mcp.jdtls.analyzeFile", new AnalyzeFileHandler());
-        HANDLERS.put("mcp.jdtls.analyzeMethod", new AnalyzeMethodHandler());
-        HANDLERS.put("mcp.jdtls.analyzeType", new AnalyzeTypeHandler());
+        HANDLERS.put(JdtlsCommands.GET_DEPENDENCY_GRAPH, new GetDependencyGraphHandler());
+        HANDLERS.put(JdtlsCommands.ANALYZE_CHANGE_IMPACT, new AnalyzeChangeImpactHandler());
+        HANDLERS.put(JdtlsCommands.ANALYZE_CONTROL_FLOW, new AnalyzeControlFlowHandler());
+        HANDLERS.put(JdtlsCommands.ANALYZE_DATA_FLOW, new AnalyzeDataFlowHandler());
+        HANDLERS.put(JdtlsCommands.ANALYZE_FILE, new AnalyzeFileHandler());
+        HANDLERS.put(JdtlsCommands.ANALYZE_METHOD, new AnalyzeMethodHandler());
+        HANDLERS.put(JdtlsCommands.ANALYZE_TYPE, new AnalyzeTypeHandler());
 
         // --- Code quality ---
-        HANDLERS.put("mcp.jdtls.findLargeClasses", new FindLargeClassesHandler());
-        HANDLERS.put("mcp.jdtls.findNamingViolations", new FindNamingViolationsHandler());
-        HANDLERS.put("mcp.jdtls.findPossibleBugs", new FindPossibleBugsHandler());
-        HANDLERS.put("mcp.jdtls.findCircularDependencies", new FindCircularDependenciesHandler());
+        HANDLERS.put(JdtlsCommands.FIND_LARGE_CLASSES, new FindLargeClassesHandler());
+        HANDLERS.put(JdtlsCommands.FIND_NAMING_VIOLATIONS, new FindNamingViolationsHandler());
+        HANDLERS.put(JdtlsCommands.FIND_POSSIBLE_BUGS, new FindPossibleBugsHandler());
+        HANDLERS.put(JdtlsCommands.FIND_CIRCULAR_DEPENDENCIES, new FindCircularDependenciesHandler());
 
         // --- Diagnostics & quick fixes ---
-        HANDLERS.put("mcp.jdtls.validateSyntax", new ValidateSyntaxHandler());
-        HANDLERS.put("mcp.jdtls.getQuickFixes", new GetQuickFixesHandler());
-        HANDLERS.put("mcp.jdtls.applyQuickFix", new ApplyQuickFixHandler());
-        HANDLERS.put("mcp.jdtls.diagnoseAndFix", new DiagnoseAndFixHandler());
-        HANDLERS.put("mcp.jdtls.applyCleanup", new ApplyCleanupHandler());
+        HANDLERS.put(JdtlsCommands.VALIDATE_SYNTAX, new ValidateSyntaxHandler());
+        HANDLERS.put(JdtlsCommands.GET_QUICK_FIXES, new GetQuickFixesHandler());
+        HANDLERS.put(JdtlsCommands.APPLY_QUICK_FIX, new ApplyQuickFixHandler());
+        HANDLERS.put(JdtlsCommands.DIAGNOSE_AND_FIX, new DiagnoseAndFixHandler());
+        HANDLERS.put(JdtlsCommands.APPLY_CLEANUP, new ApplyCleanupHandler());
 
         // --- Framework-specific ---
-        HANDLERS.put("mcp.jdtls.getHttpEndpoints", new GetHttpEndpointsHandler());
-        HANDLERS.put("mcp.jdtls.getJpaModel", new GetJpaModelHandler());
-        HANDLERS.put("mcp.jdtls.getDiRegistrations", new GetDiRegistrationsHandler());
+        HANDLERS.put(JdtlsCommands.GET_HTTP_ENDPOINTS, new GetHttpEndpointsHandler());
+        HANDLERS.put(JdtlsCommands.GET_JPA_MODEL, new GetJpaModelHandler());
+        HANDLERS.put(JdtlsCommands.GET_DI_REGISTRATIONS, new GetDiRegistrationsHandler());
 
         // --- Refactoring ---
-        HANDLERS.put("mcp.jdtls.renameSymbol", new RenameSymbolHandler());
-        HANDLERS.put("mcp.jdtls.organizeImports", new OrganizeImportsHandler());
-        HANDLERS.put("mcp.jdtls.extractMethod", new ExtractMethodHandler());
-        HANDLERS.put("mcp.jdtls.extractVariable", new ExtractVariableHandler());
-        HANDLERS.put("mcp.jdtls.extractConstant", new ExtractConstantHandler());
-        HANDLERS.put("mcp.jdtls.extractInterface", new ExtractInterfaceHandler());
-        HANDLERS.put("mcp.jdtls.extractSuperclass", new ExtractSuperclassHandler());
-        HANDLERS.put("mcp.jdtls.inlineMethod", new InlineMethodHandler());
-        HANDLERS.put("mcp.jdtls.inlineVariable", new InlineVariableHandler());
-        HANDLERS.put("mcp.jdtls.changeMethodSignature", new ChangeMethodSignatureHandler());
-        HANDLERS.put("mcp.jdtls.convertAnonymousToLambda", new ConvertAnonymousToLambdaHandler());
-        HANDLERS.put("mcp.jdtls.encapsulateField", new EncapsulateFieldHandler());
-        HANDLERS.put("mcp.jdtls.introduceParameterObject", new IntroduceParameterObjectHandler());
-        HANDLERS.put("mcp.jdtls.moveTypeToNewFile", new MoveTypeToNewFileHandler());
-        HANDLERS.put("mcp.jdtls.pullUp", new PullUpHandler());
-        HANDLERS.put("mcp.jdtls.pushDown", new PushDownHandler());
+        HANDLERS.put(JdtlsCommands.RENAME_SYMBOL, new RenameSymbolHandler());
+        HANDLERS.put(JdtlsCommands.ORGANIZE_IMPORTS, new OrganizeImportsHandler());
+        HANDLERS.put(JdtlsCommands.EXTRACT_METHOD, new ExtractMethodHandler());
+        HANDLERS.put(JdtlsCommands.EXTRACT_VARIABLE, new ExtractVariableHandler());
+        HANDLERS.put(JdtlsCommands.EXTRACT_CONSTANT, new ExtractConstantHandler());
+        HANDLERS.put(JdtlsCommands.EXTRACT_INTERFACE, new ExtractInterfaceHandler());
+        HANDLERS.put(JdtlsCommands.EXTRACT_SUPERCLASS, new ExtractSuperclassHandler());
+        HANDLERS.put(JdtlsCommands.INLINE_METHOD, new InlineMethodHandler());
+        HANDLERS.put(JdtlsCommands.INLINE_VARIABLE, new InlineVariableHandler());
+        HANDLERS.put(JdtlsCommands.CHANGE_METHOD_SIGNATURE, new ChangeMethodSignatureHandler());
+        HANDLERS.put(JdtlsCommands.CONVERT_ANONYMOUS_TO_LAMBDA, new ConvertAnonymousToLambdaHandler());
+        HANDLERS.put(JdtlsCommands.ENCAPSULATE_FIELD, new EncapsulateFieldHandler());
+        HANDLERS.put(JdtlsCommands.INTRODUCE_PARAMETER_OBJECT, new IntroduceParameterObjectHandler());
+        HANDLERS.put(JdtlsCommands.MOVE_TYPE_TO_NEW_FILE, new MoveTypeToNewFileHandler());
+        HANDLERS.put(JdtlsCommands.PULL_UP, new PullUpHandler());
+        HANDLERS.put(JdtlsCommands.PUSH_DOWN, new PushDownHandler());
 
         // --- Code generation ---
-        HANDLERS.put("mcp.jdtls.generateGettersSetters", new GenerateGettersSettersHandler());
-        HANDLERS.put("mcp.jdtls.generateConstructor", new GenerateConstructorHandler());
-        HANDLERS.put("mcp.jdtls.generateToString", new GenerateToStringHandler());
-        HANDLERS.put("mcp.jdtls.generateEqualsHashCode", new GenerateEqualsHashCodeHandler());
+        HANDLERS.put(JdtlsCommands.GENERATE_GETTERS_SETTERS, new GenerateGettersSettersHandler());
+        HANDLERS.put(JdtlsCommands.GENERATE_CONSTRUCTOR, new GenerateConstructorHandler());
+        HANDLERS.put(JdtlsCommands.GENERATE_TO_STRING, new GenerateToStringHandler());
+        HANDLERS.put(JdtlsCommands.GENERATE_EQUALS_HASHCODE, new GenerateEqualsHashCodeHandler());
 
         // --- Project ---
-        HANDLERS.put("mcp.jdtls.getProjectStructure", new GetProjectStructureHandler());
-        HANDLERS.put("mcp.jdtls.getClasspathInfo", new GetClasspathInfoHandler());
+        HANDLERS.put(JdtlsCommands.GET_PROJECT_STRUCTURE, new GetProjectStructureHandler());
+        HANDLERS.put(JdtlsCommands.GET_CLASSPATH_INFO, new GetClasspathInfoHandler());
     }
 
     @Override

@@ -60,7 +60,7 @@ public class FindImplementationsHandler implements ICommandHandler {
             impl.put("fqn", subtype.getFullyQualifiedName());
             impl.put("isInterface", Flags.isInterface(subtype.getFlags()));
             if (subtype.getResource() != null) {
-                impl.put("uri", subtype.getResource().getLocationURI().toString());
+                impl.put("uri", JdtUtils.toFileUri(subtype.getResource()));
             }
             implementations.add(impl);
         }

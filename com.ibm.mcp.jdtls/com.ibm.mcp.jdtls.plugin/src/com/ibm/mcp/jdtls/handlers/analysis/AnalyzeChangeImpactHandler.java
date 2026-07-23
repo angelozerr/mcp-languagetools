@@ -108,7 +108,7 @@ public class AnalyzeChangeImpactHandler implements ICommandHandler {
         Set<String> affectedFiles = new HashSet<>();
         for (IMember caller : directCallers) {
             if (caller.getResource() != null) {
-                affectedFiles.add(caller.getResource().getLocationURI().toString());
+                affectedFiles.add(JdtUtils.toFileUri(caller.getResource()));
             }
         }
         for (Map<String, Object> trans : transitiveImpact) {
@@ -165,7 +165,7 @@ public class AnalyzeChangeImpactHandler implements ICommandHandler {
             info.put("declaringType", member.getDeclaringType().getFullyQualifiedName());
         }
         if (element.getResource() != null) {
-            info.put("uri", element.getResource().getLocationURI().toString());
+            info.put("uri", JdtUtils.toFileUri(element.getResource()));
         }
         return info;
     }
@@ -178,7 +178,7 @@ public class AnalyzeChangeImpactHandler implements ICommandHandler {
             info.put("declaringType", member.getDeclaringType().getFullyQualifiedName());
         }
         if (member.getResource() != null) {
-            info.put("uri", member.getResource().getLocationURI().toString());
+            info.put("uri", JdtUtils.toFileUri(member.getResource()));
         }
         return info;
     }

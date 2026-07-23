@@ -22,6 +22,8 @@ import org.eclipse.jdt.core.IJavaElement;
 import org.eclipse.jdt.core.ISourceRange;
 import org.eclipse.jdt.core.ISourceReference;
 
+import com.ibm.mcp.jdtls.JdtUtils;
+
 /**
  * Handler for "mcp.jdtls.goToDefinition" command.
  *
@@ -53,10 +55,10 @@ public class GoToDefinitionHandler extends AbstractPositionHandler {
             if (range != null) {
                 // Compute the URI of the defining resource
                 if (element.getResource() != null) {
-                    result.put("uri", element.getResource().getLocationURI().toString());
+                    result.put("uri", JdtUtils.toFileUri(element.getResource()));
                 } else if (element.getAncestor(IJavaElement.COMPILATION_UNIT) instanceof ICompilationUnit defCu) {
                     if (defCu.getResource() != null) {
-                        result.put("uri", defCu.getResource().getLocationURI().toString());
+                        result.put("uri", JdtUtils.toFileUri(defCu.getResource()));
                     }
                 }
 

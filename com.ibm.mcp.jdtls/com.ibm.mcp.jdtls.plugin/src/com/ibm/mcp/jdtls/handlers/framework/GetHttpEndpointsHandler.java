@@ -38,6 +38,7 @@ import org.eclipse.jdt.core.search.SearchPattern;
 import org.eclipse.jdt.core.search.SearchRequestor;
 
 import com.ibm.mcp.jdtls.ICommandHandler;
+import com.ibm.mcp.jdtls.JdtUtils;
 
 /**
  * Handler for "mcp.jdtls.getHttpEndpoints" command.
@@ -171,7 +172,7 @@ public class GetHttpEndpointsHandler implements ICommandHandler {
         endpoint.put("methodName", method.getElementName());
 
         if (method.getResource() != null) {
-            endpoint.put("uri", method.getResource().getLocationURI().toString());
+            endpoint.put("uri", JdtUtils.toFileUri(method.getResource()));
         }
         ICompilationUnit cu = method.getCompilationUnit();
         if (cu != null) {

@@ -163,7 +163,7 @@ public class FindAffectedTestsHandler implements ICommandHandler {
                     test.put("className", declaringType.getFullyQualifiedName());
                 }
                 if (method.getResource() != null) {
-                    test.put("uri", method.getResource().getLocationURI().toString());
+                    test.put("uri", JdtUtils.toFileUri(method.getResource()));
                 }
                 affectedTests.add(test);
             }

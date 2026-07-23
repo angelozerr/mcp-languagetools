@@ -18,6 +18,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.eclipse.core.resources.IResource;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.jdt.core.ICompilationUnit;
 import org.eclipse.jdt.core.IJavaElement;
@@ -98,13 +99,13 @@ public class CallHierarchyHandler implements ICommandHandler {
         }
 
         if (incoming) {
-            return findCallers(method, monitor);
+            return findCallers(method, arguments, monitor);
         } else {
             return findCallees(method, monitor);
         }
     }
 
-    private Map<String, Object> findCallers(IMethod method, IProgressMonitor monitor) throws Exception {
+    private Map<String, Object> findCallers(IMethod method, List<Object> arguments, IProgressMonitor monitor) throws Exception {
         SearchPattern pattern = SearchPattern.createPattern(
                 method,
                 IJavaSearchConstants.REFERENCES);
@@ -113,9 +114,9 @@ public class CallHierarchyHandler implements ICommandHandler {
             return Map.of("method", method.getElementName(), "callers", List.of());
         }
 
-        IJavaSearchScope scope = SearchEngine.createWorkspaceScope();
+        IJavaSearchScope scope = JdtUtils.resolveSearchScope(arguments);
         List<Map<String, Object>> callers = new ArrayList<>();
-        Map<org.eclipse.core.resources.IResource, String> sourceCache = new HashMap<>();
+        Map<IResource, String> sourceCache = new HashMap<>();
 
         SearchEngine engine = new SearchEngine();
         engine.search(
@@ -216,6 +217,7 @@ public class CallHierarchyHandler implements ICommandHandler {
             info.put("declaringType", declaringClass.getQualifiedName());
         }
         info.put("line", ast.getLineNumber(offset) - 1);
+        info.put("character", ast.getColumnNumber(offset));
         String[] paramTypes = new String[binding.getParameterTypes().length];
         for (int i = 0; i < paramTypes.length; i++) {
             paramTypes[i] = binding.getParameterTypes()[i].getName();
@@ -226,18 +228,14 @@ public class CallHierarchyHandler implements ICommandHandler {
     }
 
     private Map<String, Object> formatMember(IMember member, SearchMatch match,
-            Map<org.eclipse.core.resources.IResource, String> sourceCache) {
-        Map<String, Object> info = new HashMap<>();
+            Map<IResource, String> sourceCache) {
+        Map<String, Object> info = JdtUtils.formatSearchMatch(match, sourceCache);
         info.put("name", member.getElementName());
         if (member.getDeclaringType() != null) {
             info.put("declaringType", member.getDeclaringType().getFullyQualifiedName());
         }
         if (member.getResource() != null) {
-            info.put("uri", member.getResource().getLocationURI().toString());
-        }
-        if (match.getResource() != null) {
-            String source = sourceCache.computeIfAbsent(match.getResource(), JdtUtils::getSource);
-            JdtUtils.putPosition(info, source, match.getOffset());
+            info.put("uri", JdtUtils.toFileUri(member.getResource()));
         }
         return info;
     }

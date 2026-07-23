@@ -23,7 +23,6 @@ import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.jdt.core.ICompilationUnit;
 import org.eclipse.jdt.core.IField;
 import org.eclipse.jdt.core.IJavaElement;
-import org.eclipse.jdt.core.IType;
 import org.eclipse.jdt.core.search.IJavaSearchConstants;
 import org.eclipse.jdt.core.search.IJavaSearchScope;
 import org.eclipse.jdt.core.search.SearchEngine;
@@ -83,7 +82,7 @@ public class FindFieldWritesHandler implements ICommandHandler {
             return Map.of("field", field.getElementName(), "writeAccesses", List.of());
         }
 
-        IJavaSearchScope scope = SearchEngine.createWorkspaceScope();
+        IJavaSearchScope scope = JdtUtils.resolveSearchScope(arguments);
         List<Map<String, Object>> writes = new ArrayList<>();
         Map<IResource, String> sourceCache = new HashMap<>();
 
@@ -95,20 +94,7 @@ public class FindFieldWritesHandler implements ICommandHandler {
                 new SearchRequestor() {
                     @Override
                     public void acceptSearchMatch(SearchMatch match) {
-                        Map<String, Object> write = new HashMap<>();
-                        if (match.getResource() != null) {
-                            write.put("uri", match.getResource().getLocationURI().toString());
-                            String source = sourceCache.computeIfAbsent(match.getResource(), JdtUtils::getSource);
-                            JdtUtils.putPosition(write, source, match.getOffset());
-                        }
-                        if (match.getElement() instanceof IJavaElement element) {
-                            write.put("element", element.getElementName());
-                            IType dt = (IType) element.getAncestor(IJavaElement.TYPE);
-                            if (dt != null) {
-                                write.put("declaringType", dt.getFullyQualifiedName());
-                            }
-                        }
-                        writes.add(write);
+                        writes.add(JdtUtils.formatSearchMatch(match, sourceCache));
                     }
                 },
                 monitor);
