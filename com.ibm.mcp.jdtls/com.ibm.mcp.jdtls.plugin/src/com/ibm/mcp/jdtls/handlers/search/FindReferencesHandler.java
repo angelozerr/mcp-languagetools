@@ -18,6 +18,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.eclipse.core.resources.IResource;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.jdt.core.ICompilationUnit;
 import org.eclipse.jdt.core.IJavaElement;
@@ -77,6 +78,7 @@ public class FindReferencesHandler implements ICommandHandler {
 
         IJavaSearchScope scope = SearchEngine.createWorkspaceScope();
         List<Map<String, Object>> references = new ArrayList<>();
+        Map<IResource, String> sourceCache = new HashMap<>();
 
         SearchEngine engine = new SearchEngine();
         engine.search(
@@ -89,9 +91,9 @@ public class FindReferencesHandler implements ICommandHandler {
                         Map<String, Object> ref = new HashMap<>();
                         if (match.getResource() != null) {
                             ref.put("uri", match.getResource().getLocationURI().toString());
+                            String source = sourceCache.computeIfAbsent(match.getResource(), JdtUtils::getSource);
+                            JdtUtils.putPosition(ref, source, match.getOffset());
                         }
-                        ref.put("offset", match.getOffset());
-                        ref.put("length", match.getLength());
                         if (match.getElement() instanceof IJavaElement element) {
                             ref.put("element", element.getElementName());
                             IType dt = (IType) element.getAncestor(IJavaElement.TYPE);

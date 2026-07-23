@@ -18,6 +18,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.eclipse.core.resources.IResource;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.jdt.core.ICompilationUnit;
 import org.eclipse.jdt.core.IField;
@@ -84,6 +85,7 @@ public class FindFieldWritesHandler implements ICommandHandler {
 
         IJavaSearchScope scope = SearchEngine.createWorkspaceScope();
         List<Map<String, Object>> writes = new ArrayList<>();
+        Map<IResource, String> sourceCache = new HashMap<>();
 
         SearchEngine engine = new SearchEngine();
         engine.search(
@@ -96,9 +98,9 @@ public class FindFieldWritesHandler implements ICommandHandler {
                         Map<String, Object> write = new HashMap<>();
                         if (match.getResource() != null) {
                             write.put("uri", match.getResource().getLocationURI().toString());
+                            String source = sourceCache.computeIfAbsent(match.getResource(), JdtUtils::getSource);
+                            JdtUtils.putPosition(write, source, match.getOffset());
                         }
-                        write.put("offset", match.getOffset());
-                        write.put("length", match.getLength());
                         if (match.getElement() instanceof IJavaElement element) {
                             write.put("element", element.getElementName());
                             IType dt = (IType) element.getAncestor(IJavaElement.TYPE);

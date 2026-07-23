@@ -87,8 +87,7 @@ public class FindUnusedCodeHandler implements ICommandHandler {
                 Map<String, Object> element = new HashMap<>();
                 element.put("message", problem.getMessage());
                 element.put("line", problem.getSourceLineNumber() - 1);
-                element.put("offset", problem.getSourceStart());
-                element.put("length", problem.getSourceEnd() - problem.getSourceStart() + 1);
+                element.put("character", astRoot.getColumnNumber(problem.getSourceStart()));
                 element.put("problemId", problem.getID());
                 unusedElements.add(element);
             }

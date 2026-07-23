@@ -18,6 +18,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.eclipse.core.resources.IFile;
+import org.eclipse.core.resources.IResource;
 import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.jdt.core.ICompilationUnit;
@@ -151,5 +152,43 @@ public final class JdtUtils {
             offset++;
         }
         return offset;
+    }
+
+    /**
+     * Convert an offset in source to line/character (0-based) and put them
+     * directly into the target map, replacing any "offset" key.
+     */
+    public static void putPosition(Map<String, Object> target, String source, int offset) {
+        int line = 0;
+        int character = 0;
+        if (source != null) {
+            for (int i = 0; i < Math.min(offset, source.length()); i++) {
+                if (source.charAt(i) == '\n') {
+                    line++;
+                    character = 0;
+                } else {
+                    character++;
+                }
+            }
+        }
+        target.put("line", line);
+        target.put("character", character);
+    }
+
+    /**
+     * Get the source code content from a workspace resource (IFile → ICompilationUnit).
+     */
+    public static String getSource(IResource resource) {
+        if (resource instanceof IFile file) {
+            IJavaElement element = JavaCore.create(file);
+            if (element instanceof ICompilationUnit cu) {
+                try {
+                    return cu.getSource();
+                } catch (JavaModelException e) {
+                    return null;
+                }
+            }
+        }
+        return null;
     }
 }

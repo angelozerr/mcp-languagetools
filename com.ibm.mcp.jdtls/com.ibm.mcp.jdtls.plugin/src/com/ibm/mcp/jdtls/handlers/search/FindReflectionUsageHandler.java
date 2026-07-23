@@ -104,8 +104,7 @@ public class FindReflectionUsageHandler implements ICommandHandler {
                     usage.put("kind", "import");
                     usage.put("expression", node.toString().trim());
                     usage.put("line", astRoot.getLineNumber(node.getStartPosition()) - 1);
-                    usage.put("offset", node.getStartPosition());
-                    usage.put("length", node.getLength());
+                    usage.put("character", astRoot.getColumnNumber(node.getStartPosition()));
                     reflectionUsages.add(usage);
                 }
                 return false;
@@ -126,8 +125,7 @@ public class FindReflectionUsageHandler implements ICommandHandler {
                             usage.put("method", qualifiedName + "." + methodName);
                             usage.put("expression", node.toString());
                             usage.put("line", astRoot.getLineNumber(node.getStartPosition()) - 1);
-                            usage.put("offset", node.getStartPosition());
-                            usage.put("length", node.getLength());
+                            usage.put("character", astRoot.getColumnNumber(node.getStartPosition()));
                             reflectionUsages.add(usage);
                         }
                     }

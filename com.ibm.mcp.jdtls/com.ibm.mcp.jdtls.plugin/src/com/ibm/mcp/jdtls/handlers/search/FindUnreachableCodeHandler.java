@@ -81,8 +81,7 @@ public class FindUnreachableCodeHandler implements ICommandHandler {
                 Map<String, Object> entry = new HashMap<>();
                 entry.put("message", problem.getMessage());
                 entry.put("line", problem.getSourceLineNumber() - 1);
-                entry.put("offset", problem.getSourceStart());
-                entry.put("length", problem.getSourceEnd() - problem.getSourceStart() + 1);
+                entry.put("character", astRoot.getColumnNumber(problem.getSourceStart()));
                 entry.put("problemId", problem.getID());
                 unreachableCode.add(entry);
             }

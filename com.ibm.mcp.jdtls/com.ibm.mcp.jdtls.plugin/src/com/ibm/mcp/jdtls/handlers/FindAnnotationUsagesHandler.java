@@ -18,6 +18,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.eclipse.core.resources.IResource;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.jdt.core.IJavaElement;
 import org.eclipse.jdt.core.IType;
@@ -64,6 +65,7 @@ public class FindAnnotationUsagesHandler implements ICommandHandler {
 
         IJavaSearchScope scope = SearchEngine.createWorkspaceScope();
         List<Map<String, Object>> usages = new ArrayList<>();
+        Map<IResource, String> sourceCache = new HashMap<>();
 
         SearchEngine engine = new SearchEngine();
         engine.search(
@@ -76,9 +78,9 @@ public class FindAnnotationUsagesHandler implements ICommandHandler {
                         Map<String, Object> usage = new HashMap<>();
                         if (match.getResource() != null) {
                             usage.put("uri", match.getResource().getLocationURI().toString());
+                            String source = sourceCache.computeIfAbsent(match.getResource(), JdtUtils::getSource);
+                            JdtUtils.putPosition(usage, source, match.getOffset());
                         }
-                        usage.put("offset", match.getOffset());
-                        usage.put("length", match.getLength());
                         if (match.getElement() instanceof IJavaElement element) {
                             usage.put("element", element.getElementName());
                             if (element.getAncestor(IJavaElement.TYPE) != null) {

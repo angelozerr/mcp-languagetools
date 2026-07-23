@@ -18,6 +18,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.eclipse.core.resources.IResource;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.jdt.core.IJavaElement;
 import org.eclipse.jdt.core.IType;
@@ -83,6 +84,7 @@ public abstract class AbstractFineGrainReferenceHandler implements ICommandHandl
         IJavaSearchScope scope = SearchEngine.createJavaSearchScope(
                 new IJavaElement[]{type.getJavaProject()}, IJavaSearchScope.SOURCES);
         List<Map<String, Object>> usages = new ArrayList<>();
+        Map<IResource, String> sourceCache = new HashMap<>();
 
         SearchEngine engine = new SearchEngine();
         engine.search(
@@ -98,8 +100,8 @@ public abstract class AbstractFineGrainReferenceHandler implements ICommandHandl
                         }
                         Map<String, Object> usage = new HashMap<>();
                         usage.put("uri", match.getResource().getLocationURI().toString());
-                        usage.put("offset", match.getOffset());
-                        usage.put("length", match.getLength());
+                        String source = sourceCache.computeIfAbsent(match.getResource(), JdtUtils::getSource);
+                        JdtUtils.putPosition(usage, source, match.getOffset());
                         if (match.getElement() instanceof IJavaElement element) {
                             usage.put("element", element.getElementName());
                             IType declaringType = (IType) element.getAncestor(IJavaElement.TYPE);

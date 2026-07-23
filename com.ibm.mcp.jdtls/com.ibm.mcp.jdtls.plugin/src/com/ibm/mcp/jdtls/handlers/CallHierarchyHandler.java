@@ -115,6 +115,7 @@ public class CallHierarchyHandler implements ICommandHandler {
 
         IJavaSearchScope scope = SearchEngine.createWorkspaceScope();
         List<Map<String, Object>> callers = new ArrayList<>();
+        Map<org.eclipse.core.resources.IResource, String> sourceCache = new HashMap<>();
 
         SearchEngine engine = new SearchEngine();
         engine.search(
@@ -126,7 +127,7 @@ public class CallHierarchyHandler implements ICommandHandler {
                     public void acceptSearchMatch(SearchMatch match) {
                         Object element = match.getElement();
                         if (element instanceof IMember member) {
-                            callers.add(formatMember(member, match));
+                            callers.add(formatMember(member, match, sourceCache));
                         }
                     }
                 },
@@ -224,7 +225,8 @@ public class CallHierarchyHandler implements ICommandHandler {
         return info;
     }
 
-    private Map<String, Object> formatMember(IMember member, SearchMatch match) {
+    private Map<String, Object> formatMember(IMember member, SearchMatch match,
+            Map<org.eclipse.core.resources.IResource, String> sourceCache) {
         Map<String, Object> info = new HashMap<>();
         info.put("name", member.getElementName());
         if (member.getDeclaringType() != null) {
@@ -233,8 +235,10 @@ public class CallHierarchyHandler implements ICommandHandler {
         if (member.getResource() != null) {
             info.put("uri", member.getResource().getLocationURI().toString());
         }
-        info.put("offset", match.getOffset());
-        info.put("length", match.getLength());
+        if (match.getResource() != null) {
+            String source = sourceCache.computeIfAbsent(match.getResource(), JdtUtils::getSource);
+            JdtUtils.putPosition(info, source, match.getOffset());
+        }
         return info;
     }
 }

@@ -68,11 +68,38 @@ This means AI assistants can leverage the same tooling that developers use in th
 | `detach_from_process` | Detach without terminating the process |
 | `get_debug_statistics` | Get statistics about active debug sessions |
 
-### Java Tools (from Java extension)
+### Java Tools (77 tools from Java extension)
 
-These tools are inspired by [javalens-mcp](https://github.com/pzalutski-pixel/javalens-mcp).
+These tools are inspired by [javalens-mcp](https://github.com/pzalutski-pixel/javalens-mcp) and provide deep Java analysis, navigation, refactoring, and code generation capabilities powered by [Eclipse JDT.LS](https://github.com/eclipse-jdtls/eclipse.jdt.ls).
 
-#### Analysis
+#### Common Parameters
+
+Most Java tools share these standard parameters:
+
+| Parameter | Description |
+|-----------|-------------|
+| `cwd` | Current working directory (project root path). Example: `'/home/user/project'` or `'C:\Users\project'` |
+| `fileUri` | File URI (must be `file://` URI as in LSP). Example: `'file:///home/user/project/src/main/java/Main.java'` |
+| `line` | Line number (0-based) |
+| `character` | Character position in the line (0-based) |
+
+#### The `apply` Parameter (Preview vs Apply)
+
+All refactoring tools (except `java_organize_imports`) support an optional `apply` parameter that controls whether changes are written to disk:
+
+| Value | Behavior |
+|-------|----------|
+| `false` (default) | **Preview mode** — Returns a preview of the changes (text edits, affected files) without modifying any file. Use this to review what will change before committing. |
+| `true` | **Apply mode** — Applies the refactoring changes directly to disk. Files are modified in place. |
+
+**Recommended workflow:**
+1. Call the refactoring tool with `apply: false` (or omit `apply`) to preview changes
+2. Review the returned text edits and affected files
+3. If satisfied, call again with `apply: true` to apply
+
+These 15 tools support the `apply` parameter: `java_rename_symbol`, `java_extract_method`, `java_extract_variable`, `java_extract_constant`, `java_extract_interface`, `java_extract_superclass`, `java_inline_method`, `java_inline_variable`, `java_change_method_signature`, `java_convert_anonymous_to_lambda`, `java_encapsulate_field`, `java_introduce_parameter_object`, `java_move_type_to_new_file`, `java_pull_up`, `java_push_down`.
+
+#### Analysis (12 tools)
 
 | Tool | Description |
 |------|-------------|
@@ -89,7 +116,7 @@ These tools are inspired by [javalens-mcp](https://github.com/pzalutski-pixel/ja
 | `java_analyze_control_flow` | Analyze control flow paths through a Java method |
 | `java_analyze_data_flow` | Track data flow through variables and parameters |
 
-#### Navigation
+#### Navigation (11 tools)
 
 | Tool | Description |
 |------|-------------|
@@ -105,7 +132,7 @@ These tools are inspired by [javalens-mcp](https://github.com/pzalutski-pixel/ja
 | `java_get_super_method` | Find the method that a Java method overrides or implements |
 | `java_get_document_symbols` | Get all symbols (types, methods, fields) in a Java file |
 
-#### Code Search
+#### Code Search (11 tools)
 
 | Tool | Description |
 |------|-------------|
@@ -121,7 +148,7 @@ These tools are inspired by [javalens-mcp](https://github.com/pzalutski-pixel/ja
 | `java_get_type_usage_summary` | Get a comprehensive usage summary for a Java type |
 | `java_search_symbols` | Search for Java symbols by name pattern |
 
-#### Reference Search
+#### Reference Search (6 tools)
 
 | Tool | Description |
 |------|-------------|
@@ -132,7 +159,9 @@ These tools are inspired by [javalens-mcp](https://github.com/pzalutski-pixel/ja
 | `java_find_throws_declarations` | Find all throws clause declarations of an exception type |
 | `java_find_type_arguments` | Find all type argument usages in generics |
 
-#### Refactoring
+#### Refactoring (16 tools)
+
+All refactoring tools (except `java_organize_imports`) support the [`apply` parameter](#the-apply-parameter-preview-vs-apply) for preview/apply workflow.
 
 | Tool | Description |
 |------|-------------|
@@ -153,7 +182,7 @@ These tools are inspired by [javalens-mcp](https://github.com/pzalutski-pixel/ja
 | `java_pull_up` | Pull members up from a subclass into its superclass |
 | `java_push_down` | Push members down from a superclass into its subclasses |
 
-#### Code Generation
+#### Code Generation (4 tools)
 
 | Tool | Description |
 |------|-------------|
@@ -162,7 +191,7 @@ These tools are inspired by [javalens-mcp](https://github.com/pzalutski-pixel/ja
 | `java_generate_to_string` | Generate a toString() method |
 | `java_generate_equals_hashcode` | Generate equals() and hashCode() methods |
 
-#### Diagnostics & Fix
+#### Diagnostics & Fix (5 tools)
 
 | Tool | Description |
 |------|-------------|
@@ -172,7 +201,7 @@ These tools are inspired by [javalens-mcp](https://github.com/pzalutski-pixel/ja
 | `java_diagnose_and_fix` | Diagnose problems and optionally apply safe auto-fixes |
 | `java_apply_cleanup` | Apply a code cleanup to a Java file |
 
-#### Code Quality
+#### Code Quality (4 tools)
 
 | Tool | Description |
 |------|-------------|
@@ -181,7 +210,7 @@ These tools are inspired by [javalens-mcp](https://github.com/pzalutski-pixel/ja
 | `java_find_possible_bugs` | Find potential bug patterns |
 | `java_find_circular_dependencies` | Find circular package dependencies |
 
-#### Framework
+#### Framework (3 tools)
 
 | Tool | Description |
 |------|-------------|
@@ -189,7 +218,7 @@ These tools are inspired by [javalens-mcp](https://github.com/pzalutski-pixel/ja
 | `java_get_jpa_model` | Get the JPA entity model |
 | `java_get_di_registrations` | Find dependency injection registrations |
 
-#### Project
+#### Project (4 tools)
 
 | Tool | Description |
 |------|-------------|
@@ -197,6 +226,22 @@ These tools are inspired by [javalens-mcp](https://github.com/pzalutski-pixel/ja
 | `java_get_classpath_info` | Get the classpath entries of a Java project |
 | `java_get_type_members` | Get all members of a Java type |
 | `java_get_dependency_graph` | Get the import-based dependency graph |
+
+#### Tool Summary
+
+| Category | Count |
+|----------|-------|
+| Analysis | 12 |
+| Navigation | 11 |
+| Code Search | 11 |
+| Reference Search | 6 |
+| Refactoring | 16 |
+| Code Generation | 4 |
+| Diagnostics & Fix | 5 |
+| Code Quality | 4 |
+| Framework | 3 |
+| Project | 4 |
+| **Total** | **77** *(including `java_get_type_members` and `java_get_dependency_graph`)* |
 
 ### Extension & Workspace Tools
 

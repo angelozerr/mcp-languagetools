@@ -17,6 +17,7 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.HashMap;
@@ -309,6 +310,15 @@ public class AnalysisAndSearchHandlerTest extends AbstractHandlerTest {
         // User is referenced in many places (UserService, UserController, Admin, etc.)
         assertTrue(((Number) map.get("count")).intValue() >= 1,
                 "User should have references in other files");
+
+        // Verify line/character format (not offset)
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> refs = (List<Map<String, Object>>) map.get("references");
+        Map<String, Object> firstRef = refs.get(0);
+        assertNotNull(firstRef.get("line"), "Reference should have line");
+        assertNotNull(firstRef.get("character"), "Reference should have character");
+        assertNull(firstRef.get("offset"), "Reference should NOT have offset");
+        assertNotNull(firstRef.get("uri"), "Reference should have uri");
     }
 
     @Test

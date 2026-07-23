@@ -99,18 +99,30 @@ public abstract class AbstractLTKRefactoringHandler extends AbstractRefactoringH
     }
 
     /**
-     * Convert an LTK {@link Change} tree into a flat list of MCP edit maps.
+     * Convert an LTK {@link Change} tree into a list of per-file edit maps
+     * using LSP-style range (line/character) format.
+     *
+     * <p>Output format per entry:
+     * <pre>{uri: "file:...", textEdits: [{range: {start: {line, character}, end: {line, character}}, newText: "..."}]}</pre>
      */
     protected List<Map<String, Object>> convertChangeToEdits(Change change) {
-        List<Map<String, Object>> edits = new ArrayList<>();
-        collectEdits(change, edits);
-        return edits;
+        Map<String, FileEdits> editsByUri = new java.util.LinkedHashMap<>();
+        collectEdits(change, editsByUri);
+
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (FileEdits fileEdits : editsByUri.values()) {
+            Map<String, Object> entry = new HashMap<>();
+            entry.put("uri", fileEdits.uri);
+            entry.put("textEdits", fileEdits.textEdits);
+            result.add(entry);
+        }
+        return result;
     }
 
-    private void collectEdits(Change change, List<Map<String, Object>> edits) {
+    private void collectEdits(Change change, Map<String, FileEdits> editsByUri) {
         if (change instanceof CompositeChange) {
             for (Change child : ((CompositeChange) change).getChildren()) {
-                collectEdits(child, edits);
+                collectEdits(child, editsByUri);
             }
         } else if (change instanceof TextChange) {
             TextChange textChange = (TextChange) change;
@@ -124,36 +136,68 @@ public abstract class AbstractLTKRefactoringHandler extends AbstractRefactoringH
                 return;
             }
 
+            String source = null;
             try {
-                String currentContent = textChange.getCurrentContent(edit.getRegion(), true, 0, new NullProgressMonitor());
-                collectTextEdits(edit, uri, currentContent, edits);
+                source = textChange.getCurrentContent(new NullProgressMonitor());
             } catch (CoreException e) {
-                collectTextEdits(edit, uri, null, edits);
+                // fall through with null source
             }
+
+            FileEdits fileEdits = editsByUri.computeIfAbsent(uri, k -> new FileEdits(k));
+            collectTextEdits(edit, source, fileEdits.textEdits);
         }
     }
 
-    private void collectTextEdits(TextEdit edit, String uri, String source, List<Map<String, Object>> edits) {
+    private void collectTextEdits(TextEdit edit, String source, List<Map<String, Object>> textEdits) {
         if (edit instanceof MultiTextEdit) {
             for (TextEdit child : edit.getChildren()) {
-                collectTextEdits(child, uri, source, edits);
+                collectTextEdits(child, source, textEdits);
             }
         } else if (edit instanceof ReplaceEdit) {
             ReplaceEdit replace = (ReplaceEdit) edit;
-            Map<String, Object> editMap = new HashMap<>();
-            editMap.put("uri", uri);
-            editMap.put("offset", replace.getOffset());
-            editMap.put("length", replace.getLength());
-            editMap.put("newText", replace.getText());
-            edits.add(editMap);
+            textEdits.add(createTextEdit(source, replace.getOffset(), replace.getLength(), replace.getText()));
         } else if (edit instanceof InsertEdit) {
             InsertEdit insert = (InsertEdit) edit;
-            Map<String, Object> editMap = new HashMap<>();
-            editMap.put("uri", uri);
-            editMap.put("offset", insert.getOffset());
-            editMap.put("length", 0);
-            editMap.put("newText", insert.getText());
-            edits.add(editMap);
+            textEdits.add(createTextEdit(source, insert.getOffset(), 0, insert.getText()));
+        }
+    }
+
+    private Map<String, Object> createTextEdit(String source, int offset, int length, String newText) {
+        Map<String, Object> edit = new HashMap<>();
+        edit.put("range", createRange(source, offset, length));
+        edit.put("newText", newText);
+        return edit;
+    }
+
+    private Map<String, Object> createRange(String source, int offset, int length) {
+        Map<String, Object> range = new HashMap<>();
+        range.put("start", offsetToPosition(source, offset));
+        range.put("end", offsetToPosition(source, offset + length));
+        return range;
+    }
+
+    private Map<String, Object> offsetToPosition(String source, int offset) {
+        int line = 0;
+        int character = 0;
+        if (source != null) {
+            for (int i = 0; i < Math.min(offset, source.length()); i++) {
+                if (source.charAt(i) == '\n') {
+                    line++;
+                    character = 0;
+                } else {
+                    character++;
+                }
+            }
+        }
+        return Map.of("line", line, "character", character);
+    }
+
+    private static class FileEdits {
+        final String uri;
+        final List<Map<String, Object>> textEdits = new ArrayList<>();
+
+        FileEdits(String uri) {
+            this.uri = uri;
         }
     }
 
