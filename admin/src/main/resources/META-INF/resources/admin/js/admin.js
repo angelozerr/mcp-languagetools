@@ -314,6 +314,9 @@
                 case 'trace-level-update':
                     handleTraceLevelUpdate(message);
                     break;
+                case 'server-enabled-changed':
+                    handleServerEnabledChanged(message);
+                    break;
                 default:
                     console.warn('Unknown WebSocket message type:', message.type);
             }
@@ -650,6 +653,42 @@
                 // Update the detail panel status badge if this server is selected
                 if (selectedServer && selectedServer.id === event.serverId) {
                     updateDetailPanelStatusBadge(changedServer);
+                }
+            }
+        }
+
+        function handleServerEnabledChanged(event) {
+            const enabled = event.enabled;
+            const serverId = event.serverId;
+
+            // Update cached config
+            if (window.lspConfigs && window.lspConfigs[serverId]) {
+                window.lspConfigs[serverId].enabled = enabled;
+            }
+            if (window.dapConfigs && window.dapConfigs[serverId]) {
+                window.dapConfigs[serverId].enabled = enabled;
+            }
+
+            // Update workspace server data
+            for (const ws of workspaces) {
+                if (ws.lspServers) {
+                    const srv = ws.lspServers.find(s => s.id === serverId);
+                    if (srv) srv.enabled = enabled;
+                }
+            }
+
+            // Update DOM (LSP uses data-server-id, DAP uses data-dap-server)
+            const serverElement = document.querySelector(`.server-item[data-server-id="${serverId}"]`) ||
+                                  document.querySelector(`.server-item[data-dap-server="${serverId}"]`);
+            if (serverElement) {
+                if (enabled) {
+                    serverElement.classList.remove('server-disabled');
+                } else {
+                    serverElement.classList.add('server-disabled');
+                }
+                const checkbox = serverElement.querySelector('.toggle-switch input[type="checkbox"]');
+                if (checkbox) {
+                    checkbox.checked = enabled;
                 }
             }
         }

@@ -22,6 +22,7 @@ import com.ibm.mcp.languagetools.language.LanguageRegistry;
 import com.ibm.mcp.languagetools.lsp.server.LspServer;
 import com.ibm.mcp.languagetools.lsp.server.LspServerConfig;
 import com.ibm.mcp.languagetools.lsp.server.LspServerStatusChangeEvent;
+import com.ibm.mcp.languagetools.event.ServerEnabledChangeEvent;
 import com.ibm.mcp.languagetools.mcp.McpClientChangeEvent;
 import com.ibm.mcp.languagetools.mcp.McpClientTracker;
 import com.ibm.mcp.languagetools.mcp.trace.McpTraceCollector;
@@ -87,6 +88,9 @@ public class Application {
     Event<LspServerStatusChangeEvent> lspServerStatusChangeEvent;
 
     // ----------- DAP servers
+
+    @Inject
+    Event<ServerEnabledChangeEvent> serverEnabledChangeEvent;
 
     // ----------- MCP servers
 
@@ -342,6 +346,32 @@ public class Application {
      */
     public Collection<Workspace> getWorkspaces() {
         return workspaces.values();
+    }
+
+    public void disableLspServer(String serverId) {
+        extensionRegistry.disableLspServer(serverId);
+        for (Workspace ws : getWorkspaces()) {
+            LspServer server = ws.getLspServer(serverId);
+            if (server != null && server.getStatus() != ServerStatus.STOPPED) {
+                server.shutdown();
+            }
+        }
+        serverEnabledChangeEvent.fire(new ServerEnabledChangeEvent(serverId, false));
+    }
+
+    public void enableLspServer(String serverId) {
+        extensionRegistry.enableLspServer(serverId);
+        serverEnabledChangeEvent.fire(new ServerEnabledChangeEvent(serverId, true));
+    }
+
+    public void disableDapServer(String serverId) {
+        extensionRegistry.disableDapServer(serverId);
+        serverEnabledChangeEvent.fire(new ServerEnabledChangeEvent(serverId, false));
+    }
+
+    public void enableDapServer(String serverId) {
+        extensionRegistry.enableDapServer(serverId);
+        serverEnabledChangeEvent.fire(new ServerEnabledChangeEvent(serverId, true));
     }
 
     /**

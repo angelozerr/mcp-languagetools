@@ -263,7 +263,7 @@ public class ExtensionTools {
     public Map<String, Object> enableLspServer(
             @ToolArg(description = "Server ID to enable") String serverId) {
         try {
-            application.getExtensionRegistry().enableLspServer(serverId);
+            application.enableLspServer(serverId);
             return Map.of("success", true, "message", "LSP server '" + serverId + "' enabled");
         } catch (Exception e) {
             LOG.error("Failed to enable LSP server", e);
@@ -276,7 +276,7 @@ public class ExtensionTools {
     public Map<String, Object> disableLspServer(
             @ToolArg(description = "Server ID to disable") String serverId) {
         try {
-            application.getExtensionRegistry().disableLspServer(serverId);
+            application.disableLspServer(serverId);
             return Map.of("success", true, "message", "LSP server '" + serverId + "' disabled");
         } catch (Exception e) {
             LOG.error("Failed to disable LSP server", e);
@@ -289,7 +289,7 @@ public class ExtensionTools {
     public Map<String, Object> enableDapServer(
             @ToolArg(description = "Server ID to enable") String serverId) {
         try {
-            application.getExtensionRegistry().enableDapServer(serverId);
+            application.enableDapServer(serverId);
             return Map.of("success", true, "message", "DAP server '" + serverId + "' enabled");
         } catch (Exception e) {
             LOG.error("Failed to enable DAP server", e);
@@ -302,7 +302,7 @@ public class ExtensionTools {
     public Map<String, Object> disableDapServer(
             @ToolArg(description = "Server ID to disable") String serverId) {
         try {
-            application.getExtensionRegistry().disableDapServer(serverId);
+            application.disableDapServer(serverId);
             return Map.of("success", true, "message", "DAP server '" + serverId + "' disabled");
         } catch (Exception e) {
             LOG.error("Failed to disable DAP server", e);

@@ -191,28 +191,28 @@ public class ExtensionAdminResource {
     @POST
     @Path("/lsp/servers/{serverId}/enable")
     public Response enableLspServer(@PathParam("serverId") String serverId) {
-        application.getExtensionRegistry().enableLspServer(serverId);
+        application.enableLspServer(serverId);
         return Response.ok(Map.of("success", true, "message", "LSP server '" + serverId + "' enabled")).build();
     }
 
     @POST
     @Path("/lsp/servers/{serverId}/disable")
     public Response disableLspServer(@PathParam("serverId") String serverId) {
-        application.getExtensionRegistry().disableLspServer(serverId);
+        application.disableLspServer(serverId);
         return Response.ok(Map.of("success", true, "message", "LSP server '" + serverId + "' disabled")).build();
     }
 
     @POST
     @Path("/dap/servers/{serverId}/enable")
     public Response enableDapServer(@PathParam("serverId") String serverId) {
-        application.getExtensionRegistry().enableDapServer(serverId);
+        application.enableDapServer(serverId);
         return Response.ok(Map.of("success", true, "message", "DAP server '" + serverId + "' enabled")).build();
     }
 
     @POST
     @Path("/dap/servers/{serverId}/disable")
     public Response disableDapServer(@PathParam("serverId") String serverId) {
-        application.getExtensionRegistry().disableDapServer(serverId);
+        application.disableDapServer(serverId);
         return Response.ok(Map.of("success", true, "message", "DAP server '" + serverId + "' disabled")).build();
     }
 

@@ -20,6 +20,7 @@ import com.ibm.mcp.languagetools.admin.dto.WorkspaceDTO;
 import com.ibm.mcp.languagetools.admin.ws.*;
 import com.ibm.mcp.languagetools.dap.session.DapSessionEvent;
 import com.ibm.mcp.languagetools.dap.session.DapSessionManager;
+import com.ibm.mcp.languagetools.event.ServerEnabledChangeEvent;
 import com.ibm.mcp.languagetools.lsp.server.LspServerStatusChangeEvent;
 import com.ibm.mcp.languagetools.server.ServerStatus;
 import com.ibm.mcp.languagetools.configuration.ApplicationConfiguration;
@@ -428,6 +429,14 @@ public class AdminWebSocketEndpoint {
                 installProgress,
                 isReady
         );
+        broadcast(msg);
+    }
+
+    void onServerEnabledChange(@Observes ServerEnabledChangeEvent event) {
+        LOG.infof("WebSocket: Server enabled changed: %s -> %s (broadcasting to %d clients)",
+                event.serverId(), event.enabled(), sessions.size());
+        ServerEnabledChangedWsMessage msg = new ServerEnabledChangedWsMessage(
+                event.serverId(), event.enabled());
         broadcast(msg);
     }
 
