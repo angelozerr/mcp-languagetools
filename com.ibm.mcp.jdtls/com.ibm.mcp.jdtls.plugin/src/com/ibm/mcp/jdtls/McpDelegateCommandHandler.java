@@ -133,12 +133,15 @@ public class McpDelegateCommandHandler implements IDelegateCommandHandler {
         HANDLERS.put(JdtlsCommands.MOVE_TYPE_TO_NEW_FILE, new MoveTypeToNewFileHandler());
         HANDLERS.put(JdtlsCommands.PULL_UP, new PullUpHandler());
         HANDLERS.put(JdtlsCommands.PUSH_DOWN, new PushDownHandler());
+        HANDLERS.put(JdtlsCommands.CONVERT_TO_RECORD, new ConvertToRecordHandler());
+        HANDLERS.put(JdtlsCommands.MOVE_TYPE_TO_PACKAGE, new MoveTypeToPackageHandler());
 
         // --- Code generation ---
         HANDLERS.put(JdtlsCommands.GENERATE_GETTERS_SETTERS, new GenerateGettersSettersHandler());
         HANDLERS.put(JdtlsCommands.GENERATE_CONSTRUCTOR, new GenerateConstructorHandler());
         HANDLERS.put(JdtlsCommands.GENERATE_TO_STRING, new GenerateToStringHandler());
         HANDLERS.put(JdtlsCommands.GENERATE_EQUALS_HASHCODE, new GenerateEqualsHashCodeHandler());
+        HANDLERS.put(JdtlsCommands.GENERATE_DELEGATE_METHODS, new GenerateDelegateMethodsHandler());
 
         // --- Project ---
         HANDLERS.put(JdtlsCommands.GET_PROJECT_STRUCTURE, new GetProjectStructureHandler());

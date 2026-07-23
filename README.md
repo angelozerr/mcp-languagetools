@@ -68,7 +68,7 @@ This means AI assistants can leverage the same tooling that developers use in th
 | `detach_from_process` | Detach without terminating the process |
 | `get_debug_statistics` | Get statistics about active debug sessions |
 
-### Java Tools (77 tools from Java extension)
+### Java Tools (80 tools from Java extension)
 
 These tools are inspired by [javalens-mcp](https://github.com/pzalutski-pixel/javalens-mcp) and provide deep Java analysis, navigation, refactoring, and code generation capabilities powered by [Eclipse JDT.LS](https://github.com/eclipse-jdtls/eclipse.jdt.ls).
 
@@ -97,7 +97,7 @@ All refactoring tools (except `java_organize_imports`) support an optional `appl
 2. Review the returned text edits and affected files
 3. If satisfied, call again with `apply: true` to apply
 
-These 15 tools support the `apply` parameter: `java_rename_symbol`, `java_extract_method`, `java_extract_variable`, `java_extract_constant`, `java_extract_interface`, `java_extract_superclass`, `java_inline_method`, `java_inline_variable`, `java_change_method_signature`, `java_convert_anonymous_to_lambda`, `java_encapsulate_field`, `java_introduce_parameter_object`, `java_move_type_to_new_file`, `java_pull_up`, `java_push_down`.
+These 17 tools support the `apply` parameter: `java_rename_symbol`, `java_extract_method`, `java_extract_variable`, `java_extract_constant`, `java_extract_interface`, `java_extract_superclass`, `java_inline_method`, `java_inline_variable`, `java_change_method_signature`, `java_convert_anonymous_to_lambda`, `java_encapsulate_field`, `java_introduce_parameter_object`, `java_move_type_to_new_file`, `java_pull_up`, `java_push_down`, `java_convert_to_record`, `java_move_type_to_package`.
 
 #### Analysis (12 tools)
 
@@ -159,7 +159,7 @@ These 15 tools support the `apply` parameter: `java_rename_symbol`, `java_extrac
 | `java_find_throws_declarations` | Find all throws clause declarations of an exception type |
 | `java_find_type_arguments` | Find all type argument usages in generics |
 
-#### Refactoring (16 tools)
+#### Refactoring (18 tools)
 
 All refactoring tools (except `java_organize_imports`) support the [`apply` parameter](#the-apply-parameter-preview-vs-apply) for preview/apply workflow.
 
@@ -181,8 +181,10 @@ All refactoring tools (except `java_organize_imports`) support the [`apply` para
 | `java_move_type_to_new_file` | Move a nested/inner type to its own top-level file |
 | `java_pull_up` | Pull members up from a subclass into its superclass |
 | `java_push_down` | Push members down from a superclass into its subclasses |
+| `java_convert_to_record` | Convert a Java class to a record (Java 16+) |
+| `java_move_type_to_package` | Move a top-level Java type to a different package |
 
-#### Code Generation (4 tools)
+#### Code Generation (5 tools)
 
 | Tool | Description |
 |------|-------------|
@@ -190,6 +192,7 @@ All refactoring tools (except `java_organize_imports`) support the [`apply` para
 | `java_generate_constructor` | Generate a constructor from fields |
 | `java_generate_to_string` | Generate a toString() method |
 | `java_generate_equals_hashcode` | Generate equals() and hashCode() methods |
+| `java_generate_delegate_methods` | Generate delegate methods for a field's type |
 
 #### Diagnostics & Fix (5 tools)
 
@@ -235,13 +238,13 @@ All refactoring tools (except `java_organize_imports`) support the [`apply` para
 | Navigation | 11 |
 | Code Search | 11 |
 | Reference Search | 6 |
-| Refactoring | 16 |
-| Code Generation | 4 |
+| Refactoring | 18 |
+| Code Generation | 5 |
 | Diagnostics & Fix | 5 |
 | Code Quality | 4 |
 | Framework | 3 |
 | Project | 4 |
-| **Total** | **77** *(including `java_get_type_members` and `java_get_dependency_graph`)* |
+| **Total** | **80** *(including `java_get_type_members` and `java_get_dependency_graph`)* |
 
 ### Extension & Workspace Tools
 

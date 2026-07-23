@@ -62,8 +62,14 @@ public class JavaRefactoringTools {
     public CompletableFuture<String> organizeImports(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
+            @ToolArg(description = JavaToolArgDescriptions.FILE_URIS, required = false) java.util.List<String> fileUris,
             Cancellation cancellation,
             Progress progress) {
+        java.util.List<String> uris = RefactoringHelper.resolveFileUris(fileUri, fileUris);
+        if (uris.size() > 1) {
+            return executor.executeBatchCommand(cwd, JdtlsCommands.ORGANIZE_IMPORTS, uris,
+                    uri -> Map.of("uri", uri), cancellation, progress);
+        }
         return executor.executeCommand(cwd, JdtlsCommands.ORGANIZE_IMPORTS,
                 Map.of("uri", fileUri),
                 cancellation, progress);
@@ -325,5 +331,41 @@ public class JavaRefactoringTools {
         params.put("memberNames", memberNames);
         RefactoringHelper.putApply(params, apply);
         return executor.executeCommand(cwd, JdtlsCommands.PUSH_DOWN, params, cancellation, progress);
+    }
+
+    @Tool(name = "java_convert_to_record",
+          description = "Convert a Java class to a record (Java 16+). " +
+                        "The class must not extend another class, must not be abstract, and should have instance fields. " +
+                        "Removes canonical constructor and simple getters. " +
+                        "Example: java_convert_to_record(cwd='/project', fileUri='file:///project/src/Point.java', line=3, character=10)")
+    public CompletableFuture<String> convertToRecord(
+            @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
+            @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
+            @ToolArg(description = ToolArgDescriptions.POSITION_LINE) int line,
+            @ToolArg(description = ToolArgDescriptions.POSITION_CHARACTER) int character,
+            @ToolArg(description = ToolArgDescriptions.APPLY, required = false) Boolean apply,
+            Cancellation cancellation,
+            Progress progress) {
+        Map<String, Object> params = RefactoringHelper.positionParams(fileUri, line, character);
+        RefactoringHelper.putApply(params, apply);
+        return executor.executeCommand(cwd, JdtlsCommands.CONVERT_TO_RECORD, params, cancellation, progress);
+    }
+
+    @Tool(name = "java_move_type_to_package",
+          description = "Move a top-level Java type to a different package. " +
+                        "Updates package declaration, moves the file, and updates all imports across the workspace. " +
+                        "Example: java_move_type_to_package(cwd='/project', fileUri='file:///project/src/util/Helper.java', targetPackage='com.example.common')")
+    public CompletableFuture<String> moveTypeToPackage(
+            @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
+            @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
+            @ToolArg(description = "Target package name (e.g., 'com.example.common')") String targetPackage,
+            @ToolArg(description = ToolArgDescriptions.APPLY, required = false) Boolean apply,
+            Cancellation cancellation,
+            Progress progress) {
+        Map<String, Object> params = new java.util.HashMap<>();
+        params.put("uri", fileUri);
+        params.put("targetPackage", targetPackage);
+        RefactoringHelper.putApply(params, apply);
+        return executor.executeCommand(cwd, JdtlsCommands.MOVE_TYPE_TO_PACKAGE, params, cancellation, progress);
     }
 }

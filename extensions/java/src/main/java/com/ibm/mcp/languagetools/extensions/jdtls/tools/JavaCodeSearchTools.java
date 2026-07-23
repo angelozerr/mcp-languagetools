@@ -21,6 +21,7 @@ import io.quarkiverse.mcp.server.ToolArg;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
@@ -61,8 +62,14 @@ public class JavaCodeSearchTools {
     public CompletableFuture<String> findTests(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
+            @ToolArg(description = JavaToolArgDescriptions.FILE_URIS, required = false) List<String> fileUris,
             Cancellation cancellation,
             Progress progress) {
+        List<String> uris = RefactoringHelper.resolveFileUris(fileUri, fileUris);
+        if (uris.size() > 1) {
+            return executor.executeBatchCommand(cwd, JdtlsCommands.FIND_TESTS, uris,
+                    uri -> Map.of("uri", uri), cancellation, progress);
+        }
         return executor.executeCommand(cwd, JdtlsCommands.FIND_TESTS,
                 Map.of("uri", fileUri),
                 cancellation, progress);
@@ -90,8 +97,14 @@ public class JavaCodeSearchTools {
     public CompletableFuture<String> findUnusedCode(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
+            @ToolArg(description = JavaToolArgDescriptions.FILE_URIS, required = false) List<String> fileUris,
             Cancellation cancellation,
             Progress progress) {
+        List<String> uris = RefactoringHelper.resolveFileUris(fileUri, fileUris);
+        if (uris.size() > 1) {
+            return executor.executeBatchCommand(cwd, JdtlsCommands.FIND_UNUSED_CODE, uris,
+                    uri -> Map.of("uri", uri), cancellation, progress);
+        }
         return executor.executeCommand(cwd, JdtlsCommands.FIND_UNUSED_CODE,
                 Map.of("uri", fileUri),
                 cancellation, progress);
@@ -103,8 +116,14 @@ public class JavaCodeSearchTools {
     public CompletableFuture<String> findUnreachableCode(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
+            @ToolArg(description = JavaToolArgDescriptions.FILE_URIS, required = false) List<String> fileUris,
             Cancellation cancellation,
             Progress progress) {
+        List<String> uris = RefactoringHelper.resolveFileUris(fileUri, fileUris);
+        if (uris.size() > 1) {
+            return executor.executeBatchCommand(cwd, JdtlsCommands.FIND_UNREACHABLE_CODE, uris,
+                    uri -> Map.of("uri", uri), cancellation, progress);
+        }
         return executor.executeCommand(cwd, JdtlsCommands.FIND_UNREACHABLE_CODE,
                 Map.of("uri", fileUri),
                 cancellation, progress);
@@ -116,8 +135,14 @@ public class JavaCodeSearchTools {
     public CompletableFuture<String> findReflectionUsage(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
+            @ToolArg(description = JavaToolArgDescriptions.FILE_URIS, required = false) List<String> fileUris,
             Cancellation cancellation,
             Progress progress) {
+        List<String> uris = RefactoringHelper.resolveFileUris(fileUri, fileUris);
+        if (uris.size() > 1) {
+            return executor.executeBatchCommand(cwd, JdtlsCommands.FIND_REFLECTION_USAGE, uris,
+                    uri -> Map.of("uri", uri), cancellation, progress);
+        }
         return executor.executeCommand(cwd, JdtlsCommands.FIND_REFLECTION_USAGE,
                 Map.of("uri", fileUri),
                 cancellation, progress);

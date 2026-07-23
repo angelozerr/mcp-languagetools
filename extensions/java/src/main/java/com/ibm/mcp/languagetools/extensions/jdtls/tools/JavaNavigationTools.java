@@ -21,6 +21,7 @@ import io.quarkiverse.mcp.server.ToolArg;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
@@ -201,8 +202,14 @@ public class JavaNavigationTools {
     public CompletableFuture<String> getDocumentSymbols(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
+            @ToolArg(description = JavaToolArgDescriptions.FILE_URIS, required = false) List<String> fileUris,
             Cancellation cancellation,
             Progress progress) {
+        List<String> uris = RefactoringHelper.resolveFileUris(fileUri, fileUris);
+        if (uris.size() > 1) {
+            return executor.executeBatchCommand(cwd, JdtlsCommands.GET_DOCUMENT_SYMBOLS, uris,
+                    uri -> Map.of("uri", uri), cancellation, progress);
+        }
         return executor.executeCommand(cwd, JdtlsCommands.GET_DOCUMENT_SYMBOLS,
                 Map.of("uri", fileUri),
                 cancellation, progress);

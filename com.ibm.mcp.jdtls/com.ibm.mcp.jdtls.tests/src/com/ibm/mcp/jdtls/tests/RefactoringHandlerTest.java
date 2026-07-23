@@ -31,6 +31,7 @@ import org.junit.jupiter.api.Test;
 
 import com.ibm.mcp.jdtls.handlers.refactoring.ChangeMethodSignatureHandler;
 import com.ibm.mcp.jdtls.handlers.refactoring.ConvertAnonymousToLambdaHandler;
+import com.ibm.mcp.jdtls.handlers.refactoring.ConvertToRecordHandler;
 import com.ibm.mcp.jdtls.handlers.refactoring.EncapsulateFieldHandler;
 import com.ibm.mcp.jdtls.handlers.refactoring.ExtractConstantHandler;
 import com.ibm.mcp.jdtls.handlers.refactoring.ExtractInterfaceHandler;
@@ -41,6 +42,7 @@ import com.ibm.mcp.jdtls.handlers.refactoring.InlineMethodHandler;
 import com.ibm.mcp.jdtls.handlers.refactoring.InlineVariableHandler;
 import com.ibm.mcp.jdtls.handlers.refactoring.IntroduceParameterObjectHandler;
 import com.ibm.mcp.jdtls.handlers.refactoring.MoveTypeToNewFileHandler;
+import com.ibm.mcp.jdtls.handlers.refactoring.MoveTypeToPackageHandler;
 import com.ibm.mcp.jdtls.handlers.refactoring.OrganizeImportsHandler;
 import com.ibm.mcp.jdtls.handlers.refactoring.PullUpHandler;
 import com.ibm.mcp.jdtls.handlers.refactoring.PushDownHandler;
@@ -874,6 +876,145 @@ public class RefactoringHandlerTest extends AbstractHandlerTest {
             assertNotNull(resultMap);
             assertEquals(false, resultMap.get("applied"));
             // Validator.java has no imports, so no edits expected
+        }
+    }
+
+    // ===================================================================
+    // 17. ConvertToRecordHandler
+    // ===================================================================
+
+    @Nested
+    @DisplayName("ConvertToRecordHandler")
+    class ConvertToRecordTests {
+
+        private final ConvertToRecordHandler handler = new ConvertToRecordHandler();
+
+        @Test
+        @DisplayName("Convert User.java to record - preview mode")
+        void convertToRecord_previewMode() throws Exception {
+            String uri = fileUri("src/com/example/model/User.java");
+            // User class at line 12 (0-based), character 13
+            Map<String, Object> p = params(uri, 12, 13);
+
+            Object result = handler.execute(args(p), MONITOR);
+            Map<String, Object> resultMap = asMap(result);
+
+            assertPreviewSuccess(resultMap);
+        }
+
+        @Test
+        @DisplayName("Convert class with superclass returns error")
+        void convertToRecord_withSuperclass() throws Exception {
+            String uri = fileUri("src/com/example/model/Admin.java");
+            // Admin class at line 4 (0-based), character 13
+            Map<String, Object> p = params(uri, 4, 13);
+
+            Object result = handler.execute(args(p), MONITOR);
+            Map<String, Object> resultMap = asMap(result);
+
+            assertEquals(false, resultMap.get("applied"));
+            assertNotNull(resultMap.get("error"));
+            assertTrue(resultMap.get("error").toString().contains("superclass"),
+                    "Error should mention superclass");
+        }
+
+        @Test
+        @DisplayName("Convert interface returns error")
+        void convertToRecord_interface() throws Exception {
+            String uri = fileUri("src/com/example/service/Validator.java");
+            // Validator interface at line 2 (0-based), character 17
+            Map<String, Object> p = params(uri, 2, 17);
+
+            Object result = handler.execute(args(p), MONITOR);
+            Map<String, Object> resultMap = asMap(result);
+
+            assertEquals(false, resultMap.get("applied"));
+            assertNotNull(resultMap.get("error"));
+            assertTrue(resultMap.get("error").toString().contains("interface"),
+                    "Error should mention interface");
+        }
+
+        @Test
+        @DisplayName("Convert class with no instance fields returns error")
+        void convertToRecord_noInstanceFields() throws Exception {
+            String uri = fileUri("src/com/example/util/StringUtils.java");
+            // StringUtils class at line 2 (0-based), character 13
+            Map<String, Object> p = params(uri, 2, 13);
+
+            Object result = handler.execute(args(p), MONITOR);
+            Map<String, Object> resultMap = asMap(result);
+
+            assertEquals(false, resultMap.get("applied"));
+            assertNotNull(resultMap.get("error"));
+        }
+    }
+
+    // ===================================================================
+    // 18. MoveTypeToPackageHandler
+    // ===================================================================
+
+    @Nested
+    @DisplayName("MoveTypeToPackageHandler")
+    class MoveTypeToPackageTests {
+
+        private final MoveTypeToPackageHandler handler = new MoveTypeToPackageHandler();
+
+        @Test
+        @DisplayName("Move to same package returns error")
+        void moveToSamePackage_returnsError() throws Exception {
+            String uri = fileUri("src/com/example/util/StringUtils.java");
+            Map<String, Object> p = new HashMap<>();
+            p.put("uri", uri);
+            p.put("targetPackage", "com.example.util");
+
+            Object result = handler.execute(args(p), MONITOR);
+            Map<String, Object> resultMap = asMap(result);
+
+            assertEquals(false, resultMap.get("applied"));
+            assertNotNull(resultMap.get("error"));
+            assertTrue(resultMap.get("error").toString().contains("already in package"),
+                    "Error should mention type is already in the target package");
+        }
+
+        @Test
+        @DisplayName("Move with missing targetPackage returns error")
+        void moveType_missingTargetPackage() throws Exception {
+            String uri = fileUri("src/com/example/util/StringUtils.java");
+            Map<String, Object> p = new HashMap<>();
+            p.put("uri", uri);
+
+            Object result = handler.execute(args(p), MONITOR);
+            Map<String, Object> resultMap = asMap(result);
+
+            assertEquals(false, resultMap.get("applied"));
+            assertNotNull(resultMap.get("error"));
+        }
+
+        @Test
+        @DisplayName("Move StringUtils to com.example.service - preview mode")
+        void moveType_previewMode() throws Exception {
+            String uri = fileUri("src/com/example/util/StringUtils.java");
+            Map<String, Object> p = new HashMap<>();
+            p.put("uri", uri);
+            p.put("targetPackage", "com.example.newpkg");
+
+            Object result = handler.execute(args(p), MONITOR);
+            Map<String, Object> resultMap = asMap(result);
+
+            assertPreviewSuccess(resultMap);
+        }
+
+        @Test
+        @DisplayName("Move with missing uri returns error")
+        void moveType_missingUri() throws Exception {
+            Map<String, Object> p = new HashMap<>();
+            p.put("targetPackage", "com.example.other");
+
+            Object result = handler.execute(args(p), MONITOR);
+            Map<String, Object> resultMap = asMap(result);
+
+            assertEquals(false, resultMap.get("applied"));
+            assertNotNull(resultMap.get("error"));
         }
     }
 

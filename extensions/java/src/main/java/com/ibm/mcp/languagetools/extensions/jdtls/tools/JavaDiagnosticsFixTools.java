@@ -21,6 +21,8 @@ import io.quarkiverse.mcp.server.ToolArg;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
@@ -45,8 +47,14 @@ public class JavaDiagnosticsFixTools {
     public CompletableFuture<String> validateSyntax(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
+            @ToolArg(description = JavaToolArgDescriptions.FILE_URIS, required = false) List<String> fileUris,
             Cancellation cancellation,
             Progress progress) {
+        List<String> uris = RefactoringHelper.resolveFileUris(fileUri, fileUris);
+        if (uris.size() > 1) {
+            return executor.executeBatchCommand(cwd, JdtlsCommands.VALIDATE_SYNTAX, uris,
+                    uri -> Map.of("uri", uri), cancellation, progress);
+        }
         return executor.executeCommand(cwd, JdtlsCommands.VALIDATE_SYNTAX,
                 Map.of("uri", fileUri),
                 cancellation, progress);
@@ -82,8 +90,14 @@ public class JavaDiagnosticsFixTools {
     public CompletableFuture<String> diagnoseAndFix(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
+            @ToolArg(description = JavaToolArgDescriptions.FILE_URIS, required = false) List<String> fileUris,
             Cancellation cancellation,
             Progress progress) {
+        List<String> uris = RefactoringHelper.resolveFileUris(fileUri, fileUris);
+        if (uris.size() > 1) {
+            return executor.executeBatchCommand(cwd, JdtlsCommands.DIAGNOSE_AND_FIX, uris,
+                    uri -> Map.of("uri", uri), cancellation, progress);
+        }
         return executor.executeCommand(cwd, JdtlsCommands.DIAGNOSE_AND_FIX,
                 Map.of("uri", fileUri),
                 cancellation, progress);
@@ -98,8 +112,19 @@ public class JavaDiagnosticsFixTools {
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
             @ToolArg(description = "Cleanup ID: remove_unused_imports, add_missing_override, convert_to_lambda, remove_unnecessary_casts, add_final_modifier") String cleanupId,
+            @ToolArg(description = JavaToolArgDescriptions.FILE_URIS, required = false) List<String> fileUris,
             Cancellation cancellation,
             Progress progress) {
+        List<String> uris = RefactoringHelper.resolveFileUris(fileUri, fileUris);
+        if (uris.size() > 1) {
+            return executor.executeBatchCommand(cwd, JdtlsCommands.APPLY_CLEANUP, uris,
+                    uri -> {
+                        Map<String, Object> params = new HashMap<>();
+                        params.put("uri", uri);
+                        params.put("cleanupId", cleanupId);
+                        return params;
+                    }, cancellation, progress);
+        }
         return executor.executeCommand(cwd, JdtlsCommands.APPLY_CLEANUP,
                 Map.of("uri", fileUri, "cleanupId", cleanupId),
                 cancellation, progress);

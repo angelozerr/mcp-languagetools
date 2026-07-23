@@ -79,7 +79,7 @@ public class GetDiRegistrationsHandler implements ICommandHandler {
     public Object execute(List<Object> arguments, IProgressMonitor monitor) throws Exception {
         List<Map<String, Object>> registrations = new ArrayList<>();
         List<Map<String, Object>> injectionPoints = new ArrayList<>();
-        IJavaSearchScope scope = resolveSearchScope(arguments);
+        IJavaSearchScope scope = JdtUtils.resolveSearchScope(arguments);
 
         // Search for Spring stereotype annotations
         for (Map.Entry<String, String> entry : SPRING_STEREOTYPES.entrySet()) {
@@ -110,10 +110,6 @@ public class GetDiRegistrationsHandler implements ICommandHandler {
         result.put("injectionPoints", injectionPoints);
         result.put("counts", counts);
         return result;
-    }
-
-    private IJavaSearchScope resolveSearchScope(List<Object> arguments) {
-        return JdtUtils.resolveSearchScope(arguments);
     }
 
     private void searchStereotype(String annotationName, String stereotype, String defaultScope,

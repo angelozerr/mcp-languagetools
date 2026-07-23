@@ -112,11 +112,15 @@ public final class JdtlsCommands {
     public static final String PULL_UP = "mcp.jdtls.pullUp";
     public static final String PUSH_DOWN = "mcp.jdtls.pushDown";
 
+    public static final String CONVERT_TO_RECORD = "mcp.jdtls.convertToRecord";
+    public static final String MOVE_TYPE_TO_PACKAGE = "mcp.jdtls.moveTypeToPackage";
+
     // --- Code generation ---
     public static final String GENERATE_GETTERS_SETTERS = "mcp.jdtls.generateGettersSetters";
     public static final String GENERATE_CONSTRUCTOR = "mcp.jdtls.generateConstructor";
     public static final String GENERATE_TO_STRING = "mcp.jdtls.generateToString";
     public static final String GENERATE_EQUALS_HASHCODE = "mcp.jdtls.generateEqualsHashCode";
+    public static final String GENERATE_DELEGATE_METHODS = "mcp.jdtls.generateDelegateMethods";
 
     // --- Project ---
     public static final String GET_PROJECT_STRUCTURE = "mcp.jdtls.getProjectStructure";

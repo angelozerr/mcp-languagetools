@@ -14,19 +14,27 @@
 package com.ibm.mcp.languagetools.extensions.jdtls.tools;
 
 /**
- * Centralized descriptions for Java-specific MCP tool arguments.
+ * Search scope for Java search operations.
  */
-public final class JavaToolArgDescriptions {
+public enum SearchScope {
 
-    private JavaToolArgDescriptions() {
+    PROJECT("project"),
+    WORKSPACE("workspace");
+
+    private final String value;
+
+    SearchScope(String value) {
+        this.value = value;
     }
 
-    public static final String FILE_URIS =
-        "List of file URIs for batch operation. When provided, overrides fileUri and processes all files";
+    public String getValue() {
+        return value;
+    }
 
-    public static final String SEARCH_SCOPE =
-        "Search scope: 'project' for project sources only (faster), 'workspace' for full workspace (default)";
-
-    public static final String PROJECT_NAME =
-        "Project name to search in (used when scope='project', defaults to first Java project)";
+    public static SearchScope fromString(String value) {
+        if (PROJECT.value.equals(value)) {
+            return PROJECT;
+        }
+        return WORKSPACE;
+    }
 }

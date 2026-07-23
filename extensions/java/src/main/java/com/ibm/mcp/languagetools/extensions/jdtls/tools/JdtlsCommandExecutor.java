@@ -22,8 +22,12 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Function;
 
 /**
  * Executor for JDT.LS delegate commands.
@@ -76,6 +80,51 @@ public class JdtlsCommandExecutor {
                 .thenApply(this::formatResult)
                 .exceptionally(ex -> {
                     LOG.errorf(ex, "Failed to execute command %s", commandId);
+                    return "Error executing " + commandId + ": " + ex.getMessage();
+                });
+    }
+
+    public CompletableFuture<String> executeBatchCommand(String cwd, String commandId,
+                                                          List<String> fileUris,
+                                                          Function<String, Object> argsBuilder,
+                                                          Cancellation cancellation, Progress progress) {
+        var workspace = application.getWorkspaceForPath(cwd);
+        LspServer jdtls = workspace.getLspServers().stream()
+                .filter(s -> JDTLS_SERVER_ID.equals(s.getConfig().getServerId()))
+                .findFirst()
+                .orElse(null);
+
+        if (jdtls == null) {
+            return CompletableFuture.completedFuture(
+                    "Error: JDT.LS server not found for workspace " + cwd);
+        }
+
+        return jdtls.waitUntilReady()
+                .thenCompose(v -> {
+                    CompletableFuture<List<Map<String, Object>>> chain =
+                            CompletableFuture.completedFuture(new ArrayList<>());
+                    for (String uri : fileUris) {
+                        chain = chain.thenCompose(results -> {
+                            Object args = argsBuilder.apply(uri);
+                            @SuppressWarnings("unchecked")
+                            List<Object> argList = args instanceof List
+                                    ? (List<Object>) args
+                                    : List.of(args);
+                            return jdtls.executeCommand(commandId, argList)
+                                    .thenApply(result -> {
+                                        Map<String, Object> entry = new LinkedHashMap<>();
+                                        entry.put("fileUri", uri);
+                                        entry.put("result", result);
+                                        results.add(entry);
+                                        return results;
+                                    });
+                        });
+                    }
+                    return chain;
+                })
+                .thenApply(this::formatResult)
+                .exceptionally(ex -> {
+                    LOG.errorf(ex, "Failed to execute batch command %s", commandId);
                     return "Error executing " + commandId + ": " + ex.getMessage();
                 });
     }

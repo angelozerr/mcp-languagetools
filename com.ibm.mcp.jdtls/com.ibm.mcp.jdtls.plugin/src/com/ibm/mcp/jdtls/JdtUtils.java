@@ -242,8 +242,7 @@ public final class JdtUtils {
     public static IJavaSearchScope resolveSearchScope(List<Object> arguments) {
         if (arguments != null && !arguments.isEmpty() && arguments.get(0) instanceof Map) {
             Map<String, Object> params = (Map<String, Object>) arguments.get(0);
-            String scopeParam = (String) params.get("scope");
-            if ("project".equals(scopeParam)) {
+            if (SearchScope.fromParams(params) == SearchScope.PROJECT) {
                 String projectName = (String) params.get("projectName");
                 IJavaProject javaProject = findJavaProject(projectName);
                 if (javaProject != null) {

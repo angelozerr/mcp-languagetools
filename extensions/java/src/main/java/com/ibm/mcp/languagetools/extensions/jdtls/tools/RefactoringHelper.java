@@ -14,6 +14,7 @@
 package com.ibm.mcp.languagetools.extensions.jdtls.tools;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -55,9 +56,20 @@ final class RefactoringHelper {
         }
     }
 
+    static List<String> resolveFileUris(String fileUri, List<String> fileUris) {
+        if (fileUris != null && !fileUris.isEmpty()) {
+            return fileUris;
+        }
+        if (fileUri != null) {
+            return List.of(fileUri);
+        }
+        return List.of();
+    }
+
     static void putScope(Map<String, Object> params, String scope, String projectName) {
         if (scope != null) {
-            params.put("scope", scope);
+            SearchScope searchScope = SearchScope.fromString(scope);
+            params.put("scope", searchScope.getValue());
         }
         if (projectName != null) {
             params.put("projectName", projectName);

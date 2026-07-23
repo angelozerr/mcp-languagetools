@@ -107,4 +107,20 @@ public class JavaCodeGenerationTools {
                 RefactoringHelper.positionParams(fileUri, line, character),
                 cancellation, progress);
     }
+
+    @Tool(name = "java_generate_delegate_methods",
+          description = "Generate delegate methods for a field in a Java class. " +
+                        "Creates forwarding methods for all public methods of the field's type. " +
+                        "Example: java_generate_delegate_methods(cwd='/project', fileUri='file:///project/src/Service.java', line=5, character=10)")
+    public CompletableFuture<String> generateDelegateMethods(
+            @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
+            @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
+            @ToolArg(description = ToolArgDescriptions.POSITION_LINE) int line,
+            @ToolArg(description = ToolArgDescriptions.POSITION_CHARACTER) int character,
+            Cancellation cancellation,
+            Progress progress) {
+        return executor.executeCommand(cwd, JdtlsCommands.GENERATE_DELEGATE_METHODS,
+                RefactoringHelper.positionParams(fileUri, line, character),
+                cancellation, progress);
+    }
 }

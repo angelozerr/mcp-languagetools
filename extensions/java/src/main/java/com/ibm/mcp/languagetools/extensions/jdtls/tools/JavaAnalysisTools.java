@@ -21,6 +21,7 @@ import io.quarkiverse.mcp.server.ToolArg;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
@@ -130,9 +131,14 @@ public class JavaAnalysisTools {
     public CompletableFuture<String> getComplexityMetrics(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
+            @ToolArg(description = JavaToolArgDescriptions.FILE_URIS, required = false) List<String> fileUris,
             Cancellation cancellation,
             Progress progress) {
-
+        List<String> uris = RefactoringHelper.resolveFileUris(fileUri, fileUris);
+        if (uris.size() > 1) {
+            return executor.executeBatchCommand(cwd, JdtlsCommands.GET_COMPLEXITY_METRICS, uris,
+                    uri -> Map.of("uri", uri), cancellation, progress);
+        }
         return executor.executeCommand(cwd, JdtlsCommands.GET_COMPLEXITY_METRICS,
                 Map.of("uri", fileUri),
                 cancellation, progress);
@@ -145,8 +151,14 @@ public class JavaAnalysisTools {
     public CompletableFuture<String> analyzeFile(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
             @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
+            @ToolArg(description = JavaToolArgDescriptions.FILE_URIS, required = false) List<String> fileUris,
             Cancellation cancellation,
             Progress progress) {
+        List<String> uris = RefactoringHelper.resolveFileUris(fileUri, fileUris);
+        if (uris.size() > 1) {
+            return executor.executeBatchCommand(cwd, JdtlsCommands.ANALYZE_FILE, uris,
+                    uri -> Map.of("uri", uri), cancellation, progress);
+        }
         return executor.executeCommand(cwd, JdtlsCommands.ANALYZE_FILE,
                 Map.of("uri", fileUri),
                 cancellation, progress);

@@ -15,6 +15,7 @@ package com.ibm.mcp.jdtls.tests;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -40,6 +41,7 @@ import com.ibm.mcp.jdtls.handlers.analysis.AnalyzeMethodHandler;
 import com.ibm.mcp.jdtls.handlers.analysis.AnalyzeTypeHandler;
 import com.ibm.mcp.jdtls.handlers.analysis.GetDependencyGraphHandler;
 import com.ibm.mcp.jdtls.handlers.codegen.GenerateConstructorHandler;
+import com.ibm.mcp.jdtls.handlers.codegen.GenerateDelegateMethodsHandler;
 import com.ibm.mcp.jdtls.handlers.codegen.GenerateEqualsHashCodeHandler;
 import com.ibm.mcp.jdtls.handlers.codegen.GenerateGettersSettersHandler;
 import com.ibm.mcp.jdtls.handlers.codegen.GenerateToStringHandler;
@@ -798,6 +800,47 @@ public class AnalysisAndSearchHandlerTest extends AbstractHandlerTest {
         assertNotNull(result);
         Map<String, Object> map = asMap(result);
         assertNotNull(map);
+    }
+
+    @Test
+    void testGenerateDelegateMethodsHandler() throws Exception {
+        GenerateDelegateMethodsHandler handler = new GenerateDelegateMethodsHandler();
+        String uri = fileUri("src/com/example/controller/UserController.java");
+
+        // userService field at line 11 (0-based), character 34
+        Map<String, Object> p = params(uri, 11, 34);
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        Map<String, Object> map = asMap(result);
+        assertNotNull(map);
+        // UserService has public methods not already in UserController,
+        // so delegate methods should be generated
+        assertEquals(false, map.get("applied"),
+                "Should return preview (applied=false)");
+        assertNull(map.get("error"),
+                "Should not return error: " + map.get("error"));
+
+        @SuppressWarnings("unchecked")
+        List<Object> edits = (List<Object>) map.get("edits");
+        assertNotNull(edits, "Edits must not be null");
+        assertFalse(edits.isEmpty(), "Should generate delegate method edits");
+    }
+
+    @Test
+    void testGenerateDelegateMethodsHandler_noFieldAtPosition() throws Exception {
+        GenerateDelegateMethodsHandler handler = new GenerateDelegateMethodsHandler();
+        String uri = fileUri("src/com/example/controller/UserController.java");
+
+        // Position on class name, not a field (line 9, character 13)
+        Map<String, Object> p = params(uri, 9, 13);
+        Object result = handler.execute(args(p), MONITOR);
+
+        assertNotNull(result);
+        Map<String, Object> map = asMap(result);
+        assertEquals(false, map.get("applied"));
+        assertNotNull(map.get("error"),
+                "Should report error when not positioned on a field");
     }
 
     // =========================================================================
