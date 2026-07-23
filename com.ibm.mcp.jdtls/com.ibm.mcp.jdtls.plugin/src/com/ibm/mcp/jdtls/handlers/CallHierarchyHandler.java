@@ -23,7 +23,17 @@ import org.eclipse.jdt.core.ICompilationUnit;
 import org.eclipse.jdt.core.IJavaElement;
 import org.eclipse.jdt.core.IMember;
 import org.eclipse.jdt.core.IMethod;
-import org.eclipse.jdt.core.JavaModelException;
+import org.eclipse.jdt.core.dom.ASTVisitor;
+import org.eclipse.jdt.core.dom.CompilationUnit;
+import org.eclipse.jdt.core.dom.IMethodBinding;
+import org.eclipse.jdt.core.dom.MethodDeclaration;
+import org.eclipse.jdt.core.dom.MethodInvocation;
+import org.eclipse.jdt.core.dom.SuperMethodInvocation;
+import org.eclipse.jdt.core.dom.ClassInstanceCreation;
+import org.eclipse.jdt.core.dom.ITypeBinding;
+import org.eclipse.jdt.core.dom.AST;
+import org.eclipse.jdt.core.dom.ASTParser;
+import org.eclipse.jdt.core.dom.NodeFinder;
 import org.eclipse.jdt.core.search.IJavaSearchConstants;
 import org.eclipse.jdt.core.search.IJavaSearchScope;
 import org.eclipse.jdt.core.search.SearchEngine;
@@ -130,14 +140,88 @@ public class CallHierarchyHandler implements ICommandHandler {
     }
 
     private Map<String, Object> findCallees(IMethod method, IProgressMonitor monitor) throws Exception {
-        // TODO: Implement outgoing call hierarchy using AST visitor
-        // For now, return a placeholder
+        ICompilationUnit cu = method.getCompilationUnit();
+        if (cu == null) {
+            return Map.of("method", method.getElementName(), "callees", List.of(),
+                    "error", "Method is not in a source compilation unit");
+        }
+
+        ASTParser parser = ASTParser.newParser(AST.getJLSLatest());
+        parser.setSource(cu);
+        parser.setResolveBindings(true);
+        parser.setBindingsRecovery(true);
+        CompilationUnit ast = (CompilationUnit) parser.createAST(monitor);
+
+        // Find the MethodDeclaration AST node for this IMethod
+        org.eclipse.jdt.core.ISourceRange sourceRange = method.getSourceRange();
+        MethodDeclaration methodDecl = null;
+        if (sourceRange != null) {
+            org.eclipse.jdt.core.dom.ASTNode node = NodeFinder.perform(ast, sourceRange.getOffset(), sourceRange.getLength());
+            while (node != null && !(node instanceof MethodDeclaration)) {
+                node = node.getParent();
+            }
+            if (node instanceof MethodDeclaration) {
+                methodDecl = (MethodDeclaration) node;
+            }
+        }
+
+        if (methodDecl == null) {
+            return Map.of("method", method.getElementName(), "callees", List.of());
+        }
+
+        List<Map<String, Object>> callees = new ArrayList<>();
+
+        methodDecl.accept(new ASTVisitor() {
+            @Override
+            public boolean visit(MethodInvocation node) {
+                IMethodBinding binding = node.resolveMethodBinding();
+                if (binding != null) {
+                    callees.add(formatBinding(binding, ast, node.getStartPosition()));
+                }
+                return true;
+            }
+
+            @Override
+            public boolean visit(SuperMethodInvocation node) {
+                IMethodBinding binding = node.resolveMethodBinding();
+                if (binding != null) {
+                    callees.add(formatBinding(binding, ast, node.getStartPosition()));
+                }
+                return true;
+            }
+
+            @Override
+            public boolean visit(ClassInstanceCreation node) {
+                IMethodBinding binding = node.resolveConstructorBinding();
+                if (binding != null) {
+                    callees.add(formatBinding(binding, ast, node.getStartPosition()));
+                }
+                return true;
+            }
+        });
+
         Map<String, Object> result = new HashMap<>();
         result.put("method", method.getElementName());
         result.put("declaringType", method.getDeclaringType().getFullyQualifiedName());
-        result.put("callees", List.of());
-        result.put("note", "Outgoing call hierarchy not yet implemented");
+        result.put("callees", callees);
         return result;
+    }
+
+    private Map<String, Object> formatBinding(IMethodBinding binding, CompilationUnit ast, int offset) {
+        Map<String, Object> info = new HashMap<>();
+        info.put("name", binding.getName());
+        ITypeBinding declaringClass = binding.getDeclaringClass();
+        if (declaringClass != null) {
+            info.put("declaringType", declaringClass.getQualifiedName());
+        }
+        info.put("line", ast.getLineNumber(offset) - 1);
+        String[] paramTypes = new String[binding.getParameterTypes().length];
+        for (int i = 0; i < paramTypes.length; i++) {
+            paramTypes[i] = binding.getParameterTypes()[i].getName();
+        }
+        info.put("parameterTypes", List.of(paramTypes));
+        info.put("returnType", binding.getReturnType().getName());
+        return info;
     }
 
     private Map<String, Object> formatMember(IMember member, SearchMatch match) {

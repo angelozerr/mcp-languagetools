@@ -70,6 +70,10 @@ This means AI assistants can leverage the same tooling that developers use in th
 
 ### Java Tools (from Java extension)
 
+These tools are inspired by [javalens-mcp](https://github.com/pzalutski-pixel/javalens-mcp).
+
+#### Analysis
+
 | Tool | Description |
 |------|-------------|
 | `java_get_type_hierarchy` | Get supertypes, super interfaces, and subtypes of a Java type |
@@ -78,6 +82,121 @@ This means AI assistants can leverage the same tooling that developers use in th
 | `java_find_annotation_usages` | Find all usages of a Java annotation type |
 | `java_find_type_instantiations` | Find all `new Type()` instantiations of a Java type |
 | `java_get_complexity_metrics` | Compute cyclomatic complexity and LOC per method |
+| `java_analyze_file` | Get comprehensive analysis of a Java file |
+| `java_analyze_type` | Get comprehensive analysis of a Java type |
+| `java_analyze_method` | Get comprehensive analysis of a Java method |
+| `java_analyze_change_impact` | Analyze the ripple effect of changing a symbol |
+| `java_analyze_control_flow` | Analyze control flow paths through a Java method |
+| `java_analyze_data_flow` | Track data flow through variables and parameters |
+
+#### Navigation
+
+| Tool | Description |
+|------|-------------|
+| `java_go_to_definition` | Navigate to the definition of a Java symbol |
+| `java_get_hover_info` | Get rich hover information (signature, Javadoc, type info) |
+| `java_get_javadoc` | Get parsed Javadoc documentation for a symbol |
+| `java_get_symbol_info` | Get detailed information about any Java symbol |
+| `java_get_enclosing_element` | Get the enclosing method, class, and package for a position |
+| `java_get_field_at_position` | Get field information at a specific position |
+| `java_get_method_at_position` | Get method information at a specific position |
+| `java_get_type_at_position` | Get type information at a specific position |
+| `java_get_signature_help` | Get method signature help at a specific position |
+| `java_get_super_method` | Find the method that a Java method overrides or implements |
+| `java_get_document_symbols` | Get all symbols (types, methods, fields) in a Java file |
+
+#### Code Search
+
+| Tool | Description |
+|------|-------------|
+| `java_find_references` | Find all references to a Java symbol |
+| `java_find_implementations` | Find all implementations of an interface or abstract class |
+| `java_find_field_writes` | Find all write accesses to a field |
+| `java_find_tests` | Find test methods in a Java file or across the workspace |
+| `java_find_affected_tests` | Find tests transitively affected by changes to a symbol |
+| `java_find_unused_code` | Find unused code (imports, private fields, methods, local variables) |
+| `java_find_unreachable_code` | Find unreachable code (dead code after return/throw) |
+| `java_find_reflection_usage` | Find reflection API usage in a Java file |
+| `java_suggest_imports` | Find import candidates for an unresolved type name |
+| `java_get_type_usage_summary` | Get a comprehensive usage summary for a Java type |
+| `java_search_symbols` | Search for Java symbols by name pattern |
+
+#### Reference Search
+
+| Tool | Description |
+|------|-------------|
+| `java_find_method_references` | Find all references to a method |
+| `java_find_casts` | Find all cast expressions to a Java type |
+| `java_find_catch_blocks` | Find all catch blocks catching a Java exception type |
+| `java_find_instanceof_checks` | Find all instanceof checks for a Java type |
+| `java_find_throws_declarations` | Find all throws clause declarations of an exception type |
+| `java_find_type_arguments` | Find all type argument usages in generics |
+
+#### Refactoring
+
+| Tool | Description |
+|------|-------------|
+| `java_rename_symbol` | Rename a Java symbol across the entire project |
+| `java_organize_imports` | Organize imports: remove unused and sort |
+| `java_extract_method` | Extract a code selection into a new method |
+| `java_extract_variable` | Extract an expression into a local variable |
+| `java_extract_constant` | Extract an expression into a static final constant field |
+| `java_extract_interface` | Extract an interface from a Java class |
+| `java_extract_superclass` | Extract a superclass from a Java class |
+| `java_inline_method` | Inline a method by replacing call sites with the method body |
+| `java_inline_variable` | Inline a local variable by replacing usages with its initializer |
+| `java_change_method_signature` | Change a method's signature and update all call sites |
+| `java_convert_anonymous_to_lambda` | Convert an anonymous class to a lambda expression |
+| `java_encapsulate_field` | Encapsulate a field by generating getter/setter methods |
+| `java_introduce_parameter_object` | Bundle method parameters into a parameter object class |
+| `java_move_type_to_new_file` | Move a nested/inner type to its own top-level file |
+| `java_pull_up` | Pull members up from a subclass into its superclass |
+| `java_push_down` | Push members down from a superclass into its subclasses |
+
+#### Code Generation
+
+| Tool | Description |
+|------|-------------|
+| `java_generate_getters_setters` | Generate getter and/or setter methods for fields |
+| `java_generate_constructor` | Generate a constructor from fields |
+| `java_generate_to_string` | Generate a toString() method |
+| `java_generate_equals_hashcode` | Generate equals() and hashCode() methods |
+
+#### Diagnostics & Fix
+
+| Tool | Description |
+|------|-------------|
+| `java_validate_syntax` | Quick syntax-only validation (no semantic analysis) |
+| `java_get_quick_fixes` | Get available quick fixes for problems at a position |
+| `java_apply_quick_fix` | Apply a specific quick fix to resolve a problem |
+| `java_diagnose_and_fix` | Diagnose problems and optionally apply safe auto-fixes |
+| `java_apply_cleanup` | Apply a code cleanup to a Java file |
+
+#### Code Quality
+
+| Tool | Description |
+|------|-------------|
+| `java_find_large_classes` | Find classes exceeding size thresholds |
+| `java_find_naming_violations` | Find naming convention violations |
+| `java_find_possible_bugs` | Find potential bug patterns |
+| `java_find_circular_dependencies` | Find circular package dependencies |
+
+#### Framework
+
+| Tool | Description |
+|------|-------------|
+| `java_get_http_endpoints` | Find all HTTP endpoints (REST API routes) |
+| `java_get_jpa_model` | Get the JPA entity model |
+| `java_get_di_registrations` | Find dependency injection registrations |
+
+#### Project
+
+| Tool | Description |
+|------|-------------|
+| `java_get_project_structure` | Get the package hierarchy and file structure |
+| `java_get_classpath_info` | Get the classpath entries of a Java project |
+| `java_get_type_members` | Get all members of a Java type |
+| `java_get_dependency_graph` | Get the import-based dependency graph |
 
 ### Extension & Workspace Tools
 

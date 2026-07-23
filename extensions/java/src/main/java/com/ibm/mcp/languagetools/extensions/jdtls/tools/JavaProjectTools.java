@@ -21,6 +21,7 @@ import io.quarkiverse.mcp.server.ToolArg;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
@@ -39,13 +40,19 @@ public class JavaProjectTools {
     @Tool(name = "java_get_project_structure",
           description = "Get the package hierarchy and file structure of a Java project. " +
                         "Returns source folders, packages, and compilation unit counts. " +
-                        "Example: java_get_project_structure(cwd='/project')")
+                        "Use projectName to target a specific project in multi-project workspaces. " +
+                        "Example: java_get_project_structure(cwd='/project', projectName='myapp')")
     public CompletableFuture<String> getProjectStructure(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
+            @ToolArg(description = "Name of the Java project to inspect (defaults to first Java project in workspace)", required = false) String projectName,
             Cancellation cancellation,
             Progress progress) {
+        Map<String, Object> args = new HashMap<>();
+        if (projectName != null) {
+            args.put("projectName", projectName);
+        }
         return executor.executeCommand(cwd, "mcp.jdtls.getProjectStructure",
-                Map.of(),
+                args,
                 cancellation, progress);
     }
 

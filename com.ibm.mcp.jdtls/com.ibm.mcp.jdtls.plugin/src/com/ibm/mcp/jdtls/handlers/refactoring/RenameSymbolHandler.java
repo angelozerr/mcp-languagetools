@@ -13,33 +13,24 @@
  *******************************************************************************/
 package com.ibm.mcp.jdtls.handlers.refactoring;
 
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.jdt.core.ICompilationUnit;
+import org.eclipse.jdt.core.IField;
 import org.eclipse.jdt.core.IJavaElement;
 import org.eclipse.jdt.core.ILocalVariable;
-import org.eclipse.jdt.core.IMember;
 import org.eclipse.jdt.core.IMethod;
-import org.eclipse.jdt.core.IField;
 import org.eclipse.jdt.core.IType;
-import org.eclipse.jdt.core.ITypeParameter;
-import org.eclipse.jdt.core.dom.AST;
-import org.eclipse.jdt.core.dom.ASTParser;
-import org.eclipse.jdt.core.dom.ASTVisitor;
-import org.eclipse.jdt.core.dom.CompilationUnit;
-import org.eclipse.jdt.core.dom.SimpleName;
-import org.eclipse.jdt.core.dom.IBinding;
-import org.eclipse.jdt.core.search.IJavaSearchConstants;
-import org.eclipse.jdt.core.search.IJavaSearchScope;
-import org.eclipse.jdt.core.search.SearchEngine;
-import org.eclipse.jdt.core.search.SearchMatch;
-import org.eclipse.jdt.core.search.SearchParticipant;
-import org.eclipse.jdt.core.search.SearchPattern;
-import org.eclipse.jdt.core.search.SearchRequestor;
+import org.eclipse.jdt.internal.corext.refactoring.rename.JavaRenameProcessor;
+import org.eclipse.jdt.internal.corext.refactoring.rename.RenameFieldProcessor;
+import org.eclipse.jdt.internal.corext.refactoring.rename.RenameLocalVariableProcessor;
+import org.eclipse.jdt.internal.corext.refactoring.rename.MethodChecks;
+import org.eclipse.jdt.internal.corext.refactoring.rename.RenameNonVirtualMethodProcessor;
+import org.eclipse.jdt.internal.corext.refactoring.rename.RenameVirtualMethodProcessor;
+import org.eclipse.jdt.internal.corext.refactoring.rename.RenameTypeProcessor;
+import org.eclipse.ltk.core.refactoring.participants.RenameRefactoring;
 
 import com.ibm.mcp.jdtls.JdtUtils;
 
@@ -48,17 +39,18 @@ import com.ibm.mcp.jdtls.JdtUtils;
  *
  * <p>Arguments: [{uri, line, character, newName}]</p>
  *
- * <p>Resolves the element at the given position via codeSelect, then finds all
- * references to the element across the workspace using SearchEngine. Builds text
- * edits to replace the old name with the new name at each occurrence.</p>
- *
- * <p>Supports renaming of types, methods, fields, local variables, and parameters.</p>
- *
- * <p>Copied and adapted from
- * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/RenameSymbolTool.java">javalens-mcp RenameSymbolTool</a>
- * for JDT.LS delegate command handler architecture.</p>
+ * <p>Renames a Java element using the JDT LTK refactoring engine. Correctly handles:
+ * <ul>
+ *   <li>Type renames (including compilation unit rename)</li>
+ *   <li>Method renames (including overriding methods in hierarchy)</li>
+ *   <li>Field renames (including getter/setter updates)</li>
+ *   <li>Local variable and parameter renames</li>
+ *   <li>Import statement updates across the workspace</li>
+ *   <li>Qualified name updates in strings and comments (optional)</li>
+ * </ul>
+ * </p>
  */
-public class RenameSymbolHandler extends AbstractRefactoringHandler {
+public class RenameSymbolHandler extends AbstractLTKRefactoringHandler {
 
     @Override
     public Object execute(List<Object> arguments, IProgressMonitor monitor) throws Exception {
@@ -91,126 +83,29 @@ public class RenameSymbolHandler extends AbstractRefactoringHandler {
             return createErrorResult("New name is the same as the old name");
         }
 
-        // For local variables, rename within the same compilation unit using AST
-        if (element instanceof ILocalVariable) {
-            return renameInSameUnit(cu, element, oldName, newName, monitor);
+        JavaRenameProcessor processor = createRenameProcessor(element);
+        if (processor == null) {
+            return createErrorResult("Unsupported element type for rename: " + element.getClass().getSimpleName());
         }
 
-        // For types, methods, fields - do workspace-wide rename via SearchEngine
-        return renameWorkspaceWide(element, oldName, newName, monitor);
+        processor.setNewElementName(newName);
+
+        RenameRefactoring refactoring = new RenameRefactoring(processor);
+        return executeRefactoring(refactoring, monitor);
     }
 
-    /**
-     * Rename a local variable within its compilation unit using AST traversal.
-     */
-    private Map<String, Object> renameInSameUnit(ICompilationUnit cu, IJavaElement element,
-            String oldName, String newName, IProgressMonitor monitor) throws Exception {
-        CompilationUnit ast = parseAST(cu, monitor);
-        String source = cu.getSource();
-        String cuUri = cu.getResource().getLocationURI().toString();
-
-        // Resolve the binding key for the element to match references accurately
-        List<int[]> positions = new ArrayList<>();
-
-        ast.accept(new ASTVisitor() {
-            @Override
-            public boolean visit(SimpleName node) {
-                if (node.getIdentifier().equals(oldName)) {
-                    IBinding binding = node.resolveBinding();
-                    if (binding != null) {
-                        IJavaElement boundElement = binding.getJavaElement();
-                        if (boundElement != null && boundElement.equals(element)) {
-                            positions.add(new int[] { node.getStartPosition(), node.getLength() });
-                        }
-                    }
-                }
-                return true;
+    private JavaRenameProcessor createRenameProcessor(IJavaElement element) throws Exception {
+        return switch (element.getElementType()) {
+            case IJavaElement.TYPE -> new RenameTypeProcessor((IType) element);
+            case IJavaElement.METHOD -> {
+                IMethod m = (IMethod) element;
+                yield MethodChecks.isVirtual(m)
+                        ? new RenameVirtualMethodProcessor(m)
+                        : new RenameNonVirtualMethodProcessor(m);
             }
-        });
-
-        if (positions.isEmpty()) {
-            return createErrorResult("No references found for the element");
-        }
-
-        // Apply replacements from end to start to preserve offsets
-        positions.sort((a, b) -> b[0] - a[0]);
-        StringBuilder sb = new StringBuilder(source);
-        for (int[] pos : positions) {
-            sb.replace(pos[0], pos[0] + pos[1], newName);
-        }
-
-        String newSource = sb.toString();
-        List<Map<String, Object>> edits = createWholeFileEdit(cuUri, source, newSource);
-        return createSuccessResult(edits);
-    }
-
-    /**
-     * Rename a type, method, or field across the workspace using SearchEngine.
-     */
-    private Map<String, Object> renameWorkspaceWide(IJavaElement element, String oldName,
-            String newName, IProgressMonitor monitor) throws Exception {
-
-        SearchPattern pattern = SearchPattern.createPattern(
-                element,
-                IJavaSearchConstants.ALL_OCCURRENCES);
-
-        if (pattern == null) {
-            return createErrorResult("Cannot create search pattern for element");
-        }
-
-        IJavaSearchScope scope = SearchEngine.createWorkspaceScope();
-        // Collect all matches grouped by compilation unit
-        Map<ICompilationUnit, List<int[]>> matchesByCu = new HashMap<>();
-
-        SearchEngine engine = new SearchEngine();
-        engine.search(
-                pattern,
-                new SearchParticipant[] { SearchEngine.getDefaultSearchParticipant() },
-                scope,
-                new SearchRequestor() {
-                    @Override
-                    public void acceptSearchMatch(SearchMatch match) {
-                        if (match.getResource() != null) {
-                            Object matchElement = match.getElement();
-                            if (matchElement instanceof IJavaElement) {
-                                ICompilationUnit matchCu = (ICompilationUnit) ((IJavaElement) matchElement)
-                                        .getAncestor(IJavaElement.COMPILATION_UNIT);
-                                if (matchCu != null) {
-                                    matchesByCu.computeIfAbsent(matchCu, k -> new ArrayList<>())
-                                            .add(new int[] { match.getOffset(), match.getLength() });
-                                }
-                            }
-                        }
-                    }
-                },
-                monitor);
-
-        if (matchesByCu.isEmpty()) {
-            return createErrorResult("No occurrences found");
-        }
-
-        List<Map<String, Object>> allEdits = new ArrayList<>();
-
-        for (Map.Entry<ICompilationUnit, List<int[]>> entry : matchesByCu.entrySet()) {
-            ICompilationUnit matchCu = entry.getKey();
-            List<int[]> positions = entry.getValue();
-            String source = matchCu.getSource();
-            String matchUri = matchCu.getResource().getLocationURI().toString();
-
-            // Sort positions from end to start
-            positions.sort((a, b) -> b[0] - a[0]);
-
-            StringBuilder sb = new StringBuilder(source);
-            for (int[] pos : positions) {
-                sb.replace(pos[0], pos[0] + pos[1], newName);
-            }
-
-            String newSource = sb.toString();
-            if (!newSource.equals(source)) {
-                allEdits.addAll(createWholeFileEdit(matchUri, source, newSource));
-            }
-        }
-
-        return createSuccessResult(allEdits);
+            case IJavaElement.FIELD -> new RenameFieldProcessor((IField) element);
+            case IJavaElement.LOCAL_VARIABLE -> new RenameLocalVariableProcessor((ILocalVariable) element);
+            default -> null;
+        };
     }
 }

@@ -18,13 +18,12 @@ import java.util.List;
 import java.util.Map;
 
 import org.eclipse.core.runtime.IProgressMonitor;
-import org.eclipse.jdt.core.ICompilationUnit;
 import org.eclipse.jdt.core.IField;
 import org.eclipse.jdt.core.IMember;
 import org.eclipse.jdt.core.IMethod;
-import org.eclipse.jdt.core.ISourceRange;
 import org.eclipse.jdt.core.IType;
-import org.eclipse.jdt.core.ITypeHierarchy;
+import org.eclipse.jdt.internal.corext.refactoring.structure.PushDownRefactoringProcessor;
+import org.eclipse.ltk.core.refactoring.participants.ProcessorBasedRefactoring;
 
 import com.ibm.mcp.jdtls.JdtUtils;
 
@@ -33,23 +32,17 @@ import com.ibm.mcp.jdtls.JdtUtils;
  *
  * <p>Arguments: [{uri, line, character, memberNames}]</p>
  *
- * <p>Pushes down members from a superclass to its direct subclasses by:
- * <ol>
- *   <li>Resolving the type and finding its direct subclasses via ITypeHierarchy</li>
- *   <li>For each selected member: copying it to every direct subclass</li>
- *   <li>Removing the member from the superclass (or making it abstract if it's a method)</li>
- *   <li>Adjusting access modifiers if necessary</li>
- * </ol>
+ * <p>Pushes down members from a superclass to its direct subclasses using the JDT LTK
+ * refactoring engine ({@link PushDownRefactoringProcessor}). Correctly handles:
+ * <ul>
+ *   <li>Distributing members to all direct subclasses</li>
+ *   <li>Making the superclass method abstract when appropriate</li>
+ *   <li>Access modifier adjustments</li>
+ *   <li>Import updates in all affected files</li>
+ * </ul>
  * </p>
- *
- * <p>All subclasses must be in the workspace (source-available) for editing.
- * Members are inserted before the closing brace of each subclass type declaration.</p>
- *
- * <p>Copied and adapted from
- * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/PushDownTool.java">javalens-mcp PushDownTool</a>
- * for JDT.LS delegate command handler architecture.</p>
  */
-public class PushDownHandler extends AbstractRefactoringHandler {
+public class PushDownHandler extends AbstractLTKRefactoringHandler {
 
     @Override
     @SuppressWarnings("unchecked")
@@ -74,20 +67,6 @@ public class PushDownHandler extends AbstractRefactoringHandler {
             return createErrorResult("No type found at position");
         }
 
-        // Find direct subclasses
-        ITypeHierarchy hierarchy = type.newTypeHierarchy(monitor);
-        IType[] subclasses = hierarchy.getSubtypes(type);
-        if (subclasses == null || subclasses.length == 0) {
-            return createErrorResult("Type has no direct subclasses");
-        }
-
-        ICompilationUnit superCu = type.getCompilationUnit();
-        if (superCu == null) {
-            return createErrorResult("Cannot find compilation unit for superclass");
-        }
-
-        String superSource = superCu.getSource();
-
         // Collect members to push down
         List<IMember> membersToMove = new ArrayList<>();
         for (String memberName : memberNames) {
@@ -109,90 +88,10 @@ public class PushDownHandler extends AbstractRefactoringHandler {
             return createErrorResult("No matching members found to push down");
         }
 
-        // Get source for each member
-        List<String> memberSources = new ArrayList<>();
-        for (IMember member : membersToMove) {
-            String memberSource = member.getSource();
-            if (memberSource != null) {
-                memberSources.add(memberSource);
-            }
-        }
+        IMember[] members = membersToMove.toArray(new IMember[0]);
+        PushDownRefactoringProcessor processor = new PushDownRefactoringProcessor(members);
 
-        List<Map<String, Object>> allEdits = new ArrayList<>();
-
-        // Add members to each subclass
-        for (IType subclass : subclasses) {
-            ICompilationUnit subCu = subclass.getCompilationUnit();
-            if (subCu == null) {
-                continue; // Skip binary subclasses
-            }
-
-            String subSource = subCu.getSource();
-            String subUri = subCu.getResource().getLocationURI().toString();
-
-            // Find the closing brace of the subclass
-            ISourceRange subRange = subclass.getSourceRange();
-            int subTypeEnd = subRange.getOffset() + subRange.getLength();
-            int closingBrace = subSource.lastIndexOf('}', subTypeEnd);
-            if (closingBrace < 0) {
-                continue;
-            }
-
-            StringBuilder newSubSource = new StringBuilder(subSource);
-            StringBuilder insertText = new StringBuilder();
-            for (String ms : memberSources) {
-                insertText.append("\n\t").append(ms.trim()).append("\n");
-            }
-            newSubSource.insert(closingBrace, insertText.toString());
-
-            if (!newSubSource.toString().equals(subSource)) {
-                allEdits.addAll(createWholeFileEdit(subUri, subSource, newSubSource.toString()));
-            }
-        }
-
-        // Remove members from the superclass
-        // Sort by position descending
-        membersToMove.sort((a, b) -> {
-            try {
-                return b.getSourceRange().getOffset() - a.getSourceRange().getOffset();
-            } catch (Exception e) {
-                return 0;
-            }
-        });
-
-        StringBuilder newSuperSource = new StringBuilder(superSource);
-        for (IMember member : membersToMove) {
-            ISourceRange range = member.getSourceRange();
-            int memberStart = range.getOffset();
-            int memberEnd = memberStart + range.getLength();
-
-            // Include leading whitespace on the same line
-            int lineStart = superSource.lastIndexOf('\n', memberStart - 1) + 1;
-            boolean allWhitespace = true;
-            for (int i = lineStart; i < memberStart; i++) {
-                if (superSource.charAt(i) != ' ' && superSource.charAt(i) != '\t') {
-                    allWhitespace = false;
-                    break;
-                }
-            }
-            if (allWhitespace) {
-                memberStart = lineStart;
-            }
-
-            // Include trailing newlines
-            while (memberEnd < newSuperSource.length()
-                    && (newSuperSource.charAt(memberEnd) == '\n' || newSuperSource.charAt(memberEnd) == '\r')) {
-                memberEnd++;
-            }
-
-            newSuperSource.delete(memberStart, memberEnd);
-        }
-
-        String superUri = superCu.getResource().getLocationURI().toString();
-        if (!newSuperSource.toString().equals(superSource)) {
-            allEdits.addAll(createWholeFileEdit(superUri, superSource, newSuperSource.toString()));
-        }
-
-        return createSuccessResult(allEdits);
+        ProcessorBasedRefactoring refactoring = new ProcessorBasedRefactoring(processor);
+        return executeRefactoring(refactoring, monitor);
     }
 }

@@ -21,6 +21,7 @@ import java.util.Map;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.jdt.core.IJavaElement;
 import org.eclipse.jdt.core.IType;
+import org.eclipse.jdt.core.search.IJavaSearchConstants;
 import org.eclipse.jdt.core.search.IJavaSearchScope;
 import org.eclipse.jdt.core.search.SearchEngine;
 import org.eclipse.jdt.core.search.SearchMatch;
@@ -66,12 +67,21 @@ public abstract class AbstractFineGrainReferenceHandler implements ICommandHandl
             return Map.of("error", "Type not found");
         }
 
-        SearchPattern pattern = SearchPattern.createPattern(type, searchConstant);
+        // Use string-based pattern (not IType-based) to avoid JDT internal ClassCastException
+        // with IntersectionCastTypeReference when scanning complex cast expressions.
+        String typeName = type.getFullyQualifiedName('$');
+        SearchPattern pattern = SearchPattern.createPattern(
+                typeName,
+                IJavaSearchConstants.TYPE,
+                searchConstant,
+                SearchPattern.R_EXACT_MATCH | SearchPattern.R_CASE_SENSITIVE);
         if (pattern == null) {
             return Map.of(typeLabel, type.getFullyQualifiedName(), resultKey, List.of());
         }
 
-        IJavaSearchScope scope = SearchEngine.createWorkspaceScope();
+        // Use source-only scope to avoid scanning JDK/library JARs
+        IJavaSearchScope scope = SearchEngine.createJavaSearchScope(
+                new IJavaElement[]{type.getJavaProject()}, IJavaSearchScope.SOURCES);
         List<Map<String, Object>> usages = new ArrayList<>();
 
         SearchEngine engine = new SearchEngine();
@@ -82,10 +92,12 @@ public abstract class AbstractFineGrainReferenceHandler implements ICommandHandl
                 new SearchRequestor() {
                     @Override
                     public void acceptSearchMatch(SearchMatch match) {
-                        Map<String, Object> usage = new HashMap<>();
-                        if (match.getResource() != null) {
-                            usage.put("uri", match.getResource().getLocationURI().toString());
+                        if (!(match.getResource() instanceof org.eclipse.core.resources.IFile f)
+                                || !"java".equalsIgnoreCase(f.getFileExtension())) {
+                            return;
                         }
+                        Map<String, Object> usage = new HashMap<>();
+                        usage.put("uri", match.getResource().getLocationURI().toString());
                         usage.put("offset", match.getOffset());
                         usage.put("length", match.getLength());
                         if (match.getElement() instanceof IJavaElement element) {

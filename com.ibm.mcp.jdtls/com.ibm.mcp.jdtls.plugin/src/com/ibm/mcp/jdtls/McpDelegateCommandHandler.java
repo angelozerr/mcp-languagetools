@@ -27,6 +27,7 @@ import com.ibm.mcp.jdtls.handlers.FindTypeInstantiationsHandler;
 import com.ibm.mcp.jdtls.handlers.GetComplexityMetricsHandler;
 import com.ibm.mcp.jdtls.handlers.TypeHierarchyHandler;
 import com.ibm.mcp.jdtls.handlers.analysis.*;
+import com.ibm.mcp.jdtls.handlers.codegen.*;
 import com.ibm.mcp.jdtls.handlers.diagnostics.*;
 import com.ibm.mcp.jdtls.handlers.framework.*;
 import com.ibm.mcp.jdtls.handlers.navigation.*;
@@ -132,6 +133,12 @@ public class McpDelegateCommandHandler implements IDelegateCommandHandler {
         HANDLERS.put("mcp.jdtls.moveTypeToNewFile", new MoveTypeToNewFileHandler());
         HANDLERS.put("mcp.jdtls.pullUp", new PullUpHandler());
         HANDLERS.put("mcp.jdtls.pushDown", new PushDownHandler());
+
+        // --- Code generation ---
+        HANDLERS.put("mcp.jdtls.generateGettersSetters", new GenerateGettersSettersHandler());
+        HANDLERS.put("mcp.jdtls.generateConstructor", new GenerateConstructorHandler());
+        HANDLERS.put("mcp.jdtls.generateToString", new GenerateToStringHandler());
+        HANDLERS.put("mcp.jdtls.generateEqualsHashCode", new GenerateEqualsHashCodeHandler());
 
         // --- Project ---
         HANDLERS.put("mcp.jdtls.getProjectStructure", new GetProjectStructureHandler());

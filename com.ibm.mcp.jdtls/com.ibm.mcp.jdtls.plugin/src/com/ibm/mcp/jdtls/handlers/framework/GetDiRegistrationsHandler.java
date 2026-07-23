@@ -18,13 +18,17 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.eclipse.core.resources.IProject;
+import org.eclipse.core.resources.ResourcesPlugin;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.jdt.core.IAnnotation;
 import org.eclipse.jdt.core.ICompilationUnit;
 import org.eclipse.jdt.core.IField;
 import org.eclipse.jdt.core.IJavaElement;
+import org.eclipse.jdt.core.IJavaProject;
 import org.eclipse.jdt.core.IMethod;
 import org.eclipse.jdt.core.IType;
+import org.eclipse.jdt.core.JavaCore;
 import org.eclipse.jdt.core.search.IJavaSearchConstants;
 import org.eclipse.jdt.core.search.IJavaSearchScope;
 import org.eclipse.jdt.core.search.SearchEngine;
@@ -38,7 +42,13 @@ import com.ibm.mcp.jdtls.ICommandHandler;
 /**
  * Handler for "mcp.jdtls.getDiRegistrations" command.
  *
- * <p>Arguments: none (workspace-wide scan)</p>
+ * <p>Arguments: optional [{scope, projectName}]</p>
+ * <ul>
+ *   <li>{@code scope} - "project" to restrict to project sources only (faster),
+ *       or "workspace" (default) for full workspace scan</li>
+ *   <li>{@code projectName} - when scope is "project", specifies which project
+ *       (defaults to first Java project)</li>
+ * </ul>
  *
  * <p>Searches for dependency injection annotations from Spring and Jakarta CDI
  * frameworks and extracts component registration and injection point metadata.</p>
@@ -67,11 +77,12 @@ public class GetDiRegistrationsHandler implements ICommandHandler {
             "Dependent", "dependent"
     );
 
+    @SuppressWarnings("unchecked")
     @Override
     public Object execute(List<Object> arguments, IProgressMonitor monitor) throws Exception {
         List<Map<String, Object>> registrations = new ArrayList<>();
         List<Map<String, Object>> injectionPoints = new ArrayList<>();
-        IJavaSearchScope scope = SearchEngine.createWorkspaceScope();
+        IJavaSearchScope scope = resolveSearchScope(arguments);
 
         // Search for Spring stereotype annotations
         for (Map.Entry<String, String> entry : SPRING_STEREOTYPES.entrySet()) {
@@ -102,6 +113,39 @@ public class GetDiRegistrationsHandler implements ICommandHandler {
         result.put("injectionPoints", injectionPoints);
         result.put("counts", counts);
         return result;
+    }
+
+    @SuppressWarnings("unchecked")
+    private IJavaSearchScope resolveSearchScope(List<Object> arguments) {
+        if (arguments != null && !arguments.isEmpty() && arguments.get(0) instanceof Map) {
+            Map<String, Object> params = (Map<String, Object>) arguments.get(0);
+            String scopeParam = (String) params.get("scope");
+            if ("project".equals(scopeParam)) {
+                String projectName = (String) params.get("projectName");
+                IJavaProject javaProject = findJavaProject(projectName);
+                if (javaProject != null) {
+                    return SearchEngine.createJavaSearchScope(
+                            new IJavaElement[]{javaProject}, IJavaSearchScope.SOURCES);
+                }
+            }
+        }
+        return SearchEngine.createWorkspaceScope();
+    }
+
+    private IJavaProject findJavaProject(String projectName) {
+        IProject[] projects = ResourcesPlugin.getWorkspace().getRoot().getProjects();
+        for (IProject project : projects) {
+            try {
+                if (project.isOpen() && project.hasNature(JavaCore.NATURE_ID)) {
+                    if (projectName == null || projectName.equals(project.getName())) {
+                        return JavaCore.create(project);
+                    }
+                }
+            } catch (Exception e) {
+                // Skip
+            }
+        }
+        return null;
     }
 
     private void searchStereotype(String annotationName, String stereotype, String defaultScope,

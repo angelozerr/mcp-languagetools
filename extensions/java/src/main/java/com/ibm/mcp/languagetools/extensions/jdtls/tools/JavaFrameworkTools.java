@@ -21,6 +21,7 @@ import io.quarkiverse.mcp.server.ToolArg;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 
@@ -68,13 +69,23 @@ public class JavaFrameworkTools {
           description = "Find dependency injection registrations in a Java project. " +
                         "Detects Spring (@Component, @Service, @Repository, @Controller, @Bean, @Autowired) and " +
                         "Jakarta CDI (@ApplicationScoped, @Inject, @Produces, @Named) annotations. " +
-                        "Example: java_get_di_registrations(cwd='/project')")
+                        "Use scope='project' for faster project-only scan (default scans entire workspace). " +
+                        "Example: java_get_di_registrations(cwd='/project', scope='project')")
     public CompletableFuture<String> getDiRegistrations(
             @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
+            @ToolArg(description = "Search scope: 'project' for project sources only (faster), 'workspace' for full workspace (default)", required = false) String scope,
+            @ToolArg(description = "Project name to search in (used when scope='project', defaults to first Java project)", required = false) String projectName,
             Cancellation cancellation,
             Progress progress) {
+        Map<String, Object> args = new HashMap<>();
+        if (scope != null) {
+            args.put("scope", scope);
+        }
+        if (projectName != null) {
+            args.put("projectName", projectName);
+        }
         return executor.executeCommand(cwd, "mcp.jdtls.getDiRegistrations",
-                Map.of(),
+                args,
                 cancellation, progress);
     }
 }

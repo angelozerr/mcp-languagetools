@@ -33,7 +33,11 @@ import com.ibm.mcp.jdtls.ICommandHandler;
 /**
  * Handler for "mcp.jdtls.getProjectStructure" command.
  *
- * <p>Arguments: none (uses first Java project in workspace)</p>
+ * <p>Arguments: optional [{projectName}]</p>
+ * <ul>
+ *   <li>{@code projectName} - name of the Java project to inspect
+ *       (defaults to first Java project in workspace)</li>
+ * </ul>
  *
  * <p>Enumerates source folders, packages, and compilation unit counts for the
  * project, providing a structural overview.</p>
@@ -44,11 +48,21 @@ import com.ibm.mcp.jdtls.ICommandHandler;
  */
 public class GetProjectStructureHandler implements ICommandHandler {
 
+    @SuppressWarnings("unchecked")
     @Override
     public Object execute(List<Object> arguments, IProgressMonitor monitor) throws Exception {
-        IJavaProject javaProject = findFirstJavaProject();
+        String projectName = null;
+        if (arguments != null && !arguments.isEmpty() && arguments.get(0) instanceof Map) {
+            Map<String, Object> params = (Map<String, Object>) arguments.get(0);
+            projectName = (String) params.get("projectName");
+        }
+
+        IJavaProject javaProject = findJavaProject(projectName);
         if (javaProject == null) {
-            return Map.of("error", "No Java project found in workspace");
+            String msg = projectName != null
+                    ? "Java project '" + projectName + "' not found in workspace"
+                    : "No Java project found in workspace";
+            return Map.of("error", msg);
         }
 
         List<Map<String, Object>> sourceFolders = new ArrayList<>();
@@ -100,12 +114,14 @@ public class GetProjectStructureHandler implements ICommandHandler {
         return result;
     }
 
-    private IJavaProject findFirstJavaProject() {
+    private IJavaProject findJavaProject(String projectName) {
         IProject[] projects = ResourcesPlugin.getWorkspace().getRoot().getProjects();
         for (IProject project : projects) {
             try {
                 if (project.isOpen() && project.hasNature(JavaCore.NATURE_ID)) {
-                    return JavaCore.create(project);
+                    if (projectName == null || projectName.equals(project.getName())) {
+                        return JavaCore.create(project);
+                    }
                 }
             } catch (Exception e) {
                 // Skip projects that cannot be processed

@@ -27,7 +27,6 @@ import org.eclipse.jdt.core.dom.ClassInstanceCreation;
 import org.eclipse.jdt.core.dom.CompilationUnit;
 import org.eclipse.jdt.core.dom.Expression;
 import org.eclipse.jdt.core.dom.ExpressionStatement;
-import org.eclipse.jdt.core.dom.IMethodBinding;
 import org.eclipse.jdt.core.dom.ITypeBinding;
 import org.eclipse.jdt.core.dom.MethodDeclaration;
 import org.eclipse.jdt.core.dom.ReturnStatement;
@@ -42,23 +41,15 @@ import com.ibm.mcp.jdtls.JdtUtils;
  * <p>Arguments: [{uri, line, character}]</p>
  *
  * <p>Converts an anonymous class to a lambda expression when the anonymous class
- * implements a functional interface (an interface with a single abstract method).</p>
- *
- * <p>The conversion:
- * <ol>
- *   <li>Verifies the anonymous class implements a functional interface</li>
- *   <li>Extracts the single method's parameters and body</li>
- *   <li>Builds a lambda expression: {@code (params) -> body} or {@code (params) -> { statements }}</li>
- *   <li>Replaces the ClassInstanceCreation with the lambda</li>
- * </ol>
+ * implements a functional interface (single abstract method). Handles:
+ * <ul>
+ *   <li>Single-expression lambdas (return statement → expression form)</li>
+ *   <li>Multi-statement block lambdas</li>
+ *   <li>Single-parameter parenthesis elision</li>
+ * </ul>
  * </p>
  *
- * <p>If the method body contains a single return statement, the lambda uses expression
- * form. Otherwise, a block lambda is generated.</p>
- *
- * <p>Copied and adapted from
- * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/ConvertAnonymousToLambdaTool.java">javalens-mcp ConvertAnonymousToLambdaTool</a>
- * for JDT.LS delegate command handler architecture.</p>
+ * <p>Note: No LTK refactoring exists for this conversion. Uses AST-based approach.</p>
  */
 public class ConvertAnonymousToLambdaHandler extends AbstractRefactoringHandler {
 
@@ -83,7 +74,6 @@ public class ConvertAnonymousToLambdaHandler extends AbstractRefactoringHandler 
         int offset = JdtUtils.getOffset(cu, line, character);
         CompilationUnit ast = parseAST(cu, monitor);
 
-        // Find the ClassInstanceCreation with AnonymousClassDeclaration at the position
         ClassInstanceCreation creation = findClassInstanceCreation(ast, offset);
         if (creation == null) {
             return createErrorResult("No anonymous class instance creation found at position");
@@ -94,32 +84,6 @@ public class ConvertAnonymousToLambdaHandler extends AbstractRefactoringHandler 
             return createErrorResult("No anonymous class declaration found");
         }
 
-        // Check that it implements a functional interface
-        ITypeBinding typeBinding = creation.resolveTypeBinding();
-        if (typeBinding == null) {
-            return createErrorResult("Cannot resolve type binding for anonymous class");
-        }
-
-        ITypeBinding[] interfaces = typeBinding.getInterfaces();
-        ITypeBinding superclass = typeBinding.getSuperclass();
-        ITypeBinding targetType = null;
-
-        // Try interfaces first, then superclass
-        if (interfaces.length > 0) {
-            targetType = interfaces[0];
-        } else if (superclass != null && superclass.isInterface()) {
-            targetType = superclass;
-        }
-
-        if (targetType == null) {
-            // Try functional interface detection via the creation type
-            ITypeBinding creationType = creation.getType().resolveBinding();
-            if (creationType != null) {
-                targetType = creationType;
-            }
-        }
-
-        // Get the single method declaration from the anonymous class
         @SuppressWarnings("unchecked")
         List<BodyDeclaration> bodyDecls = anonymousDecl.bodyDeclarations();
         MethodDeclaration singleMethod = null;
@@ -140,17 +104,14 @@ public class ConvertAnonymousToLambdaHandler extends AbstractRefactoringHandler 
             return createErrorResult("No method found in anonymous class");
         }
 
-        // Build the lambda expression
         StringBuilder lambda = new StringBuilder();
 
-        // Parameters
         @SuppressWarnings("unchecked")
         List<SingleVariableDeclaration> lambdaParams = singleMethod.parameters();
 
         if (lambdaParams.isEmpty()) {
             lambda.append("()");
         } else if (lambdaParams.size() == 1) {
-            // Single parameter - can omit type and parentheses
             lambda.append(lambdaParams.get(0).getName().getIdentifier());
         } else {
             lambda.append("(");
@@ -165,7 +126,6 @@ public class ConvertAnonymousToLambdaHandler extends AbstractRefactoringHandler 
 
         lambda.append(" -> ");
 
-        // Body
         Block body = singleMethod.getBody();
         if (body == null) {
             return createErrorResult("Method has no body");
@@ -177,31 +137,26 @@ public class ConvertAnonymousToLambdaHandler extends AbstractRefactoringHandler 
         if (statements.size() == 1) {
             Statement stmt = statements.get(0);
             if (stmt instanceof ReturnStatement) {
-                // Single return: use expression form
                 ReturnStatement retStmt = (ReturnStatement) stmt;
                 Expression retExpr = retStmt.getExpression();
                 if (retExpr != null) {
-                    lambda.append(source.substring(retExpr.getStartPosition(),
-                            retExpr.getStartPosition() + retExpr.getLength()));
+                    lambda.append(source, retExpr.getStartPosition(),
+                            retExpr.getStartPosition() + retExpr.getLength());
                 } else {
-                    // void return
                     lambda.append("{}");
                 }
             } else if (stmt instanceof ExpressionStatement) {
-                // Single expression statement: use expression form
                 ExpressionStatement exprStmt = (ExpressionStatement) stmt;
                 Expression expr = exprStmt.getExpression();
-                lambda.append(source.substring(expr.getStartPosition(),
-                        expr.getStartPosition() + expr.getLength()));
+                lambda.append(source, expr.getStartPosition(),
+                        expr.getStartPosition() + expr.getLength());
             } else {
-                // Single non-expression statement: use block form
                 lambda.append("{\n");
                 lambda.append("\t\t").append(source.substring(stmt.getStartPosition(),
                         stmt.getStartPosition() + stmt.getLength()).trim());
                 lambda.append("\n\t}");
             }
         } else {
-            // Multiple statements: use block form
             lambda.append("{\n");
             for (Statement stmt : statements) {
                 lambda.append("\t\t").append(source.substring(stmt.getStartPosition(),
@@ -210,7 +165,6 @@ public class ConvertAnonymousToLambdaHandler extends AbstractRefactoringHandler 
             lambda.append("\t}");
         }
 
-        // Replace the entire ClassInstanceCreation with the lambda
         int creationStart = creation.getStartPosition();
         int creationEnd = creationStart + creation.getLength();
 
@@ -220,9 +174,6 @@ public class ConvertAnonymousToLambdaHandler extends AbstractRefactoringHandler 
         return createSuccessResult(edits);
     }
 
-    /**
-     * Find the ClassInstanceCreation at or near the given offset.
-     */
     private ClassInstanceCreation findClassInstanceCreation(CompilationUnit ast, int offset) {
         final ClassInstanceCreation[] result = new ClassInstanceCreation[1];
         ast.accept(new ASTVisitor() {
@@ -232,9 +183,7 @@ public class ConvertAnonymousToLambdaHandler extends AbstractRefactoringHandler 
                     int start = node.getStartPosition();
                     int end = start + node.getLength();
                     if (start <= offset && end >= offset) {
-                        // Accept the most specific (deepest) match
-                        if (result[0] == null
-                                || node.getLength() < result[0].getLength()) {
+                        if (result[0] == null || node.getLength() < result[0].getLength()) {
                             result[0] = node;
                         }
                     }

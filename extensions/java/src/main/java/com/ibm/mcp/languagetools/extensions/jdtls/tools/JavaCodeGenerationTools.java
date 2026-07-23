@@ -1,0 +1,117 @@
+/*******************************************************************************
+ * Copyright (c) 2026 IBM Corporation and others.
+ *
+ * This program and the accompanying materials
+ * are made available under the terms of the Eclipse Public License 2.0
+ * which accompanies this distribution, and is available at
+ * https://www.eclipse.org/legal/epl-2.0/
+ *
+ * SPDX-License-Identifier: EPL-2.0
+ *
+ * Contributors:
+ *     Angelo ZERR - initial API and implementation
+ *******************************************************************************/
+package com.ibm.mcp.languagetools.extensions.jdtls.tools;
+
+import com.ibm.mcp.languagetools.tools.ToolArgDescriptions;
+import io.quarkiverse.mcp.server.Cancellation;
+import io.quarkiverse.mcp.server.Progress;
+import io.quarkiverse.mcp.server.Tool;
+import io.quarkiverse.mcp.server.ToolArg;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+
+/**
+ * MCP tools for Java code generation via JDT.LS delegate command handlers.
+ *
+ * <p>Generates boilerplate code: getters/setters, constructors, toString, equals/hashCode.</p>
+ */
+@ApplicationScoped
+public class JavaCodeGenerationTools {
+
+    @Inject
+    JdtlsCommandExecutor executor;
+
+    @Tool(name = "java_generate_getters_setters",
+          description = "Generate getter and/or setter methods for fields in a Java class. " +
+                        "Skips static final fields and methods that already exist. " +
+                        "Example: java_generate_getters_setters(cwd='/project', fileUri='file:///project/src/User.java', line=3, character=10)")
+    public CompletableFuture<String> generateGettersSetters(
+            @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
+            @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
+            @ToolArg(description = ToolArgDescriptions.POSITION_LINE) int line,
+            @ToolArg(description = ToolArgDescriptions.POSITION_CHARACTER) int character,
+            @ToolArg(description = "Generate only getters (default true)", required = false) Boolean generateGetters,
+            @ToolArg(description = "Generate only setters (default true)", required = false) Boolean generateSetters,
+            Cancellation cancellation,
+            Progress progress) {
+        Map<String, Object> args = new HashMap<>();
+        args.put("uri", fileUri);
+        args.put("line", line);
+        args.put("character", character);
+        if (generateGetters != null) {
+            args.put("generateGetters", generateGetters);
+        }
+        if (generateSetters != null) {
+            args.put("generateSetters", generateSetters);
+        }
+        return executor.executeCommand(cwd, "mcp.jdtls.generateGettersSetters", args, cancellation, progress);
+    }
+
+    @Tool(name = "java_generate_constructor",
+          description = "Generate a constructor for a Java class from its fields. " +
+                        "Can also generate a default no-arg constructor. " +
+                        "Example: java_generate_constructor(cwd='/project', fileUri='file:///project/src/User.java', line=3, character=10)")
+    public CompletableFuture<String> generateConstructor(
+            @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
+            @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
+            @ToolArg(description = ToolArgDescriptions.POSITION_LINE) int line,
+            @ToolArg(description = ToolArgDescriptions.POSITION_CHARACTER) int character,
+            @ToolArg(description = "Also generate a default no-arg constructor (default false)", required = false) Boolean generateDefault,
+            Cancellation cancellation,
+            Progress progress) {
+        Map<String, Object> args = new HashMap<>();
+        args.put("uri", fileUri);
+        args.put("line", line);
+        args.put("character", character);
+        if (generateDefault != null) {
+            args.put("generateDefault", generateDefault);
+        }
+        return executor.executeCommand(cwd, "mcp.jdtls.generateConstructor", args, cancellation, progress);
+    }
+
+    @Tool(name = "java_generate_to_string",
+          description = "Generate a toString() method for a Java class using its instance fields. " +
+                        "Example: java_generate_to_string(cwd='/project', fileUri='file:///project/src/User.java', line=3, character=10)")
+    public CompletableFuture<String> generateToString(
+            @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
+            @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
+            @ToolArg(description = ToolArgDescriptions.POSITION_LINE) int line,
+            @ToolArg(description = ToolArgDescriptions.POSITION_CHARACTER) int character,
+            Cancellation cancellation,
+            Progress progress) {
+        return executor.executeCommand(cwd, "mcp.jdtls.generateToString",
+                Map.of("uri", fileUri, "line", line, "character", character),
+                cancellation, progress);
+    }
+
+    @Tool(name = "java_generate_equals_hashcode",
+          description = "Generate equals() and hashCode() methods for a Java class using java.util.Objects. " +
+                        "Compares all instance fields by default. " +
+                        "Example: java_generate_equals_hashcode(cwd='/project', fileUri='file:///project/src/User.java', line=3, character=10)")
+    public CompletableFuture<String> generateEqualsHashCode(
+            @ToolArg(description = ToolArgDescriptions.CWD) String cwd,
+            @ToolArg(description = ToolArgDescriptions.FILE_URI) String fileUri,
+            @ToolArg(description = ToolArgDescriptions.POSITION_LINE) int line,
+            @ToolArg(description = ToolArgDescriptions.POSITION_CHARACTER) int character,
+            Cancellation cancellation,
+            Progress progress) {
+        return executor.executeCommand(cwd, "mcp.jdtls.generateEqualsHashCode",
+                Map.of("uri", fileUri, "line", line, "character", character),
+                cancellation, progress);
+    }
+}

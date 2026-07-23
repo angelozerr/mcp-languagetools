@@ -18,13 +18,13 @@ import java.util.List;
 import java.util.Map;
 
 import org.eclipse.core.runtime.IProgressMonitor;
-import org.eclipse.jdt.core.ICompilationUnit;
 import org.eclipse.jdt.core.IField;
 import org.eclipse.jdt.core.IMember;
 import org.eclipse.jdt.core.IMethod;
-import org.eclipse.jdt.core.ISourceRange;
 import org.eclipse.jdt.core.IType;
 import org.eclipse.jdt.core.ITypeHierarchy;
+import org.eclipse.jdt.internal.corext.refactoring.structure.PullUpRefactoringProcessor;
+import org.eclipse.ltk.core.refactoring.participants.ProcessorBasedRefactoring;
 
 import com.ibm.mcp.jdtls.JdtUtils;
 
@@ -33,23 +33,17 @@ import com.ibm.mcp.jdtls.JdtUtils;
  *
  * <p>Arguments: [{uri, line, character, memberNames}]</p>
  *
- * <p>Pulls up members from a subclass to its superclass by:
- * <ol>
- *   <li>Resolving the type and finding its superclass via the type hierarchy</li>
- *   <li>For each selected member: copying it to the superclass</li>
- *   <li>Removing the member from the subclass</li>
- *   <li>Adjusting access modifiers (private becomes protected)</li>
- * </ol>
+ * <p>Pulls up members from a subclass to its superclass using the JDT LTK
+ * refactoring engine ({@link PullUpRefactoringProcessor}). Correctly handles:
+ * <ul>
+ *   <li>Access modifier adjustments</li>
+ *   <li>Abstract method stub generation in subclasses</li>
+ *   <li>Import updates in both source and target</li>
+ *   <li>Type hierarchy consistency checks</li>
+ * </ul>
  * </p>
- *
- * <p>The superclass must be in the workspace (source-available) for editing.
- * Members are inserted before the closing brace of the superclass type declaration.</p>
- *
- * <p>Copied and adapted from
- * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/PullUpTool.java">javalens-mcp PullUpTool</a>
- * for JDT.LS delegate command handler architecture.</p>
  */
-public class PullUpHandler extends AbstractRefactoringHandler {
+public class PullUpHandler extends AbstractLTKRefactoringHandler {
 
     @Override
     @SuppressWarnings("unchecked")
@@ -77,22 +71,9 @@ public class PullUpHandler extends AbstractRefactoringHandler {
         // Find the superclass
         ITypeHierarchy hierarchy = type.newSupertypeHierarchy(monitor);
         IType superclass = hierarchy.getSuperclass(type);
-        if (superclass == null) {
-            return createErrorResult("Type has no superclass");
+        if (superclass == null || superclass.getCompilationUnit() == null) {
+            return createErrorResult("Type has no editable superclass (binary or no superclass)");
         }
-
-        ICompilationUnit superCu = superclass.getCompilationUnit();
-        if (superCu == null) {
-            return createErrorResult("Superclass is not in the workspace (binary type)");
-        }
-
-        ICompilationUnit subCu = type.getCompilationUnit();
-        if (subCu == null) {
-            return createErrorResult("Cannot find compilation unit for subclass");
-        }
-
-        String subSource = subCu.getSource();
-        String superSource = superCu.getSource();
 
         // Collect members to pull up
         List<IMember> membersToMove = new ArrayList<>();
@@ -115,80 +96,12 @@ public class PullUpHandler extends AbstractRefactoringHandler {
             return createErrorResult("No matching members found to pull up");
         }
 
-        // Build member sources for the superclass (adjusting visibility)
-        List<String> memberSources = new ArrayList<>();
-        for (IMember member : membersToMove) {
-            String memberSource = member.getSource();
-            if (memberSource != null) {
-                // Change private to protected
-                String adjusted = memberSource.replaceFirst("\\bprivate\\b", "protected");
-                memberSources.add(adjusted);
-            }
-        }
+        IMember[] members = membersToMove.toArray(new IMember[0]);
+        PullUpRefactoringProcessor processor = new PullUpRefactoringProcessor(members, null);
+        processor.setDestinationType(superclass);
+        processor.setMembersToMove(members);
 
-        // Insert members into the superclass before the closing brace
-        int superTypeEnd = superclass.getSourceRange().getOffset() + superclass.getSourceRange().getLength();
-        // Find the closing brace of the superclass type
-        int closingBrace = superSource.lastIndexOf('}', superTypeEnd);
-        if (closingBrace < 0) {
-            return createErrorResult("Cannot find closing brace of superclass");
-        }
-
-        StringBuilder newSuperSource = new StringBuilder(superSource);
-        StringBuilder insertText = new StringBuilder();
-        for (String ms : memberSources) {
-            insertText.append("\n\t").append(ms.trim()).append("\n");
-        }
-        newSuperSource.insert(closingBrace, insertText.toString());
-
-        // Remove members from the subclass
-        // Sort by position descending
-        membersToMove.sort((a, b) -> {
-            try {
-                return b.getSourceRange().getOffset() - a.getSourceRange().getOffset();
-            } catch (Exception e) {
-                return 0;
-            }
-        });
-
-        StringBuilder newSubSource = new StringBuilder(subSource);
-        for (IMember member : membersToMove) {
-            ISourceRange range = member.getSourceRange();
-            int memberStart = range.getOffset();
-            int memberEnd = memberStart + range.getLength();
-
-            // Include leading whitespace and trailing newline
-            int lineStart = subSource.lastIndexOf('\n', memberStart - 1) + 1;
-            boolean allWhitespace = true;
-            for (int i = lineStart; i < memberStart; i++) {
-                if (subSource.charAt(i) != ' ' && subSource.charAt(i) != '\t') {
-                    allWhitespace = false;
-                    break;
-                }
-            }
-            if (allWhitespace) {
-                memberStart = lineStart;
-            }
-            while (memberEnd < newSubSource.length()
-                    && (newSubSource.charAt(memberEnd) == '\n' || newSubSource.charAt(memberEnd) == '\r')) {
-                memberEnd++;
-            }
-
-            newSubSource.delete(memberStart, memberEnd);
-        }
-
-        // Build edits
-        List<Map<String, Object>> edits = new ArrayList<>();
-        String subUri = subCu.getResource().getLocationURI().toString();
-        String superUri = superCu.getResource().getLocationURI().toString();
-
-        if (!newSubSource.toString().equals(subSource)) {
-            edits.addAll(createWholeFileEdit(subUri, subSource, newSubSource.toString()));
-        }
-        if (!newSuperSource.toString().equals(superSource)) {
-            edits.addAll(createWholeFileEdit(superUri, superSource, newSuperSource.toString()));
-        }
-
-        return createSuccessResult(edits);
+        ProcessorBasedRefactoring refactoring = new ProcessorBasedRefactoring(processor);
+        return executeRefactoring(refactoring, monitor);
     }
 }

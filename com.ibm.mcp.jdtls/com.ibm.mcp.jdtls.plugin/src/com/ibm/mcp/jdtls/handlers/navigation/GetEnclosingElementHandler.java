@@ -14,6 +14,7 @@
 package com.ibm.mcp.jdtls.handlers.navigation;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.eclipse.core.runtime.IProgressMonitor;
@@ -26,35 +27,49 @@ import org.eclipse.jdt.core.ISourceReference;
 import org.eclipse.jdt.core.IType;
 import org.eclipse.jdt.core.JavaModelException;
 
+import com.ibm.mcp.jdtls.ICommandHandler;
+import com.ibm.mcp.jdtls.JdtUtils;
+
 /**
  * Handler for "mcp.jdtls.getEnclosingElement" command.
  *
  * <p>Arguments: [{uri, line, character}]</p>
  *
- * <p>Resolves the element at the given position, then navigates up the parent
- * chain to return the enclosing method, type, and package.</p>
- *
- * <p>Copied and adapted from
- * <a href="https://github.com/pzalutski-pixel/javalens-mcp/blob/master/org.javalens.mcp/src/org/javalens/mcp/tools/GetEnclosingElementTool.java">javalens-mcp GetEnclosingElementTool</a>
- * for JDT.LS delegate command handler architecture.</p>
+ * <p>Uses {@link ICompilationUnit#getElementAt(int)} to find the innermost element
+ * at the given offset, then navigates the parent chain to return the enclosing
+ * method, type, and package. Unlike {@code codeSelect}, {@code getElementAt}
+ * works even when the cursor is on whitespace, keywords, or between tokens.</p>
  */
-public class GetEnclosingElementHandler extends AbstractPositionHandler {
+public class GetEnclosingElementHandler implements ICommandHandler {
 
     @Override
-    protected Object handleElements(IJavaElement[] elements, ICompilationUnit cu, int offset,
-            IProgressMonitor monitor) throws Exception {
-        if (elements.length == 0) {
+    @SuppressWarnings("unchecked")
+    public Object execute(List<Object> arguments, IProgressMonitor monitor) throws Exception {
+        if (arguments == null || arguments.isEmpty()) {
+            return Map.of("error", "Missing arguments");
+        }
+
+        Map<String, Object> params = (Map<String, Object>) arguments.get(0);
+        String uri = (String) params.get("uri");
+        int line = ((Number) params.get("line")).intValue();
+        int character = ((Number) params.get("character")).intValue();
+
+        ICompilationUnit cu = JdtUtils.getCompilationUnit(uri);
+        if (cu == null) {
+            return Map.of("error", "Compilation unit not found: " + uri);
+        }
+
+        int offset = JdtUtils.getOffset(cu, line, character);
+
+        IJavaElement element = cu.getElementAt(offset);
+        if (element == null) {
             return Map.of("error", "No element found at position");
         }
 
-        IJavaElement element = elements[0];
         Map<String, Object> result = new HashMap<>();
 
         // Find enclosing method
-        IMethod enclosingMethod = (IMethod) element.getAncestor(IJavaElement.METHOD);
-        if (enclosingMethod == null && element instanceof IMethod) {
-            enclosingMethod = (IMethod) element;
-        }
+        IMethod enclosingMethod = findAncestor(element, IMethod.class, IJavaElement.METHOD);
         if (enclosingMethod != null) {
             Map<String, Object> methodInfo = new HashMap<>();
             methodInfo.put("name", enclosingMethod.getElementName());
@@ -65,10 +80,7 @@ public class GetEnclosingElementHandler extends AbstractPositionHandler {
         }
 
         // Find enclosing type
-        IType enclosingType = (IType) element.getAncestor(IJavaElement.TYPE);
-        if (enclosingType == null && element instanceof IType) {
-            enclosingType = (IType) element;
-        }
+        IType enclosingType = findAncestor(element, IType.class, IJavaElement.TYPE);
         if (enclosingType != null) {
             Map<String, Object> typeInfo = new HashMap<>();
             typeInfo.put("name", enclosingType.getElementName());
@@ -92,6 +104,15 @@ public class GetEnclosingElementHandler extends AbstractPositionHandler {
         }
 
         return result;
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T extends IJavaElement> T findAncestor(IJavaElement element, Class<T> type, int elementType) {
+        if (type.isInstance(element)) {
+            return (T) element;
+        }
+        IJavaElement ancestor = element.getAncestor(elementType);
+        return type.isInstance(ancestor) ? (T) ancestor : null;
     }
 
     private int getElementLine(IJavaElement element, ICompilationUnit cu) {
